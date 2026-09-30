@@ -4,9 +4,11 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+rust-version.workspace = true
+description = "India-specific market structure: NSE calendar, STT rates, indices"
 
 [dependencies]
-honba-entities = { workspace = true }
-serde = { workspace = true }
-thiserror = { workspace = true }
-chrono = { workspace = true }
+honba-messages.workspace = true
+honba-entities.workspace = true
+chrono.workspace = true
+thiserror.workspace = true

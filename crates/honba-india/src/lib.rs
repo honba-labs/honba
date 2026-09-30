@@ -1,8 +1,15 @@
+#![deny(missing_docs)]
+#![deny(rustdoc::broken_intra_doc_links)]
+#![deny(unsafe_code)]
+
+//! India-specific market structure for the Honba platform.
+//!
+//! No holiday, tax, or constituent data is hardcoded here. Every value is
+//! injected by the caller through the traits in this crate.
+
 pub mod calendar;
 pub mod costs;
+pub mod error;
 pub mod universes;
-pub mod mutual_funds;
-pub mod etf;
-pub mod options;
-pub mod equities;
-pub mod fno;
+
+pub use error::{IndiaError, Result};
