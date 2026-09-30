@@ -9,6 +9,13 @@ from __future__ import annotations
 import traceback
 from typing import Any, Dict, List, Optional
 
+try:
+    import honba as _honba_native  # populated by pyclasses::register
+    _RustBar = getattr(_honba_native, "Bar", None)
+    _RustFill = getattr(_honba_native, "Fill", None)
+    _RustSmaCrossover = getattr(_honba_native, "RustSmaCrossover", None)
+except Exception:
+    _RustBar = _RustFill = _RustSmaCrossover = None
 
 # --------------------------------------------------------------------------
 # Base
@@ -158,7 +165,10 @@ class VectorFeed(Feed):
         self.instrument = instrument
         for i, c in enumerate(closes):
             ts = start_ts + i * step_ns
-            self.push(Bar(instrument, ts, c, c, c, c))
+            if _RustBar is not None:
+                self.push(_RustBar(instrument.symbol, ts, c, c, c, c, 0.0, instrument.venue.code))
+            else:
+                self.push(Bar(instrument, ts, c, c, c, c))
 
 
 class Execution(SimObject):
@@ -243,6 +253,8 @@ class SmaCrossover(Strategy):
         self.fast, self.slow, self.qty = fast, slow, qty
         self._prices: List[float] = []
         self._prev_diff: Optional[float] = None
+        self._rust = _RustSmaCrossover(fast=fast, slow=slow, qty=qty) \
+        if _RustSmaCrossover is not None else None
 
     def _sma(self, n: int):
         if len(self._prices) < n:
@@ -251,6 +263,13 @@ class SmaCrossover(Strategy):
 
     def on_event(self, msg):
         if not isinstance(msg, Bar):
+            return
+        if self._rust is not None:
+            sig = self._rust.on_close(msg.close)
+            if sig is not None:
+                side, qty = sig
+                self.submit(OrderIntent(self.instrument, side, qty))
+                self.position = self._rust.position
             return
         self._prices.append(msg.close)
         if len(self._prices) < self.slow:
@@ -337,9 +356,12 @@ class Recorder(SimObject):
 
         wins = [p for p in trips if p > 0]
         losses = [p for p in trips if p < 0]
+        unpaired = len(self.fills) - 2 * len(trips)
+
         return Report(
             fills=len(self.fills),
             round_trips=len(trips),
+            unpaired=unpaired,
             net_pnl=sum(trips),
             win_rate=(len(wins) / len(trips)) if trips else 0.0,
             avg_win=(sum(wins) / len(wins)) if wins else 0.0,
@@ -358,6 +380,7 @@ class Report:
             f"# Backtest Report\n\n"
             f"| metric | value |\n"
             f"|---|---|\n"
+            f"| open positions | {self.unpaired} |\n"
             f"| fills | {self.fills} |\n"
             f"| round trips | {self.round_trips} |\n"
             f"| net PnL | {self.net_pnl:.2f} |\n"
