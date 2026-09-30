@@ -4,9 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+rust-version.workspace = true
+description = "Test fixtures, feeds, and paper execution for Honba"
 
 [dependencies]
-honba-algo = { workspace = true }
-honba-algo-strategies = { workspace = true }
-serde = { workspace = true }
-tokio = { workspace = true }
+honba-messages.workspace = true
+honba-entities.workspace = true
+honba-algo.workspace = true
