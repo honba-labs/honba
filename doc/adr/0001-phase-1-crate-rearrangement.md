@@ -1,7 +1,7 @@
 # ADR 001: Phase 1 Crate Re-arrangement and Layering
 
 ## Status
-Accepted / In-Progress
+Accepted / Completed
 
 ## Context
 Per [ROADMAP-borrowed-ideas.md](../../ROADMAP-borrowed-ideas.md), the Honba workspace requires structural decoupling:

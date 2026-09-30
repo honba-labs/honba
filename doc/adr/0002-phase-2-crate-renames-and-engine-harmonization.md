@@ -1,7 +1,7 @@
 # ADR 002: Phase 2 Crate Infix Harmonization and Core Engine Rename
 
 ## Status
-Accepted / In-Progress
+Accepted / Completed
 
 ## Context
 Per [ROADMAP-borrowed-ideas.md](../../ROADMAP-borrowed-ideas.md) Section 2b, the workspace uses inconsistent naming prefixes:

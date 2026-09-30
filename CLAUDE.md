@@ -15,7 +15,7 @@ Rust (toolchain pinned to `stable` with rustfmt + clippy; MSRV 1.75, `max_width 
 ```
 cargo build --workspace
 cargo test --workspace
-cargo test -p honba-algo-testing <test_name>   # single test in one crate
+cargo test -p honba-testing <test_name>   # single test in one crate
 cargo test --workspace --doc
 cargo fmt --all
 cargo clippy --workspace --all-targets -- -D warnings
@@ -40,9 +40,9 @@ CI: Rust job is blocking (fmt, check, clippy `-D warnings`, test, doctest, doc);
 
 ## Architecture
 
-**Crate layering.** `honba-messages` (events, identifiers, market-data/order messages) is the base; `honba-entities` (instruments, orders, positions, portfolio, trades) builds on it; `honba-algo` is the engine core (engine, clock, cache, queue, risk, execution, data/connector); then feature crates: `-indicators`, `-strategies`, `-testing` (backtest node, simulator, cost/latency models, paper trading, concurrent sweeps), `-analytics` (metrics, Monte Carlo, walk-forward, regime, tearsheet), `-import`/`-export` (NSE/BSE/AMFI/broker/CSV/Parquet in; CSV/JSON/Excel/Parquet/Markdown out), and `honba-india` (calendar, STT/GST/stamp-duty costs, universes, F&O, options, MFs, ETFs).
+**Crate layering.** `honba-messages` (L0: events, identifiers, market-data/order messages) is the base; `honba-entities` (L1: instruments, orders, positions, portfolio, trades) builds on it; `honba-market` (L2: generic market contracts, India pack, null test pack); `honba-engine` (L3: event loop, clock, queue, engine, execution traits) and `honba-indicators` (L3: pure compute); `honba-sim` (L4: simulator, paper execution, fill models) and `honba-strategy` (L4: Strategy trait, runner, reference models); `honba-analytics` (L5: metrics, tearsheet, Monte Carlo) and `honba-data` (L5: catalog, Parquet import/export, loaders); `honba-testing` (L6: test fixtures, VecFeed, assertions); `honba-py` (L7: PyO3 extension cdylib exposing `honba._honba`) and `honba-cli` (L7: native binary).
 
-**Enforced hierarchy.** `scripts/dependency_graph.py` holds an `ALLOWED` map of permitted `honba-*` dependencies per crate and fails CI on violations. When adding an inter-crate dependency, update that map deliberately. Note: the current `Cargo.toml`s already exceed it in places (e.g. `honba-algo-strategies` depends on indicators/testing/analytics, and `honba-algo-testing` on entities/messages) — reconcile the script or the manifests rather than ignoring the check.
+**Enforced hierarchy.** `scripts/dependency_graph.py` enforces the inward layer dependency rules across all crates and fails CI on violations.
 
 **Python mirrors Rust.** `python/honba/` has parallel packages (`core`, `entities`, `india`, `backtest`, `strategies`) plus Python-only layers: `research` (vectorized pre-filter, data loader, notebooks), `ai` (autoresearch, LLM, journal data, MCP gateway, RL, verification), `adapters` (base + registry for broker adapters, implemented in the separate honba-adapters repo). Rust bindings are exposed via `honba._honba` (stubs in `python/honba/_lib/__init__.pyi`).
 
