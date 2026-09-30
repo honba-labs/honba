@@ -453,3 +453,150 @@ def test_update_bar_equals_update(kind, kw):
     a, b = build_indicator(kind, **kw), build_indicator(kind, **kw)
     for x in SERIES["walk"][:200]:
         assert a.update_bar(_Bar(x)) == b.update(x)
+
+
+# -- regressions: overflow poisoning, stale shift on trends, cancellation ----------------------
+
+
+def exact_std(w, ddof=0):
+    """Exact (Fraction) population/sample std of floats, rounded once to float."""
+    from fractions import Fraction
+
+    fs = [Fraction(v) for v in w]
+    n = len(fs)
+    mean = sum(fs) / n
+    var = sum((v - mean) ** 2 for v in fs) / (n - ddof)
+    return math.sqrt(var) if var < Fraction(10**300) else math.inf
+
+
+@pytest.mark.parametrize("spikes", [[1e160], [1e200, -1e200], [1e154, -1e154], [1e160, 1e160]])
+@pytest.mark.parametrize("period", [3, 5])
+def test_moments_finite_overflow_recovers_when_value_leaves(spikes, period):
+    """Documented: while a value with |x| > 1e150 is in the window all moments are NaN; the
+    moment it leaves, results are exact again (no wait for the periodic rebuild)."""
+    r = random.Random(7)
+    xs = [100 + r.gauss(0, 1) for _ in range(30)] + spikes
+    xs += [100 + r.gauss(0, 1) for _ in range(300)]
+    rm, w = RollingMoments(period), deque(maxlen=period)
+    checked = 0
+    for x in xs:
+        w.append(x)
+        got = rm.update(x)
+        if len(w) < period:
+            continue
+        if max(abs(v) for v in w) > 1e150:
+            assert math.isnan(got.std) and math.isnan(got.mean)
+        else:
+            checked += 1
+            assert got.std == pytest.approx(exact_std(w), rel=1e-9, abs=1e-12)
+            assert got.mean == pytest.approx(math.fsum(w) / period, rel=1e-9)
+    assert checked > 250
+
+
+def test_moments_overflow_burst_does_not_cost_o_window_per_update():
+    import honba.strategies.indicators._rolling as mod
+
+    calls = {"n": 0}
+    real = mod.RollingMoments._recompute
+
+    def counting(self):
+        calls["n"] += 1
+        real(self)
+
+    period = 100
+    r = random.Random(2)
+    rm = RollingMoments(period)
+    mod.RollingMoments._recompute = counting
+    try:
+        for i in range(10_000):
+            rm.update(100 + r.gauss(0, 1) + (1e200 if i % 500 == 0 else 0))
+    finally:
+        mod.RollingMoments._recompute = real
+    assert calls["n"] <= 100  # a few per spike, not one per update while it is in the window
+
+
+def _ramps():
+    return {
+        "ramp": [0.1 * i for i in range(N_BARS)],
+        "neg_ramp": [1000 - 0.1 * i for i in range(N_BARS)],
+        "high_ramp": [20000 + 0.01 * i for i in range(N_BARS)],
+        "quad": [1e-5 * i * i for i in range(N_BARS)],
+    }
+
+
+RAMPS = _ramps()
+
+
+@pytest.mark.parametrize("period", [2, 3, 4, 5, 7, 10, 50])
+@pytest.mark.parametrize("name", list(RAMPS))
+def test_moments_smooth_trend_std_error(name, period):
+    rm, w = RollingMoments(period), deque(maxlen=period)
+    worst = 0.0
+    for x in RAMPS[name]:
+        w.append(x)
+        got = rm.update(x)
+        if len(w) == period:
+            sd = exact_std(w)
+            worst = max(worst, abs(got.std - sd) / sd)
+    assert worst <= 1e-9, worst
+
+
+@pytest.mark.parametrize("period", [20, 100, 300])
+def test_moments_rebuild_rate_on_random_walk(period):
+    import honba.strategies.indicators._rolling as mod
+
+    calls = {"n": 0}
+    real = mod.RollingMoments._recompute
+
+    def counting(self):
+        calls["n"] += 1
+        real(self)
+
+    r = random.Random(11)
+    rm, p, bars = RollingMoments(period), 100.0, 20_000
+    mod.RollingMoments._recompute = counting
+    try:
+        for _ in range(bars):
+            p += r.gauss(0, 1)
+            rm.update(p)
+    finally:
+        mod.RollingMoments._recompute = real
+    assert calls["n"] / bars < 0.01, calls["n"] / bars
+
+
+def test_rolling_sum_periodic_recompute_bounds_drift():
+    rs, w = RollingSum(5), deque(maxlen=5)
+    r = random.Random(4)
+    xs = [1.0 + r.random() for _ in range(50)] + [1e12] + [1.0 + r.random() for _ in range(1500)]
+    for x in xs:
+        w.append(x)
+        got = rs.update(x)
+    assert got == pytest.approx(math.fsum(w), rel=1e-12)
+
+
+@pytest.mark.parametrize("period", [1, 2, 3, 5])
+@pytest.mark.parametrize("kind", ["sum", "wma"])
+def test_sum_wma_no_cancellation_residue_after_spikes(kind, period):
+    r = random.Random(21)
+    xs = [r.gauss(0, 1) for _ in range(40)]
+    for s in (1e9, -1e9, 3e9, -3e9):
+        xs += [s] + [r.gauss(0, 1) for _ in range(30)]
+    ind = RollingSum(period) if kind == "sum" else build_indicator("wma", period=period)
+    w = deque(maxlen=period)
+    worst = 0.0
+    for x in xs:
+        w.append(x)
+        got = ind.update(x)
+        if len(w) == period:
+            want = math.fsum(w) if kind == "sum" else oracle_wma_exact(w)
+            if want != 0:
+                worst = max(worst, abs(got - want) / abs(want))
+    assert worst < 1e-9, worst
+
+
+def oracle_wma_exact(w):
+    from fractions import Fraction
+
+    n = len(w)
+    num = sum(k * Fraction(v) for k, v in enumerate(w, 1))
+    return float(num / Fraction(n * (n + 1), 2))

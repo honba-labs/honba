@@ -5,7 +5,7 @@ import math
 from collections import deque
 
 from honba.strategies.indicators._base import Indicator, indicator
-from honba.strategies.indicators._rolling import _RECOMPUTE_MIN
+from honba.strategies.indicators._rolling import _CANCEL, _RECOMPUTE_MIN
 from honba.strategies.indicators._util import check as _check
 
 
@@ -72,13 +72,16 @@ class Wma(Indicator):
 
     O(1) per update. A non-finite value in the window makes the result NaN until it has left
     the window (running state untouched meanwhile, then rebuilt exactly); the state is also
-    rebuilt every ``max(1000, 4 * period)`` updates to bound rounding drift.
+    rebuilt every ``max(1000, 4 * period)`` updates to bound rounding drift, and whenever the
+    weighted numerator falls below ``1e-6`` of the largest magnitude it has had since the last
+    rebuild (cancellation after a large spike leaves residue that would swamp a small result).
     """
 
     def __init__(self, period: int = 5) -> None:
         self.period = _check(period)
         self._w: deque[float] = deque(maxlen=period)
         self._sum = 0.0  # S: plain window sum
+        self._mag = 0.0  # max |N| since the last rebuild
         self._num = 0.0  # N: sum of weight_i * value_i, weights 1..n oldest to newest
         self._den = period * (period + 1) / 2
         self._bad = 0  # non-finite values currently in the window
@@ -89,6 +92,7 @@ class Wma(Indicator):
     def _recompute(self) -> None:
         self._sum = math.fsum(self._w)
         self._num = math.fsum(k * v for k, v in enumerate(self._w, 1))
+        self._mag = abs(self._num)
         self._since = 0
         self._dirty = False
 
@@ -110,6 +114,11 @@ class Wma(Indicator):
             self._num += n * x - self._sum
             self._sum += x - old
             self._since += 1
+            a = abs(self._num)
+            if a < self._mag * _CANCEL:
+                self._recompute()
+            elif a > self._mag:
+                self._mag = a
         else:
             self._sum += x
             self._num += len(w) * x
