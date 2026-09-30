@@ -1,0 +1,42 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/honba-messages",
+    "crates/honba-entities",
+    "crates/honba-algo",
+    "crates/honba-algo-strategies",
+    "crates/honba-algo-indicators",
+    "crates/honba-algo-testing",
+    "crates/honba-algo-analytics",
+    "crates/honba-algo-import",
+    "crates/honba-algo-export",
+    "crates/honba-india",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/honba/honba"
+rust-version = "1.75"
+
+[workspace.dependencies]
+honba-messages = { path = "crates/honba-messages" }
+honba-entities = { path = "crates/honba-entities" }
+honba-algo = { path = "crates/honba-algo" }
+honba-algo-strategies = { path = "crates/honba-algo-strategies" }
+honba-algo-indicators = { path = "crates/honba-algo-indicators" }
+honba-algo-testing = { path = "crates/honba-algo-testing" }
+honba-algo-analytics = { path = "crates/honba-algo-analytics" }
+honba-algo-import = { path = "crates/honba-algo-import" }
+honba-algo-export = { path = "crates/honba-algo-export" }
+honba-india = { path = "crates/honba-india" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+chrono = { version = ">=0.4.20, <0.4.40", features = ["serde"] }
+arrow = "51"
+parquet = "51"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+

@@ -1,0 +1,12 @@
+[package]
+name = "honba-algo-testing"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+honba-algo = { workspace = true }
+honba-algo-strategies = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
