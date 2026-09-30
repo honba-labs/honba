@@ -92,3 +92,43 @@ def test_whole_shares_sizing():
         whole_shares(1_000, 1.5, 100.0)
     with pytest.raises(ValueError):
         whole_shares(1_000, 0.5, 0.0)
+
+
+def test_busy_while_order_unfilled_then_clears_on_fill():
+    s = BuyFirstBar()
+    assert not s.busy(NIFTY)
+    s.buy(NIFTY, 10)
+    assert s.busy(NIFTY)
+    s.drain_intents()  # draining hands the order to the runner; it is still unfilled
+    assert s.busy(NIFTY)
+    from honba.entities.trade import Trade
+
+    s.handle_fill(Trade(NIFTY, OrderSide.BUY, 4, 100.0))
+    assert s.busy(NIFTY)  # partial fill, 6 remaining
+    s.handle_fill(Trade(NIFTY, OrderSide.BUY, 6, 100.0))
+    assert not s.busy(NIFTY)
+
+
+def test_rejected_order_releases_pending():
+    s = BuyFirstBar()
+    s.buy(NIFTY, 10)
+    (intent,) = s.drain_intents()
+    s.handle_rejected(intent)
+    assert not s.busy(NIFTY)
+
+
+def test_replay_with_fill_delay_fills_at_next_open():
+    class Buyer(Strategy):
+        name = "buyer"
+
+        def on_bar(self, bar: Bar) -> None:
+            if not self.busy(bar.instrument_id) and self.position(bar.instrument_id) == 0:
+                self.buy(bar.instrument_id, 1)
+
+    bars = [
+        Bar(NIFTY, 1, 100, 100, 100, 100, 1.0),
+        Bar(NIFTY, 2, 105, 106, 104, 106, 1.0),
+        Bar(NIFTY, 3, 107, 107, 107, 107, 1.0),
+    ]
+    result = replay(Buyer(), bars, fill_delay=1)
+    assert [(f.price, f.ts) for f in result.fills] == [(105, 2)]  # one buy, at bar 2's open

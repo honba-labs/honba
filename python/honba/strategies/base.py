@@ -25,6 +25,7 @@ class Strategy:
         self = super().__new__(cls)
         self._intents: list[OrderIntent] = []
         self._positions: dict[InstrumentId, float] = {}
+        self._pending: dict[tuple[InstrumentId, OrderSide], float] = {}
         return self
 
     # -- hooks (all default to no-ops) --------------------------------------
@@ -41,13 +42,23 @@ class Strategy:
         """Net signed quantity held, updated from fills."""
         return self._positions.get(instrument_id, 0.0)
 
+    def busy(self, instrument_id: InstrumentId) -> bool:
+        """True while an order for this instrument is unfilled.
+
+        Fills arrive after the strategy emits an intent, so gate new orders on
+        this to avoid duplicate entries or exits.
+        """
+        return any(q > 0 for (iid, _), q in self._pending.items() if iid == instrument_id)
+
     def buy(self, instrument_id: InstrumentId, quantity: float) -> None:
-        self._intents.append(OrderIntent.market_buy(instrument_id, quantity))
+        self.submit(OrderIntent.market_buy(instrument_id, quantity))
 
     def sell(self, instrument_id: InstrumentId, quantity: float) -> None:
-        self._intents.append(OrderIntent.market_sell(instrument_id, quantity))
+        self.submit(OrderIntent.market_sell(instrument_id, quantity))
 
     def submit(self, intent: OrderIntent) -> None:
+        key = (intent.instrument_id, intent.side)
+        self._pending[key] = self._pending.get(key, 0.0) + intent.quantity
         self._intents.append(intent)
 
     # -- runner interface ---------------------------------------------------
@@ -60,4 +71,17 @@ class Strategy:
         """Runner entry point: updates position, then calls ``on_fill``."""
         sign = 1.0 if fill.side is OrderSide.BUY else -1.0
         self._positions[fill.instrument_id] = self.position(fill.instrument_id) + sign * fill.quantity
+        self._release(fill.instrument_id, fill.side, fill.quantity)
         self.on_fill(fill)
+
+    def handle_rejected(self, intent: OrderIntent) -> None:
+        """Runner entry point: an order was rejected or cancelled unfilled."""
+        self._release(intent.instrument_id, intent.side, intent.quantity)
+
+    def _release(self, instrument_id: InstrumentId, side: OrderSide, quantity: float) -> None:
+        key = (instrument_id, side)
+        left = self._pending.get(key, 0.0) - quantity
+        if left > 1e-9:
+            self._pending[key] = left
+        else:
+            self._pending.pop(key, None)
