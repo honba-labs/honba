@@ -10,10 +10,8 @@ members = [
     "crates/honba-sim",
     "crates/honba-py",
     "crates/honba-analytics",
-    "crates/honba-algo-import",
-    "crates/honba-algo-export",
+    "crates/honba-data",
     "crates/honba-cli",
-    "crates/honba-india",
     "crates/honba-market",
 ]
 
@@ -34,9 +32,7 @@ honba-testing = { path = "crates/honba-testing" }
 honba-sim = { path = "crates/honba-sim" }
 honba-py = { path = "crates/honba-py" }
 honba-analytics = { path = "crates/honba-analytics" }
-honba-algo-import = { path = "crates/honba-algo-import" }
-honba-algo-export = { path = "crates/honba-algo-export" }
-honba-india = { path = "crates/honba-india" }
+honba-data = { path = "crates/honba-data" }
 honba-market = { path = "crates/honba-market" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

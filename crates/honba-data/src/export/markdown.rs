@@ -4,8 +4,8 @@ use std::io::Write;
 
 use honba_analytics::PerformanceReport;
 
-use crate::error::Result;
-use crate::writer::ReportWriter;
+use crate::export::error::Result;
+use crate::export::writer::ReportWriter;
 
 /// Renders a [`PerformanceReport`] as a human-readable Markdown document.
 pub struct MarkdownReportWriter<W: Write> {

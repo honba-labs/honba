@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 
-use honba_algo_import::parquet_source::ParquetBarSource;
+use honba_data::ParquetBarSource;
 use honba_messages::{InstrumentId, Venue};
 
 pub fn load(source: &str, symbol: &str) -> Result<()> {

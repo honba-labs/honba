@@ -3,11 +3,11 @@
 //! Run with:
 //!
 //! ```sh
-//! cargo run -p honba-algo-strategies --example end_to_end
+//! cargo run -p honba-strategy --example end_to_end
 //! ```
 
-use honba_algo_export::{MarkdownReportWriter, ReportWriter};
 use honba_analytics::{PerformanceReport, RoundTrip};
+use honba_data::{MarkdownReportWriter, ReportWriter};
 use honba_engine::{DataFeed, Handler};
 use honba_entities::Trade;
 use honba_messages::{InstrumentId, Venue};

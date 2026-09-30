@@ -16,4 +16,4 @@ honba-indicators.workspace = true
 [dev-dependencies]
 honba-testing.workspace = true
 honba-analytics.workspace = true
-honba-algo-export.workspace = true
+honba-data.workspace = true

@@ -20,24 +20,34 @@ use honba_messages::{
     Bar, BarAggregation, BarSpecification, BarType, InstrumentId, PriceType, UnixNanos,
 };
 
+/// Errors that can occur when reading parquet files.
 #[derive(Debug, Error)]
 pub enum ParquetError {
+    /// An I/O error occurred.
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
+    /// A parquet reader error occurred.
     #[error("parquet error: {0}")]
     Parquet(#[from] parquet::errors::ParquetError),
+    /// An Arrow array conversion error occurred.
     #[error("arrow error: {0}")]
     Arrow(#[from] arrow::error::ArrowError),
+    /// A required column is missing.
     #[error("missing column: {0}")]
     MissingColumn(&'static str),
+    /// A column had an unexpected data type.
     #[error("column {name} has type {got:?}, expected {want:?}")]
     WrongType {
+        /// Name of the column.
         name: &'static str,
+        /// Actual data type found.
         got: DataType,
+        /// Expected data type.
         want: DataType,
     },
 }
 
+/// A reader that parses Parquet files into [`Bar`] streams.
 pub struct ParquetBarSource {
     bar_type: BarType,
     path: std::path::PathBuf,
@@ -51,6 +61,7 @@ impl ParquetBarSource {
         Self::with_spec(path, instrument, spec)
     }
 
+    /// Creates a source with a custom bar specification.
     pub fn with_spec(
         path: impl AsRef<Path>,
         instrument: InstrumentId,
@@ -62,6 +73,7 @@ impl ParquetBarSource {
         }
     }
 
+    /// Reads all bars from the underlying Parquet file.
     pub fn bars(&self) -> Result<Vec<Bar>, ParquetError> {
         let file = File::open(&self.path)?;
         let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;

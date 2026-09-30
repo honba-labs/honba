@@ -22,12 +22,10 @@ pyo3 = { version = "0.22", features = ["auto-initialize"] }
 # Workspace crates
 honba-messages        = { path = "../honba-messages" }
 honba-entities        = { path = "../honba-entities" }
-honba-india           = { path = "../honba-india" }
 honba-market          = { path = "../honba-market" }
 honba-engine          = { path = "../honba-engine" }
 honba-analytics       = { path = "../honba-analytics" }
-honba-algo-export     = { path = "../honba-algo-export" }
-honba-algo-import     = { path = "../honba-algo-import" }
+honba-data            = { path = "../honba-data" }
 honba-strategy        = { path = "../honba-strategy" }
 honba-testing         = { path = "../honba-testing" }
 honba-sim             = { path = "../honba-sim" }

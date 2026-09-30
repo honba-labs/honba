@@ -6,7 +6,6 @@ from pathlib import Path
 ALLOWED = {
     "honba-messages": set(),
     "honba-entities": {"honba-messages"},
-    "honba-india": {"honba-entities", "honba-messages"},
     "honba-market": {"honba-entities", "honba-messages"},
     "honba-engine": {"honba-messages", "honba-entities"},
     "honba-indicators": {"honba-messages", "honba-entities"},
@@ -14,10 +13,9 @@ ALLOWED = {
     "honba-strategy": {"honba-engine", "honba-indicators", "honba-messages", "honba-entities"},
     "honba-testing": {"honba-engine", "honba-messages", "honba-entities", "honba-sim"},
     "honba-analytics": {"honba-messages", "honba-entities"},
-    "honba-algo-import": {"honba-messages", "honba-entities"},
-    "honba-algo-export": {"honba-messages", "honba-entities", "honba-analytics"},
+    "honba-data": {"honba-messages", "honba-entities", "honba-analytics"},
     "honba-py": {"honba-messages", "honba-entities", "honba-engine", "honba-strategy", "honba-sim"},
-    "honba-cli": {"honba-messages", "honba-entities", "honba-india", "honba-market", "honba-engine", "honba-analytics", "honba-algo-export", "honba-algo-import", "honba-strategy", "honba-testing", "honba-sim"},
+    "honba-cli": {"honba-messages", "honba-entities", "honba-market", "honba-engine", "honba-analytics", "honba-data", "honba-strategy", "honba-testing", "honba-sim"},
 }
 
 def main() -> int:

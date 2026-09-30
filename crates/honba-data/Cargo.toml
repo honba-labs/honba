@@ -1,14 +1,19 @@
 [package]
-name = "honba-algo-import"
+name = "honba-data"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+rust-version.workspace = true
+description = "Market data catalog, Parquet import/export, and report loaders for Honba"
 
 [dependencies]
 honba-messages = { workspace = true }
 honba-entities = { workspace = true }
+honba-analytics = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 arrow = { workspace = true }
 parquet = { workspace = true }
+csv = { workspace = true }

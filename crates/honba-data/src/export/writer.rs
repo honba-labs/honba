@@ -2,7 +2,7 @@
 
 use honba_analytics::PerformanceReport;
 
-use crate::error::Result;
+use crate::export::error::Result;
 
 /// Something that serializes a [`PerformanceReport`].
 pub trait ReportWriter {

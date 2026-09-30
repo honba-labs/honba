@@ -4,8 +4,8 @@ use std::io::Write;
 
 use honba_analytics::PerformanceReport;
 
-use crate::error::Result;
-use crate::writer::ReportWriter;
+use crate::export::error::Result;
+use crate::export::writer::ReportWriter;
 
 /// Writes a [`PerformanceReport`] as a two-column `metric,value` CSV.
 pub struct CsvReportWriter<W: Write> {

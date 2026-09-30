@@ -4,8 +4,8 @@ use std::path::Path;
 use anyhow::Context;
 use serde::Deserialize;
 
-use honba_algo_export::{MarkdownReportWriter, ReportWriter};
 use honba_analytics::{PerformanceReport, RoundTrip};
+use honba_data::{MarkdownReportWriter, ReportWriter};
 use honba_engine::{DataFeed, Handler};
 use honba_entities::Trade;
 use honba_messages::{InstrumentId, Venue};
