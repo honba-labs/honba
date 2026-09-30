@@ -144,4 +144,84 @@ class Donchian:
         return DonchianValue(max(self._h), min(self._l))
 
 
-__all__ = ["Sma", "Ema", "Rsi", "Macd", "MacdValue", "Bollinger", "BollingerValue", "Donchian", "DonchianValue"]
+class Atr:
+    """Wilder ATR; first value after ``period`` true ranges (``period + 1`` bars)."""
+
+    def __init__(self, period: int) -> None:
+        self.period = _check(period)
+        self._prev_close: float | None = None
+        self._trs: list[float] = []
+        self.value: float | None = None
+
+    def update(self, high: float, low: float, close: float) -> float | None:
+        prev, self._prev_close = self._prev_close, close
+        if prev is None:
+            return None
+        tr = max(high - low, abs(high - prev), abs(low - prev))
+        if self.value is not None:
+            self.value = (self.value * (self.period - 1) + tr) / self.period
+        else:
+            self._trs.append(tr)
+            if len(self._trs) == self.period:
+                self.value = sum(self._trs) / self.period
+        return self.value
+
+
+class Kdj:
+    """Stochastic KDJ: RSV over ``fastk`` bars, K = SMA(RSV), D = SMA(K), J = 3K - 2D.
+
+    RSV is 0 on a flat window (talib convention). ``update`` returns ``(k, d, j)``
+    or ``None`` until warm.
+    """
+
+    def __init__(self, fastk: int = 9, slowk: int = 3, slowd: int = 3) -> None:
+        self._h: deque[float] = deque(maxlen=_check(fastk))
+        self._l: deque[float] = deque(maxlen=fastk)
+        self._rsv: deque[float] = deque(maxlen=_check(slowk))
+        self._k: deque[float] = deque(maxlen=_check(slowd))
+
+    def update(self, high: float, low: float, close: float) -> tuple[float, float, float] | None:
+        self._h.append(high)
+        self._l.append(low)
+        if len(self._h) < self._h.maxlen:
+            return None
+        hh, ll = max(self._h), min(self._l)
+        self._rsv.append((close - ll) / (hh - ll) * 100 if hh != ll else 0.0)
+        if len(self._rsv) < self._rsv.maxlen:
+            return None
+        self._k.append(sum(self._rsv) / len(self._rsv))
+        if len(self._k) < self._k.maxlen:
+            return None
+        k, d = self._k[-1], sum(self._k) / len(self._k)
+        return k, d, 3 * k - 2 * d
+
+
+class Ichimoku:
+    """Ichimoku cloud as plotted on the current bar: the span values computed
+    ``displacement`` bars ago. ``update`` returns ``(span_a, span_b)`` or ``None`` until warm."""
+
+    def __init__(
+        self, tenkan: int = 9, kijun: int = 26, senkou_b: int = 52, displacement: int = 26
+    ) -> None:
+        self._n = (_check(tenkan), _check(kijun), _check(senkou_b))
+        self._h: deque[float] = deque(maxlen=max(self._n))
+        self._l: deque[float] = deque(maxlen=max(self._n))
+        self._spans: deque[tuple[float, float]] = deque(maxlen=displacement + 1)
+
+    def _mid(self, n: int) -> float:
+        return (max(list(self._h)[-n:]) + min(list(self._l)[-n:])) / 2
+
+    def update(self, high: float, low: float) -> tuple[float, float] | None:
+        self._h.append(high)
+        self._l.append(low)
+        if len(self._h) < self._h.maxlen:
+            return None
+        tenkan, kijun, senkou_b = (self._mid(n) for n in self._n)
+        self._spans.append(((tenkan + kijun) / 2, senkou_b))
+        return self._spans[0] if len(self._spans) == self._spans.maxlen else None
+
+
+__all__ = [
+    "Sma", "Ema", "Rsi", "Macd", "MacdValue", "Bollinger", "BollingerValue",
+    "Donchian", "DonchianValue", "Atr", "Kdj", "Ichimoku",
+]

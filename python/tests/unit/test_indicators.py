@@ -3,7 +3,7 @@ import math
 
 import pytest
 
-from honba.strategies.indicators import Bollinger, Donchian, Ema, Macd, Rsi, Sma
+from honba.strategies.indicators import Atr, Bollinger, Donchian, Ema, Ichimoku, Kdj, Macd, Rsi, Sma
 
 
 def feed(ind, values):
@@ -66,3 +66,30 @@ def test_invalid_period_rejected():
     for cls in (Sma, Ema, Rsi):
         with pytest.raises(ValueError):
             cls(0)
+
+
+def test_atr_wilder_smoothing():
+    a = Atr(2)
+    assert a.update(10, 8, 9) is None  # no previous close, no true range
+    assert a.update(11, 9, 10) is None  # first TR (2), still warming
+    assert a.update(12, 9, 11) == pytest.approx(2.5)  # mean of TRs 2 and 3
+    assert a.update(12, 10, 11) == pytest.approx(2.25)  # (2.5 * 1 + 2) / 2
+
+
+def test_kdj_with_unit_smoothing_equals_rsv():
+    k = Kdj(2, 1, 1)
+    assert k.update(5, 1, 3) is None
+    assert k.update(6, 2, 5) == pytest.approx((80.0, 80.0, 80.0))  # (5-1)/(6-1)
+
+
+def test_kdj_flat_window_gives_zero_rsv():
+    k = Kdj(2, 1, 1)
+    k.update(5, 5, 5)
+    assert k.update(5, 5, 5) == pytest.approx((0.0, 0.0, 0.0))
+
+
+def test_ichimoku_cloud_is_displaced():
+    c = Ichimoku(1, 1, 1, displacement=1)
+    assert c.update(4, 2) is None
+    assert c.update(8, 6) == pytest.approx((3.0, 3.0))  # spans from one bar ago
+    assert c.update(10, 8) == pytest.approx((7.0, 7.0))
