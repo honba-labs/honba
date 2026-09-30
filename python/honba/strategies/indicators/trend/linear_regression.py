@@ -2,11 +2,10 @@
 from __future__ import annotations
 
 import math
-from collections import deque
 from dataclasses import dataclass
 
 from honba.strategies.indicators._base import Indicator, indicator
-from honba.strategies.indicators.moving_average.lsma import linreg_fit
+from honba.strategies.indicators._rolling import RollingLinReg
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,7 +20,9 @@ class LinearRegressionValue:
            warmup=lambda s: s.length)
 class LinearRegression(Indicator):
     """Linear regression channel over ``length`` closes: value = end of the least-squares line,
-    slope per bar, upper/lower = value +/- deviation * population std of the residuals.
+    slope per bar, upper/lower = value +/- deviation * population std of the residuals. O(1) per update (``RollingLinReg``); NaN while a non-finite or
+    ``|v| > 1e150`` close is in the window. The residual std is ``sqrt(sse / n)`` with ``sse``
+    from running sums, so a near-perfect fit has std error ~1.5e-8 window standard deviations.
     """
 
     def __init__(self, length: int = 100, upper_deviation: float = 2.0, lower_deviation: float = 2.0) -> None:
@@ -31,14 +32,15 @@ class LinearRegression(Indicator):
             raise ValueError("deviations must be >= 0")
         self.length = length
         self.upper_deviation, self.lower_deviation = float(upper_deviation), float(lower_deviation)
-        self._w: deque[float] = deque(maxlen=length)
+        self._reg = RollingLinReg(length)
 
     def update(self, x: float) -> LinearRegressionValue | None:
-        self._w.append(x)
-        if len(self._w) < self.length:
+        fit = self._reg.update(x)
+        if fit is None:
             return None
-        a, b = linreg_fit(self._w)
         n = self.length
-        std = math.sqrt(sum((y - (a + b * i)) ** 2 for i, y in enumerate(self._w)) / n)
-        end = a + b * (n - 1)
-        return LinearRegressionValue(end, b, end + self.upper_deviation * std, end - self.lower_deviation * std)
+        std = math.sqrt(fit.sse / n)
+        end = fit.intercept + fit.slope * (n - 1)
+        return LinearRegressionValue(
+            end, fit.slope, end + self.upper_deviation * std, end - self.lower_deviation * std
+        )

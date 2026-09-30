@@ -1,10 +1,10 @@
 """Least-squares (linear regression) moving average."""
 from __future__ import annotations
 
-from collections import deque
 from collections.abc import Sequence
 
 from honba.strategies.indicators._base import Indicator, indicator
+from honba.strategies.indicators._rolling import RollingLinReg
 
 
 def linreg_fit(ys: Sequence[float]) -> tuple[float, float]:
@@ -24,18 +24,18 @@ def linreg_fit(ys: Sequence[float]) -> tuple[float, float]:
 class Lsma(Indicator):
     """LSMA: endpoint of the least-squares line over ``period`` bars, shifted by ``offset`` bars.
 
-    value = intercept + slope * (period - 1 - offset) (TradingView ta.linreg).
+    value = intercept + slope * (period - 1 - offset) (TradingView ta.linreg). O(1) per update
+    (``RollingLinReg``); NaN while a non-finite or ``|v| > 1e150`` value is in the window.
     """
 
     def __init__(self, period: int = 25, offset: int = 0) -> None:
         if period < 2:
             raise ValueError(f"period must be >= 2, got {period}")
         self.period, self.offset = period, offset
-        self._w: deque[float] = deque(maxlen=period)
+        self._reg = RollingLinReg(period)
 
     def update(self, x: float) -> float | None:
-        self._w.append(x)
-        if len(self._w) < self.period:
+        fit = self._reg.update(x)
+        if fit is None:
             return None
-        a, b = linreg_fit(self._w)
-        return a + b * (self.period - 1 - self.offset)
+        return fit.intercept + fit.slope * (self.period - 1 - self.offset)
