@@ -4,9 +4,13 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+rust-version.workspace = true
+description = "Report and trade exporters"
 
 [dependencies]
-honba-messages = { workspace = true }
-honba-entities = { workspace = true }
-serde = { workspace = true }
-thiserror = { workspace = true }
+honba-messages.workspace = true
+honba-entities.workspace = true
+honba-algo-analytics.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
