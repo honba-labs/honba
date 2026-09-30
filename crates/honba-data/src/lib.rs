@@ -12,3 +12,6 @@ pub use export::{
     CsvReportWriter, ExportError, JsonReportWriter, MarkdownReportWriter, ReportWriter,
 };
 pub use import::parquet_source::{ParquetBarSource, ParquetError};
+
+#[cfg(test)]
+mod tests;
