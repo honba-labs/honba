@@ -4,8 +4,14 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+rust-version.workspace = true
+description = "Strategy trait and reference strategies for Honba"
 
 [dependencies]
-honba-algo = { workspace = true }
-serde = { workspace = true }
-thiserror = { workspace = true }
+honba-messages.workspace = true
+honba-entities.workspace = true
+honba-algo.workspace = true
+honba-algo-indicators.workspace = true
+
+[dev-dependencies]
+honba-algo-testing.workspace = true
