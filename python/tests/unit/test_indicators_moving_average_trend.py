@@ -277,3 +277,25 @@ def test_linear_regression_hand_values_and_config():
     assert last(LinearRegression(50, upper_deviation=1.0), CLOSE).upper != pytest.approx(base.upper)
     assert last(LinearRegression(50, lower_deviation=1.0), CLOSE).lower != pytest.approx(base.lower)
     assert last(LinearRegression(50, lower_deviation=1.0), CLOSE).upper == pytest.approx(base.upper)
+
+
+def test_alma_offset_is_floored_like_pine():
+    """Pine ta.alma: m = floor(offset * (length - 1)); (9, 0.85) -> m = 6, not 6.8."""
+    from honba.strategies.indicators import build_indicator
+
+    def one_hot(k, n=9):
+        a = build_indicator("alma", period=n, offset=0.85, sigma=6.0)
+        out = None
+        for i in range(n):
+            out = a.update(1.0 if i == k else 0.0)
+        return out  # the weight of window position k
+
+    weights = [one_hot(k) for k in range(9)]
+    assert max(range(9), key=lambda k: weights[k]) == 6
+    assert weights[6] > weights[7] > weights[8]
+    assert sum(weights) == pytest.approx(1.0)
+    # exact value of the peak weight for m = 6, s = 1.5: 1 / sum(exp(-(i-6)^2 / 4.5))
+    import math
+
+    tot = sum(math.exp(-((i - 6) ** 2) / (2 * 1.5**2)) for i in range(9))
+    assert weights[6] == pytest.approx(1 / tot)

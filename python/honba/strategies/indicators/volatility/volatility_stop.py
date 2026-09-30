@@ -39,7 +39,8 @@ class VolatilityStop(Indicator):
         m = self.mult * atr
         if not self._started:
             self._started = True
-            self._max = self._min = self._stop = close
+            self._max = self._min = close
+            self._stop = close - m  # uptrend seed: below the close by mult * ATR
         self._max, self._min = max(self._max, close), min(self._min, close)
         if self._up:
             self._stop = max(self._stop, self._max - m)

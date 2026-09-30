@@ -174,13 +174,13 @@ def test_choppiness_config_validation():
 # -- volatility stop ----------------------------------------------------------
 
 def test_volatility_stop_hand_values():
-    # length 1 (ATR = TR, first TR = h-l), mult 1. Bar1 (h11,l9,c10): ATR=2, start up, stop=max(10,10-2)=10.
-    # Bar2 (h13,l11,c12): TR=3; max=12; stop=max(10,12-3)=10; up. Bar3 (h9,l7,c8): TR=max(2,|9-12|,|7-12|)=5;
-    # stop=max(10,12-5)=10; close-stop=-2<0 -> flip down: stop=8+5=13, direction -1.
+    # length 1 (ATR = TR, first TR = h-l), mult 1. Bar1 (h11,l9,c10): ATR=2, seed stop=10-2=8, up.
+    # Bar2 (h13,l11,c12): TR=3; max=12; stop=max(8,12-3)=9; up. Bar3 (h9,l7,c8): TR=max(2,|9-12|,|7-12|)=5;
+    # stop=max(9,12-5)=9; close-stop=-1<0 -> flip down: stop=8+5=13, direction -1.
     v = mk("volatility_stop", length=1, mult=1.0)
     out = feed(v, [11, 13, 9], [9, 11, 7], [10, 12, 8])
-    assert (out[0].value, out[0].direction) == (10, 1)
-    assert (out[1].value, out[1].direction) == (10, 1)
+    assert (out[0].value, out[0].direction) == (8, 1)
+    assert (out[1].value, out[1].direction) == (9, 1)
     assert (out[2].value, out[2].direction) == (13, -1)
 
 
@@ -192,3 +192,15 @@ def test_volatility_stop_config_validation():
     for kw in ({"length": 0}, {"mult": 0}):
         with pytest.raises(ValueError):
             mk("volatility_stop", **kw)
+
+
+def test_volatility_stop_seeds_below_close_not_at_close():
+    """First stop is close - mult*ATR (9.4 - 2*0.1 = 9.2), so a small dip does not flip it."""
+    from honba.strategies.indicators import build_indicator
+
+    v = build_indicator("volatility_stop", length=3, mult=2.0)
+    outs = [v.update(c, c, c) for c in (9.5, 9.6, 9.4)]
+    assert outs[:2] == [None, None]
+    assert outs[2].value == pytest.approx(9.2) and outs[2].direction == 1.0
+    dip = v.update(9.3, 9.3, 9.3)  # buggy seeding (stop = close) flipped to a downtrend here
+    assert dip.direction == 1.0 and dip.value == pytest.approx(9.2)
