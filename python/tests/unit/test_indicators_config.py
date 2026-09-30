@@ -155,3 +155,27 @@ def test_invalid_parameters_rejected(kind, bad):
 @pytest.mark.parametrize("kind", ["sma", "ema", "rsi", "atr", "bollinger", "donchian", "macd", "ichimoku", "kdj"])
 def test_every_indicator_builds_with_defaults(kind):
     assert build_indicator(kind) is not None
+
+
+# -- families (TradingView-style taxonomy) -------------------------------------
+
+def test_indicators_are_grouped_by_family():
+    from honba.strategies.indicators import indicator_family, list_indicators
+    from honba.strategies.indicators import momentum, trend, volatility
+
+    assert trend.Sma is Sma and trend.Macd is Macd and momentum.Rsi is Rsi
+    assert volatility.Atr is Atr and volatility.Bollinger is Bollinger
+    assert indicator_family("rsi") == "momentum"
+    assert indicator_family("atr") == "volatility"
+    assert indicator_family("ichimoku") == "trend"
+    assert list_indicators("volatility") == ["atr", "bollinger", "donchian"]
+    assert "sma" in list_indicators() and "kdj" in list_indicators()
+
+
+def test_unknown_family_or_kind_rejected():
+    from honba.strategies.indicators import indicator_family, list_indicators
+
+    with pytest.raises(ValueError):
+        list_indicators("astrology")
+    with pytest.raises(ValueError):
+        indicator_family("nope")
