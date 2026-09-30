@@ -12,7 +12,7 @@ use crate::strategy::{Strategy, StrategyAdapter};
 /// 2. Drain any [`OrderIntent`](crate::OrderIntent)s the strategy produced.
 /// 3. Convert them into orders with generated ids and submit them.
 /// 4. Drain fills from the execution engine and feed them back to the
-///    strategy via [`Strategy::on_fill`](crate::Strategy::on_fill).
+///    strategy via [`Strategy::on_fill`].
 ///
 /// Accumulated fills are available after the run via [`Self::fills`].
 ///

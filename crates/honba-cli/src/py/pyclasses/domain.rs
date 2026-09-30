@@ -31,6 +31,7 @@ pub struct RBar {
 impl RBar {
     #[new]
     #[pyo3(signature = (symbol, ts, open, high, low, close, volume=0.0, venue="NSE"))]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         symbol: String,
         ts: u64,

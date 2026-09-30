@@ -66,7 +66,7 @@ impl Engine {
     /// Each iteration pulls up to `batch_size` events from the feed into the
     /// queue, then pops the earliest and dispatches it. Time ordering within
     /// a batch is enforced by the queue; ordering across batches is enforced
-    /// by the monotonic [`Clock`](crate::Clock).
+    /// by the monotonic [`Clock`].
     ///
     /// If the feed produces events earlier than ones already dispatched, the
     /// clock returns [`AlgoError::ClockRegression`](crate::AlgoError::ClockRegression)
