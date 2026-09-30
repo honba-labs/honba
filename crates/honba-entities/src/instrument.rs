@@ -3,6 +3,7 @@
 use std::fmt;
 
 use honba_messages::InstrumentId;
+use serde::{Deserialize, Serialize};
 
 /// A currency in which instruments are denominated.
 ///
@@ -12,7 +13,7 @@ use honba_messages::InstrumentId;
 /// assert_eq!(Currency::Inr.code(), "INR");
 /// assert_eq!(Currency::Inr.to_string(), "INR");
 /// ```
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum Currency {
     /// Indian rupee.

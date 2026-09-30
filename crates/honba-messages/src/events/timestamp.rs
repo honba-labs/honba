@@ -1,5 +1,6 @@
 //! Nanosecond-precision timestamps.
 
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -15,7 +16,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// assert_eq!(ts.as_secs(), 1_700_000_000);
 /// assert_eq!(ts.as_millis(), 1_700_000_000_000);
 /// ```
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct UnixNanos(u64);
 
 impl UnixNanos {

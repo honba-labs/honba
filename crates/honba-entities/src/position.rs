@@ -1,12 +1,13 @@
 //! Position tracking.
 
 use honba_messages::InstrumentId;
+use serde::{Deserialize, Serialize};
 
 use crate::error::{EntitiesError, Result};
 use crate::instrument::Currency;
 
 /// The direction of a position.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum PositionSide {
     /// Long (net bought).

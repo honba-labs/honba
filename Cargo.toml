@@ -17,7 +17,7 @@ members = [
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
-repository = "https://github.com/honba/honba"
+repository = "https://github.com/honba-labs/honba"
 rust-version = "1.75"
 
 [workspace.dependencies]
@@ -39,4 +39,5 @@ arrow = "51"
 parquet = "51"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
+csv = "1"
 

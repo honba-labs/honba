@@ -3,10 +3,11 @@
 //! These are deliberately opaque wrappers around [`String`]. They make it
 //! impossible to pass a venue name where an instrument symbol is expected.
 
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// A trading venue, e.g. `NSE`, `BSE`, `NASDAQ`.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Venue(String);
 
 impl Venue {
@@ -35,7 +36,7 @@ impl fmt::Display for Venue {
 }
 
 /// A trading instrument, combining a symbol and its venue.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct InstrumentId {
     symbol: String,
     venue: Venue,
@@ -73,7 +74,7 @@ impl fmt::Display for InstrumentId {
 }
 
 /// A client-assigned order identifier.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct OrderId(String);
 
 impl OrderId {
@@ -95,7 +96,7 @@ impl fmt::Display for OrderId {
 }
 
 /// A venue-assigned trade identifier.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct TradeId(String);
 
 impl TradeId {
