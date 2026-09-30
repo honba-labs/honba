@@ -81,3 +81,14 @@ def test_config_from_toml_and_validation(tmp_path):
     assert cfg.params == {"fast": 20, "slow": 50}
     with pytest.raises(ValueError):
         StrategyConfig(name="x", symbol="", params={})
+
+
+def test_whole_shares_sizing():
+    from honba.strategies.sizing import whole_shares
+
+    assert whole_shares(1_000_000, 0.95, 2_450.0) == 387  # floor(950000 / 2450)
+    assert whole_shares(1_000, 1.0, 5_000.0) == 0
+    with pytest.raises(ValueError):
+        whole_shares(1_000, 1.5, 100.0)
+    with pytest.raises(ValueError):
+        whole_shares(1_000, 0.5, 0.0)
