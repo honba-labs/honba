@@ -20,6 +20,8 @@ class StrategyConfig(BaseModel):
     symbol: str = Field(min_length=1)
     venue: str = "NSE"
     params: dict[str, Any] = Field(default_factory=dict)
+    # name -> {"kind": ..., **params}; built with honba.strategies.indicators.IndicatorBank
+    indicators: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
     @property
     def instrument_id(self) -> InstrumentId:

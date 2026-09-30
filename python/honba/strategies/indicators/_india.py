@@ -16,3 +16,20 @@ def ist_session_day(ts_ns: int) -> int:
     Session-anchored indicators (VWAP, pivots) reset when this changes.
     """
     return (ts_ns + IST_OFFSET_NS) // NS_PER_DAY
+
+
+def ist_minute_of_day(ts_ns: int) -> int:
+    """Minutes since IST midnight (09:15 -> 555, 15:30 -> 930)."""
+    return ((ts_ns + IST_OFFSET_NS) % NS_PER_DAY) // NS_PER_MIN
+
+
+def hhmm_to_minutes(text: str) -> int:
+    """``"15:15"`` -> 915. Raises ValueError on anything but a valid 24h HH:MM."""
+    try:
+        h, m = text.split(":")
+        hh, mm = int(h), int(m)
+    except ValueError:
+        raise ValueError(f"expected HH:MM, got {text!r}") from None
+    if not (0 <= hh < 24 and 0 <= mm < 60 and len(m) == 2):
+        raise ValueError(f"expected HH:MM, got {text!r}")
+    return hh * 60 + mm

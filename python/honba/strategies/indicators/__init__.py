@@ -18,6 +18,7 @@ from honba.strategies.indicators.volatility import (
 
 from honba.strategies.indicators import _base
 from honba.strategies.indicators._base import FAMILIES, Indicator
+from honba.strategies.indicators.bank import IndicatorBank
 
 
 def indicator_family(kind: str) -> str:
@@ -48,5 +49,13 @@ def build_indicator(kind: str, **params):
 __all__ = [
     "Sma", "Ema", "Rma", "Wma", "Rsi", "Macd", "MacdValue", "Bollinger", "BollingerValue",
     "Donchian", "DonchianValue", "Atr", "Kdj", "Ichimoku", "make_ma", "build_indicator",
-    "indicator_family", "indicator_spec", "list_indicators", "FAMILIES", "Indicator",
+    "indicator_family", "indicator_spec", "list_indicators", "FAMILIES", "Indicator", "IndicatorBank",
 ]
+
+
+def __getattr__(name: str):
+    """Flat access to every registered indicator class: ``from ...indicators import Adx``."""
+    for cls in _base._REGISTRY.values():
+        if cls.__name__ == name:
+            return cls
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
