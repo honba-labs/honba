@@ -17,6 +17,7 @@ FAMILIES = (
 )
 
 _REGISTRY: dict[str, type[Indicator]] = {}
+_UNSET: Any = object()
 
 
 class Indicator:
@@ -54,9 +55,13 @@ def indicator(
     family: str,
     inputs: tuple[str, ...] = ("close",),
     outputs: tuple[str, ...] = ("value",),
-    warmup: Callable[[Any], int | None] | None = None,
+    warmup: Callable[[Any], int | None] | None = _UNSET,
 ):
-    """Class decorator: declares metadata, defines ``warmup`` and registers the indicator."""
+    """Class decorator: declares metadata, defines ``warmup`` and registers the indicator.
+
+    ``warmup=None`` (explicit) marks a data-dependent warm-up, e.g. session-anchored
+    indicators; omitting it is an error unless the class defines ``warmup`` itself.
+    """
     if family not in FAMILIES:
         raise ValueError(f"unknown family {family!r}")
 
@@ -64,7 +69,9 @@ def indicator(
         if kind in _REGISTRY:
             raise ValueError(f"indicator {kind!r} registered twice")
         cls.kind, cls.family, cls.inputs, cls.outputs = kind, family, tuple(inputs), tuple(outputs)
-        if warmup is not None:
+        if warmup is None:
+            cls.warmup = property(lambda self: None)
+        elif warmup is not _UNSET:
             cls.warmup = property(warmup)
         _REGISTRY[kind] = cls
         return cls

@@ -175,12 +175,16 @@ def test_indicators_are_grouped_by_family():
     assert indicator_family("ichimoku") == "trend"
     assert indicator_family("rsi") == "momentum"
     assert indicator_family("atr") == "volatility"
-    assert list_indicators("moving_average") == ["ema", "rma", "sma", "wma"]
-    assert list_indicators("trend") == ["ichimoku", "macd"]
-    assert list_indicators("momentum") == ["kdj", "rsi"]
-    assert list_indicators("volatility") == ["atr", "bollinger", "donchian"]
-    assert list_indicators("volume") == []  # family exists, nothing implemented yet
-    assert len(list_indicators()) == 11
+    assert {"ema", "rma", "sma", "wma", "hma", "dema"} <= set(list_indicators("moving_average"))
+    assert {"ichimoku", "macd", "adx", "supertrend"} <= set(list_indicators("trend"))
+    assert {"kdj", "rsi", "stochastic", "cci"} <= set(list_indicators("momentum"))
+    assert {"atr", "bollinger", "donchian", "keltner"} <= set(list_indicators("volatility"))
+    assert {"obv", "vwap", "money_flow_index"} <= set(list_indicators("volume"))
+    assert {"pivot_points"} <= set(list_indicators("support_resistance"))
+    assert {"trin", "advance_decline_line"} <= set(list_indicators("breadth"))
+    assert {"beta", "zscore"} <= set(list_indicators("statistical"))
+    assert all(list_indicators(f) for f in FAMILIES)  # every family has implementations
+    assert len(list_indicators()) >= 74
 
 
 def test_unknown_family_or_kind_rejected():

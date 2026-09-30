@@ -121,3 +121,25 @@ def test_unknown_kind_and_bad_family():
         build_indicator("nope")
     with pytest.raises(ValueError):
         list_indicators("astrology")
+
+
+def test_explicit_none_warmup_is_data_dependent_but_omitting_is_an_error():
+    from honba.strategies.indicators import _base
+
+    @_base.indicator("tmp_session", "volume", warmup=None)
+    class Tmp(Indicator):
+        def update(self, x):
+            return x
+
+    @_base.indicator("tmp_missing", "volume")
+    class Missing(Indicator):
+        def update(self, x):
+            return x
+
+    try:
+        assert Tmp().warmup is None
+        with pytest.raises(NotImplementedError):
+            Missing().warmup
+    finally:
+        _base._REGISTRY.pop("tmp_session", None)
+        _base._REGISTRY.pop("tmp_missing", None)
