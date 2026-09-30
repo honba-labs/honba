@@ -1,11 +1,14 @@
+mod backtest;
+mod data;
 mod py;
+mod calendars;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(name = "honba", version, about = "Honba simulation CLI")]
+#[command(name = "honba", version, about = "Honba trading/simulation CLI")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -13,7 +16,23 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Execute a honba-style Python script
+    /// Run a Rust-native backtest from a TOML config
+    Backtest {
+        config: PathBuf,
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
+      /// Calendar utilities
+    Calendars {
+        #[command(subcommand)]
+        command: CalendarCommands,
+    },
+    /// Import or inspect market data
+    Data {
+        #[command(subcommand)]
+        command: DataCommands,
+    },
+    /// Execute a honba-style Python simulation script
     Run {
         /// Path to the Python script
         script: PathBuf,
@@ -23,9 +42,28 @@ enum Commands {
     },
 }
 
+#[derive(Subcommand)]
+enum CalendarCommands {
+    Show { #[arg(long)] year: i32 },
+}
+
+#[derive(Subcommand)]
+enum DataCommands {
+    /// Load a data source and print a summary
+    Load { source: String, symbol: String },
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
+        Commands::Backtest { config, output } => backtest::run(&config, output.as_deref()),
+        Commands::Data { command } => match command {
+            DataCommands::Load { source, symbol } => data::load(&source, &symbol),
+        },
         Commands::Run { script, max_events } => py::run_script(&script, max_events),
+        Commands::Calendars { command } => match command {
+            CalendarCommands::Show { year } => calendars::show(year),
+        },
     }
 }
+

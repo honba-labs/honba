@@ -93,7 +93,7 @@ pub fn run(config_path: &Path, output: Option<&Path>) -> anyhow::Result<()> {
             let fast = if cfg.strategy.fast == 0 { 3 } else { cfg.strategy.fast };
             let slow = if cfg.strategy.slow == 0 { 8 } else { cfg.strategy.slow };
             let size = if cfg.strategy.trade_size == 0.0 { 10.0 } else { cfg.strategy.trade_size };
-            Box::new(SmaCrossover::new(instrument, fast, slow, size))
+            SmaCrossover::new(instrument, fast, slow, size)
         }
         other => anyhow::bail!("unknown strategy: {other}"),
     };
@@ -123,12 +123,13 @@ pub fn run(config_path: &Path, output: Option<&Path>) -> anyhow::Result<()> {
         .map(|w| (w[1] - w[0]) / w[0])
         .collect();
 
-    let report = PerformanceReport::from_returns(&returns, 252.0, 0.0, &trips)?;
-    let writer = MarkdownReportWriter::new();
+    let report = PerformanceReport::from_returns(&trips, &returns, 252.0, 0.0)?;
     if let Some(path) = output {
-        writer.write_to_file(&report, path)?;
+        let file = fs::File::create(path)
+            .with_context(|| format!("creating report {}", path.display()))?;
+        MarkdownReportWriter::new(file).write(&report)?;
     } else {
-        writer.write_to_stdout(&report)?;
+        MarkdownReportWriter::new(std::io::stdout().lock()).write(&report)?;
     }
     Ok(())
 }

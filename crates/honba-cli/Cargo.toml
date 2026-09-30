@@ -8,6 +8,24 @@ name = "honba"
 path = "src/main.rs"
 
 [dependencies]
-clap = { version = "4", features = ["derive"] }
+# CLI + error handling
+clap   = { version = "4", features = ["derive"] }
 anyhow = "1"
+
+# Config parsing (backtest.rs)
+serde  = { version = "1", features = ["derive"] }
+toml   = "0.8"
+
+# Python embedding (py/mod.rs, py/pyclasses/*)
 pyo3 = { version = "0.22", features = ["auto-initialize"] }
+
+# Workspace crates
+honba-messages        = { path = "../honba-messages" }
+honba-entities        = { path = "../honba-entities" }
+honba-india           = { path = "../honba-india" }
+honba-algo            = { path = "../honba-algo" }
+honba-algo-analytics  = { path = "../honba-algo-analytics" }
+honba-algo-export     = { path = "../honba-algo-export" }
+honba-algo-import     = { path = "../honba-algo-import" }
+honba-algo-strategies = { path = "../honba-algo-strategies" }
+honba-algo-testing    = { path = "../honba-algo-testing" }
