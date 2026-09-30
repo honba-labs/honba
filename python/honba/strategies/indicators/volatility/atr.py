@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 from honba.strategies.indicators._util import check as _check
+from honba.strategies.indicators._base import Indicator, indicator
 
 
-class Atr:
+@indicator("atr", "volatility", inputs=("high", "low", "close"), warmup=lambda s: s.period + (0 if s.include_first_bar else 1))
+class Atr(Indicator):
     """Wilder ATR. By default the first true range needs a previous close, so the first
     value appears after ``period + 1`` bars; ``include_first_bar=True`` (Jesse) uses
     high - low for the first bar, giving the first value after ``period`` bars."""

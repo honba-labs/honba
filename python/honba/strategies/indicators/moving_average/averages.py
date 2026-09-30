@@ -4,9 +4,11 @@ from __future__ import annotations
 from collections import deque
 
 from honba.strategies.indicators._util import check as _check
+from honba.strategies.indicators._base import Indicator, indicator
 
 
-class Sma:
+@indicator("sma", "moving_average", warmup=lambda s: s.period)
+class Sma(Indicator):
     def __init__(self, period: int = 5) -> None:
         self.period = _check(period)
         self._w: deque[float] = deque(maxlen=period)
@@ -20,7 +22,8 @@ class Sma:
         return self._sum / self.period if len(self._w) == self.period else None
 
 
-class Ema:
+@indicator("ema", "moving_average", warmup=lambda s: 1 if s.seed == "first" else s.period)
+class Ema(Indicator):
     """EMA with alpha = 2/(period+1).
 
     ``seed="sma"`` (TA-Lib) starts from the SMA of the first ``period`` values;
@@ -44,7 +47,8 @@ class Ema:
         return self.value
 
 
-class Rma:
+@indicator("rma", "moving_average", warmup=lambda s: s.period)
+class Rma(Indicator):
     """Wilder's smoothing: SMA seed, then ``(prev * (n - 1) + x) / n``."""
 
     def __init__(self, period: int = 14) -> None:
@@ -60,7 +64,8 @@ class Rma:
         return self.value
 
 
-class Wma:
+@indicator("wma", "moving_average", warmup=lambda s: s.period)
+class Wma(Indicator):
     """Linearly weighted moving average (newest value has the largest weight)."""
 
     def __init__(self, period: int = 5) -> None:

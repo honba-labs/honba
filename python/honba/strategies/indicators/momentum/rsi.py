@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 from honba.strategies.indicators._util import check as _check
+from honba.strategies.indicators._base import Indicator, indicator
 
 
-class Rsi:
+@indicator("rsi", "momentum", warmup=lambda s: s.period + 1)
+class Rsi(Indicator):
     """Wilder RSI; first value after ``period + 1`` inputs. A window with no losses is 100."""
 
     def __init__(self, period: int = 14) -> None:

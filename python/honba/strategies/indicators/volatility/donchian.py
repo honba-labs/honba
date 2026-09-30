@@ -5,6 +5,7 @@ from collections import deque
 from dataclasses import dataclass
 
 from honba.strategies.indicators._util import check as _check
+from honba.strategies.indicators._base import Indicator, indicator
 
 
 @dataclass(frozen=True, slots=True)
@@ -13,7 +14,8 @@ class DonchianValue:
     lower: float
 
 
-class Donchian:
+@indicator("donchian", "volatility", inputs=("high", "low"), outputs=("upper", "lower"), warmup=lambda s: s.period)
+class Donchian(Indicator):
     """Highest high / lowest low over the last ``period`` bars, including the current one."""
 
     def __init__(self, period: int = 20) -> None:

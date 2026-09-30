@@ -6,6 +6,7 @@ from collections import deque
 from dataclasses import dataclass
 
 from honba.strategies.indicators._util import check as _check
+from honba.strategies.indicators._base import Indicator, indicator
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,7 +16,8 @@ class BollingerValue:
     lower: float
 
 
-class Bollinger:
+@indicator("bollinger", "volatility", outputs=("upper", "middle", "lower"), warmup=lambda s: s.period)
+class Bollinger(Indicator):
     """Bands at ``mult`` (upper) and ``mult_lower`` (default ``mult``) population
     standard deviations around the SMA."""
 

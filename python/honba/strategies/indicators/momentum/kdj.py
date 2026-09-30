@@ -4,10 +4,12 @@ from __future__ import annotations
 from collections import deque
 
 from honba.strategies.indicators._util import check as _check
+from honba.strategies.indicators._base import Indicator, indicator
 from honba.strategies.indicators.moving_average.averages import make_ma
 
 
-class Kdj:
+@indicator("kdj", "momentum", inputs=("high", "low", "close"), outputs=("k", "d", "j"), warmup=lambda s: s._h.maxlen + s._k.period + s._d.period - 2)
+class Kdj(Indicator):
     """Stochastic KDJ: RSV over ``fastk`` bars, K = MA(RSV), D = MA(K), J = 3K - 2D.
 
     ``slowk_ma`` / ``slowd_ma`` choose the smoothing (see :func:`make_ma`; default SMA).

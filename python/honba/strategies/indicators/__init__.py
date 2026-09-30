@@ -6,6 +6,9 @@
 """
 from __future__ import annotations
 
+from honba.strategies.indicators import (  # noqa: F401  (importing registers the indicators)
+    breadth, momentum, moving_average, statistical, support_resistance, trend, volatility, volume,
+)
 from honba.strategies.indicators.momentum import Kdj, Rsi
 from honba.strategies.indicators.moving_average import Ema, Rma, Sma, Wma, make_ma
 from honba.strategies.indicators.trend import Ichimoku, Macd, MacdValue
@@ -13,38 +16,24 @@ from honba.strategies.indicators.volatility import (
     Atr, Bollinger, BollingerValue, Donchian, DonchianValue,
 )
 
-# kind -> (class, family)
-_REGISTRY = {
-    "sma": (Sma, "moving_average"), "ema": (Ema, "moving_average"),
-    "rma": (Rma, "moving_average"), "wma": (Wma, "moving_average"),
-    "macd": (Macd, "trend"), "ichimoku": (Ichimoku, "trend"),
-    "rsi": (Rsi, "momentum"), "kdj": (Kdj, "momentum"),
-    "atr": (Atr, "volatility"), "bollinger": (Bollinger, "volatility"),
-    "donchian": (Donchian, "volatility"),
-}
-# TradingView's grouping. Only some families have implementations so far.
-FAMILIES = (
-    "moving_average", "trend", "momentum", "volatility",
-    "volume", "support_resistance", "breadth", "statistical",
-)
-
-
-def _lookup(kind: str):
-    try:
-        return _REGISTRY[kind]
-    except KeyError:
-        raise ValueError(f"unknown indicator {kind!r}; choose from {sorted(_REGISTRY)}") from None
+from honba.strategies.indicators import _base
+from honba.strategies.indicators._base import FAMILIES, Indicator
 
 
 def indicator_family(kind: str) -> str:
-    return _lookup(kind)[1]
+    return _base.get(kind).family
+
+
+def indicator_spec(kind: str) -> dict:
+    """JSON-serialisable description of an indicator (params, inputs, outputs, family)."""
+    return _base.spec(kind)
 
 
 def list_indicators(family: str | None = None) -> list[str]:
     """Indicator kinds, optionally only those in ``family``."""
     if family is not None and family not in FAMILIES:
         raise ValueError(f"unknown family {family!r}; choose from {list(FAMILIES)}")
-    return sorted(k for k, (_, f) in _REGISTRY.items() if family is None or f == family)
+    return sorted(k for k, c in _base._REGISTRY.items() if family is None or c.family == family)
 
 
 def build_indicator(kind: str, **params):
@@ -53,11 +42,11 @@ def build_indicator(kind: str, **params):
     Unknown kinds raise ``ValueError``; unknown or invalid parameters raise ``TypeError`` /
     ``ValueError`` from the indicator itself.
     """
-    return _lookup(kind)[0](**params)
+    return _base.get(kind)(**params)
 
 
 __all__ = [
     "Sma", "Ema", "Rma", "Wma", "Rsi", "Macd", "MacdValue", "Bollinger", "BollingerValue",
     "Donchian", "DonchianValue", "Atr", "Kdj", "Ichimoku", "make_ma", "build_indicator",
-    "indicator_family", "list_indicators", "FAMILIES",
+    "indicator_family", "indicator_spec", "list_indicators", "FAMILIES", "Indicator",
 ]

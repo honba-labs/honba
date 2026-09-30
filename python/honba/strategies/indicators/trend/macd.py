@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from honba.strategies.indicators._util import check as _check
+from honba.strategies.indicators._base import Indicator, indicator
 from honba.strategies.indicators.moving_average.averages import Ema
 
 
@@ -14,7 +15,8 @@ class MacdValue:
     histogram: float
 
 
-class Macd:
+@indicator("macd", "trend", outputs=("macd", "signal", "histogram"), warmup=lambda s: s._slow.warmup + s._signal.warmup - 1)
+class Macd(Indicator):
     def __init__(self, fast: int = 12, slow: int = 26, signal: int = 9, seed: str = "sma") -> None:
         if not 0 < _check(fast) < _check(slow):
             raise ValueError(f"fast must be less than slow, got {fast} and {slow}")

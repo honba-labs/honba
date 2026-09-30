@@ -4,9 +4,11 @@ from __future__ import annotations
 from collections import deque
 
 from honba.strategies.indicators._util import check as _check
+from honba.strategies.indicators._base import Indicator, indicator
 
 
-class Ichimoku:
+@indicator("ichimoku", "trend", inputs=("high", "low"), outputs=("span_a", "span_b"), warmup=lambda s: max(s._n) + s._spans.maxlen - 1)
+class Ichimoku(Indicator):
     """Ichimoku cloud as plotted on the current bar: spans computed ``displacement - 1``
     bars earlier (the standard convention, matching Jesse). ``update`` returns
     ``(span_a, span_b)`` or ``None`` until warm."""
