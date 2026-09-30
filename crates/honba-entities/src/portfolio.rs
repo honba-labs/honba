@@ -30,14 +30,22 @@ pub struct Account {
 impl Account {
     /// Creates an account with the given starting cash.
     pub fn new(name: impl Into<String>, cash: Money) -> Self {
-        Self { name: name.into(), cash, positions: HashMap::new() }
+        Self {
+            name: name.into(),
+            cash,
+            positions: HashMap::new(),
+        }
     }
 
     /// Returns the account name.
-    pub fn name(&self) -> &str { &self.name }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 
     /// Returns the current cash balance.
-    pub fn cash(&self) -> Money { self.cash }
+    pub fn cash(&self) -> Money {
+        self.cash
+    }
 
     /// Adds cash to the account.
     pub fn credit(&mut self, amount: Money) -> Result<()> {
@@ -63,14 +71,15 @@ impl Account {
 
     /// Inserts or replaces a position.
     pub fn upsert_position(&mut self, position: Position) {
-        self.positions.insert(position.instrument_id().clone(), position);
+        self.positions
+            .insert(position.instrument_id().clone(), position);
     }
 
     /// Returns an error if a position for the given instrument is not present.
     pub fn require_position(&mut self, id: &InstrumentId) -> Result<&mut Position> {
-        self.positions.get_mut(id).ok_or_else(|| {
-            EntitiesError::PositionNotFound(id.to_string())
-        })
+        self.positions
+            .get_mut(id)
+            .ok_or_else(|| EntitiesError::PositionNotFound(id.to_string()))
     }
 
     /// Iterates over all positions.

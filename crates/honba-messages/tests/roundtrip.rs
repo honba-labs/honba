@@ -1,9 +1,9 @@
 //! End-to-end construction and accessor tests.
 
 use honba_messages::{
-    AggressorSide, Bar, BarAggregation, BarSpecification, BarType, Event,
-    InstrumentId, Message, Order, OrderId, OrderSide, OrderStatus, OrderType,
-    PriceType, QuoteTick, Tick, TimeInForce, TradeId, TradeTick, UnixNanos, Venue,
+    AggressorSide, Bar, BarAggregation, BarSpecification, BarType, Event, InstrumentId, Message,
+    Order, OrderId, OrderSide, OrderStatus, OrderType, PriceType, QuoteTick, Tick, TimeInForce,
+    TradeId, TradeTick, UnixNanos, Venue,
 };
 
 fn nse(sym: &str) -> InstrumentId {
@@ -43,7 +43,13 @@ fn trade_tick_roundtrip() {
 fn tick_union_reports_ts() {
     let q = Tick::Quote(QuoteTick::new(nse("X"), 1.0, 2.0, 1.0, 1.0, ts(10), ts(10)));
     let t = Tick::Trade(TradeTick::new(
-        nse("X"), 1.5, 1.0, AggressorSide::Buyer, TradeId::new("t"), ts(20), ts(20),
+        nse("X"),
+        1.5,
+        1.0,
+        AggressorSide::Buyer,
+        TradeId::new("t"),
+        ts(20),
+        ts(20),
     ));
     assert_eq!(q.ts_event().as_u64(), 10);
     assert_eq!(t.ts_event().as_u64(), 20);
@@ -55,7 +61,16 @@ fn bar_construction() {
         nse("BANKNIFTY"),
         BarSpecification::new(5, BarAggregation::Minute, PriceType::Last),
     );
-    let bar = Bar::new(bt, 48_000.0, 48_200.0, 47_900.0, 48_150.0, 12_345.0, ts(60), ts(60));
+    let bar = Bar::new(
+        bt,
+        48_000.0,
+        48_200.0,
+        47_900.0,
+        48_150.0,
+        12_345.0,
+        ts(60),
+        ts(60),
+    );
     assert_eq!(bar.high(), 48_200.0);
     assert_eq!(bar.low(), 47_900.0);
     assert_eq!(bar.bar_type().spec().step(), 5);
@@ -88,7 +103,10 @@ fn event_ts_matches_source() {
     assert_eq!(ev.ts_event().as_u64(), 99);
     assert!(ev.is_market_data());
 
-    let order_ev = Event::OrderAccepted { order_id: "O-1".into(), ts_event: ts(150) };
+    let order_ev = Event::OrderAccepted {
+        order_id: "O-1".into(),
+        ts_event: ts(150),
+    };
     assert_eq!(order_ev.ts_event().as_u64(), 150);
     assert!(!order_ev.is_market_data());
 }

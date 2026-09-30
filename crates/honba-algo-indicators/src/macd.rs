@@ -48,8 +48,14 @@ impl Macd {
     ///
     /// Panics if `fast >= slow` or if any period is zero.
     pub fn new(fast: usize, slow: usize, signal: usize) -> Self {
-        assert!(fast > 0 && slow > 0 && signal > 0, "MACD periods must be positive");
-        assert!(fast < slow, "MACD fast period must be less than slow period");
+        assert!(
+            fast > 0 && slow > 0 && signal > 0,
+            "MACD periods must be positive"
+        );
+        assert!(
+            fast < slow,
+            "MACD fast period must be less than slow period"
+        );
         Self {
             fast: Ema::new(fast),
             slow: Ema::new(slow),

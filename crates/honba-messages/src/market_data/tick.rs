@@ -52,33 +52,60 @@ impl QuoteTick {
         ts_event: UnixNanos,
         ts_init: UnixNanos,
     ) -> Self {
-        debug_assert!(ask_price >= bid_price, "ask ({ask_price}) must be >= bid ({bid_price})");
-        Self { instrument_id, bid_price, ask_price, bid_size, ask_size, ts_event, ts_init }
+        debug_assert!(
+            ask_price >= bid_price,
+            "ask ({ask_price}) must be >= bid ({bid_price})"
+        );
+        Self {
+            instrument_id,
+            bid_price,
+            ask_price,
+            bid_size,
+            ask_size,
+            ts_event,
+            ts_init,
+        }
     }
 
     /// Returns the instrument.
-    pub fn instrument_id(&self) -> &InstrumentId { &self.instrument_id }
+    pub fn instrument_id(&self) -> &InstrumentId {
+        &self.instrument_id
+    }
 
     /// Returns the bid price.
-    pub fn bid_price(&self) -> f64 { self.bid_price }
+    pub fn bid_price(&self) -> f64 {
+        self.bid_price
+    }
 
     /// Returns the ask price.
-    pub fn ask_price(&self) -> f64 { self.ask_price }
+    pub fn ask_price(&self) -> f64 {
+        self.ask_price
+    }
 
     /// Returns the bid size.
-    pub fn bid_size(&self) -> f64 { self.bid_size }
+    pub fn bid_size(&self) -> f64 {
+        self.bid_size
+    }
 
     /// Returns the ask size.
-    pub fn ask_size(&self) -> f64 { self.ask_size }
+    pub fn ask_size(&self) -> f64 {
+        self.ask_size
+    }
 
     /// Returns the mid price.
-    pub fn mid_price(&self) -> f64 { (self.bid_price + self.ask_price) / 2.0 }
+    pub fn mid_price(&self) -> f64 {
+        (self.bid_price + self.ask_price) / 2.0
+    }
 
     /// Returns the venue timestamp.
-    pub fn ts_event(&self) -> UnixNanos { self.ts_event }
+    pub fn ts_event(&self) -> UnixNanos {
+        self.ts_event
+    }
 
     /// Returns the Honba timestamp.
-    pub fn ts_init(&self) -> UnixNanos { self.ts_init }
+    pub fn ts_init(&self) -> UnixNanos {
+        self.ts_init
+    }
 }
 
 /// A last-sale trade update.
@@ -120,29 +147,51 @@ impl TradeTick {
         ts_event: UnixNanos,
         ts_init: UnixNanos,
     ) -> Self {
-        Self { instrument_id, price, size, aggressor_side, trade_id, ts_event, ts_init }
+        Self {
+            instrument_id,
+            price,
+            size,
+            aggressor_side,
+            trade_id,
+            ts_event,
+            ts_init,
+        }
     }
 
     /// Returns the instrument.
-    pub fn instrument_id(&self) -> &InstrumentId { &self.instrument_id }
+    pub fn instrument_id(&self) -> &InstrumentId {
+        &self.instrument_id
+    }
 
     /// Returns the trade price.
-    pub fn price(&self) -> f64 { self.price }
+    pub fn price(&self) -> f64 {
+        self.price
+    }
 
     /// Returns the trade size.
-    pub fn size(&self) -> f64 { self.size }
+    pub fn size(&self) -> f64 {
+        self.size
+    }
 
     /// Returns the aggressor side.
-    pub fn aggressor_side(&self) -> AggressorSide { self.aggressor_side }
+    pub fn aggressor_side(&self) -> AggressorSide {
+        self.aggressor_side
+    }
 
     /// Returns the venue trade id.
-    pub fn trade_id(&self) -> &TradeId { &self.trade_id }
+    pub fn trade_id(&self) -> &TradeId {
+        &self.trade_id
+    }
 
     /// Returns the venue timestamp.
-    pub fn ts_event(&self) -> UnixNanos { self.ts_event }
+    pub fn ts_event(&self) -> UnixNanos {
+        self.ts_event
+    }
 
     /// Returns the Honba timestamp.
-    pub fn ts_init(&self) -> UnixNanos { self.ts_init }
+    pub fn ts_init(&self) -> UnixNanos {
+        self.ts_init
+    }
 }
 
 /// A typed union of tick kinds.

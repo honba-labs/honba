@@ -1,6 +1,6 @@
 //! Completed trade records.
 
-use honba_messages::{InstrumentId, OrderSide, OrderId, UnixNanos};
+use honba_messages::{InstrumentId, OrderId, OrderSide, UnixNanos};
 
 /// A completed fill, recorded after the venue confirms execution.
 ///
@@ -44,30 +44,54 @@ impl Trade {
     ) -> Self {
         debug_assert!(quantity > 0.0, "trade quantity must be positive");
         debug_assert!(price > 0.0, "trade price must be positive");
-        Self { order_id, instrument_id, side, quantity, price, ts_event, ts_init }
+        Self {
+            order_id,
+            instrument_id,
+            side,
+            quantity,
+            price,
+            ts_event,
+            ts_init,
+        }
     }
 
     /// Returns the order id.
-    pub fn order_id(&self) -> &OrderId { &self.order_id }
+    pub fn order_id(&self) -> &OrderId {
+        &self.order_id
+    }
 
     /// Returns the instrument id.
-    pub fn instrument_id(&self) -> &InstrumentId { &self.instrument_id }
+    pub fn instrument_id(&self) -> &InstrumentId {
+        &self.instrument_id
+    }
 
     /// Returns the side.
-    pub fn side(&self) -> OrderSide { self.side }
+    pub fn side(&self) -> OrderSide {
+        self.side
+    }
 
     /// Returns the fill quantity.
-    pub fn quantity(&self) -> f64 { self.quantity }
+    pub fn quantity(&self) -> f64 {
+        self.quantity
+    }
 
     /// Returns the fill price.
-    pub fn price(&self) -> f64 { self.price }
+    pub fn price(&self) -> f64 {
+        self.price
+    }
 
     /// Returns the venue timestamp.
-    pub fn ts_event(&self) -> UnixNanos { self.ts_event }
+    pub fn ts_event(&self) -> UnixNanos {
+        self.ts_event
+    }
 
     /// Returns the Honba timestamp.
-    pub fn ts_init(&self) -> UnixNanos { self.ts_init }
+    pub fn ts_init(&self) -> UnixNanos {
+        self.ts_init
+    }
 
     /// Returns `quantity * price`.
-    pub fn notional(&self) -> f64 { self.quantity * self.price }
+    pub fn notional(&self) -> f64 {
+        self.quantity * self.price
+    }
 }

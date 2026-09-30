@@ -56,7 +56,11 @@ pub struct BarSpecification {
 impl BarSpecification {
     /// Creates a new specification.
     pub const fn new(step: usize, aggregation: BarAggregation, price_type: PriceType) -> Self {
-        Self { step, aggregation, price_type }
+        Self {
+            step,
+            aggregation,
+            price_type,
+        }
     }
 
     /// Returns the step size.
@@ -85,7 +89,10 @@ pub struct BarType {
 impl BarType {
     /// Creates a bar type.
     pub fn new(instrument_id: InstrumentId, spec: BarSpecification) -> Self {
-        Self { instrument_id, spec }
+        Self {
+            instrument_id,
+            spec,
+        }
     }
 
     /// Returns the instrument.
@@ -146,7 +153,16 @@ impl Bar {
         ts_init: UnixNanos,
     ) -> Self {
         debug_assert!(high >= low, "bar high ({high}) must be >= low ({low})");
-        Self { bar_type, open, high, low, close, volume, ts_event, ts_init }
+        Self {
+            bar_type,
+            open,
+            high,
+            low,
+            close,
+            volume,
+            ts_event,
+            ts_init,
+        }
     }
 
     /// Returns the bar type.
@@ -155,23 +171,37 @@ impl Bar {
     }
 
     /// Returns the open price.
-    pub fn open(&self) -> f64 { self.open }
+    pub fn open(&self) -> f64 {
+        self.open
+    }
 
     /// Returns the high price.
-    pub fn high(&self) -> f64 { self.high }
+    pub fn high(&self) -> f64 {
+        self.high
+    }
 
     /// Returns the low price.
-    pub fn low(&self) -> f64 { self.low }
+    pub fn low(&self) -> f64 {
+        self.low
+    }
 
     /// Returns the close price.
-    pub fn close(&self) -> f64 { self.close }
+    pub fn close(&self) -> f64 {
+        self.close
+    }
 
     /// Returns the volume.
-    pub fn volume(&self) -> f64 { self.volume }
+    pub fn volume(&self) -> f64 {
+        self.volume
+    }
 
     /// Returns the venue timestamp.
-    pub fn ts_event(&self) -> UnixNanos { self.ts_event }
+    pub fn ts_event(&self) -> UnixNanos {
+        self.ts_event
+    }
 
     /// Returns the Honba timestamp.
-    pub fn ts_init(&self) -> UnixNanos { self.ts_init }
+    pub fn ts_init(&self) -> UnixNanos {
+        self.ts_init
+    }
 }

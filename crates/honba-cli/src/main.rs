@@ -1,7 +1,7 @@
 mod backtest;
+mod calendars;
 mod data;
 mod py;
-mod calendars;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -22,7 +22,7 @@ enum Commands {
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
-      /// Calendar utilities
+    /// Calendar utilities
     Calendars {
         #[command(subcommand)]
         command: CalendarCommands,
@@ -44,7 +44,10 @@ enum Commands {
 
 #[derive(Subcommand)]
 enum CalendarCommands {
-    Show { #[arg(long)] year: i32 },
+    Show {
+        #[arg(long)]
+        year: i32,
+    },
 }
 
 #[derive(Subcommand)]
@@ -66,4 +69,3 @@ fn main() -> Result<()> {
         },
     }
 }
-

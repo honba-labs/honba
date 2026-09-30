@@ -16,9 +16,9 @@ use honba_messages::{InstrumentId, Venue};
 
 /// Synthetic price series with several swings to generate crosses.
 const CLOSES: &[f64] = &[
-    100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 104.0, 103.0, 102.0, 101.0, 100.0,
-    101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 106.0, 105.0, 104.0,
-    105.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0, 110.0, 109.0, 108.0,
+    100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 104.0, 103.0, 102.0, 101.0, 100.0, 101.0, 102.0,
+    103.0, 104.0, 105.0, 106.0, 107.0, 106.0, 105.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0,
+    110.0, 111.0, 110.0, 109.0, 108.0,
 ];
 
 fn pair_fills(fills: &[Trade]) -> Vec<RoundTrip> {
@@ -53,12 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut feed = VecFeed::new(messages);
 
     // 2. Build the execution engine and strategy runner.
-    let strategy = SmaCrossover::new(
-        InstrumentId::new("NIFTY50", Venue::new("NSE")),
-        3,
-        8,
-        10.0,
-    );
+    let strategy = SmaCrossover::new(InstrumentId::new("NIFTY50", Venue::new("NSE")), 3, 8, 10.0);
     let mut execution = BarFillEngine::new();
     let mut runner = StrategyRunner::new(strategy, execution.clone());
 
@@ -85,10 +80,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 5. Build and print the report.
     let curve = equity_curve(1_000_000.0, &trips);
-    let returns: Vec<f64> = curve
-        .windows(2)
-        .map(|w| (w[1] - w[0]) / w[0])
-        .collect();
+    let returns: Vec<f64> = curve.windows(2).map(|w| (w[1] - w[0]) / w[0]).collect();
     let report = PerformanceReport::from_returns(&trips, &returns, 252.0, 0.0)?;
 
     let stdout = std::io::stdout();

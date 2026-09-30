@@ -53,7 +53,10 @@ impl InstrumentId {
     /// assert_eq!(id.venue().as_str(), "NSE");
     /// ```
     pub fn new(symbol: impl Into<String>, venue: Venue) -> Self {
-        Self { symbol: symbol.into(), venue }
+        Self {
+            symbol: symbol.into(),
+            venue,
+        }
     }
 
     /// Returns the instrument symbol.

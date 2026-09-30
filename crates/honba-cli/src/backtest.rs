@@ -73,10 +73,9 @@ pub fn run(config_path: &Path, output: Option<&Path>) -> anyhow::Result<()> {
 
     // Synthetic series — same shape as the end-to-end example.
     let closes: Vec<f64> = vec![
-        100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 104.0, 103.0, 102.0, 101.0,
-        100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 106.0, 105.0,
-        104.0, 105.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0, 110.0, 109.0,
-        108.0,
+        100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 104.0, 103.0, 102.0, 101.0, 100.0, 101.0, 102.0,
+        103.0, 104.0, 105.0, 106.0, 107.0, 106.0, 105.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0,
+        110.0, 111.0, 110.0, 109.0, 108.0,
     ];
 
     let messages: Vec<_> = closes
@@ -90,9 +89,21 @@ pub fn run(config_path: &Path, output: Option<&Path>) -> anyhow::Result<()> {
 
     let strategy = match cfg.strategy.name.as_str() {
         "sma_crossover" => {
-            let fast = if cfg.strategy.fast == 0 { 3 } else { cfg.strategy.fast };
-            let slow = if cfg.strategy.slow == 0 { 8 } else { cfg.strategy.slow };
-            let size = if cfg.strategy.trade_size == 0.0 { 10.0 } else { cfg.strategy.trade_size };
+            let fast = if cfg.strategy.fast == 0 {
+                3
+            } else {
+                cfg.strategy.fast
+            };
+            let slow = if cfg.strategy.slow == 0 {
+                8
+            } else {
+                cfg.strategy.slow
+            };
+            let size = if cfg.strategy.trade_size == 0.0 {
+                10.0
+            } else {
+                cfg.strategy.trade_size
+            };
             SmaCrossover::new(instrument, fast, slow, size)
         }
         other => anyhow::bail!("unknown strategy: {other}"),
@@ -118,10 +129,7 @@ pub fn run(config_path: &Path, output: Option<&Path>) -> anyhow::Result<()> {
     }
 
     let curve = equity_curve(cfg.starting_equity, &trips);
-    let returns: Vec<f64> = curve
-        .windows(2)
-        .map(|w| (w[1] - w[0]) / w[0])
-        .collect();
+    let returns: Vec<f64> = curve.windows(2).map(|w| (w[1] - w[0]) / w[0]).collect();
 
     let report = PerformanceReport::from_returns(&trips, &returns, 252.0, 0.0)?;
     if let Some(path) = output {

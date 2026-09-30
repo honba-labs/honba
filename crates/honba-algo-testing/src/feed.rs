@@ -28,7 +28,9 @@ pub struct VecFeed {
 impl VecFeed {
     /// Creates a feed from a vector of messages.
     pub fn new(items: Vec<Message>) -> Self {
-        Self { items: items.into() }
+        Self {
+            items: items.into(),
+        }
     }
 
     /// Creates an empty feed.
@@ -48,9 +50,7 @@ impl VecFeed {
 
     /// Builds a bar message for the given symbol and timestamp.
     pub fn bar(symbol: &str, close: f64, ts: u64) -> Message {
-        use honba_messages::{
-            Bar, BarAggregation, BarSpecification, BarType, PriceType,
-        };
+        use honba_messages::{Bar, BarAggregation, BarSpecification, BarType, PriceType};
         let bt = BarType::new(
             InstrumentId::new(symbol, honba_messages::Venue::new("TEST")),
             BarSpecification::new(1, BarAggregation::Minute, PriceType::Last),

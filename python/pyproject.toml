@@ -4,6 +4,7 @@ build-backend = "maturin"
 
 [tool.maturin]
 module-name = "honba._honba"
+manifest-path = "../crates/honba-py/Cargo.toml"
 
 [project]
 name = "honba"

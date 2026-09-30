@@ -11,3 +11,4 @@ description = "Test fixtures, feeds, and paper execution for Honba"
 honba-messages.workspace = true
 honba-entities.workspace = true
 honba-algo.workspace = true
+honba-sim.workspace = true

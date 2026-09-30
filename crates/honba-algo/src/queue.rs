@@ -99,7 +99,12 @@ mod tests {
         Message::new(
             Event::Quote(QuoteTick::new(
                 InstrumentId::new("X", Venue::new("NSE")),
-                1.0, 2.0, 1.0, 1.0, ts(t), ts(t),
+                1.0,
+                2.0,
+                1.0,
+                1.0,
+                ts(t),
+                ts(t),
             )),
             ts(t),
         )

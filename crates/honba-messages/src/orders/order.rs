@@ -133,34 +133,54 @@ impl Order {
     }
 
     /// Returns the order id.
-    pub fn order_id(&self) -> &OrderId { &self.order_id }
+    pub fn order_id(&self) -> &OrderId {
+        &self.order_id
+    }
 
     /// Returns the instrument.
-    pub fn instrument_id(&self) -> &InstrumentId { &self.instrument_id }
+    pub fn instrument_id(&self) -> &InstrumentId {
+        &self.instrument_id
+    }
 
     /// Returns the side.
-    pub fn side(&self) -> OrderSide { self.side }
+    pub fn side(&self) -> OrderSide {
+        self.side
+    }
 
     /// Returns the order type.
-    pub fn order_type(&self) -> OrderType { self.order_type }
+    pub fn order_type(&self) -> OrderType {
+        self.order_type
+    }
 
     /// Returns the quantity.
-    pub fn quantity(&self) -> f64 { self.quantity }
+    pub fn quantity(&self) -> f64 {
+        self.quantity
+    }
 
     /// Returns the limit or stop price, if any.
-    pub fn price(&self) -> Option<f64> { self.price }
+    pub fn price(&self) -> Option<f64> {
+        self.price
+    }
 
     /// Returns the current status.
-    pub fn status(&self) -> OrderStatus { self.status }
+    pub fn status(&self) -> OrderStatus {
+        self.status
+    }
 
     /// Returns the time-in-force.
-    pub fn time_in_force(&self) -> TimeInForce { self.time_in_force }
+    pub fn time_in_force(&self) -> TimeInForce {
+        self.time_in_force
+    }
 
     /// Returns the venue timestamp.
-    pub fn ts_event(&self) -> UnixNanos { self.ts_event }
+    pub fn ts_event(&self) -> UnixNanos {
+        self.ts_event
+    }
 
     /// Returns the Honba timestamp.
-    pub fn ts_init(&self) -> UnixNanos { self.ts_init }
+    pub fn ts_init(&self) -> UnixNanos {
+        self.ts_init
+    }
 
     /// Sets the status, returning `self` for chaining.
     pub fn with_status(mut self, status: OrderStatus) -> Self {

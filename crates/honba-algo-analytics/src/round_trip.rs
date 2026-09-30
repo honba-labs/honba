@@ -43,7 +43,12 @@ impl RoundTrip {
     /// The entry fill's side determines the direction. The exit fill must be
     /// the opposite side and reference the same instrument. Fees from both
     /// fills are summed.
-    pub fn from_fills(entry: &Trade, exit: &Trade, entry_fees: f64, exit_fees: f64) -> Result<Self> {
+    pub fn from_fills(
+        entry: &Trade,
+        exit: &Trade,
+        entry_fees: f64,
+        exit_fees: f64,
+    ) -> Result<Self> {
         if entry.instrument_id() != exit.instrument_id() {
             return Err(AnalyticsError::TradeMismatch(
                 "entry and exit reference different instruments".into(),
@@ -51,12 +56,18 @@ impl RoundTrip {
         }
 
         let (side, quantity, entry_price, exit_price) = match (entry.side(), exit.side()) {
-            (OrderSide::Buy, OrderSide::Sell) => {
-                (PositionSide::Long, entry.quantity(), entry.price(), exit.price())
-            }
-            (OrderSide::Sell, OrderSide::Buy) => {
-                (PositionSide::Short, entry.quantity(), entry.price(), exit.price())
-            }
+            (OrderSide::Buy, OrderSide::Sell) => (
+                PositionSide::Long,
+                entry.quantity(),
+                entry.price(),
+                exit.price(),
+            ),
+            (OrderSide::Sell, OrderSide::Buy) => (
+                PositionSide::Short,
+                entry.quantity(),
+                entry.price(),
+                exit.price(),
+            ),
             _ => {
                 return Err(AnalyticsError::TradeMismatch(
                     "entry and exit must be opposite sides".into(),

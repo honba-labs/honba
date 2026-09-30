@@ -1,8 +1,6 @@
 //! Order intents emitted by strategies.
 
-use honba_messages::{
-    InstrumentId, Order, OrderId, OrderSide, OrderType, TimeInForce, UnixNanos,
-};
+use honba_messages::{InstrumentId, Order, OrderId, OrderSide, OrderType, TimeInForce, UnixNanos};
 
 /// A strategy's desire to trade, before it becomes a concrete [`Order`].
 ///

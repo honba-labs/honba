@@ -1,11 +1,8 @@
 //! Behavioural tests for every indicator.
 
-use honba_algo_indicators::{
-    Atr, BollingerBands, BollingerValue, Ema, Indicator, Macd, Rsi, Sma,
-};
+use honba_algo_indicators::{Atr, BollingerBands, BollingerValue, Ema, Indicator, Macd, Rsi, Sma};
 use honba_messages::{
-    Bar, BarAggregation, BarSpecification, BarType, InstrumentId, PriceType,
-    UnixNanos, Venue,
+    Bar, BarAggregation, BarSpecification, BarType, InstrumentId, PriceType, UnixNanos, Venue,
 };
 
 fn bar(h: f64, l: f64, c: f64) -> Bar {
@@ -13,7 +10,16 @@ fn bar(h: f64, l: f64, c: f64) -> Bar {
         InstrumentId::new("X", Venue::new("NSE")),
         BarSpecification::new(1, BarAggregation::Day, PriceType::Last),
     );
-    Bar::new(bt, c, h, l, c, 1.0, UnixNanos::from_u64(1), UnixNanos::from_u64(1))
+    Bar::new(
+        bt,
+        c,
+        h,
+        l,
+        c,
+        1.0,
+        UnixNanos::from_u64(1),
+        UnixNanos::from_u64(1),
+    )
 }
 
 // --- SMA ---
@@ -31,8 +37,7 @@ fn sma_returns_none_until_primed() {
 fn sma_rolling_average() {
     let mut s = Sma::new(3);
     let inputs = [1.0, 2.0, 3.0, 4.0, 5.0];
-    let expected: Vec<Option<f64>> =
-        vec![None, None, Some(2.0), Some(3.0), Some(4.0)];
+    let expected: Vec<Option<f64>> = vec![None, None, Some(2.0), Some(3.0), Some(4.0)];
     for (i, x) in inputs.iter().enumerate() {
         assert_eq!(s.update(*x), expected[i], "at index {i}");
     }
@@ -118,7 +123,7 @@ fn rsi_flat_is_neutral_when_no_loss() {
 #[test]
 fn rsi_requires_period_plus_one_inputs() {
     let mut r = Rsi::new(3);
-    assert_eq!(r.update(1.0), None);  // first price sets baseline
+    assert_eq!(r.update(1.0), None); // first price sets baseline
     assert_eq!(r.update(2.0), None);
     assert_eq!(r.update(3.0), None);
     assert_eq!(r.update(4.0), Some(100.0));
@@ -129,16 +134,16 @@ fn rsi_requires_period_plus_one_inputs() {
 #[test]
 fn atr_first_bar_uses_high_low() {
     let mut a = Atr::new(2);
-    assert_eq!(a.update(&bar(10.0, 8.0, 9.0)), None);  // tr = 2
-    // Second bar: high=11, low=9, prev_close=9 -> tr = max(2, 2, 0) = 2
+    assert_eq!(a.update(&bar(10.0, 8.0, 9.0)), None); // tr = 2
+                                                      // Second bar: high=11, low=9, prev_close=9 -> tr = max(2, 2, 0) = 2
     assert_eq!(a.update(&bar(11.0, 9.0, 10.0)), Some(2.0));
 }
 
 #[test]
 fn atr_accounts_for_gaps() {
     let mut a = Atr::new(1);
-    a.update(&bar(10.0, 9.0, 9.5));   // tr = 1
-    // Gap up: prev_close=9.5, high=20, low=15 -> tr = max(5, 10.5, 5.5) = 10.5
+    a.update(&bar(10.0, 9.0, 9.5)); // tr = 1
+                                    // Gap up: prev_close=9.5, high=20, low=15 -> tr = max(5, 10.5, 5.5) = 10.5
     let v = a.update(&bar(20.0, 15.0, 19.0)).unwrap();
     assert!((v - 10.5).abs() < 1e-9);
 }

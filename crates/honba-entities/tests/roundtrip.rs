@@ -1,8 +1,8 @@
 //! End-to-end construction, arithmetic, and lifecycle tests.
 
 use honba_entities::{
-    Account, Currency, EntitiesError, Instrument, InstrumentKind, Money, Portfolio,
-    Position, PositionSide, Trade,
+    Account, Currency, EntitiesError, Instrument, InstrumentKind, Money, Portfolio, Position,
+    PositionSide, Trade,
 };
 use honba_messages::{InstrumentId, OrderId, OrderSide, UnixNanos, Venue};
 

@@ -78,25 +78,39 @@ impl Position {
     }
 
     /// Returns the instrument id.
-    pub fn instrument_id(&self) -> &InstrumentId { &self.instrument_id }
+    pub fn instrument_id(&self) -> &InstrumentId {
+        &self.instrument_id
+    }
 
     /// Returns the settlement currency.
-    pub fn currency(&self) -> Currency { self.currency }
+    pub fn currency(&self) -> Currency {
+        self.currency
+    }
 
     /// Returns the current side. Meaningful only when `quantity > 0`.
-    pub fn side(&self) -> PositionSide { self.side }
+    pub fn side(&self) -> PositionSide {
+        self.side
+    }
 
     /// Returns the absolute quantity held.
-    pub fn quantity(&self) -> f64 { self.quantity }
+    pub fn quantity(&self) -> f64 {
+        self.quantity
+    }
 
     /// Returns the volume-weighted average entry price.
-    pub fn avg_price(&self) -> f64 { self.avg_price }
+    pub fn avg_price(&self) -> f64 {
+        self.avg_price
+    }
 
     /// Returns realized profit and loss in the position's currency.
-    pub fn realized_pnl(&self) -> f64 { self.realized_pnl }
+    pub fn realized_pnl(&self) -> f64 {
+        self.realized_pnl
+    }
 
     /// Returns `true` if the position holds no quantity.
-    pub fn is_flat(&self) -> bool { self.quantity == 0.0 }
+    pub fn is_flat(&self) -> bool {
+        self.quantity == 0.0
+    }
 
     /// Returns unrealized PnL against a mark price.
     pub fn unrealized_pnl(&self, mark: f64) -> f64 {

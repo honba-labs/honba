@@ -5,13 +5,12 @@
 //! Test fixtures and helpers for the Honba platform.
 
 pub mod assert;
-pub mod bar_fill;
 pub mod feed;
-pub mod paper;
 pub mod recorder;
 
 pub use assert::{assert_close, assert_close_slice};
-pub use bar_fill::BarFillEngine;
 pub use feed::VecFeed;
-pub use paper::{OrderLedger, PaperExecution};
 pub use recorder::Recorder;
+
+// Re-exported from honba-sim for backward compatibility during transition
+pub use honba_sim::{bar_fill, paper, BarFillEngine, OrderLedger, PaperExecution};

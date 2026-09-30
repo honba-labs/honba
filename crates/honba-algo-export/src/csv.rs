@@ -16,7 +16,10 @@ pub struct CsvReportWriter<W: Write> {
 impl<W: Write> CsvReportWriter<W> {
     /// Creates a CSV report writer.
     pub fn new(inner: W) -> Self {
-        Self { inner, header_written: false }
+        Self {
+            inner,
+            header_written: false,
+        }
     }
 }
 
@@ -50,12 +53,21 @@ impl<W: Write> ReportWriter for CsvReportWriter<W> {
             ("trades.total_fees", format!("{}", r.trades.total_fees)),
             ("equity.n_periods", r.equity.n_periods.to_string()),
             ("equity.total_return", format!("{}", r.equity.total_return)),
-            ("equity.annualized_return", format!("{}", r.equity.annualized_return)),
-            ("equity.annualized_volatility", format!("{}", r.equity.annualized_volatility)),
+            (
+                "equity.annualized_return",
+                format!("{}", r.equity.annualized_return),
+            ),
+            (
+                "equity.annualized_volatility",
+                format!("{}", r.equity.annualized_volatility),
+            ),
             ("equity.sharpe", opt(r.equity.sharpe)),
             ("equity.sortino", opt(r.equity.sortino)),
             ("equity.max_drawdown", format!("{}", r.equity.max_drawdown)),
-            ("equity.max_drawdown_pct", format!("{}", r.equity.max_drawdown_pct)),
+            (
+                "equity.max_drawdown_pct",
+                format!("{}", r.equity.max_drawdown_pct),
+            ),
             ("equity.calmar", opt(r.equity.calmar)),
         ];
 

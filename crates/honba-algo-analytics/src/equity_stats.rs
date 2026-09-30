@@ -86,11 +86,7 @@ impl EquityStats {
         };
 
         // Downside deviation (target = risk-free)
-        let downside_sq: f64 = excess
-            .iter()
-            .filter(|r| **r < 0.0)
-            .map(|r| r * r)
-            .sum();
+        let downside_sq: f64 = excess.iter().filter(|r| **r < 0.0).map(|r| r * r).sum();
         let downside_dev = (downside_sq / n_f).sqrt();
         let sortino = if downside_dev > 0.0 {
             Some(mean_excess / downside_dev * periods_per_year.sqrt())
@@ -101,11 +97,7 @@ impl EquityStats {
         // Annualized volatility
         let annualized_volatility = if n >= 2 {
             let mean = returns.iter().sum::<f64>() / n_f;
-            let var = returns
-                .iter()
-                .map(|r| (r - mean).powi(2))
-                .sum::<f64>()
-                / (n_f - 1.0);
+            let var = returns.iter().map(|r| (r - mean).powi(2)).sum::<f64>() / (n_f - 1.0);
             var.sqrt() * periods_per_year.sqrt()
         } else {
             0.0

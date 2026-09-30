@@ -16,12 +16,18 @@ pub struct JsonReportWriter<W: Write> {
 impl<W: Write> JsonReportWriter<W> {
     /// Creates a compact JSON writer.
     pub fn new(inner: W) -> Self {
-        Self { inner, pretty: false }
+        Self {
+            inner,
+            pretty: false,
+        }
     }
 
     /// Creates a pretty-printed JSON writer.
     pub fn pretty(inner: W) -> Self {
-        Self { inner, pretty: true }
+        Self {
+            inner,
+            pretty: true,
+        }
     }
 }
 

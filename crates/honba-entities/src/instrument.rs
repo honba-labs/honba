@@ -71,7 +71,10 @@ impl Money {
 
     /// Returns a zero amount in the given currency.
     pub const fn zero(currency: Currency) -> Self {
-        Self { amount: 0.0, currency }
+        Self {
+            amount: 0.0,
+            currency,
+        }
     }
 
     /// Returns the amount.
@@ -86,7 +89,10 @@ impl Money {
 
     /// Returns the negated amount.
     pub fn neg(&self) -> Self {
-        Self { amount: -self.amount, currency: self.currency }
+        Self {
+            amount: -self.amount,
+            currency: self.currency,
+        }
     }
 }
 
@@ -100,7 +106,10 @@ impl std::ops::Add for Money {
                 right: rhs.currency.to_string(),
             });
         }
-        Ok(Money { amount: self.amount + rhs.amount, currency: self.currency })
+        Ok(Money {
+            amount: self.amount + rhs.amount,
+            currency: self.currency,
+        })
     }
 }
 
@@ -114,7 +123,10 @@ impl std::ops::Sub for Money {
                 right: rhs.currency.to_string(),
             });
         }
-        Ok(Money { amount: self.amount - rhs.amount, currency: self.currency })
+        Ok(Money {
+            amount: self.amount - rhs.amount,
+            currency: self.currency,
+        })
     }
 }
 
@@ -172,21 +184,37 @@ impl Instrument {
     ) -> Self {
         debug_assert!(lot_size > 0.0, "lot_size must be positive");
         debug_assert!(tick_size > 0.0, "tick_size must be positive");
-        Self { id, kind, currency, lot_size, tick_size }
+        Self {
+            id,
+            kind,
+            currency,
+            lot_size,
+            tick_size,
+        }
     }
 
     /// Returns the instrument id.
-    pub fn id(&self) -> &InstrumentId { &self.id }
+    pub fn id(&self) -> &InstrumentId {
+        &self.id
+    }
 
     /// Returns the instrument kind.
-    pub fn kind(&self) -> InstrumentKind { self.kind }
+    pub fn kind(&self) -> InstrumentKind {
+        self.kind
+    }
 
     /// Returns the settlement currency.
-    pub fn currency(&self) -> Currency { self.currency }
+    pub fn currency(&self) -> Currency {
+        self.currency
+    }
 
     /// Returns the minimum tradable quantity.
-    pub fn lot_size(&self) -> f64 { self.lot_size }
+    pub fn lot_size(&self) -> f64 {
+        self.lot_size
+    }
 
     /// Returns the minimum price increment.
-    pub fn tick_size(&self) -> f64 { self.tick_size }
+    pub fn tick_size(&self) -> f64 {
+        self.tick_size
+    }
 }

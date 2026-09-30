@@ -2,12 +2,8 @@
 
 use std::sync::{Arc, Mutex};
 
-use honba_algo::{
-    AlgoError, DataFeed, Engine, Handler, Result,
-};
-use honba_messages::{
-    Event, InstrumentId, Message, QuoteTick, UnixNanos, Venue,
-};
+use honba_algo::{AlgoError, DataFeed, Engine, Handler, Result};
+use honba_messages::{Event, InstrumentId, Message, QuoteTick, UnixNanos, Venue};
 
 fn ts(n: u64) -> UnixNanos {
     UnixNanos::from_u64(n)
@@ -17,7 +13,12 @@ fn quote(t: u64) -> Message {
     Message::new(
         Event::Quote(QuoteTick::new(
             InstrumentId::new("X", Venue::new("NSE")),
-            1.0, 2.0, 1.0, 1.0, ts(t), ts(t),
+            1.0,
+            2.0,
+            1.0,
+            1.0,
+            ts(t),
+            ts(t),
         )),
         ts(t),
     )
@@ -29,7 +30,9 @@ struct VecFeed {
 
 impl VecFeed {
     fn new(items: Vec<Message>) -> Self {
-        Self { items: items.into() }
+        Self {
+            items: items.into(),
+        }
     }
 }
 
@@ -125,7 +128,10 @@ fn engine_detects_clock_regression() {
     engine.run(&mut feed).unwrap();
 
     // Sanity: the AlgoError variant exists and formats.
-    let e = AlgoError::ClockRegression { current: 10, requested: 5 };
+    let e = AlgoError::ClockRegression {
+        current: 10,
+        requested: 5,
+    };
     assert!(format!("{e}").contains("clock cannot go backwards"));
 }
 
@@ -159,4 +165,3 @@ fn batch_size_one_requires_ordered_feed() {
     let err = engine.run(&mut feed).unwrap_err();
     assert!(matches!(err, AlgoError::ClockRegression { .. }));
 }
-

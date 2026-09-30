@@ -6,14 +6,18 @@ from pathlib import Path
 ALLOWED = {
     "honba-messages": set(),
     "honba-entities": {"honba-messages"},
+    "honba-india": {"honba-entities", "honba-messages"},
+    "honba-market": {"honba-entities", "honba-messages"},
     "honba-algo": {"honba-messages", "honba-entities"},
-    "honba-algo-strategies": {"honba-algo"},
     "honba-algo-indicators": {"honba-messages", "honba-entities"},
-    "honba-algo-testing": {"honba-algo", "honba-algo-strategies"},
+    "honba-sim": {"honba-messages", "honba-entities", "honba-algo"},
+    "honba-algo-strategies": {"honba-algo", "honba-algo-indicators", "honba-messages", "honba-entities"},
+    "honba-algo-testing": {"honba-algo", "honba-messages", "honba-entities", "honba-sim"},
     "honba-algo-analytics": {"honba-messages", "honba-entities"},
     "honba-algo-import": {"honba-messages", "honba-entities"},
-    "honba-algo-export": {"honba-messages", "honba-entities"},
-    "honba-india": {"honba-entities"},
+    "honba-algo-export": {"honba-messages", "honba-entities", "honba-algo-analytics"},
+    "honba-py": {"honba-messages", "honba-entities", "honba-algo", "honba-algo-strategies", "honba-sim"},
+    "honba-cli": {"honba-messages", "honba-entities", "honba-india", "honba-market", "honba-algo", "honba-algo-analytics", "honba-algo-export", "honba-algo-import", "honba-algo-strategies", "honba-algo-testing", "honba-sim"},
 }
 
 def main() -> int:
@@ -38,12 +42,12 @@ def main() -> int:
 if __name__ == "__main__":
     sys.exit(main())
 
-SETUP_SH = "#!/usr/bin/env bash
+SETUP_SH = """#!/usr/bin/env bash
 set -euo pipefail
 cargo build --workspace
 (cd python && pip install -e '.[dev]')
 echo 'Honba dev environment ready.'
-"
+"""
 
 PYPKG = ["core", "entities", "strategies", "backtest", "research",
          "india", "adapters", "ai", "cli"]
@@ -77,17 +81,19 @@ CATS = {
     "06_etf": ["tracking_error_arb", "sector_rotation", "gold_equity_rotation", "international_diversification"],
     "07_intraday": ["opening_range_breakout", "vwap_scalp", "gap_fill", "pivot_bounce"],
     "08_swing": ["earnings_momentum", "sector_leadership", "relative_strength"],
-}EX = {
-    "01_basic": ["01_connect_dhan", "02_fetch_instruments", "03_subscribe_quotes", "04_place_order_paper", "05_check_positions"],
-    "02_candles": ["01_historical_candles", "02_realtime_candles", "03_custom_aggregation", "04_multi_timeframe"],
-    "03_storage": ["01_parquet_catalog", "02_import_nse_bhavcopy", "03_import_amfi_nav", "04_export_tearsheet"],
-    "04_universes": ["01_nifty50_constituents", "02_banknifty_constituents", "03_alpha30_constituents", "04_universe_rebalance", "05_custom_universe"],
-    "05_strategies": ["01_first_strategy", "02_with_indicators", "03_position_sizing", "04_risk_management", "05_multi_instrument"],
-    "06_backtesting": ["01_first_backtest", "02_cost_modeling", "03_latency_modeling", "04_walk_forward", "05_monte_carlo", "06_concurrent_backtest"],
-    "07_mutual_funds": ["01_fetch_nav", "02_sip_backtest", "03_category_analysis", "04_portfolio_optimization"],
-    "08_options": ["01_option_chain", "02_greeks_calculation", "03_backtest_straddle", "04_backtest_iron_condor", "05_expiry_day_strategy"],
-    "09_ai_research": ["01_llm_research_analyst", "02_autoresearch_loop", "03_nl_to_strategy", "04_rl_training", "05_mcp_integration", "06_natural_language_critique"],
-    "10_production": ["01_paper_trading", "02_live_trading_dhan", "03_multi_account", "04_monitoring", "05_deployment"],
+}
+
+EX = {
+    "basic": ["01_connect_dhan", "02_fetch_instruments", "03_subscribe_quotes", "04_place_order_paper", "05_check_positions"],
+    "candles": ["01_historical_candles", "02_realtime_candles", "03_custom_aggregation", "04_multi_timeframe"],
+    "storage": ["01_parquet_catalog", "02_import_nse_bhavcopy", "03_import_amfi_nav", "04_export_tearsheet"],
+    "universes": ["01_nifty50_constituents", "02_banknifty_constituents", "03_alpha30_constituents", "04_universe_rebalance", "05_custom_universe"],
+    "strategies": ["01_first_strategy", "02_with_indicators", "03_position_sizing", "04_risk_management", "05_multi_instrument"],
+    "backtesting": ["01_first_backtest", "02_cost_modeling", "03_latency_modeling", "04_walk_forward", "05_monte_carlo", "06_concurrent_backtest"],
+    "mutual_funds": ["01_fetch_nav", "02_sip_backtest", "03_category_analysis", "04_portfolio_optimization"],
+    "options": ["01_option_chain", "02_greeks_calculation", "03_backtest_straddle", "04_backtest_iron_condor", "05_expiry_day_strategy"],
+    "ai_research": ["01_llm_research_analyst", "02_autoresearch_loop", "03_nl_to_strategy", "04_rl_training", "05_mcp_integration", "06_natural_language_critique"],
+    "production": ["01_paper_trading", "02_live_trading_dhan", "03_multi_account", "04_monitoring", "05_deployment"],
 }
 
 BROKERS = ["dhan", "zerodha", "angelone", "fyers", "upstox", "kotak", "iifl", "motilal"]

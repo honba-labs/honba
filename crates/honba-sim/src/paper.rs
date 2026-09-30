@@ -15,7 +15,7 @@ use honba_messages::{Order, OrderId, OrderSide, OrderStatus, UnixNanos};
 ///
 /// ```
 /// use honba_algo::ExecutionEngine;
-/// use honba_algo_testing::PaperExecution;
+/// use honba_sim::PaperExecution;
 /// use honba_messages::{
 ///     InstrumentId, Order, OrderId, OrderSide, OrderType, TimeInForce,
 ///     UnixNanos, Venue,
@@ -45,7 +45,12 @@ pub struct PaperExecution {
 impl PaperExecution {
     /// Creates a paper engine that fills at the given fixed price.
     pub fn new(price: f64) -> Self {
-        Self { price, pending: Vec::new(), fills: Vec::new(), next_ts: 1 }
+        Self {
+            price,
+            pending: Vec::new(),
+            fills: Vec::new(),
+            next_ts: 1,
+        }
     }
 
     /// Changes the fill price for subsequent submissions.
@@ -71,8 +76,14 @@ impl ExecutionEngine for PaperExecution {
         let t = UnixNanos::from_u64(self.next_ts);
         self.next_ts += 1;
 
-        let side = if side == OrderSide::Sell { OrderSide::Sell } else { OrderSide::Buy };
-        self.fills.push(Trade::new(order_id, instrument, side, qty, self.price, t, t));
+        let side = if side == OrderSide::Sell {
+            OrderSide::Sell
+        } else {
+            OrderSide::Buy
+        };
+        self.fills.push(Trade::new(
+            order_id, instrument, side, qty, self.price, t, t,
+        ));
         Ok(())
     }
 

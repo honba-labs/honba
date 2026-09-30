@@ -31,7 +31,12 @@ pub struct BuyAndHold {
 impl BuyAndHold {
     /// Creates a buy-and-hold strategy.
     pub fn new(instrument_id: InstrumentId, quantity: f64) -> Self {
-        Self { instrument_id, quantity, bought: false, intents: Vec::new() }
+        Self {
+            instrument_id,
+            quantity,
+            bought: false,
+            intents: Vec::new(),
+        }
     }
 
     /// Returns the instrument being traded.

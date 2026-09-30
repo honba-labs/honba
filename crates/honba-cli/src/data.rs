@@ -19,11 +19,7 @@ pub fn load(source: &str, symbol: &str) -> Result<()> {
             first.ts_event(),
             first.close()
         );
-        println!(
-            "last:  ts_event={} close={}",
-            last.ts_event(),
-            last.close()
-        );
+        println!("last:  ts_event={} close={}", last.ts_event(), last.close());
     }
     Ok(())
 }

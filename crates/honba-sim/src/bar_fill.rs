@@ -22,7 +22,8 @@ struct Inner {
 /// execute orders.
 ///
 /// ```
-/// use honba_algo_testing::{BarFillEngine, VecFeed};
+/// use honba_algo_testing::VecFeed;
+/// use honba_sim::BarFillEngine;
 /// use honba_algo::{Engine, ExecutionEngine};
 /// use honba_messages::{
 ///     InstrumentId, Order, OrderId, OrderSide, OrderType, TimeInForce,

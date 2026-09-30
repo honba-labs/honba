@@ -1,16 +1,16 @@
 //! End-to-end integration test across the full stack.
 
 use honba_algo::Handler;
+use honba_algo::{DataFeed, Result};
 use honba_algo_analytics::{PerformanceReport, RoundTrip};
 use honba_algo_strategies::{SmaCrossover, StrategyRunner};
 use honba_algo_testing::{BarFillEngine, VecFeed};
-use honba_algo::{DataFeed, Result};
 use honba_entities::Trade;
 use honba_messages::{InstrumentId, Venue};
 
 const CLOSES: &[f64] = &[
-    100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 104.0, 103.0, 102.0, 101.0,
-    100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 106.0, 105.0,
+    100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 104.0, 103.0, 102.0, 101.0, 100.0, 101.0, 102.0,
+    103.0, 104.0, 105.0, 106.0, 107.0, 106.0, 105.0,
 ];
 
 fn pair_fills(fills: &[Trade]) -> Vec<RoundTrip> {
@@ -26,7 +26,7 @@ fn pair_fills(fills: &[Trade]) -> Vec<RoundTrip> {
 }
 
 #[test]
-fn full_stack_produces_a_report() -> Result<()> {
+fn full_stack_produces_a_report() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let messages: Vec<_> = CLOSES
         .iter()
         .enumerate()
@@ -34,12 +34,7 @@ fn full_stack_produces_a_report() -> Result<()> {
         .collect();
     let mut feed = VecFeed::new(messages);
 
-    let strategy = SmaCrossover::new(
-        InstrumentId::new("NIFTY50", Venue::new("NSE")),
-        3,
-        8,
-        10.0,
-    );
+    let strategy = SmaCrossover::new(InstrumentId::new("NIFTY50", Venue::new("NSE")), 3, 8, 10.0);
     let mut execution = BarFillEngine::new();
     let mut runner = StrategyRunner::new(strategy, execution.clone());
 
@@ -80,12 +75,7 @@ fn full_stack_produces_a_report() -> Result<()> {
 #[test]
 fn runner_with_empty_feed_finishes() -> Result<()> {
     let mut feed = VecFeed::empty();
-    let strategy = SmaCrossover::new(
-        InstrumentId::new("X", Venue::new("TEST")),
-        3,
-        8,
-        1.0,
-    );
+    let strategy = SmaCrossover::new(InstrumentId::new("X", Venue::new("TEST")), 3, 8, 1.0);
     let execution = BarFillEngine::new();
     let mut runner = StrategyRunner::new(strategy, execution.clone());
 

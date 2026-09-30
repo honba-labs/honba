@@ -7,11 +7,14 @@ members = [
     "crates/honba-algo-strategies",
     "crates/honba-algo-indicators",
     "crates/honba-algo-testing",
+    "crates/honba-sim",
+    "crates/honba-py",
     "crates/honba-algo-analytics",
     "crates/honba-algo-import",
     "crates/honba-algo-export",
     "crates/honba-cli",
     "crates/honba-india",
+    "crates/honba-market",
 ]
 
 [workspace.package]
@@ -28,10 +31,13 @@ honba-algo = { path = "crates/honba-algo" }
 honba-algo-strategies = { path = "crates/honba-algo-strategies" }
 honba-algo-indicators = { path = "crates/honba-algo-indicators" }
 honba-algo-testing = { path = "crates/honba-algo-testing" }
+honba-sim = { path = "crates/honba-sim" }
+honba-py = { path = "crates/honba-py" }
 honba-algo-analytics = { path = "crates/honba-algo-analytics" }
 honba-algo-import = { path = "crates/honba-algo-import" }
 honba-algo-export = { path = "crates/honba-algo-export" }
 honba-india = { path = "crates/honba-india" }
+honba-market = { path = "crates/honba-market" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"

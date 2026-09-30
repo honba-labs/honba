@@ -6,8 +6,8 @@ use honba_algo_strategies::{
 };
 use honba_algo_testing::VecFeed;
 use honba_messages::{
-    Bar, BarAggregation, BarSpecification, BarType, InstrumentId, Message, OrderSide,
-    PriceType, UnixNanos, Venue,
+    Bar, BarAggregation, BarSpecification, BarType, InstrumentId, Message, OrderSide, PriceType,
+    UnixNanos, Venue,
 };
 
 fn bar(symbol: &str, close: f64, ts: u64) -> Message {
@@ -33,7 +33,16 @@ fn buy_and_hold_emits_one_buy() {
         InstrumentId::new("X", Venue::new("TEST")),
         BarSpecification::new(1, BarAggregation::Minute, PriceType::Last),
     );
-    let b = Bar::new(bt, 1.0, 1.0, 1.0, 1.0, 1.0, UnixNanos::from_u64(1), UnixNanos::from_u64(1));
+    let b = Bar::new(
+        bt,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        UnixNanos::from_u64(1),
+        UnixNanos::from_u64(1),
+    );
     s.on_bar(&b, UnixNanos::from_u64(1)).unwrap();
     s.on_bar(&b, UnixNanos::from_u64(2)).unwrap();
     s.on_bar(&b, UnixNanos::from_u64(3)).unwrap();
@@ -60,13 +69,23 @@ fn sma_crossover_emits_buy_on_cross_up() {
         BarSpecification::new(1, BarAggregation::Minute, PriceType::Last),
     );
     let mk = |c: f64, t: u64| {
-        Bar::new(bt.clone(), c, c, c, c, 1.0, UnixNanos::from_u64(t), UnixNanos::from_u64(t))
+        Bar::new(
+            bt.clone(),
+            c,
+            c,
+            c,
+            c,
+            1.0,
+            UnixNanos::from_u64(t),
+            UnixNanos::from_u64(t),
+        )
     };
 
     // Flat then rise: fast SMA crosses above slow.
     let closes = [1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 2.0];
     for (i, c) in closes.iter().enumerate() {
-        s.on_bar(&mk(*c, i as u64 + 1), UnixNanos::from_u64(1)).unwrap();
+        s.on_bar(&mk(*c, i as u64 + 1), UnixNanos::from_u64(1))
+            .unwrap();
     }
 
     let intents = s.drain_intents();
@@ -84,13 +103,23 @@ fn sma_crossover_emits_sell_on_cross_down() {
         BarSpecification::new(1, BarAggregation::Minute, PriceType::Last),
     );
     let mk = |c: f64, t: u64| {
-        Bar::new(bt.clone(), c, c, c, c, 1.0, UnixNanos::from_u64(t), UnixNanos::from_u64(t))
+        Bar::new(
+            bt.clone(),
+            c,
+            c,
+            c,
+            c,
+            1.0,
+            UnixNanos::from_u64(t),
+            UnixNanos::from_u64(t),
+        )
     };
 
     // Rise then fall.
     let closes = [1.0, 2.0, 3.0, 4.0, 5.0, 5.0, 1.0, 1.0, 1.0];
     for (i, c) in closes.iter().enumerate() {
-        s.on_bar(&mk(*c, i as u64 + 1), UnixNanos::from_u64(1)).unwrap();
+        s.on_bar(&mk(*c, i as u64 + 1), UnixNanos::from_u64(1))
+            .unwrap();
     }
 
     let intents = s.drain_intents();
@@ -118,12 +147,22 @@ fn rsi_reversal_buys_when_oversold() {
         BarSpecification::new(1, BarAggregation::Minute, PriceType::Last),
     );
     let mk = |c: f64, t: u64| {
-        Bar::new(bt.clone(), c, c, c, c, 1.0, UnixNanos::from_u64(t), UnixNanos::from_u64(t))
+        Bar::new(
+            bt.clone(),
+            c,
+            c,
+            c,
+            c,
+            1.0,
+            UnixNanos::from_u64(t),
+            UnixNanos::from_u64(t),
+        )
     };
 
     // Monotonic decline drives RSI to 0.
     for (i, c) in [10.0, 9.0, 8.0, 7.0, 6.0, 5.0].iter().enumerate() {
-        s.on_bar(&mk(*c, i as u64 + 1), UnixNanos::from_u64(1)).unwrap();
+        s.on_bar(&mk(*c, i as u64 + 1), UnixNanos::from_u64(1))
+            .unwrap();
     }
 
     let intents = s.drain_intents();
@@ -143,12 +182,22 @@ fn rsi_reversal_sells_when_overbought() {
         BarSpecification::new(1, BarAggregation::Minute, PriceType::Last),
     );
     let mk = |c: f64, t: u64| {
-        Bar::new(bt.clone(), c, c, c, c, 1.0, UnixNanos::from_u64(t), UnixNanos::from_u64(t))
+        Bar::new(
+            bt.clone(),
+            c,
+            c,
+            c,
+            c,
+            1.0,
+            UnixNanos::from_u64(t),
+            UnixNanos::from_u64(t),
+        )
     };
 
     // Monotonic rise drives RSI to 100.
     for (i, c) in [1.0, 2.0, 3.0, 4.0, 5.0, 6.0].iter().enumerate() {
-        s.on_bar(&mk(*c, i as u64 + 1), UnixNanos::from_u64(1)).unwrap();
+        s.on_bar(&mk(*c, i as u64 + 1), UnixNanos::from_u64(1))
+            .unwrap();
     }
 
     let intents = s.drain_intents();
@@ -168,12 +217,22 @@ fn rsi_reversal_does_not_repeat_in_zone() {
         BarSpecification::new(1, BarAggregation::Minute, PriceType::Last),
     );
     let mk = |c: f64, t: u64| {
-        Bar::new(bt.clone(), c, c, c, c, 1.0, UnixNanos::from_u64(t), UnixNanos::from_u64(t))
+        Bar::new(
+            bt.clone(),
+            c,
+            c,
+            c,
+            c,
+            1.0,
+            UnixNanos::from_u64(t),
+            UnixNanos::from_u64(t),
+        )
     };
 
     // Deep decline, all below oversold.
     for (i, c) in [10.0, 9.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0].iter().enumerate() {
-        s.on_bar(&mk(*c, i as u64 + 1), UnixNanos::from_u64(1)).unwrap();
+        s.on_bar(&mk(*c, i as u64 + 1), UnixNanos::from_u64(1))
+            .unwrap();
     }
 
     let intents = s.drain_intents();
@@ -191,11 +250,7 @@ fn strategy_runs_through_engine() {
     let mut engine = Engine::new();
     engine.add_handler(adapter);
 
-    let mut feed = VecFeed::new(vec![
-        bar("X", 1.0, 1),
-        bar("X", 2.0, 2),
-        bar("X", 3.0, 3),
-    ]);
+    let mut feed = VecFeed::new(vec![bar("X", 1.0, 1), bar("X", 2.0, 2), bar("X", 3.0, 3)]);
     engine.run(&mut feed).unwrap();
     // Run completed; strategy's intents were drained by the adapter internally
     // only if the runner calls drain_intents. Since the engine doesn't, the

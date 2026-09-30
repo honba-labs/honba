@@ -31,15 +31,16 @@ impl Nifty50 {
     }
 
     /// Loads a universe via a [`UniverseSource`].
-    pub fn from_source<S: UniverseSource + ?Sized>(
-        as_of: NaiveDate,
-        source: &S,
-    ) -> Result<Self> {
+    pub fn from_source<S: UniverseSource + ?Sized>(as_of: NaiveDate, source: &S) -> Result<Self> {
         Self::new(as_of, source.load(as_of)?)
     }
 }
 
 impl Universe for Nifty50 {
-    fn as_of(&self) -> NaiveDate { self.as_of }
-    fn symbols(&self) -> &[String] { &self.symbols }
+    fn as_of(&self) -> NaiveDate {
+        self.as_of
+    }
+    fn symbols(&self) -> &[String] {
+        &self.symbols
+    }
 }

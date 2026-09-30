@@ -14,15 +14,13 @@ fn date(y: i32, m: u32, d: u32) -> NaiveDate {
 
 struct FixedHolidays(Vec<NaiveDate>);
 impl HolidaySource for FixedHolidays {
-    fn holidays(&self) -> Result<Vec<NaiveDate>> { Ok(self.0.clone()) }
+    fn holidays(&self) -> Result<Vec<NaiveDate>> {
+        Ok(self.0.clone())
+    }
 }
 
 fn test_calendar() -> NseCalendar {
-    NseCalendar::from_holidays([
-        date(2025, 1, 26),
-        date(2025, 10, 21),
-        date(2025, 12, 25),
-    ])
+    NseCalendar::from_holidays([date(2025, 1, 26), date(2025, 10, 21), date(2025, 12, 25)])
 }
 
 #[test]
@@ -54,12 +52,18 @@ fn from_source_matches_from_holidays() {
 
 #[test]
 fn next_trading_day_skips_weekend() {
-    assert_eq!(test_calendar().next_trading_day(date(2025, 1, 3)), date(2025, 1, 6));
+    assert_eq!(
+        test_calendar().next_trading_day(date(2025, 1, 3)),
+        date(2025, 1, 6)
+    );
 }
 
 #[test]
 fn prev_trading_day_skips_weekend() {
-    assert_eq!(test_calendar().prev_trading_day(date(2025, 1, 6)), date(2025, 1, 3));
+    assert_eq!(
+        test_calendar().prev_trading_day(date(2025, 1, 6)),
+        date(2025, 1, 3)
+    );
 }
 
 #[test]
@@ -119,7 +123,9 @@ fn cost_model_intraday_buy_has_no_stt() {
 
 struct FixedModel(CostModel);
 impl CostModelSource for FixedModel {
-    fn model_for(&self, _date: NaiveDate) -> Result<CostModel> { Ok(self.0) }
+    fn model_for(&self, _date: NaiveDate) -> Result<CostModel> {
+        Ok(self.0)
+    }
 }
 
 #[test]
@@ -132,7 +138,9 @@ fn cost_model_source_returns_model() {
 
 struct FixedUniverse(Vec<String>);
 impl UniverseSource for FixedUniverse {
-    fn load(&self, _as_of: NaiveDate) -> Result<Vec<String>> { Ok(self.0.clone()) }
+    fn load(&self, _as_of: NaiveDate) -> Result<Vec<String>> {
+        Ok(self.0.clone())
+    }
 }
 
 fn test_universe() -> Nifty50 {

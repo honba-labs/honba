@@ -1,0 +1,20 @@
+[package]
+name = "honba-py"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "PyO3 bindings and honba._honba extension module"
+
+[lib]
+name = "honba"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pyo3 = { version = "0.22", features = ["extension-module", "auto-initialize"] }
+honba-messages.workspace = true
+honba-entities.workspace = true
+honba-algo.workspace = true
+honba-algo-strategies.workspace = true
+honba-sim.workspace = true

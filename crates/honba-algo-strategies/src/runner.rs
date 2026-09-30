@@ -66,7 +66,12 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
 
     /// Consumes the runner, returning the strategy, execution engine, and fills.
     pub fn into_parts(self) -> (S, E, Vec<Trade>) {
-        let Self { adapter, execution, fills, .. } = self;
+        let Self {
+            adapter,
+            execution,
+            fills,
+            ..
+        } = self;
         (adapter.into_inner(), execution, fills)
     }
 

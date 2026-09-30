@@ -1,8 +1,6 @@
 //! Numerical checks for analytics primitives.
 
-use honba_algo_analytics::{
-    AnalyticsError, EquityStats, PerformanceReport, RoundTrip, TradeStats,
-};
+use honba_algo_analytics::{AnalyticsError, EquityStats, PerformanceReport, RoundTrip, TradeStats};
 use honba_entities::{PositionSide, Trade};
 use honba_messages::{InstrumentId, UnixNanos, Venue};
 
@@ -15,7 +13,16 @@ fn ts(n: u64) -> UnixNanos {
 }
 
 fn trip(entry: f64, exit: f64, qty: f64) -> RoundTrip {
-    RoundTrip::new(id(), PositionSide::Long, qty, entry, exit, ts(1), ts(2), 0.0)
+    RoundTrip::new(
+        id(),
+        PositionSide::Long,
+        qty,
+        entry,
+        exit,
+        ts(1),
+        ts(2),
+        0.0,
+    )
 }
 
 // --- TradeStats ---
@@ -23,10 +30,10 @@ fn trip(entry: f64, exit: f64, qty: f64) -> RoundTrip {
 #[test]
 fn trade_stats_counts_wins_and_losses() {
     let trades = vec![
-        trip(100.0, 110.0, 1.0),  // +10
-        trip(100.0, 105.0, 1.0),  // +5
-        trip(100.0, 95.0, 1.0),   // -5
-        trip(100.0, 90.0, 1.0),   // -10
+        trip(100.0, 110.0, 1.0), // +10
+        trip(100.0, 105.0, 1.0), // +5
+        trip(100.0, 95.0, 1.0),  // -5
+        trip(100.0, 90.0, 1.0),  // -10
     ];
     let s = TradeStats::from_round_trips(&trades).unwrap();
     assert_eq!(s.n_trades, 4);
@@ -63,10 +70,22 @@ fn round_trip_from_fills_pairs_buy_then_sell() {
     use honba_messages::{OrderId, OrderSide};
 
     let buy = Trade::new(
-        OrderId::new("B1"), id(), OrderSide::Buy, 10.0, 100.0, ts(1), ts(1),
+        OrderId::new("B1"),
+        id(),
+        OrderSide::Buy,
+        10.0,
+        100.0,
+        ts(1),
+        ts(1),
     );
     let sell = Trade::new(
-        OrderId::new("S1"), id(), OrderSide::Sell, 10.0, 110.0, ts(2), ts(2),
+        OrderId::new("S1"),
+        id(),
+        OrderSide::Sell,
+        10.0,
+        110.0,
+        ts(2),
+        ts(2),
     );
     let rt = RoundTrip::from_fills(&buy, &sell, 0.5, 0.5).unwrap();
     assert_eq!(rt.side, PositionSide::Long);
@@ -80,10 +99,22 @@ fn round_trip_from_fills_short_profits_on_decline() {
     use honba_messages::{OrderId, OrderSide};
 
     let sell = Trade::new(
-        OrderId::new("S1"), id(), OrderSide::Sell, 10.0, 110.0, ts(1), ts(1),
+        OrderId::new("S1"),
+        id(),
+        OrderSide::Sell,
+        10.0,
+        110.0,
+        ts(1),
+        ts(1),
     );
     let buy = Trade::new(
-        OrderId::new("B1"), id(), OrderSide::Buy, 10.0, 100.0, ts(2), ts(2),
+        OrderId::new("B1"),
+        id(),
+        OrderSide::Buy,
+        10.0,
+        100.0,
+        ts(2),
+        ts(2),
     );
     let rt = RoundTrip::from_fills(&sell, &buy, 0.0, 0.0).unwrap();
     assert_eq!(rt.side, PositionSide::Short);

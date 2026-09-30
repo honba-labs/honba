@@ -12,8 +12,8 @@ mod pyclasses;
 const HONBA_BRIDGE: &str = include_str!("honba_bridge.py");
 
 pub fn run_script(script: &Path, max_events: Option<u64>) -> Result<()> {
-    let source = fs::read_to_string(script)
-        .with_context(|| format!("reading {}", script.display()))?;
+    let source =
+        fs::read_to_string(script).with_context(|| format!("reading {}", script.display()))?;
 
     Python::with_gil(|py| -> PyResult<()> {
         let module = PyModule::from_code_bound(py, HONBA_BRIDGE, "honba_bridge.py", "honba")?;
@@ -31,7 +31,11 @@ pub fn run_script(script: &Path, max_events: Option<u64>) -> Result<()> {
 
         let result = module.call_method1(
             "run_script",
-            (source.as_str(), script.to_string_lossy().as_ref(), max_events_obj),
+            (
+                source.as_str(),
+                script.to_string_lossy().as_ref(),
+                max_events_obj,
+            ),
         )?;
 
         let exit_code: i32 = result.get_item("exit_code")?.extract()?;
