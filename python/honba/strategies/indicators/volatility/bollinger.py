@@ -1,12 +1,11 @@
 """Bollinger bands (volatility family)."""
 from __future__ import annotations
 
-import math
-from collections import deque
 from dataclasses import dataclass
 
-from honba.strategies.indicators._util import check as _check
 from honba.strategies.indicators._base import Indicator, indicator
+from honba.strategies.indicators._rolling import RollingMoments
+from honba.strategies.indicators._util import check as _check
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,12 +25,10 @@ class Bollinger(Indicator):
         self.mult_lower = mult if mult_lower is None else mult_lower
         if mult < 0 or self.mult_lower < 0:
             raise ValueError("band multipliers must be >= 0")
-        self._w: deque[float] = deque(maxlen=period)
+        self._m = RollingMoments(period)
 
     def update(self, x: float) -> BollingerValue | None:
-        self._w.append(x)
-        if len(self._w) < self.period:
+        r = self._m.update(x)
+        if r is None:
             return None
-        mean = sum(self._w) / self.period
-        sd = math.sqrt(sum((v - mean) ** 2 for v in self._w) / self.period)
-        return BollingerValue(mean + self.mult * sd, mean, mean - self.mult_lower * sd)
+        return BollingerValue(r.mean + self.mult * r.std, r.mean, r.mean - self.mult_lower * r.std)

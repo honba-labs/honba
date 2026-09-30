@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from collections import deque
 
-from honba.strategies.indicators._util import check as _check
 from honba.strategies.indicators._base import Indicator, indicator
+from honba.strategies.indicators._util import check as _check
 
 
 @indicator("sma", "moving_average", warmup=lambda s: s.period)
@@ -71,13 +71,21 @@ class Wma(Indicator):
     def __init__(self, period: int = 5) -> None:
         self.period = _check(period)
         self._w: deque[float] = deque(maxlen=period)
+        self._sum = 0.0  # S: plain window sum
+        self._num = 0.0  # N: sum of weight_i * value_i, weights 1..n oldest to newest
+        self._den = period * (period + 1) / 2
 
     def update(self, x: float) -> float | None:
-        self._w.append(x)
-        if len(self._w) < self.period:
-            return None
         n = self.period
-        return sum(w * v for w, v in enumerate(self._w, 1)) / (n * (n + 1) / 2)
+        if len(self._w) == n:
+            # Window slides: every weight drops by one (N -= S), old value leaves, x enters at n.
+            self._num += n * x - self._sum
+            self._sum += x - self._w[0]
+        else:
+            self._sum += x
+            self._num += (len(self._w) + 1) * x
+        self._w.append(x)
+        return self._num / self._den if len(self._w) == n else None
 
 
 _MA_KINDS = {"sma": Sma, "ema": Ema, "rma": Rma, "wma": Wma}

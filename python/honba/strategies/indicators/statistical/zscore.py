@@ -1,10 +1,8 @@
 """Rolling z-score (statistical family)."""
 from __future__ import annotations
 
-import math
-from collections import deque
-
 from honba.strategies.indicators._base import Indicator, indicator
+from honba.strategies.indicators._rolling import RollingMoments
 
 
 @indicator("zscore", "statistical", warmup=lambda s: s.length)
@@ -15,12 +13,10 @@ class ZScore(Indicator):
         if length < 2:
             raise ValueError(f"length must be >= 2, got {length}")
         self.length = length
-        self._w: deque[float] = deque(maxlen=length)
+        self._m = RollingMoments(length)
 
     def update(self, close: float) -> float | None:
-        self._w.append(close)
-        if len(self._w) < self.length:
+        r = self._m.update(close)
+        if r is None:
             return None
-        m = sum(self._w) / self.length
-        sd = math.sqrt(sum((v - m) ** 2 for v in self._w) / self.length)
-        return (close - m) / sd if sd > 0 else 0.0
+        return (close - r.mean) / r.std if r.std > 0 else 0.0
