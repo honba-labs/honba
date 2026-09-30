@@ -1,16 +1,17 @@
-"""Executed fill (mirrors honba_entities::Trade)."""
+"""OHLCV bar (mirrors honba_messages::Bar)."""
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 from honba.entities.instrument import InstrumentId
-from honba.entities.order import OrderSide
 
 
 @dataclass(frozen=True, slots=True)
-class Trade:
+class Bar:
     instrument_id: InstrumentId
-    side: OrderSide
-    quantity: float
-    price: float
-    ts: int = 0
+    ts: int  # unix nanoseconds
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
