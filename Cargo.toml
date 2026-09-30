@@ -10,6 +10,7 @@ members = [
     "crates/honba-algo-analytics",
     "crates/honba-algo-import",
     "crates/honba-algo-export",
+    "crates/honba-cli",
     "crates/honba-india",
 ]
 
@@ -40,4 +41,7 @@ parquet = "51"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 csv = "1"
+clap = { version = "4", features = ["derive"] }
+toml = "0.8"
+anyhow = "1"
 
