@@ -160,16 +160,27 @@ def test_every_indicator_builds_with_defaults(kind):
 # -- families (TradingView-style taxonomy) -------------------------------------
 
 def test_indicators_are_grouped_by_family():
-    from honba.strategies.indicators import indicator_family, list_indicators
-    from honba.strategies.indicators import momentum, trend, volatility
+    from honba.strategies.indicators import FAMILIES, indicator_family, list_indicators
+    from honba.strategies.indicators import momentum, moving_average, trend, volatility
 
-    assert trend.Sma is Sma and trend.Macd is Macd and momentum.Rsi is Rsi
+    assert FAMILIES == (
+        "moving_average", "trend", "momentum", "volatility",
+        "volume", "support_resistance", "breadth", "statistical",
+    )
+    assert moving_average.Sma is Sma and moving_average.make_ma is make_ma
+    assert trend.Macd is Macd and momentum.Rsi is Rsi and momentum.Kdj is Kdj
     assert volatility.Atr is Atr and volatility.Bollinger is Bollinger
+    assert indicator_family("sma") == "moving_average"
+    assert indicator_family("macd") == "trend"
+    assert indicator_family("ichimoku") == "trend"
     assert indicator_family("rsi") == "momentum"
     assert indicator_family("atr") == "volatility"
-    assert indicator_family("ichimoku") == "trend"
+    assert list_indicators("moving_average") == ["ema", "rma", "sma", "wma"]
+    assert list_indicators("trend") == ["ichimoku", "macd"]
+    assert list_indicators("momentum") == ["kdj", "rsi"]
     assert list_indicators("volatility") == ["atr", "bollinger", "donchian"]
-    assert "sma" in list_indicators() and "kdj" in list_indicators()
+    assert list_indicators("volume") == []  # family exists, nothing implemented yet
+    assert len(list_indicators()) == 11
 
 
 def test_unknown_family_or_kind_rejected():

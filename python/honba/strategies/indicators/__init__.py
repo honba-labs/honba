@@ -1,4 +1,5 @@
-"""Streaming indicators, grouped by family like TradingView's taxonomy.
+"""Streaming indicators, grouped by family like TradingView's taxonomy
+(moving_average, trend, momentum, volatility, volume, support_resistance, breadth, statistical).
 
 ``update`` returns ``None`` until warmed up. Import from the family
 (``indicators.momentum.Rsi``) or from here (``indicators.Rsi``).
@@ -6,22 +7,26 @@
 from __future__ import annotations
 
 from honba.strategies.indicators.momentum import Kdj, Rsi
-from honba.strategies.indicators.trend import (
-    Ema, Ichimoku, Macd, MacdValue, Rma, Sma, Wma, make_ma,
-)
+from honba.strategies.indicators.moving_average import Ema, Rma, Sma, Wma, make_ma
+from honba.strategies.indicators.trend import Ichimoku, Macd, MacdValue
 from honba.strategies.indicators.volatility import (
     Atr, Bollinger, BollingerValue, Donchian, DonchianValue,
 )
 
 # kind -> (class, family)
 _REGISTRY = {
-    "sma": (Sma, "trend"), "ema": (Ema, "trend"), "rma": (Rma, "trend"), "wma": (Wma, "trend"),
+    "sma": (Sma, "moving_average"), "ema": (Ema, "moving_average"),
+    "rma": (Rma, "moving_average"), "wma": (Wma, "moving_average"),
     "macd": (Macd, "trend"), "ichimoku": (Ichimoku, "trend"),
     "rsi": (Rsi, "momentum"), "kdj": (Kdj, "momentum"),
     "atr": (Atr, "volatility"), "bollinger": (Bollinger, "volatility"),
     "donchian": (Donchian, "volatility"),
 }
-FAMILIES = ("trend", "momentum", "volatility", "volume")
+# TradingView's grouping. Only some families have implementations so far.
+FAMILIES = (
+    "moving_average", "trend", "momentum", "volatility",
+    "volume", "support_resistance", "breadth", "statistical",
+)
 
 
 def _lookup(kind: str):

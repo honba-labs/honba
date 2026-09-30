@@ -1,6 +1,5 @@
-"""Trend indicators: moving averages, MACD, Ichimoku."""
-from honba.strategies.indicators.trend.moving_average import Sma, Ema, Rma, Wma, make_ma
-from honba.strategies.indicators.trend.macd import Macd, MacdValue
+"""Trend indicators: MACD, Ichimoku."""
 from honba.strategies.indicators.trend.ichimoku import Ichimoku
+from honba.strategies.indicators.trend.macd import Macd, MacdValue
 
-__all__ = ['Sma', 'Ema', 'Rma', 'Wma', 'make_ma', 'Macd', 'MacdValue', 'Ichimoku']
+__all__ = ["Macd", "MacdValue", "Ichimoku"]
