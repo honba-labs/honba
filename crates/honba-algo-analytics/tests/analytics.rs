@@ -3,7 +3,7 @@
 use honba_algo_analytics::{
     AnalyticsError, EquityStats, PerformanceReport, RoundTrip, TradeStats,
 };
-use honba_entities::PositionSide;
+use honba_entities::{PositionSide, Trade};
 use honba_messages::{InstrumentId, UnixNanos, Venue};
 
 fn id() -> InstrumentId {
@@ -60,7 +60,7 @@ fn trade_stats_empty_input_errors() {
 
 #[test]
 fn round_trip_from_fills_pairs_buy_then_sell() {
-    use honba_messages::{OrderId, OrderSide, Trade};
+    use honba_messages::{OrderId, OrderSide};
 
     let buy = Trade::new(
         OrderId::new("B1"), id(), OrderSide::Buy, 10.0, 100.0, ts(1), ts(1),
@@ -77,7 +77,7 @@ fn round_trip_from_fills_pairs_buy_then_sell() {
 
 #[test]
 fn round_trip_from_fills_short_profits_on_decline() {
-    use honba_messages::{OrderId, OrderSide, Trade};
+    use honba_messages::{OrderId, OrderSide};
 
     let sell = Trade::new(
         OrderId::new("S1"), id(), OrderSide::Sell, 10.0, 110.0, ts(1), ts(1),
