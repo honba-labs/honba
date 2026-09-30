@@ -24,6 +24,10 @@ def test_ema_seeds_with_sma_then_smooths():
     assert out[3] == pytest.approx(3.0)  # 4*0.5 + 2*0.5, alpha = 2/(3+1)
 
 
+def test_rsi_flat_series_is_100_like_jesse():
+    assert feed(Rsi(3), [100.0] * 6)[-1] == pytest.approx(100.0)
+
+
 def test_rsi_all_gains_is_100_and_all_losses_is_0():
     assert feed(Rsi(3), [1, 2, 3, 4, 5])[-1] == pytest.approx(100.0)
     assert feed(Rsi(3), [5, 4, 3, 2, 1])[-1] == pytest.approx(0.0)
@@ -89,7 +93,7 @@ def test_kdj_flat_window_gives_zero_rsv():
 
 
 def test_ichimoku_cloud_is_displaced():
-    c = Ichimoku(1, 1, 1, displacement=1)
+    c = Ichimoku(1, 1, 1, displacement=2)  # cloud plotted displacement-1 bars back
     assert c.update(4, 2) is None
     assert c.update(8, 6) == pytest.approx((3.0, 3.0))  # spans from one bar ago
     assert c.update(10, 8) == pytest.approx((7.0, 7.0))
