@@ -10,3 +10,5 @@ honba-messages = { workspace = true }
 honba-entities = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+arrow = { workspace = true }
+parquet = { workspace = true }
