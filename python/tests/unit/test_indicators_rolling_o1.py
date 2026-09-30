@@ -600,3 +600,133 @@ def oracle_wma_exact(w):
     n = len(w)
     num = sum(k * Fraction(v) for k, v in enumerate(w, 1))
     return float(num / Fraction(n * (n + 1), 2))
+
+
+# -- regressions: warmup spikes, overflow of finite sums, guard rebuild rate ---------------------
+
+
+def _make(kind, period):
+    return RollingSum(period) if kind == "sum" else build_indicator("wma", period=period)
+
+
+def _exact(kind, w):
+    from fractions import Fraction
+
+    if kind == "sum":
+        return float(sum(Fraction(v) for v in w))
+    return oracle_wma_exact(w)
+
+
+def _warmup_spike_worst(kind, period, spike, seed=3):
+    """Max relative error vs exact Fractions with a spike at bar 1 (inside the warmup)."""
+    r = random.Random(seed)
+    xs = [1.0 + r.gauss(0, 0.1) for _ in range(3 * period + 20)]
+    xs[1] += spike
+    ind, w, worst = _make(kind, period), deque(maxlen=period), 0.0
+    for x in xs:
+        w.append(x)
+        got = ind.update(x)
+        if len(w) == period:
+            want = _exact(kind, w)
+            worst = max(worst, abs(got - want) / abs(want))
+    return worst
+
+
+@pytest.mark.parametrize("kind", ["sum", "wma"])
+@pytest.mark.parametrize("spike", [1e8, 1e9, 1e200])
+def test_spike_inside_warmup_leaves_no_residue(kind, spike):
+    for period in range(1, 101):
+        worst = _warmup_spike_worst(kind, period, spike)
+        assert worst <= 1e-9, (period, worst)
+
+
+@pytest.mark.parametrize("kind", ["sum", "wma"])
+def test_spike_in_first_bar_exact_repro(kind):
+    ind = _make(kind, 4)
+    out = [ind.update(x) for x in [1e200, 1, 2, 3, 4, 5, 6]]
+    want = [_exact(kind, w) for w in ([1, 2, 3, 4], [2, 3, 4, 5], [3, 4, 5, 6])]
+    assert out[4:] == pytest.approx(want, rel=1e-12)
+
+
+def _overflow_oracle(kind, w):
+    return sum(w) if kind == "sum" else _old_wma(list(w))
+
+
+@pytest.mark.parametrize("kind", ["sum", "wma"])
+@pytest.mark.parametrize("big", [1e308, 1e200, -1e308, 1e160])
+@pytest.mark.parametrize("period", [2, 3, 4])
+def test_finite_overflow_recovers_when_value_leaves(kind, big, period):
+    """Convention (as RollingMoments): |x| > 1e150 in the window reports NaN; the moment the
+    last such value leaves, results are exact again (no wait for the periodic rebuild)."""
+    xs = [1.0, 2.0] + [big] * 3 + [float(i) for i in range(1, 30)]
+    ind, w = _make(kind, period), deque(maxlen=period)
+    for x in xs:
+        w.append(x)
+        got = ind.update(x)
+        if len(w) < period:
+            assert got is None
+        elif max(abs(v) for v in w) > 1e150:
+            assert math.isnan(got)
+        else:
+            assert got == pytest.approx(_overflow_oracle(kind, w), rel=1e-9)
+
+
+def _count_rebuilds(kind, xs, period):
+    import honba.strategies.indicators._rolling as rmod
+    from honba.strategies.indicators.moving_average import averages as amod
+
+    cls, name = (rmod.RollingSum, "_rebuild") if kind == "sum" else (amod.Wma, "_recompute")
+    calls, real = {"n": 0}, getattr(cls, name)
+
+    def counting(self):
+        calls["n"] += 1
+        real(self)
+
+    ind = _make(kind, period)
+    setattr(cls, name, counting)
+    try:
+        for x in xs:
+            ind.update(x)
+    finally:
+        setattr(cls, name, real)
+    return calls["n"] / len(xs)
+
+
+def _alternating(period, s=1e6, bars=4000):
+    """x_i = x_{i-p} + (-1)^i * s: the window sum alternates between ~s and ~0."""
+    r = random.Random(6)
+    xs = [r.gauss(0, 1e-3) for _ in range(period)]
+    for i in range(period, bars):
+        xs.append(xs[i - period] + (s if i % 2 == 0 else -s))
+    return xs
+
+
+def _alternating_wma(period, s=1e6, bars=200):
+    """Values chosen (feedback on the exact weighted numerator N) so N alternates s, ~0, s, ..."""
+    r = random.Random(6)
+    xs = [r.gauss(0, 1e-3) for _ in range(period)]
+    w = deque(xs, maxlen=period)
+    num = sum(k * v for k, v in enumerate(w, 1))
+    for i in range(period, bars):
+        target = s if i % 2 == 0 else 1e-3
+        x = (target - num + sum(w)) / period
+        w.append(x)
+        num = target
+        xs.append(x)
+    return xs
+
+
+@pytest.mark.parametrize("kind", ["sum", "wma"])
+@pytest.mark.parametrize("period", [10, 20, 50, 100])
+def test_guard_rebuild_rate_limited_on_adversarial_input(kind, period):
+    xs = _alternating(period) if kind == "sum" else _alternating_wma(period)
+    rate = _count_rebuilds(kind, xs, period)
+    assert rate <= 2 / period + 0.01, rate
+
+
+@pytest.mark.parametrize("kind", ["sum", "wma"])
+@pytest.mark.parametrize("period", [10, 50])
+def test_guard_rebuild_rate_on_zero_mean_noise(kind, period):
+    r = random.Random(8)
+    rate = _count_rebuilds(kind, [r.gauss(0, 1) for _ in range(6000)], period)
+    assert rate <= 1 / 1000 + 0.002, rate

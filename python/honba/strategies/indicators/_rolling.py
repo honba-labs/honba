@@ -12,7 +12,7 @@ _RECOMPUTE_MIN = 1000
 _DROP = 1e-4  # recompute when m2 falls below this fraction of its peak since the last rebuild
 _HUGE = 1e150  # |x| above this can overflow squares/sums (1e150**2 * n stays < 1.8e308)
 _SHIFT_K2 = 1e3  # re-shift when (x - shift)**2 exceeds this multiple of the window variance
-_CANCEL = 1e-6  # rebuild when a running total falls below this fraction of its running peak
+_CANCEL = 1e-4  # rebuild when a running total falls below this fraction of its running peak
 _NAN = float("nan")
 
 
@@ -20,23 +20,30 @@ class RollingSum:
     """Sum over the last ``period`` values (``None`` until the window is full).
 
     A non-finite value in the window makes the sum NaN until it has left the window; the running
-    total is then rebuilt exactly, so a NaN/inf never poisons later results. The total is also
-    rebuilt every ``max(1000, 4 * period)`` updates to bound rounding drift, and whenever the
-    total falls below ``1e-6`` of the largest magnitude it has had since the last rebuild (a big
-    spike leaves rounding residue ~``spike * eps``, which would swamp a small true sum). This
-    keeps the relative error near ``1e-10``; it costs an ``O(period)`` rebuild only when the
-    total collapses, which is rare for ordinary data.
+    total is then rebuilt exactly, so a NaN/inf never poisons later results. Overflow follows the
+    ``RollingMoments`` convention: a value with ``|x| > 1e150`` is treated like a NaN/inf (the
+    sum is reported as NaN while it is in the window, even if the exact sum is representable) and
+    the total is rebuilt exactly, immediately, once the last such value has left. A running total
+    that is nevertheless non-finite while the window is finite is rebuilt at once.
+
+    The total is also rebuilt every ``max(1000, 4 * period)`` updates to bound rounding drift, and
+    whenever it falls below ``1e-4`` of the largest magnitude it has had since the last rebuild
+    (a big spike leaves rounding residue ~``spike * eps``, which would swamp a small true sum;
+    the peak is tracked during warmup too). These guard rebuilds are rate-limited to one per
+    ``max(1, period // 2)`` updates, so adversarial input cannot force ``O(period)`` work on
+    more than ~``2 / period`` of the updates. This keeps the relative error near ``1e-10``.
     """
 
     def __init__(self, period: int) -> None:
         self.period = _check(period)
         self._w: deque[float] = deque(maxlen=period)
         self._sum = 0.0
-        self._mag = 0.0  # max |sum| since the last rebuild
-        self._bad = 0  # non-finite values currently in the window
-        self._dirty = False  # running state not trustworthy; rebuild once the window is finite
-        self._since = 0
+        self._mag = 0.0  # max |sum| since the last rebuild (warmup included)
+        self._bad = 0  # unsafe (non-finite or huge) values currently in the window
+        self._dirty = False  # running state not trustworthy; rebuild once the window is safe
+        self._since = 0  # updates since the last rebuild
         self._every = max(_RECOMPUTE_MIN, 4 * period)
+        self._gap = max(1, period // 2)  # minimum updates between cancellation-guard rebuilds
 
     def _rebuild(self) -> None:
         self._sum = math.fsum(self._w)
@@ -46,11 +53,11 @@ class RollingSum:
 
     def update(self, x: float) -> float | None:
         w = self._w
-        if len(w) == self.period and not math.isfinite(w[0]):
-            self._bad -= 1
-        if not math.isfinite(x):
-            self._bad += 1
         full = len(w) == self.period
+        if full and _unsafe(w[0]):
+            self._bad -= 1
+        if _unsafe(x):
+            self._bad += 1
         old = w[0] if full else 0.0
         w.append(x)
         if self._bad:
@@ -61,7 +68,7 @@ class RollingSum:
             self._sum += x - old if full else x
             self._since += 1
             a = abs(self._sum)
-            if a < self._mag * _CANCEL:
+            if not math.isfinite(a) or (a < self._mag * _CANCEL and self._since >= self._gap):
                 self._rebuild()
             elif a > self._mag:
                 self._mag = a
@@ -94,8 +101,10 @@ class RollingMoments:
     * when the newest value has drifted more than ``sqrt(1e3)`` (~32) window standard deviations
       from the shift (smooth trends: the shift is fixed at each rebuild, so ``x - shift`` would
       otherwise grow while ``m2`` stays small and relative precision would erode); the state is
-      rebuilt around the current window mean. Measured: at most 0.2% of updates on a 20000-bar
-      random walk; a ramp rebuilds once per ``~32 * std / slope`` updates;
+      rebuilt around the current window mean. Measured on a 20000-bar random walk (rebuilds per
+      update, period-dependent): ~7.6% at p=2, 2.2% at p=3, 0.83% at p=5, 0.25% at p=10 and
+      0.18% at p>=20 (so <= 0.2% only for period >= ~20; the O(period) cost stays small for
+      small periods); a ramp rebuilds once per ``~32 * std / slope`` updates;
     * when ``m2`` falls below ``1e-4`` of its peak since the last rebuild. A large outlier leaves
       a rounding residue of ~``outlier**2 * eps`` in ``m2``; once the outlier has left this
       residue would dominate the true (small) ``m2``, so the state is rebuilt exactly. Keeping
@@ -149,7 +158,7 @@ class RollingMoments:
             self._bad += 1
         self._run = self._run + 1 if w and w[-1] == x else 1
         if self._bad:
-            self._dirty = True  # NaN/inf/huge in window; leave running state alone; it is rebuilt when the window is clean
+            self._dirty = True  # unsafe value in window: leave state alone, rebuild when clean
             w.append(x)
             return _NAN_MOMENTS if len(w) == n else None
         if self._dirty:
