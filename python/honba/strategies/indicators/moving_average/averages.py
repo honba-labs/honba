@@ -1,9 +1,11 @@
 """Moving averages."""
 from __future__ import annotations
 
+import math
 from collections import deque
 
 from honba.strategies.indicators._base import Indicator, indicator
+from honba.strategies.indicators._rolling import _RECOMPUTE_MIN
 from honba.strategies.indicators._util import check as _check
 
 
@@ -66,7 +68,12 @@ class Rma(Indicator):
 
 @indicator("wma", "moving_average", warmup=lambda s: s.period)
 class Wma(Indicator):
-    """Linearly weighted moving average (newest value has the largest weight)."""
+    """Linearly weighted moving average (newest value has the largest weight).
+
+    O(1) per update. A non-finite value in the window makes the result NaN until it has left
+    the window (running state untouched meanwhile, then rebuilt exactly); the state is also
+    rebuilt every ``max(1000, 4 * period)`` updates to bound rounding drift.
+    """
 
     def __init__(self, period: int = 5) -> None:
         self.period = _check(period)
@@ -74,18 +81,41 @@ class Wma(Indicator):
         self._sum = 0.0  # S: plain window sum
         self._num = 0.0  # N: sum of weight_i * value_i, weights 1..n oldest to newest
         self._den = period * (period + 1) / 2
+        self._bad = 0  # non-finite values currently in the window
+        self._dirty = False
+        self._since = 0
+        self._every = max(_RECOMPUTE_MIN, 4 * period)
+
+    def _recompute(self) -> None:
+        self._sum = math.fsum(self._w)
+        self._num = math.fsum(k * v for k, v in enumerate(self._w, 1))
+        self._since = 0
+        self._dirty = False
 
     def update(self, x: float) -> float | None:
-        n = self.period
-        if len(self._w) == n:
+        n, w = self.period, self._w
+        full = len(w) == n
+        if full and not math.isfinite(w[0]):
+            self._bad -= 1
+        if not math.isfinite(x):
+            self._bad += 1
+        old = w[0] if full else 0.0
+        w.append(x)
+        if self._bad:
+            self._dirty = True
+        elif self._dirty or self._since >= self._every:
+            self._recompute()
+        elif full:
             # Window slides: every weight drops by one (N -= S), old value leaves, x enters at n.
             self._num += n * x - self._sum
-            self._sum += x - self._w[0]
+            self._sum += x - old
+            self._since += 1
         else:
             self._sum += x
-            self._num += (len(self._w) + 1) * x
-        self._w.append(x)
-        return self._num / self._den if len(self._w) == n else None
+            self._num += len(w) * x
+        if len(w) < n:
+            return None
+        return math.nan if self._bad else self._num / self._den
 
 
 _MA_KINDS = {"sma": Sma, "ema": Ema, "rma": Rma, "wma": Wma}
