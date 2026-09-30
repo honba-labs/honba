@@ -1,6 +1,6 @@
 //! The `ReportWriter` trait.
 
-use honba_algo_analytics::PerformanceReport;
+use honba_analytics::PerformanceReport;
 
 use crate::error::Result;
 

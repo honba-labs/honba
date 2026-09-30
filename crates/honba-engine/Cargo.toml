@@ -1,16 +1,13 @@
 [package]
-name = "honba-sim"
+name = "honba-engine"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-description = "Simulation and paper execution models for Honba"
+description = "Event kernel: clock, queue, dispatch, and engine traits"
 
 [dependencies]
 honba-messages.workspace = true
 honba-entities.workspace = true
-honba-engine.workspace = true
-
-[dev-dependencies]
-honba-testing.workspace = true
+thiserror.workspace = true

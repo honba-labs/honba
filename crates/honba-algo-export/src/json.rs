@@ -2,7 +2,7 @@
 
 use std::io::Write;
 
-use honba_algo_analytics::PerformanceReport;
+use honba_analytics::PerformanceReport;
 
 use crate::error::Result;
 use crate::writer::ReportWriter;

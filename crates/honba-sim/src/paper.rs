@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use honba_algo::{ExecutionEngine, Result};
+use honba_engine::{ExecutionEngine, Result};
 use honba_entities::Trade;
 use honba_messages::{Order, OrderId, OrderSide, OrderStatus, UnixNanos};
 
@@ -14,7 +14,7 @@ use honba_messages::{Order, OrderId, OrderSide, OrderStatus, UnixNanos};
 /// a dedicated adapter.
 ///
 /// ```
-/// use honba_algo::ExecutionEngine;
+/// use honba_engine::ExecutionEngine;
 /// use honba_sim::PaperExecution;
 /// use honba_messages::{
 ///     InstrumentId, Order, OrderId, OrderSide, OrderType, TimeInForce,

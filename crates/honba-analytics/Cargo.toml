@@ -1,16 +1,14 @@
 [package]
-name = "honba-sim"
+name = "honba-analytics"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-description = "Simulation and paper execution models for Honba"
+description = "Performance analytics: trade stats, equity stats, risk metrics"
 
 [dependencies]
 honba-messages.workspace = true
 honba-entities.workspace = true
-honba-engine.workspace = true
-
-[dev-dependencies]
-honba-testing.workspace = true
+serde.workspace = true
+thiserror.workspace = true

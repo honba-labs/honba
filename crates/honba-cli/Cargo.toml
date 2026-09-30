@@ -23,9 +23,11 @@ pyo3 = { version = "0.22", features = ["auto-initialize"] }
 honba-messages        = { path = "../honba-messages" }
 honba-entities        = { path = "../honba-entities" }
 honba-india           = { path = "../honba-india" }
-honba-algo            = { path = "../honba-algo" }
-honba-algo-analytics  = { path = "../honba-algo-analytics" }
+honba-market          = { path = "../honba-market" }
+honba-engine          = { path = "../honba-engine" }
+honba-analytics       = { path = "../honba-analytics" }
 honba-algo-export     = { path = "../honba-algo-export" }
 honba-algo-import     = { path = "../honba-algo-import" }
-honba-algo-strategies = { path = "../honba-algo-strategies" }
-honba-algo-testing    = { path = "../honba-algo-testing" }
+honba-strategy        = { path = "../honba-strategy" }
+honba-testing         = { path = "../honba-testing" }
+honba-sim             = { path = "../honba-sim" }

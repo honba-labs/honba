@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use honba_algo::{ExecutionEngine, Handler, Result};
+use honba_engine::{ExecutionEngine, Handler, Result};
 use honba_entities::Trade;
 use honba_messages::{Event, Order, OrderId, UnixNanos};
 
@@ -22,9 +22,9 @@ struct Inner {
 /// execute orders.
 ///
 /// ```
-/// use honba_algo_testing::VecFeed;
+/// use honba_testing::VecFeed;
 /// use honba_sim::BarFillEngine;
-/// use honba_algo::{Engine, ExecutionEngine};
+/// use honba_engine::{Engine, ExecutionEngine};
 /// use honba_messages::{
 ///     InstrumentId, Order, OrderId, OrderSide, OrderType, TimeInForce,
 ///     UnixNanos, Venue,

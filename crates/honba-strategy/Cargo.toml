@@ -1,16 +1,19 @@
 [package]
-name = "honba-sim"
+name = "honba-strategy"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-description = "Simulation and paper execution models for Honba"
+description = "Strategy trait and reference strategies for Honba"
 
 [dependencies]
 honba-messages.workspace = true
 honba-entities.workspace = true
 honba-engine.workspace = true
+honba-indicators.workspace = true
 
 [dev-dependencies]
 honba-testing.workspace = true
+honba-analytics.workspace = true
+honba-algo-export.workspace = true
