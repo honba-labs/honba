@@ -38,6 +38,12 @@ pub trait Strategy: Send + 'static {
         Ok(())
     }
 
+    /// Called when the runner receives a fill for an order the strategy
+    /// emitted. Default is a no-op.
+    fn on_fill(&mut self, _fill: &honba_entities::Trade) -> Result<()> {
+        Ok(())
+    }
+
     /// Called once after the last event.
     fn on_stop(&mut self) -> Result<()> {
         Ok(())
@@ -91,6 +97,11 @@ impl<S: Strategy> StrategyAdapter<S> {
     /// Drains intents from the wrapped strategy.
     pub fn drain_intents(&mut self) -> Vec<OrderIntent> {
         self.inner.drain_intents()
+    }
+
+    /// Consumes the adapter, returning the wrapped strategy.
+    pub fn into_inner(self) -> S {
+        self.inner
     }
 }
 

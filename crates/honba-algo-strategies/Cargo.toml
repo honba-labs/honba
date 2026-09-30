@@ -15,3 +15,5 @@ honba-algo-indicators.workspace = true
 
 [dev-dependencies]
 honba-algo-testing.workspace = true
+honba-algo-analytics.workspace = true
+honba-algo-export.workspace = true

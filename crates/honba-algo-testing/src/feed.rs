@@ -46,6 +46,22 @@ impl VecFeed {
         )
     }
 
+    /// Builds a bar message for the given symbol and timestamp.
+    pub fn bar(symbol: &str, close: f64, ts: u64) -> Message {
+        use honba_messages::{
+            Bar, BarAggregation, BarSpecification, BarType, PriceType,
+        };
+        let bt = BarType::new(
+            InstrumentId::new(symbol, honba_messages::Venue::new("TEST")),
+            BarSpecification::new(1, BarAggregation::Minute, PriceType::Last),
+        );
+        let t = UnixNanos::from_u64(ts);
+        Message::new(
+            Event::Bar(Bar::new(bt, close, close, close, close, 1.0, t, t)),
+            t,
+        )
+    }
+
     /// Builds a trade message for the given symbol and timestamps.
     pub fn trade(symbol: &str, price: f64, qty: f64, ts: u64) -> Message {
         let instrument = InstrumentId::new(symbol, honba_messages::Venue::new("TEST"));
