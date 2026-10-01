@@ -64,3 +64,15 @@ impl SttRates {
         }
     }
 }
+
+impl Default for SttRates {
+    fn default() -> Self {
+        Self {
+            equity_delivery: 0.001,
+            equity_intraday_sell: 0.00025,
+            equity_futures_sell: 0.0002,
+            equity_options_sell: 0.001,
+            equity_options_exercise: 0.00125,
+        }
+    }
+}

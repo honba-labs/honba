@@ -2,7 +2,7 @@
 
 use chrono::NaiveDate;
 
-use crate::Result;
+use super::super::error::Result;
 
 use super::model::CostModel;
 

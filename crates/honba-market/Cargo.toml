@@ -15,4 +15,5 @@ india = []
 honba-messages.workspace = true
 honba-entities.workspace = true
 chrono.workspace = true
+serde.workspace = true
 thiserror.workspace = true

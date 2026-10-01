@@ -10,6 +10,8 @@
 pub mod calendar;
 pub mod costs;
 pub mod error;
+pub mod profile;
 pub mod universes;
 
 pub use error::{IndiaError, Result};
+pub use profile::IndiaMarketProfile;

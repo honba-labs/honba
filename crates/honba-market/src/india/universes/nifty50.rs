@@ -2,7 +2,7 @@
 
 use chrono::NaiveDate;
 
-use crate::{IndiaError, Result};
+use super::super::error::{IndiaError, Result};
 
 use super::source::{Universe, UniverseSource};
 

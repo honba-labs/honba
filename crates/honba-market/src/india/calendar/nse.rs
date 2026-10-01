@@ -4,47 +4,11 @@ use std::collections::HashSet;
 
 use chrono::{NaiveDate, NaiveTime};
 
-use crate::Result;
+use super::super::error::Result;
 
 use super::source::{HolidaySource, TradingCalendar};
 
-/// A trading session window on a given day.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Session {
-    open: NaiveTime,
-    close: NaiveTime,
-}
-
-impl Session {
-    /// Creates a session between the given times.
-    pub fn new(open: NaiveTime, close: NaiveTime) -> Self {
-        debug_assert!(close > open, "session close must be after open");
-        Self { open, close }
-    }
-
-    /// The regular equity session: 09:15 to 15:30 IST.
-    pub fn regular() -> Self {
-        Self {
-            open: NaiveTime::from_hms_opt(9, 15, 0).unwrap(),
-            close: NaiveTime::from_hms_opt(15, 30, 0).unwrap(),
-        }
-    }
-
-    /// The opening time.
-    pub fn open(&self) -> NaiveTime {
-        self.open
-    }
-
-    /// The closing time.
-    pub fn close(&self) -> NaiveTime {
-        self.close
-    }
-
-    /// Returns `true` if the time falls within `[open, close)`.
-    pub fn contains(&self, t: NaiveTime) -> bool {
-        t >= self.open && t < self.close
-    }
-}
+pub use crate::calendar::Session;
 
 /// The NSE trading calendar.
 #[derive(Clone, Debug)]
@@ -58,7 +22,10 @@ impl NseCalendar {
     pub fn from_holidays(holidays: impl IntoIterator<Item = NaiveDate>) -> Self {
         Self {
             holidays: holidays.into_iter().collect(),
-            session: Session::regular(),
+            session: Session::new(
+                NaiveTime::from_hms_opt(9, 15, 0).unwrap(),
+                NaiveTime::from_hms_opt(15, 30, 0).unwrap(),
+            ),
         }
     }
 

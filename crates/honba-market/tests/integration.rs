@@ -1,10 +1,13 @@
+#![cfg(feature = "india")]
 //! Integration tests for the India crate.
 
 use chrono::{NaiveDate, NaiveTime};
 
-use honba_market::calendar::{HolidaySource, NseCalendar, Session, TradingCalendar};
-use honba_market::costs::{CostModel, CostModelSource, Segment, SttRates};
-use honba_market::universes::{Nifty50, Universe, UniverseSource, NIFTY50_SIZE};
+use honba_market::calendar::{HolidaySource, Session, TradingCalendar};
+use honba_market::india::calendar::NseCalendar;
+use honba_market::india::costs::{CostModel, CostModelSource, Segment, SttRates};
+use honba_market::india::universes::{Nifty50, NIFTY50_SIZE};
+use honba_market::universes::{Universe, UniverseSource};
 use honba_market::Result;
 use honba_messages::OrderSide;
 
@@ -123,7 +126,7 @@ fn cost_model_intraday_buy_has_no_stt() {
 
 struct FixedModel(CostModel);
 impl CostModelSource for FixedModel {
-    fn model_for(&self, _date: NaiveDate) -> Result<CostModel> {
+    fn model_for(&self, _date: NaiveDate) -> honba_market::india::Result<CostModel> {
         Ok(self.0)
     }
 }

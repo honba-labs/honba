@@ -109,3 +109,46 @@ impl CostModel {
         }
     }
 }
+
+impl CostBreakdown {
+    /// Converts this India-specific cost breakdown into a generic [`crate::costs::FeeBreakdown`].
+    pub fn to_fee_breakdown(&self) -> crate::costs::FeeBreakdown {
+        let mut breakdown = crate::costs::FeeBreakdown::empty();
+        if self.stt > 0.0 {
+            breakdown.add(crate::india::costs::CHARGE_STT, self.stt);
+        }
+        if self.exchange_fee > 0.0 {
+            breakdown.add(crate::india::costs::CHARGE_EXCHANGE_FEE, self.exchange_fee);
+        }
+        if self.gst > 0.0 {
+            breakdown.add(crate::india::costs::CHARGE_GST, self.gst);
+        }
+        if self.stamp_duty > 0.0 {
+            breakdown.add(crate::india::costs::CHARGE_STAMP_DUTY, self.stamp_duty);
+        }
+        if self.sebi_fee > 0.0 {
+            breakdown.add(crate::india::costs::CHARGE_SEBI_FEE, self.sebi_fee);
+        }
+        if self.brokerage > 0.0 {
+            breakdown.add(crate::india::costs::CHARGE_BROKERAGE, self.brokerage);
+        }
+        breakdown
+    }
+}
+
+impl crate::costs::CostSchedule for CostModel {
+    fn compute_costs(
+        &self,
+        segment: &crate::costs::MarketSegment,
+        side: OrderSide,
+        notional: f64,
+    ) -> crate::costs::FeeBreakdown {
+        let ind_seg = match segment.as_str() {
+            "equity_intraday" | "intraday" => Segment::EquityIntraday,
+            "equity_futures" | "futures" => Segment::EquityFutures,
+            "equity_options" | "options" => Segment::EquityOptions,
+            _ => Segment::EquityDelivery,
+        };
+        self.compute(ind_seg, side, notional).to_fee_breakdown()
+    }
+}

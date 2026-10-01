@@ -27,6 +27,9 @@ jobs:
       - name: cargo check
         run: cargo check --workspace --all-targets
 
+      - name: cargo check honba-market (no default features)
+        run: cargo check -p honba-market --no-default-features
+
       - name: cargo clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 

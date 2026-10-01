@@ -21,3 +21,24 @@ pub enum IndiaError {
     #[error("symbol not found: {0}")]
     SymbolNotFound(String),
 }
+
+impl From<IndiaError> for crate::MarketError {
+    fn from(err: IndiaError) -> Self {
+        match err {
+            IndiaError::InvalidDate(d) => crate::MarketError::InvalidDate(d),
+            IndiaError::UnknownSegment(s) => crate::MarketError::UnknownSegment(s),
+            IndiaError::SymbolNotFound(sym) => crate::MarketError::SymbolNotFound(sym),
+        }
+    }
+}
+
+impl From<crate::MarketError> for IndiaError {
+    fn from(err: crate::MarketError) -> Self {
+        match err {
+            crate::MarketError::InvalidDate(d) => IndiaError::InvalidDate(d),
+            crate::MarketError::UnknownSegment(s) => IndiaError::UnknownSegment(s),
+            crate::MarketError::SymbolNotFound(sym) => IndiaError::SymbolNotFound(sym),
+            other => IndiaError::InvalidDate(other.to_string()),
+        }
+    }
+}
