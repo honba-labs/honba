@@ -3,6 +3,10 @@
 //! `canonical_json` parses a payload with the Rust serde types and serializes
 //! it back, so Python can check that its models agree with Rust exactly.
 
+// PyO3 0.22 `#[pyfunction]` expansion trips this lint on `PyResult` returns
+// (same allowance as `domain.rs`).
+#![allow(clippy::useless_conversion)]
+
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
