@@ -84,3 +84,24 @@ def test_strategy_intent_survives_rust_roundtrip():
         payload = wire.OrderIntent.from_domain(intent).model_dump_json()
         back = wire.OrderIntent.model_validate_json(_honba.canonical_json("OrderIntent", payload))
         assert back.to_domain() == intent
+
+
+def test_rust_and_python_wire_enums_have_the_same_variants():
+    """A variant added on either side without the other fails here."""
+    rust = _honba.wire_enum_values()
+    assert set(rust) == set(wire.ENUMS)
+    for name, enum in wire.ENUMS.items():
+        assert sorted(rust[name]) == sorted(member.value for member in enum), name
+
+
+@pytest.mark.parametrize(
+    ("kind", "value"),
+    [
+        pytest.param(name, member.value, id=f"{name}.{member.name}")
+        for name, enum in wire.ENUMS.items()
+        for member in enum
+    ],
+)
+def test_every_python_enum_value_parses_in_rust(kind, value):
+    payload = json.dumps(value)
+    assert _honba.canonical_json(kind, payload) == payload

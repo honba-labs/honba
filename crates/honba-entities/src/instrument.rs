@@ -5,26 +5,28 @@ use std::fmt;
 use honba_messages::InstrumentId;
 use serde::{Deserialize, Serialize};
 
-/// A currency in which instruments are denominated.
-///
-/// ```
-/// use honba_entities::Currency;
-///
-/// assert_eq!(Currency::Inr.code(), "INR");
-/// assert_eq!(Currency::Inr.to_string(), "INR");
-/// ```
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "UPPERCASE")]
-#[non_exhaustive]
-pub enum Currency {
-    /// Indian rupee.
-    Inr,
-    /// United States dollar.
-    Usd,
-    /// Euro.
-    Eur,
-    /// Pound sterling.
-    Gbp,
+honba_messages::enum_with_all! {
+    /// A currency in which instruments are denominated.
+    ///
+    /// ```
+    /// use honba_entities::Currency;
+    ///
+    /// assert_eq!(Currency::Inr.code(), "INR");
+    /// assert_eq!(Currency::Inr.to_string(), "INR");
+    /// ```
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+    #[serde(rename_all = "UPPERCASE")]
+    #[non_exhaustive]
+    pub enum Currency {
+        /// Indian rupee.
+        Inr,
+        /// United States dollar.
+        Usd,
+        /// Euro.
+        Eur,
+        /// Pound sterling.
+        Gbp,
+    }
 }
 
 impl Currency {

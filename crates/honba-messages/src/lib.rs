@@ -39,6 +39,33 @@
 //! assert_eq!(bar.close(), 22_020.0);
 //! ```
 
+/// Defines a fieldless enum together with an `ALL` constant listing every
+/// variant in declaration order.
+///
+/// Because the list is generated from the definition it cannot fall out of
+/// date; the Python bindings use it to check that every Rust wire enum
+/// variant has a Python counterpart (ADR 006).
+#[doc(hidden)]
+#[macro_export]
+macro_rules! enum_with_all {
+    (
+        $(#[$meta:meta])*
+        $vis:vis enum $name:ident {
+            $( $(#[$vmeta:meta])* $variant:ident ),+ $(,)?
+        }
+    ) => {
+        $(#[$meta])*
+        $vis enum $name {
+            $( $(#[$vmeta])* $variant ),+
+        }
+
+        impl $name {
+            /// Every variant, in declaration order.
+            pub const ALL: &'static [$name] = &[$($name::$variant),+];
+        }
+    };
+}
+
 pub mod events;
 pub mod identifiers;
 pub mod market_data;

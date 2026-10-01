@@ -40,7 +40,10 @@ Python. Before this ADR:
    - Structs are JSON objects with snake_case field names equal to the Rust field names; `Option` is always emitted
      (`null` when absent).
    - Unit enums are lower snake_case strings (`"buy"`, `"stop_limit"`, `"partially_filled"`); `Currency` is its ISO
-     code (`"INR"`).
+     code (`"INR"`). Every wire enum is declared through `honba_messages::enum_with_all!`, which generates an `ALL`
+     list from the definition; `honba._honba.wire_enum_values()` exposes those lists and a cross-language test
+     requires them to equal `honba.entities.wire.ENUMS` and sends every Python value through `canonical_json`, so a
+     variant added on one side only fails CI.
    - Identifier newtypes (`Venue`, `OrderId`, `TradeId`) are plain strings; `InstrumentId` is
      `{"symbol", "venue"}`.
    - `UnixNanos` is a JSON integer (u64). Values above 2^53 are exact in Rust and Python but not in JavaScript;

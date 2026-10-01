@@ -8,72 +8,80 @@ use crate::validation::{
     finite_opt, positive, serialize_finite, serialize_finite_opt, InvariantError,
 };
 
-/// Which side of the book an order sits on.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum OrderSide {
-    /// Buy side.
-    Buy,
-    /// Sell side.
-    Sell,
-    /// No side specified.
-    NoOrderSide,
+crate::enum_with_all! {
+    /// Which side of the book an order sits on.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    #[non_exhaustive]
+    pub enum OrderSide {
+        /// Buy side.
+        Buy,
+        /// Sell side.
+        Sell,
+        /// No side specified.
+        NoOrderSide,
+    }
 }
 
-/// The kind of execution instruction.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum OrderType {
-    /// Execute at the best available price.
-    Market,
-    /// Execute at or better than a limit price.
-    Limit,
-    /// Become a market order when a stop price is touched.
-    StopMarket,
-    /// Become a limit order when a stop price is touched.
-    StopLimit,
+crate::enum_with_all! {
+    /// The kind of execution instruction.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    #[non_exhaustive]
+    pub enum OrderType {
+        /// Execute at the best available price.
+        Market,
+        /// Execute at or better than a limit price.
+        Limit,
+        /// Become a market order when a stop price is touched.
+        StopMarket,
+        /// Become a limit order when a stop price is touched.
+        StopLimit,
+    }
 }
 
-/// The current lifecycle state of an order.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum OrderStatus {
-    /// Created locally, not yet sent.
-    Initialized,
-    /// Sent to the venue, awaiting acknowledgement.
-    Submitted,
-    /// Acknowledged by the venue.
-    Accepted,
-    /// Partially filled.
-    PartiallyFilled,
-    /// Fully filled.
-    Filled,
-    /// Cancelled by the client or venue.
-    Cancelled,
-    /// Rejected by the venue.
-    Rejected,
-    /// Expired according to its time-in-force.
-    Expired,
+crate::enum_with_all! {
+    /// The current lifecycle state of an order.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    #[non_exhaustive]
+    pub enum OrderStatus {
+        /// Created locally, not yet sent.
+        Initialized,
+        /// Sent to the venue, awaiting acknowledgement.
+        Submitted,
+        /// Acknowledged by the venue.
+        Accepted,
+        /// Partially filled.
+        PartiallyFilled,
+        /// Fully filled.
+        Filled,
+        /// Cancelled by the client or venue.
+        Cancelled,
+        /// Rejected by the venue.
+        Rejected,
+        /// Expired according to its time-in-force.
+        Expired,
+    }
 }
 
-/// How long an order remains active.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum TimeInForce {
-    /// Good till cancelled.
-    Gtc,
-    /// Immediate or cancel.
-    Ioc,
-    /// Fill or kill.
-    Fok,
-    /// Valid until the end of the trading day.
-    Day,
-    /// Good till a specified date.
-    Gtd,
+crate::enum_with_all! {
+    /// How long an order remains active.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    #[non_exhaustive]
+    pub enum TimeInForce {
+        /// Good till cancelled.
+        Gtc,
+        /// Immediate or cancel.
+        Ioc,
+        /// Fill or kill.
+        Fok,
+        /// Valid until the end of the trading day.
+        Day,
+        /// Good till a specified date.
+        Gtd,
+    }
 }
 
 /// A client order.
@@ -332,6 +340,17 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(err.contains("quantity"), "{err}");
+    }
+
+    #[test]
+    fn all_lists_every_variant_once() {
+        assert_eq!(
+            OrderSide::ALL,
+            &[OrderSide::Buy, OrderSide::Sell, OrderSide::NoOrderSide]
+        );
+        assert_eq!(OrderType::ALL.len(), 4);
+        assert_eq!(OrderStatus::ALL.len(), 8);
+        assert_eq!(TimeInForce::ALL.len(), 5);
     }
 
     #[test]

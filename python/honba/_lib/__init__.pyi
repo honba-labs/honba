@@ -5,6 +5,7 @@ from typing import Final, List, Optional, Tuple
 SCHEMA_VERSION: Final[int]
 
 def canonical_json(kind: str, payload: str) -> str: ...
+def wire_enum_values() -> dict[str, list[str]]: ...
 
 class InstrumentId:
     symbol: str

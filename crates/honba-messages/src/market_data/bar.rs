@@ -6,40 +6,44 @@ use crate::events::timestamp::UnixNanos;
 use crate::identifiers::InstrumentId;
 use crate::validation::{finite, non_negative, serialize_finite, InvariantError};
 
-/// How a bar aggregates its underlying data.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum BarAggregation {
-    /// Aggregate every N ticks.
-    Tick,
-    /// Aggregate every N seconds.
-    Second,
-    /// Aggregate every N minutes.
-    Minute,
-    /// Aggregate every N hours.
-    Hour,
-    /// Aggregate every N days.
-    Day,
-    /// Aggregate every N weeks.
-    Week,
-    /// Aggregate every N calendar months.
-    Month,
+crate::enum_with_all! {
+    /// How a bar aggregates its underlying data.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    #[non_exhaustive]
+    pub enum BarAggregation {
+        /// Aggregate every N ticks.
+        Tick,
+        /// Aggregate every N seconds.
+        Second,
+        /// Aggregate every N minutes.
+        Minute,
+        /// Aggregate every N hours.
+        Hour,
+        /// Aggregate every N days.
+        Day,
+        /// Aggregate every N weeks.
+        Week,
+        /// Aggregate every N calendar months.
+        Month,
+    }
 }
 
-/// Which price of the underlying data feeds the bar.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum PriceType {
-    /// Use the bid price.
-    Bid,
-    /// Use the ask price.
-    Ask,
-    /// Use the midpoint.
-    Mid,
-    /// Use the last traded price.
-    Last,
+crate::enum_with_all! {
+    /// Which price of the underlying data feeds the bar.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    #[non_exhaustive]
+    pub enum PriceType {
+        /// Use the bid price.
+        Bid,
+        /// Use the ask price.
+        Ask,
+        /// Use the midpoint.
+        Mid,
+        /// Use the last traded price.
+        Last,
+    }
 }
 
 /// Describes how a [`Bar`] aggregates its inputs.

@@ -6,17 +6,19 @@ use crate::events::timestamp::UnixNanos;
 use crate::identifiers::{InstrumentId, TradeId};
 use crate::validation::{finite, non_negative, serialize_finite, InvariantError};
 
-/// Which side initiated a trade.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum AggressorSide {
-    /// The buyer was the aggressor.
-    Buyer,
-    /// The seller was the aggressor.
-    Seller,
-    /// The venue did not report an aggressor.
-    NoAggressor,
+crate::enum_with_all! {
+    /// Which side initiated a trade.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    #[non_exhaustive]
+    pub enum AggressorSide {
+        /// The buyer was the aggressor.
+        Buyer,
+        /// The seller was the aggressor.
+        Seller,
+        /// The venue did not report an aggressor.
+        NoAggressor,
+    }
 }
 
 /// A top-of-book quote update.

@@ -7,15 +7,17 @@ use serde::{Deserialize, Serialize};
 use crate::error::{EntitiesError, Result};
 use crate::instrument::Currency;
 
-/// The direction of a position.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum PositionSide {
-    /// Long (net bought).
-    Long,
-    /// Short (net sold).
-    Short,
+honba_messages::enum_with_all! {
+    /// The direction of a position.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    #[non_exhaustive]
+    pub enum PositionSide {
+        /// Long (net bought).
+        Long,
+        /// Short (net sold).
+        Short,
+    }
 }
 
 impl PositionSide {

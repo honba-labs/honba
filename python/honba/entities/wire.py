@@ -354,6 +354,23 @@ MODELS: Final[dict[str, Any]] = {
 }
 """Wire-contract type name (as in the golden files and ``canonical_json``) to model."""
 
+ENUMS: Final[dict[str, type[Enum]]] = {
+    "OrderSide": OrderSide,
+    "OrderType": OrderType,
+    "OrderStatus": OrderStatus,
+    "TimeInForce": TimeInForce,
+    "BarAggregation": BarAggregation,
+    "PriceType": PriceType,
+    "AggressorSide": AggressorSide,
+    "PositionSide": PositionSide,
+    "Currency": Currency,
+}
+"""Wire enum name (as in ``honba._honba.wire_enum_values``) to its Python enum.
+
+Aliases (``OrderType.STOP``) are not separate members, so iterating an enum
+yields exactly its canonical wire values.
+"""
+
 _ADAPTERS: Final[dict[str, TypeAdapter[Any]]] = {
     name: TypeAdapter(model) for name, model in MODELS.items()
 }
