@@ -1,4 +1,5 @@
 """Unit tests for the wire-contract surface of ``honba._honba`` (ADR 006)."""
+
 from __future__ import annotations
 
 import json
@@ -24,8 +25,11 @@ def test_canonical_json_rejects_unknown_kind():
 
 
 def test_canonical_json_rejects_invalid_payload():
-    bad = {"schema_version": 99, "event": {"type": "order_cancelled", "order_id": "O",
-                                           "ts_event": 1}, "ts_init": 1}
+    bad = {
+        "schema_version": 99,
+        "event": {"type": "order_cancelled", "order_id": "O", "ts_event": 1},
+        "ts_init": 1,
+    }
     with pytest.raises(ValueError, match="schema_version"):
         _honba.canonical_json("Message", json.dumps(bad))
 

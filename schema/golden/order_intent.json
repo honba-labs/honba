@@ -184,6 +184,36 @@
         "time_in_force": "day",
         "extra": 1
       }
+    },
+    {
+      "name": "legacy_stop_name_not_canonical",
+      "value": {
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "venue": "NSE"
+        },
+        "side": "buy",
+        "quantity": 75.0,
+        "order_type": "stop",
+        "price": null,
+        "trigger_price": 22050.0,
+        "time_in_force": "day"
+      }
+    },
+    {
+      "name": "quantity_as_string",
+      "value": {
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "venue": "NSE"
+        },
+        "side": "buy",
+        "quantity": "75.0",
+        "order_type": "market",
+        "price": null,
+        "trigger_price": null,
+        "time_in_force": "day"
+      }
     }
   ]
 }
