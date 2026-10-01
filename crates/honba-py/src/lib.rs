@@ -16,3 +16,6 @@ pub fn register_embedded(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pyclasses::register(m)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests;
