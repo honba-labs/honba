@@ -8,6 +8,7 @@ use crate::instrument::Currency;
 
 /// The direction of a position.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum PositionSide {
     /// Long (net bought).
@@ -54,7 +55,8 @@ impl PositionSide {
 /// assert_eq!(pos.quantity(), 100.0);
 /// assert_eq!(pos.avg_price(), 22_025.0);   // (75*22000 + 25*22100) / 100
 /// ```
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Position {
     instrument_id: InstrumentId,
     currency: Currency,
@@ -182,5 +184,16 @@ impl Position {
                 self.instrument_id, self.quantity
             )))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn position_side_serializes_lowercase() {
+        assert_eq!(serde_json::to_value(PositionSide::Long).unwrap(), "long");
+        assert_eq!(serde_json::to_value(PositionSide::Short).unwrap(), "short");
     }
 }

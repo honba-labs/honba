@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 /// assert_eq!(Currency::Inr.to_string(), "INR");
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
 #[non_exhaustive]
 pub enum Currency {
     /// Indian rupee.
@@ -216,5 +217,19 @@ impl Instrument {
     /// Returns the minimum price increment.
     pub fn tick_size(&self) -> f64 {
         self.tick_size
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn currency_serializes_as_iso_code() {
+        for c in [Currency::Inr, Currency::Usd, Currency::Eur, Currency::Gbp] {
+            let json = serde_json::to_value(c).unwrap();
+            assert_eq!(json, c.code());
+            assert_eq!(serde_json::from_value::<Currency>(json).unwrap(), c);
+        }
     }
 }

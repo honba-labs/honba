@@ -11,3 +11,6 @@ description = "Domain entities: instruments, positions, portfolios, trades"
 honba-messages.workspace = true
 thiserror.workspace = true
 serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
