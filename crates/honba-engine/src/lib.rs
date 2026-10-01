@@ -25,3 +25,6 @@ pub use error::{AlgoError, Result};
 pub use execution::ExecutionEngine;
 pub use handler::{Handler, NoopHandler};
 pub use queue::EventQueue;
+
+#[cfg(test)]
+mod tests;
