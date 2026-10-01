@@ -19,13 +19,18 @@ class LinearRegressionValue:
 @indicator("linear_regression", "trend", outputs=("value", "slope", "upper", "lower"),
            warmup=lambda s: s.length)
 class LinearRegression(Indicator):
-    """Linear regression channel over ``length`` closes: value = end of the least-squares line,
-    slope per bar, upper/lower = value +/- deviation * population std of the residuals. O(1) per update (``RollingLinReg``); NaN while a non-finite or
-    ``|v| > 1e150`` close is in the window. The residual std is ``sqrt(sse / n)`` with ``sse``
-    from running sums, so a near-perfect fit has std error ~1.5e-8 window standard deviations.
+    """Linear regression channel over ``length`` closes.
+
+    value = end of the least-squares line, slope per bar, upper/lower = value +/- deviation *
+    population std of the residuals. O(1) per update (``RollingLinReg``); NaN while a non-finite
+    or ``|v| > 1e150`` close is in the window. The residual std is ``sqrt(sse / n)`` with ``sse``
+    from running sums, so a near-perfect fit has std error up to ~2.9e-8 window standard
+    deviations.
     """
 
-    def __init__(self, length: int = 100, upper_deviation: float = 2.0, lower_deviation: float = 2.0) -> None:
+    def __init__(
+        self, length: int = 100, upper_deviation: float = 2.0, lower_deviation: float = 2.0
+    ) -> None:
         if length < 2:
             raise ValueError(f"length must be >= 2, got {length}")
         if upper_deviation < 0 or lower_deviation < 0:

@@ -125,7 +125,8 @@ class RollingMoments:
     A windowful of constant huge values is likewise NaN. Recovery is therefore immediate, not
     left to the periodic rebuild, and costs no ``O(period)`` work while the value is inside.
 
-    A window of identical values reports variance exactly 0. ``ddof`` follows numpy (0 = population).
+    A window of identical values reports variance exactly 0. ``ddof`` follows numpy
+    (0 = population).
 
     ``update_raw`` is the hot path (returns a plain ``(mean, variance, std)`` tuple; a full,
     finite window takes one inlined branch of a few arithmetic operations); ``update`` wraps it
@@ -422,10 +423,12 @@ class RollingPairMoments:
                 sx, sy, nmx, nmy = self._sx, self._sy, self._mx, self._my
                 m2x, m2y, c = self._m2x, self._m2y, self._c
             if self._rx >= n:  # constant x window: exact zero variance and covariance
-                self._sx, self._mx, self._m2x, self._px, self._c, self._pc = x, 0.0, 0.0, 0.0, 0.0, 0.0
+                self._sx, self._mx, self._m2x = x, 0.0, 0.0
+                self._px = self._c = self._pc = 0.0
                 sx, nmx, m2x, c = x, 0.0, 0.0, 0.0
             if self._ry >= n:
-                self._sy, self._my, self._m2y, self._py, self._c, self._pc = y, 0.0, 0.0, 0.0, 0.0, 0.0
+                self._sy, self._my, self._m2y = y, 0.0, 0.0
+                self._py = self._c = self._pc = 0.0
                 sy, nmy, m2y, c = y, 0.0, 0.0, 0.0
             d = self._d
             vx = m2x / d
@@ -511,9 +514,10 @@ class RollingLinReg:
     ``sse`` falling below ``1e-6 * m2``, see below).
     Slope and intercept keep a relative error ~1e-12 while ``|T|`` stays above ``1e-4`` of its
     peak. ``sse`` is a difference of two sums of squares, so its absolute error is ~``eps * m2``
-    even right after a rebuild: the residual std of a near-perfect fit is good to ~``1.5e-8``
-    window standard deviations (more between rebuilds, which the ``sse < 1e-6 * m2`` guard
-    requests as often as the rate limit allows); ``sse`` is clamped at zero. The window is
+    even right after a rebuild: the residual std of a near-perfect fit is good to ~``2.9e-8``
+    window standard deviations (measured worst case over the test series; more between
+    rebuilds, which the ``sse < 1e-6 * m2`` guard requests as often as the rate limit allows);
+    ``sse`` is clamped at zero. The window is
     rebuilt once when it first fills.
 
     ``update_raw`` is the hot path (plain ``(intercept, slope, sse)`` tuple); ``update`` wraps it
@@ -641,7 +645,8 @@ class RollingLinReg:
                 self._recompute()
                 sh, nm, m2, tv = self._sh, self._m, self._m2, self._t
             if self._run >= n:  # constant window: exactly flat, zero residual
-                self._sh, self._m, self._m2, self._t, self._p2, self._pt = y, 0.0, 0.0, 0.0, 0.0, 0.0
+                self._sh, self._m, self._m2 = y, 0.0, 0.0
+                self._t = self._p2 = self._pt = 0.0
                 self._s = self._sc = 0.0
                 sh, nm, m2, tv = y, 0.0, 0.0, 0.0
             slope = tv / self._sxx

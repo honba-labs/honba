@@ -9,8 +9,9 @@ from honba.strategies.indicators._rolling import RollingPairMoments
 
 @indicator("correlation", "statistical", inputs=("close", "benchmark"), warmup=lambda s: s.length)
 class Correlation(Indicator):
-    """Pearson correlation of close vs benchmark PRICES over ``length`` bars (TradingView ta.correlation).
+    """Pearson correlation of close vs benchmark PRICES over ``length`` bars.
 
+    Matches TradingView ``ta.correlation``.
     Returns 0.0 when either window has zero variance. O(1) per update (``RollingPairMoments``);
     NaN while a non-finite or ``|v| > 1e150`` value is in either window (the old O(n) code
     returned 1.0 there by accident of ``min``/``max`` with NaN), exact again once it has left.

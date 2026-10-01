@@ -250,6 +250,7 @@ def _old_wma(w):
     return sum(k * v for k, v in enumerate(w, 1)) / (n * (n + 1) / 2)
 
 
+@pytest.mark.slow
 def test_moments_recovers_after_nan():
     rm = RollingMoments(5)
     for x in [1, 2, 3, NAN]:
@@ -263,6 +264,7 @@ def test_moments_recovers_after_nan():
     assert r.mean == pytest.approx(m, **TOL) and r.std == pytest.approx(sd, **TOL)
 
 
+@pytest.mark.slow
 def test_moments_recovers_after_inf():
     rm = RollingMoments(5)
     out = [rm.update(float(x)) for x in [1, 2, INF, 3, 4, 5, 6, 7, 8, 9, 10]]
@@ -270,6 +272,7 @@ def test_moments_recovers_after_inf():
     assert out[-1].mean == pytest.approx(8.0)
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("bad", [NAN, INF, -INF])
 @pytest.mark.parametrize("period", [3, 5])
 def test_moments_nan_duration_matches_old(bad, period):
@@ -330,6 +333,7 @@ def _spike_series(noise, spike, base=100.0, quiet=300, seed=5):
     return xs
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("noise,spike", [(1e-2, 1e5), (1e-2, 1e7), (1e-3, 1e7), (1.0, 1e9)])
 def test_moments_no_stale_residue_after_outlier(noise, spike):
     period = 20
@@ -344,6 +348,7 @@ def test_moments_no_stale_residue_after_outlier(noise, spike):
     assert worst < 1e-9
 
 
+@pytest.mark.slow
 def test_zscore_no_stale_residue_after_outlier():
     ind, w = build_indicator("zscore", length=20), deque(maxlen=20)
     for x in _spike_series(1e-2, 1e7):
@@ -354,6 +359,7 @@ def test_zscore_no_stale_residue_after_outlier():
             assert got == pytest.approx((x - m) / sd, rel=1e-6, abs=1e-6)
 
 
+@pytest.mark.slow
 def test_moments_decaying_cascade_of_spikes():
     """Each drop is <1e4 but the cumulative drop is huge; residue must not survive."""
     period = 10
@@ -404,6 +410,7 @@ def test_wma_periodic_recompute_bounds_drift():
     assert got == pytest.approx(_old_wma(w), rel=1e-12)
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("period", [300])
 @pytest.mark.parametrize("sid", SIDS)
 def test_long_period_crosses_recompute_boundary(sid, period):
@@ -527,6 +534,7 @@ def _ramps():
 RAMPS = _ramps()
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("period", [2, 3, 4, 5, 7, 10, 50])
 @pytest.mark.parametrize("name", list(RAMPS))
 def test_moments_smooth_trend_std_error(name, period):
@@ -541,6 +549,7 @@ def test_moments_smooth_trend_std_error(name, period):
     assert worst <= 1e-9, worst
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("period", [20, 100, 300])
 def test_moments_rebuild_rate_on_random_walk(period):
     import honba.strategies.indicators._rolling as mod
@@ -632,6 +641,7 @@ def _warmup_spike_worst(kind, period, spike, seed=3):
     return worst
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("kind", ["sum", "wma"])
 @pytest.mark.parametrize("spike", [1e8, 1e9, 1e200])
 def test_spike_inside_warmup_leaves_no_residue(kind, spike):
@@ -716,6 +726,7 @@ def _alternating_wma(period, s=1e6, bars=200):
     return xs
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("kind", ["sum", "wma"])
 @pytest.mark.parametrize("period", [10, 20, 50, 100])
 def test_guard_rebuild_rate_limited_on_adversarial_input(kind, period):
@@ -724,6 +735,7 @@ def test_guard_rebuild_rate_limited_on_adversarial_input(kind, period):
     assert rate <= 2 / period + 0.01, rate
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("kind", ["sum", "wma"])
 @pytest.mark.parametrize("period", [10, 50])
 def test_guard_rebuild_rate_on_zero_mean_noise(kind, period):

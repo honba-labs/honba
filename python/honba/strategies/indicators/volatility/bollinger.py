@@ -15,12 +15,16 @@ class BollingerValue:
     lower: float
 
 
-@indicator("bollinger", "volatility", outputs=("upper", "middle", "lower"), warmup=lambda s: s.period)
+@indicator(
+    "bollinger", "volatility", outputs=("upper", "middle", "lower"), warmup=lambda s: s.period
+)
 class Bollinger(Indicator):
     """Bands at ``mult`` (upper) and ``mult_lower`` (default ``mult``) population
     standard deviations around the SMA."""
 
-    def __init__(self, period: int = 20, mult: float = 2.0, mult_lower: float | None = None) -> None:
+    def __init__(
+        self, period: int = 20, mult: float = 2.0, mult_lower: float | None = None
+    ) -> None:
         self.period, self.mult = _check(period), mult
         self.mult_lower = mult if mult_lower is None else mult_lower
         if mult < 0 or self.mult_lower < 0:

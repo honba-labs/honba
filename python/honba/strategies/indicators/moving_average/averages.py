@@ -170,4 +170,6 @@ def make_ma(kind: str, period: int):
     try:
         return _MA_KINDS[kind](period)
     except KeyError:
-        raise ValueError(f"unknown moving average {kind!r}; choose from {sorted(_MA_KINDS)}") from None
+        raise ValueError(
+            f"unknown moving average {kind!r}; choose from {sorted(_MA_KINDS)}"
+        ) from None

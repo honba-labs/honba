@@ -5,10 +5,13 @@ from honba.strategies.indicators._base import Indicator, indicator
 from honba.strategies.indicators._rolling import RollingPairMoments
 
 
-@indicator("covariance", "statistical", inputs=("close", "benchmark"), warmup=lambda s: s.length + 1)
+@indicator(
+    "covariance", "statistical", inputs=("close", "benchmark"), warmup=lambda s: s.length + 1
+)
 class Covariance(Indicator):
-    """Sample covariance (divisor n-1) of asset and benchmark simple returns over ``length`` returns.
+    """Sample covariance (divisor n-1) of asset and benchmark simple returns.
 
+    Taken over ``length`` returns.
     O(1) per update (``RollingPairMoments``, ddof=1); NaN while a non-finite or ``|v| > 1e150``
     return is in either window, exact again once it has left.
     """

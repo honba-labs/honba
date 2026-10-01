@@ -11,8 +11,9 @@ use ``|got - want| / max(|want|, 1e-4 * natural_scale)`` with a per-window natur
 guard's own threshold, so a quantity that crosses zero is not compared to an absolute zero.  The
 threshold is 1e-9 everywhere (the indicator-level std, read back from upper - value, is given an
 allowance of two ulps of the output for that subtraction's own rounding).  The residual std of a
-regression is relative (1e-9) while the fit is not near-perfect (std >= 1e-2 sigma_y) and absolute 1e-7 * sigma_y otherwise (subtracting two
-nearly equal sums of squares cannot do better than sqrt(eps) * sigma_y).
+regression is relative (1e-9) while the fit is not near-perfect (std >= 1e-2 sigma_y) and
+absolute 5e-8 * sigma_y otherwise (subtracting two nearly equal sums of squares cannot do better
+than sqrt(eps) * sigma_y; the measured worst is ~2.9e-8).
 """
 
 import math
@@ -163,7 +164,7 @@ def errors(got: dict, want: dict, sc: dict) -> dict:
     for k, w in want.items():
         g = got[k]
         if k == "std":
-            d = w if w >= 1e-2 * sc[k] else 100.0 * sc[k]
+            d = w if w >= 1e-2 * sc[k] else 50.0 * sc[k]  # 50 * TOL = 5e-8 * sigma_y
             d = d if d > 0 else 1e-9  # constant window: std must be exactly 0
             diff = max(0.0, abs(g - w) - 2.0 * got.get("ulp", 0.0))  # output rounding
             out[k] = diff / d if math.isfinite(g) else math.inf
@@ -310,6 +311,7 @@ def _helpers():
     return _rolling.RollingPairMoments, _rolling.RollingLinReg
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("sid", PIDS)
 @pytest.mark.parametrize("period,ddof", [(1, 0), (2, 0), (2, 1), (20, 0), (20, 1), (200, 1)])
 def test_pair_moments_matches_exact(sid, period, ddof):
@@ -351,6 +353,7 @@ def test_pair_moments_ddof_validation_and_period():
         RollingLinReg(1)
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("sid", PIDS)
 @pytest.mark.parametrize("period", [2, 3, 20, 200])
 def test_linreg_matches_exact(sid, period):
@@ -383,6 +386,7 @@ def test_linreg_matches_exact(sid, period):
 # -- 2. indicators vs old code and exact, on the shared series -------------------------------------
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("kind", ALL_KINDS)
 @pytest.mark.parametrize("sid", PIDS)
 @pytest.mark.parametrize("period", [2, 5, 20, 60])
@@ -392,6 +396,7 @@ def test_indicator_matches_exact(kind, sid, period):
     check_worst(worst, label=(kind, sid, period))
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("kind", ALL_KINDS)
 @pytest.mark.parametrize("sid", ["walk", "flat_then_noise", "collinear"])
 @pytest.mark.parametrize("period", [2, 7, 25])
@@ -401,6 +406,7 @@ def test_indicator_matches_old_code(kind, sid, period):
     check_worst(worst_old, label=(kind, sid, period))
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("kind", ALL_KINDS)
 @pytest.mark.parametrize("sid", PIDS)
 def test_long_period_12000_bars_crosses_rebuild_boundary(kind, sid):
@@ -410,6 +416,7 @@ def test_long_period_12000_bars_crosses_rebuild_boundary(kind, sid):
     check_worst(worst, label=(kind, sid))
 
 
+@pytest.mark.slow
 def test_lsma_offset_matches_old_code():
     xs, ys = PAIRS["walk"]
     for off in (-3, 0, 4, 30):
@@ -458,12 +465,31 @@ def test_constant_windows_and_zero_variance_outputs():
 
 
 def test_constant_window_with_inexact_mean_is_exactly_zero_variance():
-    """Documented deviation: the old two-pass code returned float noise for 0.1 * n windows
-    (mean != 0.1 after summing); a constant window is now exactly degenerate."""
-    assert (
-        _last(build_indicator("correlation", length=3), [(0.1, 1.0), (0.1, 3.0), (0.1, 2.0)]) == 0.0
-    )
-    assert _last(build_indicator("covariance", length=3), [(1.0, 0.1)] * 5) == 0.0
+    """Documented deviation: the old two-pass code returned float noise for constant windows
+    whose mean is not exactly representable (sum(0.1 * n) / n != 0.1); a constant window is now
+    exactly degenerate.  Each input below made the old code (6a91432^) return noise: correlation
+    -7.5e-17 instead of 0.0, lsma 0.10000000000000002 instead of 0.1, a nonzero slope and
+    residual band for linear_regression (period 7)."""
+    ys = [1.0, 3.0, 2.0, 5.0, 4.0, 7.0]
+    assert _last(build_indicator("correlation", length=6), [(0.1, y) for y in ys]) == 0.0
+    assert _last(build_indicator("lsma", period=3), [(0.1,)] * 3) == 0.1
+    out = _last(build_indicator("linear_regression", length=7), [(0.1,)] * 7)
+    assert (out.slope, out.value, out.upper, out.lower) == (0.0, 0.1, 0.1, 0.1)
+
+
+def test_constant_x_window_has_exactly_zero_pair_moments():
+    """Helper level (covariance / beta use ddof=1 / 0 pair moments of returns): a constant x
+    window with an inexact mean has zero variance and covariance, where the old centred sums
+    (``old_cov_var``) give noise."""
+    RollingPairMoments, _ = _helpers()
+    xs, ys = [0.1] * 6, [1.0, 3.0, 2.0, 5.0, 4.0, 7.0]
+    _, vx_old, _ = old_cov_var(xs, ys, 1)
+    assert vx_old != 0.0  # the oracle really returns noise here
+    for ddof in (0, 1):
+        rp = RollingPairMoments(6, ddof=ddof)
+        got = [rp.update(x, y) for x, y in zip(xs, ys)][-1]
+        assert (got.var_x, got.cov) == (0.0, 0.0)
+        assert got.mean_x == 0.1
 
 
 def test_constant_windows_after_varying_values_are_exact():
@@ -477,7 +503,7 @@ def test_constant_windows_after_varying_values_are_exact():
     assert outs[-1] == 0.0
 
 
-# -- 4. non-finite and huge values -------------------------------------------------------------------
+# -- 4. non-finite and huge values -----------------------------------------------------------------
 
 
 def _bad_feeds(bad, where, p, n=60):
@@ -495,6 +521,7 @@ def _bad_feeds(bad, where, p, n=60):
     return feeds
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("bad", [NAN, INF, -INF, 1e160, -1e200])
 @pytest.mark.parametrize("where", ["x", "y", "both"])
 @pytest.mark.parametrize("period", [2, 3, 5])
@@ -513,6 +540,7 @@ def test_unsafe_values_nan_while_in_window_then_match_old(kind, where, bad, peri
         assert not is_nan_result(outs[-1])  # recovered by the end of the feed
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("bad", [NAN, INF, -INF, 1e160])
 @pytest.mark.parametrize("where", ["x", "y", "both"])
 @pytest.mark.parametrize("period", [1, 2, 3])
@@ -547,6 +575,7 @@ def test_helpers_unsafe_values(where, bad, period):
                     assert got.slope == pytest.approx(float(sxy / sxx), rel=1e-9, abs=1e-12)
 
 
+@pytest.mark.slow
 def test_nan_during_warmup_and_nan_in_both_do_not_poison():
     ind = build_indicator("correlation", length=4)
     assert ind.update(NAN, NAN) is None
@@ -557,7 +586,7 @@ def test_nan_during_warmup_and_nan_in_both_do_not_poison():
     assert out == pytest.approx(old_value("correlation", [1, 2, 3, 4], [2, 1, 5, 2])["v"])
 
 
-# -- 5. outlier residue -----------------------------------------------------------------------------
+# -- 5. outlier residue ----------------------------------------------------------------------------
 
 
 def _spiky(noise, spike, where, kind_scale=1.0, quiet=300, seed=5, at=60, both=False):
@@ -572,6 +601,7 @@ def _spiky(noise, spike, where, kind_scale=1.0, quiet=300, seed=5, at=60, both=F
     return xs, ys
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("noise,spike", [(1e-3, 1e3), (1e-2, 1e5), (1e-3, 1e7), (1.0, 1e9)])
 @pytest.mark.parametrize("period", [5, 20, 100])
 @pytest.mark.parametrize("where", ["x", "y", "both"])
@@ -582,6 +612,7 @@ def test_no_residue_after_outlier(kind, where, period, noise, spike):
     check_worst(worst, label=(kind, where, period, noise, spike))
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("noise,spike", [(1e-3, 1e3), (1e-2, 1e5), (1e-3, 1e7), (1.0, 1e9)])
 @pytest.mark.parametrize("period", [5, 20, 100])
 def test_linreg_helper_residual_std_after_outlier(period, noise, spike):
@@ -605,6 +636,7 @@ def test_linreg_helper_residual_std_after_outlier(period, noise, spike):
     check_worst(worst, label=(period, noise, spike))
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("period", [5, 20, 100])
 @pytest.mark.parametrize("spike", [1e6, 1e9])
 @pytest.mark.parametrize("kind", ALL_KINDS)
@@ -615,6 +647,7 @@ def test_spike_inside_first_period_bars(kind, period, spike):
         check_worst(worst, label=(kind, period, at, spike))
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("period", [5, 10, 20])
 @pytest.mark.parametrize("kind", ALL_KINDS)
 def test_decaying_cascade_of_spikes(kind, period):
@@ -629,7 +662,7 @@ def test_decaying_cascade_of_spikes(kind, period):
     check_worst(worst, label=(kind, period))
 
 
-# -- 6. smooth trends -------------------------------------------------------------------------------
+# -- 6. smooth trends ------------------------------------------------------------------------------
 
 
 def _curves(n=3000):
@@ -649,6 +682,7 @@ TREND_PERIODS = [2, 3, 4, 5, 7, 10, 50]
 WORST_TREND: dict = {}
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("period", TREND_PERIODS)
 @pytest.mark.parametrize("name", list(CURVES))
 @pytest.mark.parametrize("kind", ALL_KINDS)
@@ -661,6 +695,7 @@ def test_smooth_trend_error(kind, name, period):
     check_worst(worst, label=(kind, name, period))
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("period", TREND_PERIODS)
 @pytest.mark.parametrize("name", list(CURVES))
 def test_smooth_trend_slope_and_intercept_helper(name, period):
@@ -680,17 +715,22 @@ def test_smooth_trend_slope_and_intercept_helper(name, period):
     check_worst(worst, label=(name, period))
 
 
+@pytest.mark.slow
 def test_print_worst_trend_errors():
     """Informational: the maxima over all smooth-trend cases (run with -s)."""
-    print(
-        "\nworst smooth-trend errors:",
-        {f"{k[0]}.{k[1]}": v for k, v in WORST_TREND.items() if len(k) == 2},
-    )
+    worst = {f"{k[0]}.{k[1]}": v for k, v in WORST_TREND.items() if len(k) == 2}
+    helpers = {k: v for k, v in WORST_TREND.items() if len(k) == 3}
+    if not worst and not helpers:
+        pytest.skip("run together with test_smooth_trend_error to fill WORST_TREND")
+    print("\nworst smooth-trend errors:", worst)
+    assert all(v <= TOL for v in worst.values()), worst
+    assert all(e <= TOL for d in helpers.values() for e in d.values()), helpers
 
 
 # -- 7. variance cancellation: collinear and near-constant inputs ---------------------------------
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("noise", [0.0, 1e-12, 1e-9, 1e-6, 1e-3])
 @pytest.mark.parametrize("period", [2, 5, 20, 100])
 @pytest.mark.parametrize("kind", PAIR_KINDS)
@@ -732,7 +772,7 @@ def test_near_constant_single_ulp_changes():
     assert outs[-1] == 0.0 and outs[45] != 0.0  # after the step left: exactly the old 0.0
 
 
-# -- 8. amortised cost -------------------------------------------------------------------------------
+# -- 8. amortised cost -----------------------------------------------------------------------------
 
 
 def _count_rebuilds(cls_name, factory, updates):
@@ -765,6 +805,7 @@ def _walk(seed, bars=20_000):
     return out
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("period", [20, 100, 300])
 def test_pair_rebuild_rate_on_random_walks(period):
     rate = _count_rebuilds("RollingPairMoments", lambda c: c(period), _walk(11))
@@ -779,6 +820,7 @@ def test_pair_rebuild_rate_on_random_walks(period):
     assert rate_r < 0.01, rate_r
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("period", [20, 100, 300])
 def test_linreg_rebuild_rate_on_random_walks(period):
     rate = _count_rebuilds("RollingLinReg", lambda c: c(period), [(p[0],) for p in _walk(11)])
@@ -816,6 +858,7 @@ def _spike_train(period, bars=4000):
     ]
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("period", [10, 20, 50, 100])
 @pytest.mark.parametrize("gen", [_alternating_pair, _sawtooth, _spike_train])
 def test_rebuild_rate_bounded_on_adversarial_input(gen, period):
@@ -823,7 +866,8 @@ def test_rebuild_rate_bounded_on_adversarial_input(gen, period):
     rate = _count_rebuilds("RollingPairMoments", lambda c: c(period), data)
     rate_l = _count_rebuilds("RollingLinReg", lambda c: c(period), [(d[1],) for d in data])
     print(
-        f"\n{gen.__name__} p={period}: pair {rate:.4f} linreg {rate_l:.4f} bound {2 / period + 0.01:.4f}"
+        f"\n{gen.__name__} p={period}: pair {rate:.4f} linreg {rate_l:.4f} "
+        f"bound {2 / period + 0.01:.4f}"
     )
     assert rate <= 2 / period + 0.01, rate
     assert rate_l <= 2 / period + 0.01, rate_l

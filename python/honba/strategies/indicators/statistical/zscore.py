@@ -7,7 +7,10 @@ from honba.strategies.indicators._rolling import RollingMoments
 
 @indicator("zscore", "statistical", warmup=lambda s: s.length)
 class ZScore(Indicator):
-    """(close - SMA) / population stdev over ``length`` bars (like ta.stdev, biased); 0.0 if stdev is 0."""
+    """(close - SMA) / population stdev over ``length`` bars (like ta.stdev, biased).
+
+    0.0 if the stdev is 0.
+    """
 
     def __init__(self, length: int = 20) -> None:
         if length < 2:
