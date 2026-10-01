@@ -32,3 +32,6 @@ pub use error::{AnalyticsError, Result};
 pub use report::PerformanceReport;
 pub use round_trip::RoundTrip;
 pub use trade_stats::TradeStats;
+
+#[cfg(test)]
+mod tests;
