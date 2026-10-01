@@ -39,3 +39,6 @@ pub use indicator::Indicator;
 pub use macd::{Macd, MacdValue};
 pub use rsi::Rsi;
 pub use sma::Sma;
+
+#[cfg(test)]
+mod tests;
