@@ -6,16 +6,18 @@ strategy runs in backtest, paper and live.
 """
 from __future__ import annotations
 
+from abc import ABC
 from typing import ClassVar
 
 from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
 from honba.entities.order import OrderIntent, OrderSide
+from honba.entities.tick import QuoteTick, TradeTick
 from honba.entities.trade import Trade
 
 
-class Strategy:
-    """Subclass, set ``name``, override the hooks you need."""
+class Strategy(ABC):
+    """Subclass, set ``name``, override the hooks you need (ADR 008)."""
 
     name: ClassVar[str]
 
@@ -32,6 +34,12 @@ class Strategy:
     def on_start(self) -> None: ...
 
     def on_bar(self, bar: Bar) -> None: ...
+
+    def on_quote(self, quote: QuoteTick) -> None:
+        """Top-of-book update."""
+
+    def on_trade(self, trade: TradeTick) -> None:
+        """A market trade print (the strategy's own executions arrive in ``on_fill``)."""
 
     def on_fill(self, fill: Trade) -> None: ...
 

@@ -1,5 +1,6 @@
 //! Unit tests for this crate, one file per area.
 
+mod context;
 mod intent;
 
 use honba_messages::{InstrumentId, Venue};

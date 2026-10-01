@@ -10,6 +10,7 @@
 //! closes the loop inside the event kernel.
 
 pub mod buy_and_hold;
+pub mod context;
 pub mod intent;
 pub mod rsi_reversal;
 pub mod runner;
@@ -17,6 +18,7 @@ pub mod sma_crossover;
 pub mod strategy;
 
 pub use buy_and_hold::BuyAndHold;
+pub use context::StrategyContext;
 pub use intent::{IntentError, OrderIntent};
 pub use rsi_reversal::RsiReversal;
 pub use runner::{IntentRejection, StrategyRunner};

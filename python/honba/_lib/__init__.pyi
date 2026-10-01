@@ -6,6 +6,21 @@ SCHEMA_VERSION: Final[int]
 
 def canonical_json(kind: str, payload: str) -> str: ...
 def wire_enum_values() -> dict[str, list[str]]: ...
+def run_strategy(
+    strategy: str,
+    params: str,
+    events: str,
+    instruments: str = "[]",
+    initial_cash: float = 0.0,
+) -> str:
+    """Run a Rust reference strategy over JSON wire messages (ADR 008).
+
+    ``strategy`` is ``"contract_probe"``, ``"buy_and_hold"`` or ``"sma_crossover"``;
+    ``params``, ``events`` (a list of wire ``Message``) and ``instruments`` are JSON.
+    Orders fill at the last bar close (``BarFillEngine``). Returns JSON with
+    ``intents``, ``fills``, ``observations``, ``positions`` and ``cash``.
+    Raises ``ValueError`` for an unknown strategy or invalid JSON.
+    """
 
 class InstrumentId:
     symbol: str

@@ -28,6 +28,7 @@ from pydantic import (
 from honba.entities import instrument as _instrument
 from honba.entities import order as _order
 from honba.entities.order import OrderSide, OrderStatus, OrderType, TimeInForce
+from honba.entities.tick import AggressorSide
 
 SCHEMA_VERSION: Final[int] = 1
 """Wire-contract version; must equal ``honba_messages::SCHEMA_VERSION``."""
@@ -84,12 +85,6 @@ class PriceType(Enum):
     ASK = "ask"
     MID = "mid"
     LAST = "last"
-
-
-class AggressorSide(Enum):
-    BUYER = "buyer"
-    SELLER = "seller"
-    NO_AGGRESSOR = "no_aggressor"
 
 
 WireOrderSide = Annotated[OrderSide, _canonical(OrderSide)]
