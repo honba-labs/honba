@@ -67,3 +67,6 @@ pub use india::error::IndiaError;
 pub use india::profile::IndiaMarketProfile;
 #[cfg(feature = "india")]
 pub use india::universes::nifty50::{Nifty50, NIFTY50_SIZE};
+
+#[cfg(test)]
+mod tests;
