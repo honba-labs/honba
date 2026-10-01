@@ -72,7 +72,9 @@ fn order_intent_invalid_cases_are_rejected() {
 #[test]
 fn stop_limit_intent_becomes_order_with_both_prices() {
     let intent = OrderIntent::stop_limit_buy(nifty(), 75.0, 22_000.0, 22_010.0);
-    let order = intent.into_order(OrderId::new("O-1"), UnixNanos::from_u64(5));
+    let order = intent
+        .into_order(OrderId::new("O-1"), UnixNanos::from_u64(5))
+        .unwrap();
     assert_eq!(order.order_type(), OrderType::StopLimit);
     assert_eq!(order.price(), Some(22_010.0));
     assert_eq!(order.trigger_price(), Some(22_000.0));

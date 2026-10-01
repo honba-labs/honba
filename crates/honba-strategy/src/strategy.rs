@@ -3,7 +3,7 @@
 use honba_engine::{Handler, Result};
 use honba_messages::{Bar, Event, QuoteTick, TradeTick, UnixNanos};
 
-use crate::intent::OrderIntent;
+use crate::intent::{IntentError, OrderIntent};
 
 /// A trading strategy.
 ///
@@ -41,6 +41,13 @@ pub trait Strategy: Send + 'static {
     /// Called when the runner receives a fill for an order the strategy
     /// emitted. Default is a no-op.
     fn on_fill(&mut self, _fill: &honba_entities::Trade) -> Result<()> {
+        Ok(())
+    }
+
+    /// Called when the runner rejects an intent the strategy emitted because
+    /// it violates the [`OrderIntent`] invariants. No order was submitted for
+    /// it. Default is a no-op.
+    fn on_intent_rejected(&mut self, _intent: &OrderIntent, _error: &IntentError) -> Result<()> {
         Ok(())
     }
 

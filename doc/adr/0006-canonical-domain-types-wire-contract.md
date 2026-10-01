@@ -49,13 +49,20 @@ Python. Before this ADR:
 4. **Domain additions (additive where possible).**
    - `OrderIntent` gains `trigger_price` and `stop_*` / `stop_limit_*` constructors. `price` is the limit price only.
      Invariants (both languages): market has neither price; limit needs `price`; stop-market needs `trigger_price`
-     and no `price`; stop-limit needs both; side is buy or sell; quantity > 0. Deserialization enforces them.
+     and no `price`; stop-limit needs both; side is buy or sell; quantity > 0; prices finite. The fields stay public
+     and the constructors are infallible, so an `OrderIntent` *value* may be invalid; what is guaranteed is that an
+     invalid intent never becomes an `Order`: deserialization rejects it, and `OrderIntent::into_order` (the only
+     intent -> order path) validates and returns `Result<Order, IntentError>`. `StrategyRunner` does not submit a
+     rejected intent; it records an `IntentRejection { intent, error, ts_init }` (`StrategyRunner::rejections`),
+     calls `Strategy::on_intent_rejected` (default no-op) and continues the run. In Python the `OrderIntent`
+     dataclass and the wire model validate on construction.
    - `Order` gains an optional `trigger_price` (`with_trigger_price`), so a stop-limit intent survives conversion.
    - `Trade` gains `costs` (total transaction costs in settlement currency, default 0, `with_costs`).
    - Python `OrderType.STOP` becomes an alias of `STOP_MARKET` (`"stop"` still parses); `TimeInForce` gains `FOK`,
      `GTD`; `OrderSide` gains `NO_ORDER_SIDE` (wire-only; intents reject it).
 
 ## Consequences
+- Breaking (Rust): `OrderIntent::into_order` returns `Result<Order, IntentError>`.
 - Breaking (Rust): `Event::Order*::order_id` is now `OrderId` (`"O-1".into()` still compiles via `From<&str>`);
   `OrderIntent` has a new public field (struct literals must add `trigger_price`); `PositionSide` and `Currency`
   serialize as `"long"` / `"INR"` (affects `honba-analytics` `RoundTrip` JSON output).
@@ -64,3 +71,9 @@ Python. Before this ADR:
 - Adding or changing a wire field requires updating the golden vectors in the same commit; a breaking change bumps
   `SCHEMA_VERSION` in both `honba_messages` and `honba.entities.wire`.
 - Money stays `f64` here; the integer-money decision is E0-S6.
+
+## Known gaps
+- `honba-sim`'s `BarFillEngine` fills every order at the last bar close, ignoring `order_type`, `price` and
+  `trigger_price`: stop and stop-limit orders (and limit orders) are filled immediately as if they were market
+  orders. The intent and order types carry stop prices correctly, but no simulator honours them yet. Tracked as a
+  follow-up ticket; it is not part of E0-S2.

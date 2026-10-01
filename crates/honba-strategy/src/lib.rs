@@ -19,6 +19,6 @@ pub mod strategy;
 pub use buy_and_hold::BuyAndHold;
 pub use intent::{IntentError, OrderIntent};
 pub use rsi_reversal::RsiReversal;
-pub use runner::StrategyRunner;
+pub use runner::{IntentRejection, StrategyRunner};
 pub use sma_crossover::SmaCrossover;
 pub use strategy::{Strategy, StrategyAdapter};

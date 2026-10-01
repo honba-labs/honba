@@ -265,7 +265,9 @@ fn intent_into_order_preserves_fields() {
 
     let id = InstrumentId::new("X", Venue::new("TEST"));
     let intent = OrderIntent::market_buy(id.clone(), 75.0);
-    let order = intent.into_order(OrderId::new("O-1"), UnixNanos::from_u64(100));
+    let order = intent
+        .into_order(OrderId::new("O-1"), UnixNanos::from_u64(100))
+        .unwrap();
 
     assert_eq!(order.order_id().as_str(), "O-1");
     assert_eq!(order.instrument_id(), &id);

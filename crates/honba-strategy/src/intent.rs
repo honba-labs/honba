@@ -11,8 +11,9 @@ use serde::{Deserialize, Serialize};
 /// unique ids and timestamps. This indirection keeps strategies free of
 /// bookkeeping they shouldn't care about.
 ///
-/// Price fields by order type (checked by [`OrderIntent::validate`] and on
-/// deserialization):
+/// Price fields by order type (checked by [`OrderIntent::validate`], on
+/// deserialization, and by [`OrderIntent::into_order`], so an invalid intent
+/// built with a constructor or struct literal never becomes an [`Order`]):
 ///
 /// | `order_type`  | `price` (limit) | `trigger_price` (stop) |
 /// |---------------|-----------------|------------------------|
@@ -299,8 +300,25 @@ impl OrderIntent {
         }
     }
 
-    /// Converts the intent into a concrete order.
-    pub fn into_order(self, order_id: OrderId, ts: UnixNanos) -> Order {
+    /// Validates the intent and converts it into a concrete order.
+    ///
+    /// This is the only way from an intent to an [`Order`], so an intent that
+    /// breaks its invariants (for example `market_buy(id, -1.0)`, or a limit
+    /// intent without a price built with a struct literal) can never become
+    /// one.
+    ///
+    /// ```
+    /// use honba_strategy::{IntentError, OrderIntent};
+    /// use honba_messages::{InstrumentId, OrderId, UnixNanos, Venue};
+    ///
+    /// let id = InstrumentId::new("NIFTY50", Venue::new("NSE"));
+    /// let err = OrderIntent::market_buy(id, -1.0)
+    ///     .into_order(OrderId::new("O-1"), UnixNanos::from_u64(1))
+    ///     .unwrap_err();
+    /// assert_eq!(err, IntentError::NonPositiveQuantity(-1.0));
+    /// ```
+    pub fn into_order(self, order_id: OrderId, ts: UnixNanos) -> Result<Order, IntentError> {
+        self.validate()?;
         let order = Order::new(
             order_id,
             self.instrument_id,
@@ -312,10 +330,10 @@ impl OrderIntent {
             ts,
             ts,
         );
-        match self.trigger_price {
+        Ok(match self.trigger_price {
             Some(trigger) => order.with_trigger_price(trigger),
             None => order,
-        }
+        })
     }
 }
 
@@ -420,10 +438,35 @@ mod tests {
 
     #[test]
     fn into_order_keeps_trigger_price() {
-        let order = OrderIntent::stop_buy(id(), 1.0, 10.0).into_order(OrderId::new("O"), 1.into());
+        let order = OrderIntent::stop_buy(id(), 1.0, 10.0)
+            .into_order(OrderId::new("O"), 1.into())
+            .unwrap();
         assert_eq!(order.trigger_price(), Some(10.0));
         assert_eq!(order.price(), None);
-        let order = OrderIntent::market_buy(id(), 1.0).into_order(OrderId::new("O"), 1.into());
+        let order = OrderIntent::market_buy(id(), 1.0)
+            .into_order(OrderId::new("O"), 1.into())
+            .unwrap();
         assert_eq!(order.trigger_price(), None);
+    }
+
+    #[test]
+    fn into_order_rejects_invalid_intents() {
+        let o = OrderId::new("O");
+        assert_eq!(
+            OrderIntent::market_buy(id(), -1.0).into_order(o.clone(), 1.into()),
+            Err(IntentError::NonPositiveQuantity(-1.0))
+        );
+        let no_price = OrderIntent {
+            price: None,
+            ..OrderIntent::limit_sell(id(), 1.0, 10.0)
+        };
+        assert_eq!(
+            no_price.into_order(o.clone(), 1.into()),
+            Err(IntentError::MissingPrice(OrderType::Limit))
+        );
+        assert_eq!(
+            OrderIntent::stop_sell(id(), 1.0, f64::INFINITY).into_order(o, 1.into()),
+            Err(IntentError::NonFinitePrice)
+        );
     }
 }

@@ -1,16 +1,32 @@
 //! The `StrategyRunner`: glues a strategy to an execution engine.
 
-use honba_engine::{ExecutionEngine, Handler, Result};
+use honba_engine::{AlgoError, ExecutionEngine, Handler, Result};
 use honba_entities::Trade;
 use honba_messages::{Event, OrderId, UnixNanos};
 
+use crate::intent::{IntentError, OrderIntent};
 use crate::strategy::{Strategy, StrategyAdapter};
+
+/// An intent the runner refused to turn into an order.
+#[derive(Clone, Debug, PartialEq)]
+pub struct IntentRejection {
+    /// The rejected intent, as the strategy emitted it.
+    pub intent: OrderIntent,
+    /// Which invariant it broke.
+    pub error: IntentError,
+    /// The `ts_init` of the event during which it was emitted.
+    pub ts_init: UnixNanos,
+}
 
 /// Wraps a [`Strategy`] with an [`ExecutionEngine`], closing the loop:
 ///
 /// 1. Dispatch the incoming event to the strategy.
 /// 2. Drain any [`OrderIntent`](crate::OrderIntent)s the strategy produced.
-/// 3. Convert them into orders with generated ids and submit them.
+/// 3. Validate them and convert them into orders with generated ids and
+///    submit them. An intent that breaks the [`OrderIntent`] invariants is
+///    not submitted: it is recorded as an [`IntentRejection`] (see
+///    [`Self::rejections`]) and reported to the strategy through
+///    [`Strategy::on_intent_rejected`]; the run continues.
 /// 4. Drain fills from the execution engine and feed them back to the
 ///    strategy via [`Strategy::on_fill`].
 ///
@@ -37,6 +53,7 @@ pub struct StrategyRunner<S: Strategy, E: ExecutionEngine> {
     execution: E,
     order_seq: u64,
     fills: Vec<Trade>,
+    rejections: Vec<IntentRejection>,
 }
 
 impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
@@ -47,6 +64,7 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
             execution,
             order_seq: 0,
             fills: Vec::new(),
+            rejections: Vec::new(),
         }
     }
 
@@ -63,6 +81,11 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
     /// Returns all fills produced during the run.
     pub fn fills(&self) -> &[Trade] {
         &self.fills
+    }
+
+    /// Returns every intent rejected during the run, in emission order.
+    pub fn rejections(&self) -> &[IntentRejection] {
+        &self.rejections
     }
 
     /// Consumes the runner, returning the strategy, execution engine, and fills.
@@ -95,8 +118,21 @@ impl<S: Strategy, E: ExecutionEngine> Handler for StrategyRunner<S, E> {
         // 2. Drain intents and submit them.
         let intents = self.adapter.drain_intents();
         for intent in intents {
+            if let Err(error) = intent.validate() {
+                self.adapter
+                    .inner_mut()
+                    .on_intent_rejected(&intent, &error)?;
+                self.rejections.push(IntentRejection {
+                    intent,
+                    error,
+                    ts_init,
+                });
+                continue;
+            }
             let id = self.next_order_id();
-            let order = intent.into_order(id, ts_init);
+            let order = intent
+                .into_order(id, ts_init)
+                .map_err(|e| AlgoError::Component(e.to_string()))?;
             self.execution.submit(order)?;
         }
 
