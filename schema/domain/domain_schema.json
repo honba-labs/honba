@@ -1,0 +1,951 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HonbaDomainEnvelope",
+  "description": "Honba canonical wire models generated from Rust single source of truth contracts",
+  "type": "object",
+  "properties": {
+    "message": {
+      "$ref": "#/$defs/Message"
+    },
+    "event": {
+      "$ref": "#/$defs/Event"
+    },
+    "order": {
+      "$ref": "#/$defs/Order"
+    },
+    "order_intent": {
+      "$ref": "#/$defs/OrderIntent"
+    },
+    "trade": {
+      "$ref": "#/$defs/Trade"
+    },
+    "position": {
+      "$ref": "#/$defs/Position"
+    },
+    "bar": {
+      "$ref": "#/$defs/Bar"
+    },
+    "instrument_id": {
+      "$ref": "#/$defs/InstrumentId"
+    }
+  },
+  "$defs": {
+    "InstrumentId": {
+      "additionalProperties": false,
+      "properties": {
+        "symbol": {
+          "title": "Symbol",
+          "type": "string"
+        },
+        "venue": {
+          "title": "Venue",
+          "type": "string"
+        }
+      },
+      "required": [
+        "symbol",
+        "venue"
+      ],
+      "title": "InstrumentId",
+      "type": "object"
+    },
+    "BarAggregation": {
+      "enum": [
+        "tick",
+        "second",
+        "minute",
+        "hour",
+        "day",
+        "week",
+        "month"
+      ],
+      "title": "BarAggregation",
+      "type": "string"
+    },
+    "BarSpecification": {
+      "additionalProperties": false,
+      "properties": {
+        "step": {
+          "maximum": 18446744073709551615,
+          "minimum": 1,
+          "title": "Step",
+          "type": "integer"
+        },
+        "aggregation": {
+          "$ref": "#/$defs/BarAggregation"
+        },
+        "price_type": {
+          "$ref": "#/$defs/PriceType"
+        }
+      },
+      "required": [
+        "step",
+        "aggregation",
+        "price_type"
+      ],
+      "title": "BarSpecification",
+      "type": "object"
+    },
+    "BarType": {
+      "additionalProperties": false,
+      "properties": {
+        "instrument_id": {
+          "$ref": "#/$defs/InstrumentId"
+        },
+        "spec": {
+          "$ref": "#/$defs/BarSpecification"
+        }
+      },
+      "required": [
+        "instrument_id",
+        "spec"
+      ],
+      "title": "BarType",
+      "type": "object"
+    },
+    "PriceType": {
+      "enum": [
+        "bid",
+        "ask",
+        "mid",
+        "last"
+      ],
+      "title": "PriceType",
+      "type": "string"
+    },
+    "Bar": {
+      "additionalProperties": false,
+      "description": "OHLCV bar; ``low <= open, close <= high`` and ``volume >= 0``.",
+      "properties": {
+        "bar_type": {
+          "$ref": "#/$defs/BarType"
+        },
+        "open": {
+          "title": "Open",
+          "type": "number"
+        },
+        "high": {
+          "title": "High",
+          "type": "number"
+        },
+        "low": {
+          "title": "Low",
+          "type": "number"
+        },
+        "close": {
+          "title": "Close",
+          "type": "number"
+        },
+        "volume": {
+          "minimum": 0,
+          "title": "Volume",
+          "type": "number"
+        },
+        "ts_event": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "title": "Ts Event",
+          "type": "integer"
+        },
+        "ts_init": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "title": "Ts Init",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "bar_type",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "ts_event",
+        "ts_init"
+      ],
+      "title": "Bar",
+      "type": "object"
+    },
+    "OrderSide": {
+      "enum": [
+        "buy",
+        "sell",
+        "no_order_side"
+      ],
+      "title": "OrderSide",
+      "type": "string"
+    },
+    "OrderStatus": {
+      "enum": [
+        "initialized",
+        "submitted",
+        "accepted",
+        "partially_filled",
+        "filled",
+        "cancelled",
+        "rejected",
+        "expired"
+      ],
+      "title": "OrderStatus",
+      "type": "string"
+    },
+    "OrderType": {
+      "enum": [
+        "market",
+        "limit",
+        "stop_market",
+        "stop_limit",
+        "stop_market"
+      ],
+      "title": "OrderType",
+      "type": "string"
+    },
+    "TimeInForce": {
+      "enum": [
+        "day",
+        "gtc",
+        "ioc",
+        "fok",
+        "gtd"
+      ],
+      "title": "TimeInForce",
+      "type": "string"
+    },
+    "Order": {
+      "additionalProperties": false,
+      "description": "A client order record; ``quantity > 0`` (``side`` may be ``no_order_side``).",
+      "properties": {
+        "order_id": {
+          "title": "Order Id",
+          "type": "string"
+        },
+        "instrument_id": {
+          "$ref": "#/$defs/InstrumentId"
+        },
+        "side": {
+          "$ref": "#/$defs/OrderSide"
+        },
+        "order_type": {
+          "$ref": "#/$defs/OrderType"
+        },
+        "quantity": {
+          "exclusiveMinimum": 0,
+          "title": "Quantity",
+          "type": "number"
+        },
+        "price": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Price"
+        },
+        "trigger_price": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trigger Price"
+        },
+        "status": {
+          "$ref": "#/$defs/OrderStatus"
+        },
+        "time_in_force": {
+          "$ref": "#/$defs/TimeInForce"
+        },
+        "ts_event": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "title": "Ts Event",
+          "type": "integer"
+        },
+        "ts_init": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "title": "Ts Init",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "order_id",
+        "instrument_id",
+        "side",
+        "order_type",
+        "quantity",
+        "status",
+        "time_in_force",
+        "ts_event",
+        "ts_init"
+      ],
+      "title": "Order",
+      "type": "object"
+    },
+    "OrderIntent": {
+      "additionalProperties": false,
+      "properties": {
+        "instrument_id": {
+          "$ref": "#/$defs/InstrumentId"
+        },
+        "side": {
+          "$ref": "#/$defs/OrderSide"
+        },
+        "quantity": {
+          "title": "Quantity",
+          "type": "number"
+        },
+        "order_type": {
+          "$ref": "#/$defs/OrderType"
+        },
+        "price": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Price"
+        },
+        "trigger_price": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trigger Price"
+        },
+        "time_in_force": {
+          "$ref": "#/$defs/TimeInForce"
+        }
+      },
+      "required": [
+        "instrument_id",
+        "side",
+        "quantity",
+        "order_type",
+        "time_in_force"
+      ],
+      "title": "OrderIntent",
+      "type": "object"
+    },
+    "Trade": {
+      "additionalProperties": false,
+      "description": "A fill; ``side`` is buy or sell, ``quantity > 0``, ``price > 0``.",
+      "properties": {
+        "order_id": {
+          "title": "Order Id",
+          "type": "string"
+        },
+        "instrument_id": {
+          "$ref": "#/$defs/InstrumentId"
+        },
+        "side": {
+          "$ref": "#/$defs/OrderSide"
+        },
+        "quantity": {
+          "exclusiveMinimum": 0,
+          "title": "Quantity",
+          "type": "number"
+        },
+        "price": {
+          "exclusiveMinimum": 0,
+          "title": "Price",
+          "type": "number"
+        },
+        "costs": {
+          "title": "Costs",
+          "type": "number"
+        },
+        "ts_event": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "title": "Ts Event",
+          "type": "integer"
+        },
+        "ts_init": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "title": "Ts Init",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "order_id",
+        "instrument_id",
+        "side",
+        "quantity",
+        "price",
+        "costs",
+        "ts_event",
+        "ts_init"
+      ],
+      "title": "Trade",
+      "type": "object"
+    },
+    "Currency": {
+      "enum": [
+        "INR",
+        "USD",
+        "EUR",
+        "GBP"
+      ],
+      "title": "Currency",
+      "type": "string"
+    },
+    "PositionSide": {
+      "enum": [
+        "long",
+        "short"
+      ],
+      "title": "PositionSide",
+      "type": "string"
+    },
+    "Position": {
+      "additionalProperties": false,
+      "description": "A position; ``quantity`` and ``avg_price`` are ``>= 0`` (``side`` gives direction).",
+      "properties": {
+        "instrument_id": {
+          "$ref": "#/$defs/InstrumentId"
+        },
+        "currency": {
+          "$ref": "#/$defs/Currency"
+        },
+        "side": {
+          "$ref": "#/$defs/PositionSide"
+        },
+        "quantity": {
+          "minimum": 0,
+          "title": "Quantity",
+          "type": "number"
+        },
+        "avg_price": {
+          "minimum": 0,
+          "title": "Avg Price",
+          "type": "number"
+        },
+        "realized_pnl": {
+          "title": "Realized Pnl",
+          "type": "number"
+        }
+      },
+      "required": [
+        "instrument_id",
+        "currency",
+        "side",
+        "quantity",
+        "avg_price",
+        "realized_pnl"
+      ],
+      "title": "Position",
+      "type": "object"
+    },
+    "AggressorSide": {
+      "description": "Which side initiated a market trade.",
+      "enum": [
+        "buyer",
+        "seller",
+        "no_aggressor"
+      ],
+      "title": "AggressorSide",
+      "type": "string"
+    },
+    "BarEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "bar_type": {
+          "$ref": "#/$defs/BarType"
+        },
+        "open": {
+          "title": "Open",
+          "type": "number"
+        },
+        "high": {
+          "title": "High",
+          "type": "number"
+        },
+        "low": {
+          "title": "Low",
+          "type": "number"
+        },
+        "close": {
+          "title": "Close",
+          "type": "number"
+        },
+        "volume": {
+          "minimum": 0,
+          "title": "Volume",
+          "type": "number"
+        },
+        "ts_event": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "title": "Ts Event",
+          "type": "integer"
+        },
+        "ts_init": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "title": "Ts Init",
+          "type": "integer"
+        },
+        "type": {
+          "const": "bar",
+          "default": "bar",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bar_type",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "ts_event",
+        "ts_init"
+      ],
+      "title": "BarEvent",
+      "type": "object"
+    },
+    "OrderAccepted": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "order_accepted",
+          "default": "order_accepted",
+          "title": "Type",
+          "type": "string"
+        },
+        "order_id": {
+          "title": "Order Id",
+          "type": "string"
+        },
+        "ts_event": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "title": "Ts Event",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "order_id",
+        "ts_event"
+      ],
+      "title": "OrderAccepted",
+      "type": "object"
+    },
+    "OrderCancelled": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "order_cancelled",
+          "default": "order_cancelled",
+          "title": "Type",
+          "type": "string"
+        },
+        "order_id": {
+          "title": "Order Id",
+          "type": "string"
+        },
+        "ts_event": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "title": "Ts Event",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "order_id",
+        "ts_event"
+      ],
+      "title": "OrderCancelled",
+      "type": "object"
+    },
+    "OrderEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "order_id": {
+          "title": "Order Id",
+          "type": "string"
+        },
+        "instrument_id": {
+          "$ref": "#/$defs/InstrumentId"
+        },
+        "side": {
+          "$ref": "#/$defs/OrderSide"
+        },
+        "order_type": {
+          "$ref": "#/$defs/OrderType"
+        },
+        "quantity": {
+          "exclusiveMinimum": 0,
+          "title": "Quantity",
+          "type": "number"
+        },
+        "price": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Price"
+        },
+        "trigger_price": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trigger Price"
+        },
+        "status": {
+          "$ref": "#/$defs/OrderStatus"
+        },
+        "time_in_force": {
+          "$ref": "#/$defs/TimeInForce"
+        },
+        "ts_event": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "title": "Ts Event",
+          "type": "integer"
+        },
+        "ts_init": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "title": "Ts Init",
+          "type": "integer"
+        },
+        "type": {
+          "const": "order",
+          "default": "order",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "order_id",
+        "instrument_id",
+        "side",
+        "order_type",
+        "quantity",
+        "status",
+        "time_in_force",
+        "ts_event",
+        "ts_init"
+      ],
+      "title": "OrderEvent",
+      "type": "object"
+    },
+    "OrderFilled": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "order_filled",
+          "default": "order_filled",
+          "title": "Type",
+          "type": "string"
+        },
+        "order_id": {
+          "title": "Order Id",
+          "type": "string"
+        },
+        "last_qty": {
+          "exclusiveMinimum": 0,
+          "title": "Last Qty",
+          "type": "number"
+        },
+        "last_px": {
+          "title": "Last Px",
+          "type": "number"
+        },
+        "ts_event": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "title": "Ts Event",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "order_id",
+        "last_qty",
+        "last_px",
+        "ts_event"
+      ],
+      "title": "OrderFilled",
+      "type": "object"
+    },
+    "OrderRejected": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "order_rejected",
+          "default": "order_rejected",
+          "title": "Type",
+          "type": "string"
+        },
+        "order_id": {
+          "title": "Order Id",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "ts_event": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "title": "Ts Event",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "order_id",
+        "reason",
+        "ts_event"
+      ],
+      "title": "OrderRejected",
+      "type": "object"
+    },
+    "QuoteEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "instrument_id": {
+          "$ref": "#/$defs/InstrumentId"
+        },
+        "bid_price": {
+          "title": "Bid Price",
+          "type": "number"
+        },
+        "ask_price": {
+          "title": "Ask Price",
+          "type": "number"
+        },
+        "bid_size": {
+          "minimum": 0,
+          "title": "Bid Size",
+          "type": "number"
+        },
+        "ask_size": {
+          "minimum": 0,
+          "title": "Ask Size",
+          "type": "number"
+        },
+        "ts_event": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "title": "Ts Event",
+          "type": "integer"
+        },
+        "ts_init": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "title": "Ts Init",
+          "type": "integer"
+        },
+        "type": {
+          "const": "quote",
+          "default": "quote",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "instrument_id",
+        "bid_price",
+        "ask_price",
+        "bid_size",
+        "ask_size",
+        "ts_event",
+        "ts_init"
+      ],
+      "title": "QuoteEvent",
+      "type": "object"
+    },
+    "TradeEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "instrument_id": {
+          "$ref": "#/$defs/InstrumentId"
+        },
+        "price": {
+          "title": "Price",
+          "type": "number"
+        },
+        "size": {
+          "minimum": 0,
+          "title": "Size",
+          "type": "number"
+        },
+        "aggressor_side": {
+          "$ref": "#/$defs/AggressorSide"
+        },
+        "trade_id": {
+          "title": "Trade Id",
+          "type": "string"
+        },
+        "ts_event": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "title": "Ts Event",
+          "type": "integer"
+        },
+        "ts_init": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "title": "Ts Init",
+          "type": "integer"
+        },
+        "type": {
+          "const": "trade",
+          "default": "trade",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "instrument_id",
+        "price",
+        "size",
+        "aggressor_side",
+        "trade_id",
+        "ts_event",
+        "ts_init"
+      ],
+      "title": "TradeEvent",
+      "type": "object"
+    },
+    "Event": {
+      "discriminator": {
+        "mapping": {
+          "bar": "#/$defs/BarEvent",
+          "order": "#/$defs/OrderEvent",
+          "order_accepted": "#/$defs/OrderAccepted",
+          "order_cancelled": "#/$defs/OrderCancelled",
+          "order_filled": "#/$defs/OrderFilled",
+          "order_rejected": "#/$defs/OrderRejected",
+          "quote": "#/$defs/QuoteEvent",
+          "trade": "#/$defs/TradeEvent"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/QuoteEvent"
+        },
+        {
+          "$ref": "#/$defs/TradeEvent"
+        },
+        {
+          "$ref": "#/$defs/BarEvent"
+        },
+        {
+          "$ref": "#/$defs/OrderEvent"
+        },
+        {
+          "$ref": "#/$defs/OrderAccepted"
+        },
+        {
+          "$ref": "#/$defs/OrderRejected"
+        },
+        {
+          "$ref": "#/$defs/OrderFilled"
+        },
+        {
+          "$ref": "#/$defs/OrderCancelled"
+        }
+      ]
+    },
+    "Message": {
+      "additionalProperties": false,
+      "description": "The versioned envelope; ``schema_version`` must equal ``SCHEMA_VERSION``.",
+      "properties": {
+        "schema_version": {
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "event": {
+          "discriminator": {
+            "mapping": {
+              "bar": "#/$defs/BarEvent",
+              "order": "#/$defs/OrderEvent",
+              "order_accepted": "#/$defs/OrderAccepted",
+              "order_cancelled": "#/$defs/OrderCancelled",
+              "order_filled": "#/$defs/OrderFilled",
+              "order_rejected": "#/$defs/OrderRejected",
+              "quote": "#/$defs/QuoteEvent",
+              "trade": "#/$defs/TradeEvent"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/QuoteEvent"
+            },
+            {
+              "$ref": "#/$defs/TradeEvent"
+            },
+            {
+              "$ref": "#/$defs/BarEvent"
+            },
+            {
+              "$ref": "#/$defs/OrderEvent"
+            },
+            {
+              "$ref": "#/$defs/OrderAccepted"
+            },
+            {
+              "$ref": "#/$defs/OrderRejected"
+            },
+            {
+              "$ref": "#/$defs/OrderFilled"
+            },
+            {
+              "$ref": "#/$defs/OrderCancelled"
+            }
+          ],
+          "title": "Event"
+        },
+        "ts_init": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "title": "Ts Init",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schema_version",
+        "event",
+        "ts_init"
+      ],
+      "title": "Message",
+      "type": "object"
+    }
+  }
+}

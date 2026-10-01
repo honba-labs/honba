@@ -2,10 +2,12 @@
 import typer
 
 from honba.cli.indicators import app as indicators_app
+from honba.cli.schema import app as schema_app
 
 app = typer.Typer(help="Honba - AI-native trading for Indian markets")
 
 app.add_typer(indicators_app, name="indicators")
+app.add_typer(schema_app, name="schema")
 
 
 @app.command()
