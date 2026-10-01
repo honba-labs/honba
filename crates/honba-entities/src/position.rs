@@ -65,15 +65,15 @@ impl PositionSide {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "PositionRepr")]
 pub struct Position {
-    instrument_id: InstrumentId,
-    currency: Currency,
-    side: PositionSide,
+    pub(crate) instrument_id: InstrumentId,
+    pub(crate) currency: Currency,
+    pub(crate) side: PositionSide,
     #[serde(serialize_with = "serialize_finite")]
-    quantity: f64,
+    pub(crate) quantity: f64,
     #[serde(serialize_with = "serialize_finite")]
-    avg_price: f64,
+    pub(crate) avg_price: f64,
     #[serde(serialize_with = "serialize_finite")]
-    realized_pnl: f64,
+    pub(crate) realized_pnl: f64,
 }
 
 /// The raw wire form, validated into a [`Position`].
@@ -231,54 +231,5 @@ impl Position {
                 self.instrument_id, self.quantity
             )))
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use honba_messages::{InvariantError, Venue};
-
-    fn short() -> Position {
-        let mut p = Position::flat(InstrumentId::new("X", Venue::new("NSE")), Currency::Inr);
-        p.apply_fill(PositionSide::Short, 60.0, 10.0);
-        p
-    }
-
-    #[test]
-    fn validate_reports_typed_errors() {
-        assert_eq!(short().validate(), Ok(()));
-        let negative = Position {
-            quantity: -5.0,
-            ..short()
-        };
-        assert_eq!(
-            negative.validate(),
-            Err(InvariantError::Negative {
-                field: "quantity",
-                value: -5.0,
-            })
-        );
-        let json = serde_json::to_value(negative).unwrap();
-        let err = serde_json::from_value::<Position>(json)
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("quantity"), "{err}");
-    }
-
-    #[test]
-    fn non_finite_values_never_serialize_as_null() {
-        let p = Position {
-            realized_pnl: f64::NAN,
-            ..short()
-        };
-        assert!(serde_json::to_string(&p).is_err());
-    }
-
-    #[test]
-    fn position_side_serializes_lowercase() {
-        assert_eq!(serde_json::to_value(PositionSide::Long).unwrap(), "long");
-        assert_eq!(serde_json::to_value(PositionSide::Short).unwrap(), "short");
     }
 }

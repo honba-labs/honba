@@ -44,3 +44,6 @@ pub use instrument::{Currency, Instrument, InstrumentKind, Money};
 pub use portfolio::{Account, Portfolio};
 pub use position::{Position, PositionSide};
 pub use trade::Trade;
+
+#[cfg(test)]
+mod tests;
