@@ -115,3 +115,34 @@ def test_python_run_matches_the_fixture(scenario):
     want = scenario["expected"]
     for key in ("intents", "fills", "observations", "positions", "cash"):
         assert got[key] == want[key], f"{scenario['name']}: {key}"
+
+
+def run_rust(scenario: dict[str, Any]) -> dict[str, Any]:
+    from honba import _honba
+
+    out = _honba.run_strategy(
+        scenario["strategy"],
+        json.dumps(scenario["params"]),
+        json.dumps(scenario["events"]),
+        json.dumps(scenario["instruments"]),
+        scenario["initial_cash"],
+    )
+    return json.loads(out)
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s["name"])
+def test_rust_strategy_through_the_binding_matches_python_and_the_fixture(scenario):
+    rust, python = run_rust(scenario), run_python(scenario)
+    assert rust == python, scenario["name"]
+    assert rust == scenario["expected"], scenario["name"]
+
+
+def test_run_strategy_rejects_unknown_strategies_and_bad_json():
+    from honba import _honba
+
+    params = json.dumps({"instrument_id": {"symbol": "X", "venue": "NSE"}, "quantity": 1.0})
+    with pytest.raises(ValueError, match="unknown strategy"):
+        _honba.run_strategy("nope", params, "[]")
+    with pytest.raises(ValueError):
+        _honba.run_strategy("buy_and_hold", params, "not json")
+    assert json.loads(_honba.run_strategy("buy_and_hold", params, "[]"))["fills"] == []

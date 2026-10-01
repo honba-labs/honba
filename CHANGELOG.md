@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Strategy contract (E0-S3, ADR 008)
+
+- Python `Strategy` is an ABC with `on_start`, `on_bar`, `on_quote`, `on_trade`, `on_fill` and
+  `on_stop` (the new hooks default to no-ops) and acts through `self.ctx`, a `StrategyContext`
+  (clock, positions, cash, busy, instrument lookup, submit). New: `LedgerContext`,
+  `StrategyRunner`, `honba.strategies.reference`, `honba.strategies.testing.BarCloseFills`,
+  domain `QuoteTick` / `TradeTick` / `Instrument`, `wire.loads_many`.
+- Compatibility (until 0.3): existing subclasses work unchanged, with or without
+  `super().__init__()`; overriding `drain_intents`, `handle_fill` or `handle_rejected` emits a
+  `DeprecationWarning` and is still honoured.
+- Breaking (Rust): `Strategy` hooks take `ctx: &mut dyn StrategyContext`, market-data hooks lose
+  `ts_init`, and `drain_intents` is gone (use `ctx.submit`). New: `LedgerContext`,
+  `ContractProbe`, `StrategyRunner::{with_context, context, submitted}`.
+- `honba._honba.run_strategy` runs a Rust reference strategy over JSON wire messages.
+- `schema/conformance/strategy_contract.json` is run by the Rust, Python and cross-language suites.
+
 ### Performance
 
 - Streaming indicators are now O(1) per update instead of O(period): Bollinger bands, z-score,

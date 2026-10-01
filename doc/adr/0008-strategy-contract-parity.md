@@ -97,7 +97,8 @@ this ADR:
 9. **Python binding.** `honba._honba.run_strategy(strategy, params, events, instruments="[]", initial_cash=0.0)`
    runs a Rust reference strategy over JSON wire messages with `BarFillEngine` and returns JSON (intents, fills,
    observations, positions, cash). It is the cross-language half of the conformance suite and a machine-readable
-   entry point for research and agents.
+   entry point for research and agents. Like the Python mirror it refuses (`ValueError`) an order submitted before
+   any bar instead of filling it at 0.0.
 
 ## Consequences
 - Breaking (Rust): every `Strategy` hook takes `ctx: &mut dyn StrategyContext`; market-data hooks lose `ts_init`;
@@ -112,7 +113,7 @@ this ADR:
 
 ## Known gaps
 - `BarFillEngine` fills at the last bar close of *any* instrument and at 0.0 before the first bar (ADR 006). The
-  fixture avoids both; the Python mirror raises instead of filling at 0.0.
+  fixture avoids both; the Python mirror and `run_strategy` raise instead of filling at 0.0.
 - `IntentRejection` is not exposed to Python; Python intents cannot be invalid.
 - Venue-side rejections and cancellations (an order state machine) are E2-S6; until then `release` is only driven by
   invariant rejections in Rust and by `handle_rejected` in Python.
