@@ -38,6 +38,17 @@ Optional extras: `ai` (openai, anthropic, litellm, mcp), `rl` (torch, gymnasium)
 
 CI: Rust job (fmt, check, clippy `-D warnings`, test, doctest, doc), dependency-graph check, and Python job (deps, maturin develop, stubtest, pytest) are all blocking.
 
+## Rust test layout (ADR 007)
+
+- **Unit tests** go in each crate's `src/tests/`: declare `#[cfg(test)] mod tests;` once in `lib.rs` (`main.rs` for
+  `honba-cli`), with `src/tests/mod.rs` and one file per area (`src/tests/<area>.rs`). No inline
+  `#[cfg(test)] mod tests { ... }` blocks in implementation files. Doctests stay on the items they document.
+- **Integration tests** go in `<crate>/tests/` and use only the public API (the CLI's run the built binary).
+- Tests needing internals get `pub(crate)` access, never a wider public API.
+- Shared test data: small helpers such as `any_instrument()` in each crate's `src/tests/mod.rs`; integration tests in
+  crates allowed to dev-depend on `honba-testing` use `honba_testing::fixtures`. Keep literals where the value matters.
+- Known gaps are `#[ignore = "known gap: ..."]` tests with the reason, not deleted or weakened assertions.
+
 ## Architecture
 
 **Crate layering.** `honba-messages` (L0: events, identifiers, market-data/order messages) is the base; `honba-entities` (L1: instruments, orders, positions, portfolio, trades) builds on it; `honba-market` (L2: generic market contracts, India pack, null test pack); `honba-engine` (L3: event loop, clock, queue, engine, execution traits) and `honba-indicators` (L3: pure compute); `honba-sim` (L4: simulator, paper execution, fill models) and `honba-strategy` (L4: Strategy trait, runner, reference models); `honba-analytics` (L5: metrics, tearsheet, Monte Carlo) and `honba-data` (L5: catalog, Parquet import/export, loaders); `honba-testing` (L6: test fixtures, VecFeed, assertions); `honba-py` (L7: PyO3 extension cdylib exposing `honba._honba`) and `honba-cli` (L7: native binary).
