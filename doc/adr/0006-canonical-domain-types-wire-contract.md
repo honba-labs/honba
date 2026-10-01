@@ -98,3 +98,6 @@ Python. Before this ADR:
   `trigger_price`: stop and stop-limit orders (and limit orders) are filled immediately as if they were market
   orders. The intent and order types carry stop prices correctly, but no simulator honours them yet. Tracked as a
   follow-up ticket; it is not part of E0-S2.
+- `BarFillEngine` has no reject path: an order submitted before any bar has been seen is filled at price 0.0
+  instead of being rejected or held. Pinned by an `#[ignore]`d test in `crates/honba-sim/src/tests/bar_fill.rs`.
+  Tracked as a follow-up ticket (the E2-S6 order-state machine gives it a proper reject event).
