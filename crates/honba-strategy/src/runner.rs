@@ -21,7 +21,7 @@ pub struct IntentRejection {
 /// Wraps a [`Strategy`] with an [`ExecutionEngine`], closing the loop:
 ///
 /// 1. Dispatch the incoming event to the strategy.
-/// 2. Drain any [`OrderIntent`](crate::OrderIntent)s the strategy produced.
+/// 2. Drain any [`OrderIntent`]s the strategy produced.
 /// 3. Validate them and convert them into orders with generated ids and
 ///    submit them. An intent that breaks the [`OrderIntent`] invariants is
 ///    not submitted: it is recorded as an [`IntentRejection`] (see
