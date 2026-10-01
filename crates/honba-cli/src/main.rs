@@ -1,6 +1,8 @@
 mod backtest;
 mod calendars;
 mod data;
+#[cfg(test)]
+mod tests;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};

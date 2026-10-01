@@ -14,14 +14,14 @@ use honba_strategy::{SmaCrossover, Strategy, StrategyRunner};
 use honba_testing::VecFeed;
 
 #[derive(Debug, Deserialize)]
-struct BacktestConfig {
+pub(crate) struct BacktestConfig {
     #[serde(default = "default_symbol")]
-    symbol: String,
+    pub(crate) symbol: String,
     #[serde(default = "default_venue")]
-    venue: String,
-    strategy: StrategyConfig,
+    pub(crate) venue: String,
+    pub(crate) strategy: StrategyConfig,
     #[serde(default = "default_starting_equity")]
-    starting_equity: f64,
+    pub(crate) starting_equity: f64,
 }
 
 fn default_symbol() -> String {
@@ -35,17 +35,17 @@ fn default_starting_equity() -> f64 {
 }
 
 #[derive(Debug, Deserialize)]
-struct StrategyConfig {
-    name: String,
+pub(crate) struct StrategyConfig {
+    pub(crate) name: String,
     #[serde(default)]
-    fast: usize,
+    pub(crate) fast: usize,
     #[serde(default)]
-    slow: usize,
+    pub(crate) slow: usize,
     #[serde(default)]
-    trade_size: f64,
+    pub(crate) trade_size: f64,
 }
 
-fn pair_fills(fills: &[Trade]) -> Vec<RoundTrip> {
+pub(crate) fn pair_fills(fills: &[Trade]) -> Vec<RoundTrip> {
     let mut trips = Vec::new();
     let mut i = 0;
     while i + 1 < fills.len() {
@@ -57,7 +57,7 @@ fn pair_fills(fills: &[Trade]) -> Vec<RoundTrip> {
     trips
 }
 
-fn equity_curve(starting: f64, trips: &[RoundTrip]) -> Vec<f64> {
+pub(crate) fn equity_curve(starting: f64, trips: &[RoundTrip]) -> Vec<f64> {
     let mut equity = vec![starting];
     let mut cur = starting;
     for t in trips {
