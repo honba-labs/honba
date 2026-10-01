@@ -1,13 +1,14 @@
 //! Unit tests for `crate::orders::order`.
 
-use crate::identifiers::{InstrumentId, OrderId, Venue};
+use super::any_instrument;
+use crate::identifiers::OrderId;
 use crate::orders::order::*;
 use crate::validation::InvariantError::*;
 
 fn order() -> Order {
     Order::new(
         OrderId::new("O"),
-        InstrumentId::new("X", Venue::new("NSE")),
+        any_instrument(),
         OrderSide::Buy,
         OrderType::Limit,
         5.0,

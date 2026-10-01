@@ -1,6 +1,6 @@
 //! Unit tests for `crate::market_data::bar`.
 
-use crate::identifiers::{InstrumentId, Venue};
+use super::any_instrument;
 use crate::market_data::bar::*;
 use crate::validation::InvariantError::{self, *};
 
@@ -9,7 +9,7 @@ fn spec(step: usize) -> BarSpecification {
 }
 
 fn valid() -> Bar {
-    let bar_type = BarType::new(InstrumentId::new("X", Venue::new("NSE")), spec(1));
+    let bar_type = BarType::new(any_instrument(), spec(1));
     Bar::new(bar_type, 10.0, 12.0, 9.0, 11.0, 5.0, 1.into(), 1.into())
 }
 

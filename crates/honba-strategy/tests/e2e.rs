@@ -7,6 +7,7 @@ use honba_entities::Trade;
 use honba_messages::{InstrumentId, Venue};
 use honba_sim::BarFillEngine;
 use honba_strategy::{SmaCrossover, StrategyRunner};
+use honba_testing::fixtures::any_instrument;
 use honba_testing::VecFeed;
 
 const CLOSES: &[f64] = &[
@@ -76,7 +77,7 @@ fn full_stack_produces_a_report() -> std::result::Result<(), Box<dyn std::error:
 #[test]
 fn runner_with_empty_feed_finishes() -> Result<()> {
     let mut feed = VecFeed::empty();
-    let strategy = SmaCrossover::new(InstrumentId::new("X", Venue::new("TEST")), 3, 8, 1.0);
+    let strategy = SmaCrossover::new(any_instrument(), 3, 8, 1.0);
     let execution = BarFillEngine::new();
     let mut runner = StrategyRunner::new(strategy, execution.clone());
 

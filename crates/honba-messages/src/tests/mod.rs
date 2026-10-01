@@ -6,3 +6,10 @@ mod identifiers;
 mod order;
 mod tick;
 mod validation;
+
+use crate::{InstrumentId, Venue};
+
+/// A placeholder instrument for tests where the instrument does not matter.
+fn any_instrument() -> InstrumentId {
+    InstrumentId::new("X", Venue::new("NSE"))
+}

@@ -1,24 +1,22 @@
 //! Unit tests for `crate::intent`.
 
-use honba_messages::{InstrumentId, OrderId, OrderSide, OrderType, Venue};
+use honba_messages::{OrderId, OrderSide, OrderType};
+
+use super::any_instrument;
 
 use crate::intent::*;
-
-fn id() -> InstrumentId {
-    InstrumentId::new("X", Venue::new("NSE"))
-}
 
 #[test]
 fn constructors_are_valid() {
     for i in [
-        OrderIntent::market_buy(id(), 1.0),
-        OrderIntent::market_sell(id(), 1.0),
-        OrderIntent::limit_buy(id(), 1.0, 10.0),
-        OrderIntent::limit_sell(id(), 1.0, 10.0),
-        OrderIntent::stop_buy(id(), 1.0, 10.0),
-        OrderIntent::stop_sell(id(), 1.0, 10.0),
-        OrderIntent::stop_limit_buy(id(), 1.0, 10.0, 10.5),
-        OrderIntent::stop_limit_sell(id(), 1.0, 10.0, 9.5),
+        OrderIntent::market_buy(any_instrument(), 1.0),
+        OrderIntent::market_sell(any_instrument(), 1.0),
+        OrderIntent::limit_buy(any_instrument(), 1.0, 10.0),
+        OrderIntent::limit_sell(any_instrument(), 1.0, 10.0),
+        OrderIntent::stop_buy(any_instrument(), 1.0, 10.0),
+        OrderIntent::stop_sell(any_instrument(), 1.0, 10.0),
+        OrderIntent::stop_limit_buy(any_instrument(), 1.0, 10.0, 10.5),
+        OrderIntent::stop_limit_sell(any_instrument(), 1.0, 10.0, 9.5),
     ] {
         assert_eq!(i.validate(), Ok(()), "{i:?}");
     }
@@ -26,7 +24,7 @@ fn constructors_are_valid() {
 
 #[test]
 fn stop_constructors_set_trigger_not_limit() {
-    let i = OrderIntent::stop_sell(id(), 2.0, 99.0);
+    let i = OrderIntent::stop_sell(any_instrument(), 2.0, 99.0);
     assert_eq!(i.order_type, OrderType::StopMarket);
     assert_eq!((i.price, i.trigger_price), (None, Some(99.0)));
     assert_eq!(i.side, OrderSide::Sell);
@@ -35,7 +33,7 @@ fn stop_constructors_set_trigger_not_limit() {
 #[test]
 fn validate_rejects_each_broken_rule() {
     use IntentError::*;
-    let base = OrderIntent::stop_limit_buy(id(), 1.0, 10.0, 10.5);
+    let base = OrderIntent::stop_limit_buy(any_instrument(), 1.0, 10.0, 10.5);
     let cases = [
         (
             OrderIntent {
@@ -100,12 +98,12 @@ fn validate_rejects_each_broken_rule() {
 
 #[test]
 fn into_order_keeps_trigger_price() {
-    let order = OrderIntent::stop_buy(id(), 1.0, 10.0)
+    let order = OrderIntent::stop_buy(any_instrument(), 1.0, 10.0)
         .into_order(OrderId::new("O"), 1.into())
         .unwrap();
     assert_eq!(order.trigger_price(), Some(10.0));
     assert_eq!(order.price(), None);
-    let order = OrderIntent::market_buy(id(), 1.0)
+    let order = OrderIntent::market_buy(any_instrument(), 1.0)
         .into_order(OrderId::new("O"), 1.into())
         .unwrap();
     assert_eq!(order.trigger_price(), None);
@@ -115,19 +113,19 @@ fn into_order_keeps_trigger_price() {
 fn into_order_rejects_invalid_intents() {
     let o = OrderId::new("O");
     assert_eq!(
-        OrderIntent::market_buy(id(), -1.0).into_order(o.clone(), 1.into()),
+        OrderIntent::market_buy(any_instrument(), -1.0).into_order(o.clone(), 1.into()),
         Err(IntentError::NonPositiveQuantity(-1.0))
     );
     let no_price = OrderIntent {
         price: None,
-        ..OrderIntent::limit_sell(id(), 1.0, 10.0)
+        ..OrderIntent::limit_sell(any_instrument(), 1.0, 10.0)
     };
     assert_eq!(
         no_price.into_order(o.clone(), 1.into()),
         Err(IntentError::MissingPrice(OrderType::Limit))
     );
     assert_eq!(
-        OrderIntent::stop_sell(id(), 1.0, f64::INFINITY).into_order(o, 1.into()),
+        OrderIntent::stop_sell(any_instrument(), 1.0, f64::INFINITY).into_order(o, 1.into()),
         Err(IntentError::NonFinitePrice)
     );
 }

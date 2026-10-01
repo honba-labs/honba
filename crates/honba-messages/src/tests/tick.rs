@@ -1,20 +1,17 @@
 //! Unit tests for `crate::market_data::tick`.
 
-use crate::identifiers::{InstrumentId, TradeId, Venue};
+use super::any_instrument;
+use crate::identifiers::TradeId;
 use crate::market_data::tick::*;
 use crate::validation::InvariantError::*;
 
-fn id() -> InstrumentId {
-    InstrumentId::new("X", Venue::new("NSE"))
-}
-
 fn quote() -> QuoteTick {
-    QuoteTick::new(id(), 10.0, 10.5, 1.0, 2.0, 1.into(), 1.into())
+    QuoteTick::new(any_instrument(), 10.0, 10.5, 1.0, 2.0, 1.into(), 1.into())
 }
 
 fn trade() -> TradeTick {
     TradeTick::new(
-        id(),
+        any_instrument(),
         10.0,
         3.0,
         AggressorSide::Buyer,

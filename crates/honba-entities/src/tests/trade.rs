@@ -1,13 +1,15 @@
 //! Unit tests for `crate::trade`.
 
-use honba_messages::{InstrumentId, OrderId, OrderSide, UnixNanos, Venue};
+use honba_messages::{OrderId, OrderSide, UnixNanos};
+
+use super::any_instrument;
 
 use crate::Trade;
 
 fn trade() -> Trade {
     Trade::new(
         OrderId::new("O-9"),
-        InstrumentId::new("X", Venue::new("NSE")),
+        any_instrument(),
         OrderSide::Sell,
         2.0,
         10.0,

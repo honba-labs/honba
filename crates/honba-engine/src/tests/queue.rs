@@ -1,6 +1,8 @@
 //! Unit tests for `crate::queue`.
 
-use honba_messages::{Event, InstrumentId, Message, QuoteTick, UnixNanos, Venue};
+use honba_messages::{Event, Message, QuoteTick, UnixNanos};
+
+use super::any_instrument;
 
 use crate::EventQueue;
 
@@ -11,7 +13,7 @@ fn ts(n: u64) -> UnixNanos {
 fn quote(t: u64) -> Message {
     Message::new(
         Event::Quote(QuoteTick::new(
-            InstrumentId::new("X", Venue::new("NSE")),
+            any_instrument(),
             1.0,
             2.0,
             1.0,

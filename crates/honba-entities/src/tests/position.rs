@@ -1,11 +1,13 @@
 //! Unit tests for `crate::position`.
 
-use honba_messages::{InstrumentId, InvariantError, Venue};
+use honba_messages::InvariantError;
+
+use super::any_instrument;
 
 use crate::{Currency, Position, PositionSide};
 
 fn short() -> Position {
-    let mut p = Position::flat(InstrumentId::new("X", Venue::new("NSE")), Currency::Inr);
+    let mut p = Position::flat(any_instrument(), Currency::Inr);
     p.apply_fill(PositionSide::Short, 60.0, 10.0);
     p
 }

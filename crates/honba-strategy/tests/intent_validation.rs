@@ -9,12 +9,13 @@ use std::sync::{Arc, Mutex};
 
 use honba_engine::{Engine, ExecutionEngine, Result};
 use honba_entities::Trade;
-use honba_messages::{Bar, InstrumentId, Order, OrderType, UnixNanos, Venue};
+use honba_messages::{Bar, InstrumentId, Order, OrderType, UnixNanos};
 use honba_strategy::{IntentError, OrderIntent, Strategy, StrategyRunner};
+use honba_testing::fixtures::instrument;
 use honba_testing::VecFeed;
 
 fn id() -> InstrumentId {
-    InstrumentId::new("NIFTY50", Venue::new("TEST"))
+    instrument("NIFTY50")
 }
 
 /// Records every submitted order; never fills.
