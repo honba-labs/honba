@@ -1,10 +1,22 @@
 //! The [`Event`] enum and the [`Message`] envelope.
 
+use serde::{Deserialize, Serialize};
+
 use crate::events::timestamp::UnixNanos;
+use crate::identifiers::OrderId;
 use crate::market_data::{Bar, QuoteTick, TradeTick};
 use crate::orders::Order;
 
+/// Version of the JSON wire contract carried by every [`Message`].
+///
+/// Bump it on any breaking change to the serialized form of a message type,
+/// together with the golden vectors in `schema/golden/` and the Python
+/// constant `honba.entities.wire.SCHEMA_VERSION` (see ADR 006).
+pub const SCHEMA_VERSION: u32 = 1;
+
 /// Any typed event that can flow through the Honba event kernel.
+///
+/// Serialized as an internally tagged JSON object: `{"type": "order_filled", ...}`.
 ///
 /// ```
 /// use honba_messages::Event;
@@ -13,7 +25,8 @@ use crate::orders::Order;
 ///     matches!(ev, Event::Quote(_) | Event::Trade(_) | Event::Bar(_))
 /// }
 /// ```
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 #[non_exhaustive]
 pub enum Event {
     /// A quote (top-of-book) update.
@@ -27,14 +40,14 @@ pub enum Event {
     /// The venue accepted an order.
     OrderAccepted {
         /// The client order identifier.
-        order_id: String,
+        order_id: OrderId,
         /// The venue timestamp at which acceptance occurred.
         ts_event: UnixNanos,
     },
     /// The venue rejected an order.
     OrderRejected {
         /// The client order identifier.
-        order_id: String,
+        order_id: OrderId,
         /// A human-readable rejection reason.
         reason: String,
         /// The venue timestamp at which rejection occurred.
@@ -43,7 +56,7 @@ pub enum Event {
     /// An order received a (possibly partial) fill.
     OrderFilled {
         /// The client order identifier.
-        order_id: String,
+        order_id: OrderId,
         /// The quantity filled in this event.
         last_qty: f64,
         /// The price at which this fill occurred.
@@ -54,7 +67,7 @@ pub enum Event {
     /// An order was cancelled.
     OrderCancelled {
         /// The client order identifier.
-        order_id: String,
+        order_id: OrderId,
         /// The venue timestamp at which cancellation occurred.
         ts_event: UnixNanos,
     },
@@ -83,6 +96,10 @@ impl Event {
 
 /// The envelope that carries an [`Event`] plus Honba-side metadata.
 ///
+/// This is the versioned unit of the wire contract: its JSON form is
+/// `{"schema_version": 1, "event": {...}, "ts_init": n}`, and deserializing a
+/// message with any other `schema_version` fails.
+///
 /// ```
 /// use honba_messages::{Event, Message, UnixNanos, QuoteTick, InstrumentId, Venue};
 ///
@@ -94,17 +111,54 @@ impl Event {
 /// );
 /// let msg = Message::new(Event::Quote(quote), UnixNanos::from_u64(2));
 /// assert!(msg.event().is_market_data());
+/// assert_eq!(msg.schema_version(), honba_messages::SCHEMA_VERSION);
 /// ```
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Message {
+    schema_version: SchemaVersion,
     event: Event,
     ts_init: UnixNanos,
+}
+
+/// The `schema_version` field: always [`SCHEMA_VERSION`] once constructed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "u32", into = "u32")]
+struct SchemaVersion;
+
+impl TryFrom<u32> for SchemaVersion {
+    type Error = String;
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        if value == SCHEMA_VERSION {
+            Ok(SchemaVersion)
+        } else {
+            Err(format!(
+                "unsupported schema_version {value}; this build reads {SCHEMA_VERSION}"
+            ))
+        }
+    }
+}
+
+impl From<SchemaVersion> for u32 {
+    fn from(_: SchemaVersion) -> Self {
+        SCHEMA_VERSION
+    }
 }
 
 impl Message {
     /// Wraps an event with the time Honba created the envelope.
     pub fn new(event: Event, ts_init: UnixNanos) -> Self {
-        Self { event, ts_init }
+        Self {
+            schema_version: SchemaVersion,
+            event,
+            ts_init,
+        }
+    }
+
+    /// Returns the wire-contract version of this message.
+    pub fn schema_version(&self) -> u32 {
+        self.schema_version.into()
     }
 
     /// Returns the wrapped event.
@@ -120,5 +174,29 @@ impl Message {
     /// Returns the time Honba created the envelope.
     pub fn ts_init(&self) -> UnixNanos {
         self.ts_init
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn schema_version_accepts_only_current() {
+        assert!(SchemaVersion::try_from(SCHEMA_VERSION).is_ok());
+        let err = SchemaVersion::try_from(SCHEMA_VERSION + 1).unwrap_err();
+        assert!(err.contains("unsupported schema_version"), "{err}");
+    }
+
+    #[test]
+    fn new_message_has_current_schema_version() {
+        let ev = Event::OrderCancelled {
+            order_id: OrderId::new("O-1"),
+            ts_event: UnixNanos::from_u64(1),
+        };
+        assert_eq!(
+            Message::new(ev, UnixNanos::from_u64(2)).schema_version(),
+            SCHEMA_VERSION
+        );
     }
 }

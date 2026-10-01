@@ -1,10 +1,13 @@
 //! Aggregated OHLCV bars and their specifications.
 
+use serde::{Deserialize, Serialize};
+
 use crate::events::timestamp::UnixNanos;
 use crate::identifiers::InstrumentId;
 
 /// How a bar aggregates its underlying data.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum BarAggregation {
     /// Aggregate every N ticks.
@@ -24,7 +27,8 @@ pub enum BarAggregation {
 }
 
 /// Which price of the underlying data feeds the bar.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum PriceType {
     /// Use the bid price.
@@ -46,7 +50,8 @@ pub enum PriceType {
 /// assert_eq!(spec.step(), 1);
 /// assert_eq!(spec.aggregation(), BarAggregation::Minute);
 /// ```
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BarSpecification {
     step: usize,
     aggregation: BarAggregation,
@@ -80,7 +85,8 @@ impl BarSpecification {
 }
 
 /// Fully identifies a bar: which instrument, and how it aggregates.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BarType {
     instrument_id: InstrumentId,
     spec: BarSpecification,
@@ -127,7 +133,8 @@ impl BarType {
 /// assert_eq!(bar.open(), 22_000.0);
 /// assert_eq!(bar.close(), 22_020.0);
 /// ```
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Bar {
     bar_type: BarType,
     open: f64,

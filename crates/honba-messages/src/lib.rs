@@ -44,7 +44,7 @@ pub mod identifiers;
 pub mod market_data;
 pub mod orders;
 
-pub use events::{timestamp::UnixNanos, Event, Message};
+pub use events::{timestamp::UnixNanos, Event, Message, SCHEMA_VERSION};
 pub use identifiers::{InstrumentId, OrderId, TradeId, Venue};
 pub use market_data::{
     bar::{Bar, BarAggregation, BarSpecification, BarType, PriceType},

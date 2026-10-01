@@ -1,10 +1,13 @@
 //! Tick types: top-of-book quotes and last-sale trades.
 
+use serde::{Deserialize, Serialize};
+
 use crate::events::timestamp::UnixNanos;
 use crate::identifiers::{InstrumentId, TradeId};
 
 /// Which side initiated a trade.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum AggressorSide {
     /// The buyer was the aggressor.
@@ -29,7 +32,8 @@ pub enum AggressorSide {
 /// assert_eq!(tick.bid_price(), 22_000.0);
 /// assert_eq!(tick.ask_price(), 22_001.0);
 /// ```
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct QuoteTick {
     instrument_id: InstrumentId,
     bid_price: f64,
@@ -124,7 +128,8 @@ impl QuoteTick {
 /// assert_eq!(tick.price(), 22_001.0);
 /// assert_eq!(tick.aggressor_side(), AggressorSide::Buyer);
 /// ```
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TradeTick {
     instrument_id: InstrumentId,
     price: f64,

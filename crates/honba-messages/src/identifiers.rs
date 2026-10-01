@@ -92,6 +92,18 @@ impl OrderId {
     }
 }
 
+impl From<&str> for OrderId {
+    fn from(value: &str) -> Self {
+        Self::new(value)
+    }
+}
+
+impl From<String> for OrderId {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
 impl fmt::Display for OrderId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
@@ -117,5 +129,18 @@ impl TradeId {
 impl fmt::Display for TradeId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn order_id_from_str_and_string() {
+        let a: OrderId = "O-1".into();
+        let b: OrderId = String::from("O-1").into();
+        assert_eq!(a, b);
+        assert_eq!(a.as_str(), "O-1");
     }
 }

@@ -122,6 +122,23 @@
         "order_id": "O-1",
         "ts_event": 1700000060000000000
       }
+    },
+    {
+      "name": "order_accepted_unknown_field",
+      "value": {
+        "type": "order_accepted",
+        "order_id": "O-1",
+        "ts_event": 1,
+        "venue_order_id": "X"
+      }
+    },
+    {
+      "name": "order_id_not_a_string",
+      "value": {
+        "type": "order_cancelled",
+        "order_id": 7,
+        "ts_event": 1
+      }
     }
   ]
 }
