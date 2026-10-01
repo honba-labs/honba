@@ -3,7 +3,9 @@
 use std::collections::VecDeque;
 
 use honba_engine::{DataFeed, Result};
-use honba_messages::{Event, InstrumentId, Message, QuoteTick, TradeTick, UnixNanos};
+use honba_messages::{Event, Message, QuoteTick, TradeTick, UnixNanos};
+
+use crate::fixtures;
 
 /// A feed backed by an in-memory vector of messages.
 ///
@@ -40,7 +42,7 @@ impl VecFeed {
 
     /// Builds a quote message for the given symbol and timestamps.
     pub fn quote(symbol: &str, bid: f64, ask: f64, ts: u64) -> Message {
-        let instrument = InstrumentId::new(symbol, honba_messages::Venue::new("TEST"));
+        let instrument = fixtures::instrument(symbol);
         let t = UnixNanos::from_u64(ts);
         Message::new(
             Event::Quote(QuoteTick::new(instrument, bid, ask, 1.0, 1.0, t, t)),
@@ -48,23 +50,15 @@ impl VecFeed {
         )
     }
 
-    /// Builds a bar message for the given symbol and timestamp.
+    /// Builds a flat one-minute bar message (see [`fixtures::flat_bar`]).
     pub fn bar(symbol: &str, close: f64, ts: u64) -> Message {
-        use honba_messages::{Bar, BarAggregation, BarSpecification, BarType, PriceType};
-        let bt = BarType::new(
-            InstrumentId::new(symbol, honba_messages::Venue::new("TEST")),
-            BarSpecification::new(1, BarAggregation::Minute, PriceType::Last),
-        );
         let t = UnixNanos::from_u64(ts);
-        Message::new(
-            Event::Bar(Bar::new(bt, close, close, close, close, 1.0, t, t)),
-            t,
-        )
+        Message::new(Event::Bar(fixtures::flat_bar(symbol, close, ts)), t)
     }
 
     /// Builds a trade message for the given symbol and timestamps.
     pub fn trade(symbol: &str, price: f64, qty: f64, ts: u64) -> Message {
-        let instrument = InstrumentId::new(symbol, honba_messages::Venue::new("TEST"));
+        let instrument = fixtures::instrument(symbol);
         let t = UnixNanos::from_u64(ts);
         Message::new(
             Event::Trade(TradeTick::new(

@@ -6,8 +6,12 @@
 
 pub mod assert;
 pub mod feed;
+pub mod fixtures;
 pub mod recorder;
 
 pub use assert::{assert_close, assert_close_slice};
 pub use feed::VecFeed;
 pub use recorder::Recorder;
+
+#[cfg(test)]
+mod tests;
