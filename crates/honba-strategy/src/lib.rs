@@ -22,3 +22,6 @@ pub use rsi_reversal::RsiReversal;
 pub use runner::{IntentRejection, StrategyRunner};
 pub use sma_crossover::SmaCrossover;
 pub use strategy::{Strategy, StrategyAdapter};
+
+#[cfg(test)]
+mod tests;
