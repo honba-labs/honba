@@ -18,3 +18,5 @@ honba-entities.workspace = true
 honba-engine.workspace = true
 honba-strategy.workspace = true
 honba-sim.workspace = true
+serde.workspace = true
+serde_json.workspace = true

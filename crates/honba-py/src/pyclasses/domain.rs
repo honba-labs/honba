@@ -239,6 +239,10 @@ impl RFill {
 }
 
 /// Rust-backed OrderIntent. Mirrors `honba_strategy::OrderIntent`.
+///
+/// `price` is the limit price (limit and stop-limit orders); `trigger_price`
+/// is the stop trigger (stop-market and stop-limit orders). The constructor
+/// enforces the same invariants as `OrderIntent::validate` in Rust.
 #[pyclass(name = "OrderIntent", module = "honba")]
 #[derive(Clone, Debug)]
 pub struct ROrderIntent {
@@ -255,6 +259,8 @@ pub struct ROrderIntent {
     #[pyo3(get)]
     pub price: Option<f64>,
     #[pyo3(get)]
+    pub trigger_price: Option<f64>,
+    #[pyo3(get)]
     pub time_in_force: String,
 }
 
@@ -262,7 +268,7 @@ pub struct ROrderIntent {
 #[allow(clippy::useless_conversion)]
 impl ROrderIntent {
     #[new]
-    #[pyo3(signature = (symbol, side, quantity, order_type="market", price=None, time_in_force="day", venue="NSE"))]
+    #[pyo3(signature = (symbol, side, quantity, order_type="market", price=None, time_in_force="day", venue="NSE", trigger_price=None))]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         symbol: String,
@@ -272,61 +278,138 @@ impl ROrderIntent {
         price: Option<f64>,
         time_in_force: &str,
         venue: &str,
+        trigger_price: Option<f64>,
     ) -> PyResult<Self> {
-        if quantity <= 0.0 {
-            return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                "quantity must be positive, got {quantity}"
-            )));
-        }
-        let norm_side = side.to_lowercase();
-        if norm_side != "buy" && norm_side != "sell" {
-            return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                "invalid side '{side}'; must be 'buy' or 'sell'"
-            )));
-        }
-        let norm_type = order_type.to_lowercase();
-        if (norm_type == "limit" || norm_type == "stop") && price.is_none() {
-            return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                "{norm_type} order requires a price"
-            )));
-        }
-        Ok(Self {
+        let norm_type = match order_type.to_lowercase().as_str() {
+            "stop" => "stop_market".to_string(),
+            other => other.to_string(),
+        };
+        let intent = Self {
             symbol,
             venue: venue.to_string(),
-            side: norm_side,
+            side: side.to_lowercase(),
             quantity,
             order_type: norm_type,
             price,
+            trigger_price,
             time_in_force: time_in_force.to_lowercase(),
-        })
+        };
+        let rust = intent
+            .to_rust()
+            .map_err(pyo3::exceptions::PyValueError::new_err)?;
+        rust.validate()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        Ok(intent)
     }
 
     #[staticmethod]
     #[pyo3(signature = (symbol, quantity, venue="NSE"))]
-    #[allow(clippy::useless_conversion)]
     pub fn market_buy(symbol: String, quantity: f64, venue: &str) -> PyResult<Self> {
-        Self::new(symbol, "buy", quantity, "market", None, "day", venue)
+        Self::new(symbol, "buy", quantity, "market", None, "day", venue, None)
     }
 
     #[staticmethod]
     #[pyo3(signature = (symbol, quantity, venue="NSE"))]
-    #[allow(clippy::useless_conversion)]
     pub fn market_sell(symbol: String, quantity: f64, venue: &str) -> PyResult<Self> {
-        Self::new(symbol, "sell", quantity, "market", None, "day", venue)
+        Self::new(symbol, "sell", quantity, "market", None, "day", venue, None)
     }
 
     #[staticmethod]
     #[pyo3(signature = (symbol, quantity, price, venue="NSE"))]
-    #[allow(clippy::useless_conversion)]
     pub fn limit_buy(symbol: String, quantity: f64, price: f64, venue: &str) -> PyResult<Self> {
-        Self::new(symbol, "buy", quantity, "limit", Some(price), "day", venue)
+        Self::new(
+            symbol,
+            "buy",
+            quantity,
+            "limit",
+            Some(price),
+            "day",
+            venue,
+            None,
+        )
     }
 
     #[staticmethod]
     #[pyo3(signature = (symbol, quantity, price, venue="NSE"))]
-    #[allow(clippy::useless_conversion)]
     pub fn limit_sell(symbol: String, quantity: f64, price: f64, venue: &str) -> PyResult<Self> {
-        Self::new(symbol, "sell", quantity, "limit", Some(price), "day", venue)
+        Self::new(
+            symbol,
+            "sell",
+            quantity,
+            "limit",
+            Some(price),
+            "day",
+            venue,
+            None,
+        )
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (symbol, quantity, trigger_price, venue="NSE"))]
+    pub fn stop_buy(
+        symbol: String,
+        quantity: f64,
+        trigger_price: f64,
+        venue: &str,
+    ) -> PyResult<Self> {
+        let t = Some(trigger_price);
+        Self::new(
+            symbol,
+            "buy",
+            quantity,
+            "stop_market",
+            None,
+            "day",
+            venue,
+            t,
+        )
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (symbol, quantity, trigger_price, venue="NSE"))]
+    pub fn stop_sell(
+        symbol: String,
+        quantity: f64,
+        trigger_price: f64,
+        venue: &str,
+    ) -> PyResult<Self> {
+        let t = Some(trigger_price);
+        Self::new(
+            symbol,
+            "sell",
+            quantity,
+            "stop_market",
+            None,
+            "day",
+            venue,
+            t,
+        )
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (symbol, quantity, trigger_price, limit_price, venue="NSE"))]
+    pub fn stop_limit_buy(
+        symbol: String,
+        quantity: f64,
+        trigger_price: f64,
+        limit_price: f64,
+        venue: &str,
+    ) -> PyResult<Self> {
+        let (p, t) = (Some(limit_price), Some(trigger_price));
+        Self::new(symbol, "buy", quantity, "stop_limit", p, "day", venue, t)
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (symbol, quantity, trigger_price, limit_price, venue="NSE"))]
+    pub fn stop_limit_sell(
+        symbol: String,
+        quantity: f64,
+        trigger_price: f64,
+        limit_price: f64,
+        venue: &str,
+    ) -> PyResult<Self> {
+        let (p, t) = (Some(limit_price), Some(trigger_price));
+        Self::new(symbol, "sell", quantity, "stop_limit", p, "day", venue, t)
     }
 
     fn __repr__(&self) -> String {
@@ -343,7 +426,7 @@ impl ROrderIntent {
         let side = match self.side.as_str() {
             "buy" => RustOrderSide::Buy,
             "sell" => RustOrderSide::Sell,
-            other => return Err(format!("unknown order side: {other}")),
+            other => return Err(format!("invalid side '{other}'; must be 'buy' or 'sell'")),
         };
         let order_type = match self.order_type.as_str() {
             "market" => RustOrderType::Market,
@@ -356,6 +439,8 @@ impl ROrderIntent {
             "day" => RustTimeInForce::Day,
             "gtc" => RustTimeInForce::Gtc,
             "ioc" => RustTimeInForce::Ioc,
+            "fok" => RustTimeInForce::Fok,
+            "gtd" => RustTimeInForce::Gtd,
             other => return Err(format!("unknown time in force: {other}")),
         };
         Ok(RustOrderIntent {
@@ -364,7 +449,7 @@ impl ROrderIntent {
             quantity: self.quantity,
             order_type,
             price: self.price,
-            trigger_price: None,
+            trigger_price: self.trigger_price,
             time_in_force: tif,
         })
     }

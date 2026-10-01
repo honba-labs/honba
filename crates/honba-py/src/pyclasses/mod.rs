@@ -8,9 +8,11 @@ use pyo3::types::PyModule;
 
 pub mod domain;
 pub mod strategy;
+pub mod wire;
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     domain::register(m)?;
     strategy::register(m)?;
+    wire::register(m)?;
     Ok(())
 }

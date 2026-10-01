@@ -1,6 +1,10 @@
 """Type stubs for honba._honba native PyO3 extension module."""
 
-from typing import List, Optional, Tuple
+from typing import Final, List, Optional, Tuple
+
+SCHEMA_VERSION: Final[int]
+
+def canonical_json(kind: str, payload: str) -> str: ...
 
 class InstrumentId:
     symbol: str
@@ -76,6 +80,7 @@ class OrderIntent:
     quantity: float
     order_type: str
     price: Optional[float]
+    trigger_price: Optional[float]
     time_in_force: str
     def __init__(
         self,
@@ -86,6 +91,7 @@ class OrderIntent:
         price: Optional[float] = None,
         time_in_force: str = "day",
         venue: str = "NSE",
+        trigger_price: Optional[float] = None,
     ) -> None: ...
     @staticmethod
     def market_buy(symbol: str, quantity: float, venue: str = "NSE") -> OrderIntent: ...
@@ -98,6 +104,22 @@ class OrderIntent:
     @staticmethod
     def limit_sell(
         symbol: str, quantity: float, price: float, venue: str = "NSE"
+    ) -> OrderIntent: ...
+    @staticmethod
+    def stop_buy(
+        symbol: str, quantity: float, trigger_price: float, venue: str = "NSE"
+    ) -> OrderIntent: ...
+    @staticmethod
+    def stop_sell(
+        symbol: str, quantity: float, trigger_price: float, venue: str = "NSE"
+    ) -> OrderIntent: ...
+    @staticmethod
+    def stop_limit_buy(
+        symbol: str, quantity: float, trigger_price: float, limit_price: float, venue: str = "NSE"
+    ) -> OrderIntent: ...
+    @staticmethod
+    def stop_limit_sell(
+        symbol: str, quantity: float, trigger_price: float, limit_price: float, venue: str = "NSE"
     ) -> OrderIntent: ...
     def __repr__(self) -> str: ...
 
