@@ -80,3 +80,6 @@ pub use market_data::{
 };
 pub use orders::order::{Order, OrderSide, OrderStatus, OrderType, TimeInForce};
 pub use validation::InvariantError;
+
+#[cfg(test)]
+mod tests;
