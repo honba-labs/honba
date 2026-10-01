@@ -6,8 +6,10 @@
 //! unchanged in backtest, paper and live. Mirrors the Python
 //! `honba.strategies.context.StrategyContext` ABC.
 
-use honba_entities::Instrument;
-use honba_messages::{InstrumentId, UnixNanos};
+use std::collections::BTreeMap;
+
+use honba_entities::{Instrument, Trade};
+use honba_messages::{InstrumentId, OrderSide, UnixNanos};
 
 use crate::intent::OrderIntent;
 
@@ -38,4 +40,155 @@ pub trait StrategyContext {
     /// Queues an intent; the runner turns it into an order after the current
     /// hook returns.
     fn submit(&mut self, intent: OrderIntent);
+}
+
+/// Unfilled quantity below this counts as filled (float noise from partial fills).
+const EPSILON: f64 = 1e-9;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct Pending {
+    buy: f64,
+    sell: f64,
+}
+
+/// The reference [`StrategyContext`]: a deterministic in-memory ledger.
+///
+/// The runner sets the clock, applies fills and releases rejected intents;
+/// the strategy reads it and submits intents, which the runner drains. It is
+/// pure (no I/O, no wall clock), so backtest, paper and live share it.
+/// Mirrors the Python `honba.strategies.context.LedgerContext`.
+///
+/// ```
+/// use honba_strategy::{LedgerContext, OrderIntent, StrategyContext};
+/// use honba_messages::{InstrumentId, Venue};
+///
+/// let id = InstrumentId::new("NIFTY50", Venue::new("NSE"));
+/// let mut ctx = LedgerContext::with_cash(100_000.0);
+/// ctx.submit(OrderIntent::market_buy(id.clone(), 75.0));
+/// assert!(ctx.busy(&id));
+/// assert_eq!(ctx.drain_intents().len(), 1);
+/// ```
+#[derive(Clone, Debug, Default)]
+pub struct LedgerContext {
+    now: UnixNanos,
+    cash: f64,
+    positions: BTreeMap<InstrumentId, f64>,
+    pending: BTreeMap<InstrumentId, Pending>,
+    instruments: BTreeMap<InstrumentId, Instrument>,
+    outbox: Vec<OrderIntent>,
+}
+
+impl LedgerContext {
+    /// An empty ledger with zero cash.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// An empty ledger starting with `cash`.
+    pub fn with_cash(cash: f64) -> Self {
+        Self {
+            cash,
+            ..Self::default()
+        }
+    }
+
+    /// Sets the clock to the `ts_init` of the event about to be processed.
+    pub fn set_now(&mut self, ts_init: UnixNanos) {
+        self.now = ts_init;
+    }
+
+    /// Registers instrument metadata for [`StrategyContext::instrument`].
+    pub fn add_instrument(&mut self, instrument: Instrument) {
+        self.instruments.insert(instrument.id().clone(), instrument);
+    }
+
+    /// Returns and clears submitted intents, in submission order.
+    pub fn drain_intents(&mut self) -> Vec<OrderIntent> {
+        std::mem::take(&mut self.outbox)
+    }
+
+    /// Books a fill: position, cash (`quantity * price` and costs) and the
+    /// pending quantity of the instrument.
+    pub fn apply_fill(&mut self, fill: &Trade) {
+        let (qty, px, costs) = (fill.quantity(), fill.price(), fill.costs());
+        let position = self
+            .positions
+            .entry(fill.instrument_id().clone())
+            .or_insert(0.0);
+        if fill.side() == OrderSide::Buy {
+            *position += qty;
+            self.cash -= qty * px + costs;
+        } else {
+            *position -= qty;
+            self.cash += qty * px - costs;
+        }
+        self.reduce_pending(fill.instrument_id(), fill.side(), qty);
+    }
+
+    /// An intent was rejected or its order cancelled unfilled: it no longer
+    /// counts towards [`StrategyContext::busy`].
+    pub fn release(&mut self, intent: &OrderIntent) {
+        self.reduce_pending(&intent.instrument_id, intent.side, intent.quantity);
+    }
+
+    fn reduce_pending(&mut self, instrument_id: &InstrumentId, side: OrderSide, qty: f64) {
+        let Some(p) = self.pending.get_mut(instrument_id) else {
+            return;
+        };
+        let slot = if side == OrderSide::Buy {
+            &mut p.buy
+        } else {
+            &mut p.sell
+        };
+        let left = *slot - qty;
+        *slot = if left > EPSILON { left } else { 0.0 };
+        if *p == Pending::default() {
+            self.pending.remove(instrument_id);
+        }
+    }
+}
+
+impl StrategyContext for LedgerContext {
+    fn now(&self) -> UnixNanos {
+        self.now
+    }
+
+    fn position(&self, instrument_id: &InstrumentId) -> f64 {
+        self.positions.get(instrument_id).copied().unwrap_or(0.0)
+    }
+
+    fn positions(&self) -> Vec<(InstrumentId, f64)> {
+        self.positions
+            .iter()
+            .filter(|(_, q)| **q != 0.0)
+            .map(|(id, q)| (id.clone(), *q))
+            .collect()
+    }
+
+    fn cash(&self) -> f64 {
+        self.cash
+    }
+
+    fn busy(&self, instrument_id: &InstrumentId) -> bool {
+        self.pending
+            .get(instrument_id)
+            .is_some_and(|p| p.buy > 0.0 || p.sell > 0.0)
+    }
+
+    fn instrument(&self, instrument_id: &InstrumentId) -> Option<&Instrument> {
+        self.instruments.get(instrument_id)
+    }
+
+    fn submit(&mut self, intent: OrderIntent) {
+        let p = self
+            .pending
+            .entry(intent.instrument_id.clone())
+            .or_default();
+        if intent.side == OrderSide::Buy {
+            p.buy += intent.quantity;
+        } else {
+            p.sell += intent.quantity;
+        }
+        self.outbox.push(intent);
+    }
 }

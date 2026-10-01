@@ -2,8 +2,9 @@
 
 use honba_engine::Result;
 use honba_indicators::{Indicator, Rsi};
-use honba_messages::{Bar, InstrumentId, UnixNanos};
+use honba_messages::{Bar, InstrumentId};
 
+use crate::context::StrategyContext;
 use crate::intent::OrderIntent;
 use crate::strategy::Strategy;
 
@@ -38,7 +39,6 @@ pub struct RsiReversal {
     overbought: f64,
     quantity: f64,
     side: Side,
-    intents: Vec<OrderIntent>,
 }
 
 impl RsiReversal {
@@ -63,7 +63,6 @@ impl RsiReversal {
             overbought,
             quantity,
             side: Side::Flat,
-            intents: Vec::new(),
         }
     }
 
@@ -78,28 +77,24 @@ impl Strategy for RsiReversal {
         "rsi_reversal"
     }
 
-    fn on_bar(&mut self, bar: &Bar, _ts_init: UnixNanos) -> Result<()> {
+    fn on_bar(&mut self, ctx: &mut dyn StrategyContext, bar: &Bar) -> Result<()> {
         let Some(v) = self.rsi.update(bar.close()) else {
             return Ok(());
         };
 
         if v < self.oversold && self.side != Side::Long {
-            self.intents.push(OrderIntent::market_buy(
+            ctx.submit(OrderIntent::market_buy(
                 self.instrument_id.clone(),
                 self.quantity,
             ));
             self.side = Side::Long;
         } else if v > self.overbought && self.side != Side::Short {
-            self.intents.push(OrderIntent::market_sell(
+            ctx.submit(OrderIntent::market_sell(
                 self.instrument_id.clone(),
                 self.quantity,
             ));
             self.side = Side::Short;
         }
         Ok(())
-    }
-
-    fn drain_intents(&mut self) -> Vec<OrderIntent> {
-        std::mem::take(&mut self.intents)
     }
 }

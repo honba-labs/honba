@@ -3,7 +3,7 @@
 use honba_engine::Engine;
 use honba_messages::{OrderSide, UnixNanos};
 use honba_strategy::{
-    BuyAndHold, OrderIntent, RsiReversal, SmaCrossover, Strategy, StrategyAdapter,
+    BuyAndHold, LedgerContext, OrderIntent, RsiReversal, SmaCrossover, Strategy, StrategyAdapter,
 };
 use honba_testing::fixtures::{any_instrument, flat_bar};
 use honba_testing::VecFeed;
@@ -14,20 +14,21 @@ use honba_testing::VecFeed;
 fn buy_and_hold_emits_one_buy() {
     let id = any_instrument();
     let mut s = BuyAndHold::new(id, 10.0);
+    let mut ctx = LedgerContext::new();
 
     let b = flat_bar("X", 1.0, 1);
-    s.on_bar(&b, UnixNanos::from_u64(1)).unwrap();
-    s.on_bar(&b, UnixNanos::from_u64(2)).unwrap();
-    s.on_bar(&b, UnixNanos::from_u64(3)).unwrap();
+    s.on_bar(&mut ctx, &b).unwrap();
+    s.on_bar(&mut ctx, &b).unwrap();
+    s.on_bar(&mut ctx, &b).unwrap();
 
-    let intents = s.drain_intents();
+    let intents = ctx.drain_intents();
     assert_eq!(intents.len(), 1);
     assert_eq!(intents[0].side, OrderSide::Buy);
     assert_eq!(intents[0].quantity, 10.0);
     assert!(s.has_bought());
 
     // Second drain is empty.
-    assert!(s.drain_intents().is_empty());
+    assert!(ctx.drain_intents().is_empty());
 }
 
 // --- SmaCrossover ---
@@ -36,15 +37,16 @@ fn buy_and_hold_emits_one_buy() {
 fn sma_crossover_emits_buy_on_cross_up() {
     let id = any_instrument();
     let mut s = SmaCrossover::new(id, 2, 5, 1.0);
+    let mut ctx = LedgerContext::new();
 
     // Flat then rise: fast SMA crosses above slow.
     let closes = [1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 2.0];
     for (i, c) in closes.iter().enumerate() {
-        s.on_bar(&flat_bar("X", *c, i as u64 + 1), UnixNanos::from_u64(1))
+        s.on_bar(&mut ctx, &flat_bar("X", *c, i as u64 + 1))
             .unwrap();
     }
 
-    let intents = s.drain_intents();
+    let intents = ctx.drain_intents();
     assert!(!intents.is_empty(), "expected at least one intent");
     assert_eq!(intents[0].side, OrderSide::Buy);
 }
@@ -53,15 +55,16 @@ fn sma_crossover_emits_buy_on_cross_up() {
 fn sma_crossover_emits_sell_on_cross_down() {
     let id = any_instrument();
     let mut s = SmaCrossover::new(id, 2, 5, 1.0);
+    let mut ctx = LedgerContext::new();
 
     // Rise then fall.
     let closes = [1.0, 2.0, 3.0, 4.0, 5.0, 5.0, 1.0, 1.0, 1.0];
     for (i, c) in closes.iter().enumerate() {
-        s.on_bar(&flat_bar("X", *c, i as u64 + 1), UnixNanos::from_u64(1))
+        s.on_bar(&mut ctx, &flat_bar("X", *c, i as u64 + 1))
             .unwrap();
     }
 
-    let intents = s.drain_intents();
+    let intents = ctx.drain_intents();
     assert!(
         intents.iter().any(|i| i.side == OrderSide::Sell),
         "expected a sell intent, got {intents:?}"
@@ -80,14 +83,15 @@ fn sma_crossover_rejects_bad_periods() {
 fn rsi_reversal_buys_when_oversold() {
     let id = any_instrument();
     let mut s = RsiReversal::new(id, 3, 30.0, 70.0, 1.0);
+    let mut ctx = LedgerContext::new();
 
     // Monotonic decline drives RSI to 0.
     for (i, c) in [10.0, 9.0, 8.0, 7.0, 6.0, 5.0].iter().enumerate() {
-        s.on_bar(&flat_bar("X", *c, i as u64 + 1), UnixNanos::from_u64(1))
+        s.on_bar(&mut ctx, &flat_bar("X", *c, i as u64 + 1))
             .unwrap();
     }
 
-    let intents = s.drain_intents();
+    let intents = ctx.drain_intents();
     assert!(
         intents.iter().any(|i| i.side == OrderSide::Buy),
         "expected a buy intent, got {intents:?}"
@@ -98,14 +102,15 @@ fn rsi_reversal_buys_when_oversold() {
 fn rsi_reversal_sells_when_overbought() {
     let id = any_instrument();
     let mut s = RsiReversal::new(id, 3, 30.0, 70.0, 1.0);
+    let mut ctx = LedgerContext::new();
 
     // Monotonic rise drives RSI to 100.
     for (i, c) in [1.0, 2.0, 3.0, 4.0, 5.0, 6.0].iter().enumerate() {
-        s.on_bar(&flat_bar("X", *c, i as u64 + 1), UnixNanos::from_u64(1))
+        s.on_bar(&mut ctx, &flat_bar("X", *c, i as u64 + 1))
             .unwrap();
     }
 
-    let intents = s.drain_intents();
+    let intents = ctx.drain_intents();
     assert!(
         intents.iter().any(|i| i.side == OrderSide::Sell),
         "expected a sell intent, got {intents:?}"
@@ -116,14 +121,15 @@ fn rsi_reversal_sells_when_overbought() {
 fn rsi_reversal_does_not_repeat_in_zone() {
     let id = any_instrument();
     let mut s = RsiReversal::new(id, 3, 30.0, 70.0, 1.0);
+    let mut ctx = LedgerContext::new();
 
     // Deep decline, all below oversold.
     for (i, c) in [10.0, 9.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0].iter().enumerate() {
-        s.on_bar(&flat_bar("X", *c, i as u64 + 1), UnixNanos::from_u64(1))
+        s.on_bar(&mut ctx, &flat_bar("X", *c, i as u64 + 1))
             .unwrap();
     }
 
-    let intents = s.drain_intents();
+    let intents = ctx.drain_intents();
     let buys = intents.iter().filter(|i| i.side == OrderSide::Buy).count();
     assert_eq!(buys, 1, "expected exactly one buy, got {buys}");
 }

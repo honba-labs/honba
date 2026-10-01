@@ -2,8 +2,9 @@
 
 use honba_engine::Result;
 use honba_indicators::{Indicator, Sma};
-use honba_messages::{Bar, InstrumentId, UnixNanos};
+use honba_messages::{Bar, InstrumentId};
 
+use crate::context::StrategyContext;
 use crate::intent::OrderIntent;
 use crate::strategy::Strategy;
 
@@ -30,7 +31,6 @@ pub struct SmaCrossover {
     slow: Sma,
     quantity: f64,
     prev_above: Option<bool>,
-    intents: Vec<OrderIntent>,
 }
 
 impl SmaCrossover {
@@ -48,7 +48,6 @@ impl SmaCrossover {
             slow: Sma::new(slow),
             quantity,
             prev_above: None,
-            intents: Vec::new(),
         }
     }
 
@@ -68,7 +67,7 @@ impl Strategy for SmaCrossover {
         "sma_crossover"
     }
 
-    fn on_bar(&mut self, bar: &Bar, _ts_init: UnixNanos) -> Result<()> {
+    fn on_bar(&mut self, ctx: &mut dyn StrategyContext, bar: &Bar) -> Result<()> {
         let f = self.fast.update(bar.close());
         let s = self.slow.update(bar.close());
 
@@ -81,16 +80,12 @@ impl Strategy for SmaCrossover {
                     } else {
                         OrderIntent::market_sell(self.instrument_id.clone(), self.quantity)
                     };
-                    self.intents.push(intent);
+                    ctx.submit(intent);
                 }
                 _ => {}
             }
             self.prev_above = Some(above);
         }
         Ok(())
-    }
-
-    fn drain_intents(&mut self) -> Vec<OrderIntent> {
-        std::mem::take(&mut self.intents)
     }
 }

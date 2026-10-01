@@ -2,6 +2,7 @@
 
 mod context;
 mod intent;
+mod ledger;
 
 use honba_messages::{InstrumentId, Venue};
 

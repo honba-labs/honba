@@ -9,8 +9,8 @@ use std::sync::{Arc, Mutex};
 
 use honba_engine::{Engine, ExecutionEngine, Result};
 use honba_entities::Trade;
-use honba_messages::{Bar, InstrumentId, Order, OrderType, UnixNanos};
-use honba_strategy::{IntentError, OrderIntent, Strategy, StrategyRunner};
+use honba_messages::{Bar, InstrumentId, Order, OrderType};
+use honba_strategy::{IntentError, OrderIntent, Strategy, StrategyContext, StrategyRunner};
 use honba_testing::fixtures::instrument;
 use honba_testing::VecFeed;
 
@@ -43,7 +43,6 @@ type Rejections = Arc<Mutex<Vec<(OrderIntent, IntentError)>>>;
 
 /// Emits two invalid intents and one valid one on the first bar.
 struct Misbehaving {
-    pending: Vec<OrderIntent>,
     fired: bool,
     rejected: Rejections,
 }
@@ -53,26 +52,27 @@ impl Strategy for Misbehaving {
         "misbehaving"
     }
 
-    fn on_bar(&mut self, _bar: &Bar, _ts: UnixNanos) -> Result<()> {
+    fn on_bar(&mut self, ctx: &mut dyn StrategyContext, _bar: &Bar) -> Result<()> {
         if !self.fired {
             self.fired = true;
-            self.pending.push(OrderIntent::market_buy(id(), -1.0));
-            self.pending.push(OrderIntent {
+            ctx.submit(OrderIntent::market_buy(id(), -1.0));
+            ctx.submit(OrderIntent {
                 price: None,
                 ..OrderIntent::limit_buy(id(), 1.0, 100.0)
             });
-            self.pending.push(OrderIntent::market_buy(id(), 2.0));
+            ctx.submit(OrderIntent::market_buy(id(), 2.0));
         }
         Ok(())
     }
 
-    fn on_intent_rejected(&mut self, intent: &OrderIntent, error: &IntentError) -> Result<()> {
+    fn on_intent_rejected(
+        &mut self,
+        _ctx: &mut dyn StrategyContext,
+        intent: &OrderIntent,
+        error: &IntentError,
+    ) -> Result<()> {
         self.rejected.lock().unwrap().push((intent.clone(), *error));
         Ok(())
-    }
-
-    fn drain_intents(&mut self) -> Vec<OrderIntent> {
-        std::mem::take(&mut self.pending)
     }
 }
 
@@ -81,7 +81,6 @@ fn engine_run_rejects_invalid_intents_without_submitting_orders() {
     let execution = RecordingExecution::default();
     let rejected = Rejections::default();
     let strategy = Misbehaving {
-        pending: Vec::new(),
         fired: false,
         rejected: rejected.clone(),
     };
@@ -118,7 +117,6 @@ fn runner_keeps_typed_rejections() {
 
     let execution = RecordingExecution::default();
     let strategy = Misbehaving {
-        pending: Vec::new(),
         fired: false,
         rejected: Rejections::default(),
     };

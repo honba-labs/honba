@@ -1,8 +1,9 @@
 //! Buy-and-hold reference strategy.
 
 use honba_engine::Result;
-use honba_messages::{Bar, InstrumentId, UnixNanos};
+use honba_messages::{Bar, InstrumentId};
 
+use crate::context::StrategyContext;
 use crate::intent::OrderIntent;
 use crate::strategy::Strategy;
 
@@ -25,7 +26,6 @@ pub struct BuyAndHold {
     instrument_id: InstrumentId,
     quantity: f64,
     bought: bool,
-    intents: Vec<OrderIntent>,
 }
 
 impl BuyAndHold {
@@ -35,7 +35,6 @@ impl BuyAndHold {
             instrument_id,
             quantity,
             bought: false,
-            intents: Vec::new(),
         }
     }
 
@@ -60,18 +59,14 @@ impl Strategy for BuyAndHold {
         "buy_and_hold"
     }
 
-    fn on_bar(&mut self, _bar: &Bar, _ts_init: UnixNanos) -> Result<()> {
+    fn on_bar(&mut self, ctx: &mut dyn StrategyContext, _bar: &Bar) -> Result<()> {
         if !self.bought {
-            self.intents.push(OrderIntent::market_buy(
+            ctx.submit(OrderIntent::market_buy(
                 self.instrument_id.clone(),
                 self.quantity,
             ));
             self.bought = true;
         }
         Ok(())
-    }
-
-    fn drain_intents(&mut self) -> Vec<OrderIntent> {
-        std::mem::take(&mut self.intents)
     }
 }
