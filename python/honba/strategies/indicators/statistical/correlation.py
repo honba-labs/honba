@@ -21,13 +21,16 @@ class Correlation(Indicator):
             raise ValueError(f"length must be >= 2, got {length}")
         self.length = length
         self._rp = RollingPairMoments(length)
+        self._update = self._rp.update_raw
 
     def update(self, close: float, benchmark: float) -> float | None:
-        m = self._rp.update(close, benchmark)
+        m = self._update(close, benchmark)
         if m is None:
             return None
-        if math.isnan(m.cov):
+        cov, vx, vy = m[4], m[2], m[3]
+        if cov != cov:
             return math.nan
-        if m.var_x <= 0 or m.var_y <= 0:
+        if vx <= 0 or vy <= 0:
             return 0.0
-        return max(-1.0, min(1.0, m.cov / math.sqrt(m.var_x * m.var_y)))
+        r = cov / math.sqrt(vx * vy)
+        return 1.0 if r > 1.0 else -1.0 if r < -1.0 else r

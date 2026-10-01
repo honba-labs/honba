@@ -5,7 +5,6 @@ import math
 
 from honba.strategies.indicators._base import Indicator, indicator
 from honba.strategies.indicators._rolling import RollingPairMoments
-from honba.strategies.indicators.statistical._pair import simple_return
 
 
 @indicator("beta", "statistical", inputs=("close", "benchmark"), warmup=lambda s: s.length + 1)
@@ -25,15 +24,21 @@ class Beta(Indicator):
             raise ValueError(f"length must be >= 2, got {length}")
         self.length = length
         self._rp = RollingPairMoments(length)
+        self._update = self._rp.update_raw
         self._prev: tuple[float, float] | None = None
 
     def update(self, close: float, benchmark: float) -> float | None:
         prev, self._prev = self._prev, (close, benchmark)
         if prev is None:
             return None
-        m = self._rp.update(simple_return(prev[0], close), simple_return(prev[1], benchmark))
+        # simple_return inlined (hot path): cur / prev - 1, 0.0 when prev <= 0
+        m = self._update(
+            close / prev[0] - 1.0 if prev[0] > 0 else 0.0,
+            benchmark / prev[1] - 1.0 if prev[1] > 0 else 0.0,
+        )
         if m is None:
             return None
-        if math.isnan(m.cov):
+        cov, vy = m[4], m[3]
+        if cov != cov:
             return math.nan
-        return m.cov / m.var_y if m.var_y > 0 else 0.0
+        return cov / vy if vy > 0 else 0.0

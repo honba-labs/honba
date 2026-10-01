@@ -33,14 +33,16 @@ class LinearRegression(Indicator):
         self.length = length
         self.upper_deviation, self.lower_deviation = float(upper_deviation), float(lower_deviation)
         self._reg = RollingLinReg(length)
+        self._update = self._reg.update_raw
+        self._last = length - 1
 
     def update(self, x: float) -> LinearRegressionValue | None:
-        fit = self._reg.update(x)
+        fit = self._update(x)
         if fit is None:
             return None
-        n = self.length
-        std = math.sqrt(fit.sse / n)
-        end = fit.intercept + fit.slope * (n - 1)
+        intercept, slope, sse = fit
+        std = math.sqrt(sse / self.length)
+        end = intercept + slope * self._last
         return LinearRegressionValue(
-            end, fit.slope, end + self.upper_deviation * std, end - self.lower_deviation * std
+            end, slope, end + self.upper_deviation * std, end - self.lower_deviation * std
         )

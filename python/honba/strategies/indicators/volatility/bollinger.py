@@ -26,9 +26,11 @@ class Bollinger(Indicator):
         if mult < 0 or self.mult_lower < 0:
             raise ValueError("band multipliers must be >= 0")
         self._m = RollingMoments(period)
+        self._update = self._m.update_raw
 
     def update(self, x: float) -> BollingerValue | None:
-        r = self._m.update(x)
+        r = self._update(x)
         if r is None:
             return None
-        return BollingerValue(r.mean + self.mult * r.std, r.mean, r.mean - self.mult_lower * r.std)
+        mean, _, std = r
+        return BollingerValue(mean + self.mult * std, mean, mean - self.mult_lower * std)

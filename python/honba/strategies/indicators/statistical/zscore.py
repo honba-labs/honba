@@ -14,9 +14,11 @@ class ZScore(Indicator):
             raise ValueError(f"length must be >= 2, got {length}")
         self.length = length
         self._m = RollingMoments(length)
+        self._update = self._m.update_raw
 
     def update(self, close: float) -> float | None:
-        r = self._m.update(close)
+        r = self._update(close)
         if r is None:
             return None
-        return (close - r.mean) / r.std if r.std > 0 else 0.0
+        std = r[2]
+        return (close - r[0]) / std if std > 0 else 0.0

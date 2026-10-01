@@ -33,9 +33,11 @@ class Lsma(Indicator):
             raise ValueError(f"period must be >= 2, got {period}")
         self.period, self.offset = period, offset
         self._reg = RollingLinReg(period)
+        self._update = self._reg.update_raw
+        self._k = period - 1 - offset
 
     def update(self, x: float) -> float | None:
-        fit = self._reg.update(x)
+        fit = self._update(x)
         if fit is None:
             return None
-        return fit.intercept + fit.slope * (self.period - 1 - self.offset)
+        return fit[0] + fit[1] * self._k
