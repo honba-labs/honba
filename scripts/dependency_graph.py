@@ -32,6 +32,11 @@ def main() -> int:
         if bad:
             print(f"VIOLATION: {name} -> {sorted(bad)}")
             errs += 1
+
+        all_deps = set(data.get("dependencies", {}).keys())
+        if "pyo3" in all_deps and name != "honba-py":
+            print(f"VIOLATION: {name} depends on pyo3 (pyo3 is restricted to honba-py only)")
+            errs += 1
     if errs:
         return 1
     print("Dependency hierarchy OK.")

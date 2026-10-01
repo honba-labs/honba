@@ -36,7 +36,7 @@ ruff check .                              # line-length 100
 
 Optional extras: `ai` (openai, anthropic, litellm, mcp), `rl` (torch, gymnasium). CLI entry point: `honba` → `honba.cli.main:app` (typer; subcommands in `python/honba/cli/`: backtest, data, optimize, research, strategy, ai).
 
-CI: Rust job is blocking (fmt, check, clippy `-D warnings`, test, doctest, doc); the Python job is `continue-on-error`.
+CI: Rust job (fmt, check, clippy `-D warnings`, test, doctest, doc), dependency-graph check, and Python job (deps, maturin develop, stubtest, pytest) are all blocking.
 
 ## Architecture
 

@@ -1,7 +1,6 @@
 mod backtest;
 mod calendars;
 mod data;
-mod py;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -32,14 +31,6 @@ enum Commands {
         #[command(subcommand)]
         command: DataCommands,
     },
-    /// Execute a honba-style Python simulation script
-    Run {
-        /// Path to the Python script
-        script: PathBuf,
-        /// Optional cap on dispatched events
-        #[arg(long)]
-        max_events: Option<u64>,
-    },
 }
 
 #[derive(Subcommand)]
@@ -63,7 +54,6 @@ fn main() -> Result<()> {
         Commands::Data { command } => match command {
             DataCommands::Load { source, symbol } => data::load(&source, &symbol),
         },
-        Commands::Run { script, max_events } => py::run_script(&script, max_events),
         Commands::Calendars { command } => match command {
             CalendarCommands::Show { year } => calendars::show(year),
         },

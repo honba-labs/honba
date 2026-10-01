@@ -16,8 +16,6 @@ anyhow = "1"
 serde  = { version = "1", features = ["derive"] }
 toml   = "0.8"
 
-# Python embedding (py/mod.rs, py/pyclasses/*)
-pyo3 = { version = "0.22", features = ["auto-initialize"] }
 
 # Workspace crates
 honba-messages        = { path = "../honba-messages" }

@@ -53,22 +53,33 @@ jobs:
 
   python:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: pip
+
       - name: install deps
         working-directory: python
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
-      - name: editable install (may be skipped until pyproject is fixed)
+
+      - name: build and install wheel via maturin
         working-directory: python
-        run: pip install -e . || echo "editable install skipped"
+        run: |
+          maturin develop
+
+      - name: verify extension type stubs
+        working-directory: python
+        run: |
+          python -m mypy.stubtest honba._honba
+
       - name: pytest
         working-directory: python
         run: |
-          if [ -d tests ]; then pytest -q tests/; else echo "no tests dir yet"; fi
+          pytest -q tests/
