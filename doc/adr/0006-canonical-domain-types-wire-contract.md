@@ -53,6 +53,8 @@ Python. Before this ADR:
      - `QuoteTick`: finite, `bid_price <= ask_price`, sizes `>= 0`. `TradeTick`: finite, `size >= 0`.
      - `Order`: `quantity > 0`, prices finite; `side` may be `no_order_side` (an order is a record).
      - `Event::OrderFilled`: `last_qty > 0`, `last_px` finite.
+     - `Trade`: `side` is buy or sell, `quantity > 0`, `price > 0`, `costs` finite.
+     - `Position`: `quantity >= 0` and `avg_price >= 0` (direction is `side`), `realized_pnl` finite.
    - `Event` is internally tagged: `{"type": "<variant>", ...fields}` with variants `quote`, `trade`, `bar`, `order`,
      `order_accepted`, `order_rejected`, `order_filled`, `order_cancelled`. Order lifecycle events use `OrderId`.
    - `Message` is the versioned envelope: `{"schema_version": 1, "event": {...}, "ts_init": n}`. A reader rejects any

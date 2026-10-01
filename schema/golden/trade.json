@@ -34,5 +34,70 @@
         "ts_init": 1700000060000000000
       }
     }
+  ],
+  "invalid": [
+    {
+      "name": "negative_quantity",
+      "value": {
+        "order_id": "O-1",
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "venue": "NSE"
+        },
+        "side": "buy",
+        "quantity": -1.0,
+        "price": 22000.0,
+        "costs": 45.67,
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000005
+      }
+    },
+    {
+      "name": "zero_price",
+      "value": {
+        "order_id": "O-1",
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "venue": "NSE"
+        },
+        "side": "buy",
+        "quantity": 75.0,
+        "price": 0.0,
+        "costs": 45.67,
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000005
+      }
+    },
+    {
+      "name": "no_order_side",
+      "value": {
+        "order_id": "O-1",
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "venue": "NSE"
+        },
+        "side": "no_order_side",
+        "quantity": 75.0,
+        "price": 22000.0,
+        "costs": 45.67,
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000005
+      }
+    },
+    {
+      "name": "missing_costs",
+      "value": {
+        "order_id": "O-1",
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "venue": "NSE"
+        },
+        "side": "buy",
+        "quantity": 75.0,
+        "price": 22000.0,
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000005
+      }
+    }
   ]
 }

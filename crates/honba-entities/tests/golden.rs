@@ -15,6 +15,15 @@ use serde_json::Value;
 const TS: u64 = 1_700_000_060_000_000_000;
 
 fn load_cases(file: &str, type_name: &str) -> BTreeMap<String, Value> {
+    load(file, type_name, "cases")
+}
+
+/// Loads the `invalid` cases; files without that section have none.
+fn load_invalid(file: &str, type_name: &str) -> BTreeMap<String, Value> {
+    load(file, type_name, "invalid")
+}
+
+fn load(file: &str, type_name: &str, key: &str) -> BTreeMap<String, Value> {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../schema/golden")
         .join(file);
@@ -22,12 +31,15 @@ fn load_cases(file: &str, type_name: &str) -> BTreeMap<String, Value> {
     let doc: Value = serde_json::from_str(&text).unwrap();
     assert_eq!(doc["schema_version"], u64::from(SCHEMA_VERSION), "{file}");
     assert_eq!(doc["type"], type_name, "{file}");
-    doc["cases"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|c| (c["name"].as_str().unwrap().to_owned(), c["value"].clone()))
-        .collect()
+    doc.get(key)
+        .and_then(Value::as_array)
+        .map(|cases| {
+            cases
+                .iter()
+                .map(|c| (c["name"].as_str().unwrap().to_owned(), c["value"].clone()))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn check<T>(file: &str, type_name: &str, expected: Vec<(&str, T)>)
@@ -53,6 +65,12 @@ where
         );
         let again: T = serde_json::from_str(&serde_json::to_string(&got).unwrap()).unwrap();
         assert_eq!(&again, want, "{file}/{name}: text round trip");
+    }
+    let invalid = load_invalid(file, type_name);
+    assert!(!invalid.is_empty(), "{file}: expected invalid cases");
+    for (name, json) in &invalid {
+        let res: Result<T, _> = serde_json::from_value(json.clone());
+        assert!(res.is_err(), "{file}/{name}: invalid case was accepted");
     }
 }
 

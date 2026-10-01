@@ -1,6 +1,7 @@
 //! Position tracking.
 
-use honba_messages::InstrumentId;
+use honba_messages::validation::{finite, non_negative, serialize_finite};
+use honba_messages::{InstrumentId, InvariantError};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{EntitiesError, Result};
@@ -55,15 +56,51 @@ impl PositionSide {
 /// assert_eq!(pos.quantity(), 100.0);
 /// assert_eq!(pos.avg_price(), 22_025.0);   // (75*22000 + 25*22100) / 100
 /// ```
+///
+/// Invariants (checked by [`Position::validate`] and on deserialization):
+/// `quantity` and `avg_price` are finite and `>= 0` (the side carries the
+/// direction), `realized_pnl` is finite.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "PositionRepr")]
 pub struct Position {
+    instrument_id: InstrumentId,
+    currency: Currency,
+    side: PositionSide,
+    #[serde(serialize_with = "serialize_finite")]
+    quantity: f64,
+    #[serde(serialize_with = "serialize_finite")]
+    avg_price: f64,
+    #[serde(serialize_with = "serialize_finite")]
+    realized_pnl: f64,
+}
+
+/// The raw wire form, validated into a [`Position`].
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PositionRepr {
     instrument_id: InstrumentId,
     currency: Currency,
     side: PositionSide,
     quantity: f64,
     avg_price: f64,
     realized_pnl: f64,
+}
+
+impl TryFrom<PositionRepr> for Position {
+    type Error = InvariantError;
+
+    fn try_from(r: PositionRepr) -> std::result::Result<Self, Self::Error> {
+        let position = Position {
+            instrument_id: r.instrument_id,
+            currency: r.currency,
+            side: r.side,
+            quantity: r.quantity,
+            avg_price: r.avg_price,
+            realized_pnl: r.realized_pnl,
+        };
+        position.validate()?;
+        Ok(position)
+    }
 }
 
 impl Position {
@@ -107,6 +144,14 @@ impl Position {
     /// Returns realized profit and loss in the position's currency.
     pub fn realized_pnl(&self) -> f64 {
         self.realized_pnl
+    }
+
+    /// Checks the position's invariants (see [`Position`]).
+    pub fn validate(&self) -> std::result::Result<(), InvariantError> {
+        non_negative("quantity", self.quantity)?;
+        non_negative("avg_price", self.avg_price)?;
+        finite("realized_pnl", self.realized_pnl)?;
+        Ok(())
     }
 
     /// Returns `true` if the position holds no quantity.
@@ -190,6 +235,44 @@ impl Position {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use honba_messages::{InvariantError, Venue};
+
+    fn short() -> Position {
+        let mut p = Position::flat(InstrumentId::new("X", Venue::new("NSE")), Currency::Inr);
+        p.apply_fill(PositionSide::Short, 60.0, 10.0);
+        p
+    }
+
+    #[test]
+    fn validate_reports_typed_errors() {
+        assert_eq!(short().validate(), Ok(()));
+        let negative = Position {
+            quantity: -5.0,
+            ..short()
+        };
+        assert_eq!(
+            negative.validate(),
+            Err(InvariantError::Negative {
+                field: "quantity",
+                value: -5.0,
+            })
+        );
+        let json = serde_json::to_value(negative).unwrap();
+        let err = serde_json::from_value::<Position>(json)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("quantity"), "{err}");
+    }
+
+    #[test]
+    fn non_finite_values_never_serialize_as_null() {
+        let p = Position {
+            realized_pnl: f64::NAN,
+            ..short()
+        };
+        assert!(serde_json::to_string(&p).is_err());
+    }
 
     #[test]
     fn position_side_serializes_lowercase() {

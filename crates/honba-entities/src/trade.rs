@@ -1,6 +1,7 @@
 //! Completed trade records.
 
-use honba_messages::{InstrumentId, OrderId, OrderSide, UnixNanos};
+use honba_messages::validation::{finite, positive, serialize_finite};
+use honba_messages::{InstrumentId, InvariantError, OrderId, OrderSide, UnixNanos};
 use serde::{Deserialize, Serialize};
 
 /// A completed fill, recorded after the venue confirms execution.
@@ -25,9 +26,30 @@ use serde::{Deserialize, Serialize};
 /// assert_eq!(t.notional(), 75.0 * 22_000.0);
 /// assert_eq!(t.costs(), 0.0);
 /// ```
+///
+/// Invariants (checked by [`Trade::validate`] and on deserialization): `side`
+/// is buy or sell, `quantity` and `price` are finite and `> 0`, `costs` is
+/// finite.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "TradeRepr")]
 pub struct Trade {
+    order_id: OrderId,
+    instrument_id: InstrumentId,
+    side: OrderSide,
+    #[serde(serialize_with = "serialize_finite")]
+    quantity: f64,
+    #[serde(serialize_with = "serialize_finite")]
+    price: f64,
+    #[serde(serialize_with = "serialize_finite")]
+    costs: f64,
+    ts_event: UnixNanos,
+    ts_init: UnixNanos,
+}
+
+/// The raw wire form, validated into a [`Trade`].
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TradeRepr {
     order_id: OrderId,
     instrument_id: InstrumentId,
     side: OrderSide,
@@ -36,6 +58,25 @@ pub struct Trade {
     costs: f64,
     ts_event: UnixNanos,
     ts_init: UnixNanos,
+}
+
+impl TryFrom<TradeRepr> for Trade {
+    type Error = InvariantError;
+
+    fn try_from(r: TradeRepr) -> std::result::Result<Self, Self::Error> {
+        let trade = Trade {
+            order_id: r.order_id,
+            instrument_id: r.instrument_id,
+            side: r.side,
+            quantity: r.quantity,
+            price: r.price,
+            costs: r.costs,
+            ts_event: r.ts_event,
+            ts_init: r.ts_init,
+        };
+        trade.validate()?;
+        Ok(trade)
+    }
 }
 
 impl Trade {
@@ -50,9 +91,7 @@ impl Trade {
         ts_event: UnixNanos,
         ts_init: UnixNanos,
     ) -> Self {
-        debug_assert!(quantity > 0.0, "trade quantity must be positive");
-        debug_assert!(price > 0.0, "trade price must be positive");
-        Self {
+        let trade = Self {
             order_id,
             instrument_id,
             side,
@@ -61,7 +100,24 @@ impl Trade {
             costs: 0.0,
             ts_event,
             ts_init,
+        };
+        debug_assert!(
+            trade.validate().is_ok(),
+            "invalid trade: {:?}",
+            trade.validate()
+        );
+        trade
+    }
+
+    /// Checks the trade's invariants (see [`Trade`]).
+    pub fn validate(&self) -> std::result::Result<(), InvariantError> {
+        if !matches!(self.side, OrderSide::Buy | OrderSide::Sell) {
+            return Err(InvariantError::NotAllowed { field: "side" });
         }
+        positive("quantity", self.quantity)?;
+        positive("price", self.price)?;
+        finite("costs", self.costs)?;
+        Ok(())
     }
 
     /// Returns the order id.
@@ -159,6 +215,66 @@ mod tests {
         assert_eq!(t.costs(), 1.5);
         assert_eq!(t.notional(), 20.0);
         assert_eq!(t.order_id().as_str(), "O-9");
+    }
+
+    #[test]
+    fn validate_reports_typed_errors() {
+        use honba_messages::InvariantError::*;
+        assert_eq!(trade().validate(), Ok(()));
+        let cases = [
+            (
+                Trade {
+                    quantity: -1.0,
+                    ..trade()
+                },
+                NotPositive {
+                    field: "quantity",
+                    value: -1.0,
+                },
+            ),
+            (
+                Trade {
+                    price: 0.0,
+                    ..trade()
+                },
+                NotPositive {
+                    field: "price",
+                    value: 0.0,
+                },
+            ),
+            (
+                Trade {
+                    side: OrderSide::NoOrderSide,
+                    ..trade()
+                },
+                NotAllowed { field: "side" },
+            ),
+            (
+                Trade {
+                    costs: f64::INFINITY,
+                    ..trade()
+                },
+                NonFinite { field: "costs" },
+            ),
+        ];
+        for (t, err) in cases {
+            assert_eq!(t.validate(), Err(err), "{t:?}");
+        }
+        let json = serde_json::to_value(Trade {
+            side: OrderSide::NoOrderSide,
+            ..trade()
+        })
+        .unwrap();
+        assert!(serde_json::from_value::<Trade>(json).is_err());
+    }
+
+    #[test]
+    fn non_finite_costs_never_serialize_as_null() {
+        let t = Trade {
+            costs: f64::NAN,
+            ..trade()
+        };
+        assert!(serde_json::to_string(&t).is_err());
     }
 
     #[test]

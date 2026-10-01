@@ -30,5 +30,49 @@
         "realized_pnl": -80.0
       }
     }
+  ],
+  "invalid": [
+    {
+      "name": "negative_quantity",
+      "value": {
+        "instrument_id": {
+          "symbol": "RELIANCE",
+          "venue": "NSE"
+        },
+        "currency": "INR",
+        "side": "short",
+        "quantity": -5.0,
+        "avg_price": 2950.5,
+        "realized_pnl": -80.0
+      }
+    },
+    {
+      "name": "negative_avg_price",
+      "value": {
+        "instrument_id": {
+          "symbol": "RELIANCE",
+          "venue": "NSE"
+        },
+        "currency": "INR",
+        "side": "short",
+        "quantity": 60.0,
+        "avg_price": -1.0,
+        "realized_pnl": -80.0
+      }
+    },
+    {
+      "name": "unknown_currency",
+      "value": {
+        "instrument_id": {
+          "symbol": "RELIANCE",
+          "venue": "NSE"
+        },
+        "currency": "inr",
+        "side": "short",
+        "quantity": 60.0,
+        "avg_price": 2950.5,
+        "realized_pnl": -80.0
+      }
+    }
   ]
 }

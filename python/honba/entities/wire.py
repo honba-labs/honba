@@ -222,22 +222,32 @@ class OrderIntent(_Wire):
 
 
 class Trade(_Wire):
+    """A fill; ``side`` is buy or sell, ``quantity > 0``, ``price > 0``."""
+
     order_id: Str
     instrument_id: InstrumentId
     side: WireOrderSide
-    quantity: Float
-    price: Float
+    quantity: PositiveFloat
+    price: PositiveFloat
     costs: Float
     ts_event: UnixNanos
     ts_init: UnixNanos
 
+    @model_validator(mode="after")
+    def _check_side(self) -> Trade:
+        if self.side not in (OrderSide.BUY, OrderSide.SELL):
+            raise ValueError("trade side must be buy or sell")
+        return self
+
 
 class Position(_Wire):
+    """A position; ``quantity`` and ``avg_price`` are ``>= 0`` (``side`` gives direction)."""
+
     instrument_id: InstrumentId
     currency: Currency
     side: PositionSide
-    quantity: Float
-    avg_price: Float
+    quantity: NonNegativeFloat
+    avg_price: NonNegativeFloat
     realized_pnl: Float
 
 
