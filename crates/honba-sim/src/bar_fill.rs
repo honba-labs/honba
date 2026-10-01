@@ -22,34 +22,32 @@ struct Inner {
 /// execute orders.
 ///
 /// ```
-/// use honba_testing::VecFeed;
 /// use honba_sim::BarFillEngine;
-/// use honba_engine::{Engine, ExecutionEngine};
+/// use honba_engine::{ExecutionEngine, Handler};
 /// use honba_messages::{
-///     InstrumentId, Order, OrderId, OrderSide, OrderType, TimeInForce,
+///     Bar, BarAggregation, BarSpecification, BarType, Event, InstrumentId,
+///     Order, OrderId, OrderSide, OrderType, PriceType, TimeInForce,
 ///     UnixNanos, Venue,
 /// };
 ///
-/// let mut feed = VecFeed::new(vec![
-///     VecFeed::bar("X", 100.0, 1),
-///     VecFeed::bar("X", 101.0, 2),
-/// ]);
+/// let mut exec = BarFillEngine::new();
+/// let bt = BarType::new(
+///     InstrumentId::new("X", Venue::new("TEST")),
+///     BarSpecification::new(1, BarAggregation::Minute, PriceType::Last),
+/// );
+/// let t = UnixNanos::from_u64(2);
+/// let bar = Bar::new(bt, 100.0, 102.0, 99.0, 101.0, 1000.0, t, t);
+/// exec.on_event(&Event::Bar(bar), t).unwrap();
 ///
-/// let exec = BarFillEngine::new();
-/// let mut engine = Engine::new();
-/// engine.add_handler(exec.clone());
-/// engine.run(&mut feed).unwrap();
-///
-/// // After the run, last price is 101. Submit and drain.
-/// let mut exec2 = exec.clone();
+/// // Last price observed from bar close is 101. Submit and drain.
 /// let order = Order::new(
 ///     OrderId::new("O-1"),
 ///     InstrumentId::new("X", Venue::new("TEST")),
 ///     OrderSide::Buy, OrderType::Market, 5.0, None, TimeInForce::Day,
 ///     UnixNanos::from_u64(2), UnixNanos::from_u64(2),
 /// );
-/// exec2.submit(order).unwrap();
-/// let fills = exec2.drain_fills().unwrap();
+/// exec.submit(order).unwrap();
+/// let fills = exec.drain_fills().unwrap();
 /// assert_eq!(fills.len(), 1);
 /// assert_eq!(fills[0].price(), 101.0);
 /// ```

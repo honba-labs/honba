@@ -4,7 +4,8 @@ use honba_engine::{Engine, ExecutionEngine};
 use honba_messages::{
     InstrumentId, Order, OrderId, OrderSide, OrderType, TimeInForce, UnixNanos, Venue,
 };
-use honba_testing::{assert_close, assert_close_slice, PaperExecution, Recorder, VecFeed};
+use honba_sim::PaperExecution;
+use honba_testing::{assert_close, assert_close_slice, Recorder, VecFeed};
 
 fn order(id: &str, side: OrderSide, qty: f64) -> Order {
     Order::new(

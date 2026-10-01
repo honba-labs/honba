@@ -12,5 +12,4 @@ honba-messages.workspace = true
 honba-entities.workspace = true
 honba-engine.workspace = true
 
-[dev-dependencies]
-honba-testing.workspace = true
+

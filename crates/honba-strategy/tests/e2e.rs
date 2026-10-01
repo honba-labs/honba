@@ -5,8 +5,9 @@ use honba_engine::Handler;
 use honba_engine::{DataFeed, Result};
 use honba_entities::Trade;
 use honba_messages::{InstrumentId, Venue};
+use honba_sim::BarFillEngine;
 use honba_strategy::{SmaCrossover, StrategyRunner};
-use honba_testing::{BarFillEngine, VecFeed};
+use honba_testing::VecFeed;
 
 const CLOSES: &[f64] = &[
     100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 104.0, 103.0, 102.0, 101.0, 100.0, 101.0, 102.0,

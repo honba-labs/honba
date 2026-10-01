@@ -11,6 +11,3 @@ pub mod recorder;
 pub use assert::{assert_close, assert_close_slice};
 pub use feed::VecFeed;
 pub use recorder::Recorder;
-
-// Re-exported from honba-sim for backward compatibility during transition
-pub use honba_sim::{bar_fill, paper, BarFillEngine, OrderLedger, PaperExecution};

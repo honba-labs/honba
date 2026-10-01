@@ -9,8 +9,9 @@ use honba_data::{MarkdownReportWriter, ReportWriter};
 use honba_engine::{DataFeed, Handler};
 use honba_entities::Trade;
 use honba_messages::{InstrumentId, Venue};
+use honba_sim::BarFillEngine;
 use honba_strategy::{SmaCrossover, Strategy, StrategyRunner};
-use honba_testing::{BarFillEngine, VecFeed};
+use honba_testing::VecFeed;
 
 #[derive(Debug, Deserialize)]
 struct BacktestConfig {

@@ -11,8 +11,9 @@ use honba_data::{MarkdownReportWriter, ReportWriter};
 use honba_engine::{DataFeed, Handler};
 use honba_entities::Trade;
 use honba_messages::{InstrumentId, Venue};
+use honba_sim::BarFillEngine;
 use honba_strategy::{SmaCrossover, Strategy, StrategyRunner};
-use honba_testing::{BarFillEngine, VecFeed};
+use honba_testing::VecFeed;
 
 /// Synthetic price series with several swings to generate crosses.
 const CLOSES: &[f64] = &[
