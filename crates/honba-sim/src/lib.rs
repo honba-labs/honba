@@ -9,3 +9,6 @@ pub mod paper;
 
 pub use bar_fill::BarFillEngine;
 pub use paper::{OrderLedger, PaperExecution};
+
+#[cfg(test)]
+mod tests;
