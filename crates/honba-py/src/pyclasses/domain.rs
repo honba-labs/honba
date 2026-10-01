@@ -364,6 +364,7 @@ impl ROrderIntent {
             quantity: self.quantity,
             order_type,
             price: self.price,
+            trigger_price: None,
             time_in_force: tif,
         })
     }

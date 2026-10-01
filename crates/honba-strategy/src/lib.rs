@@ -17,7 +17,7 @@ pub mod sma_crossover;
 pub mod strategy;
 
 pub use buy_and_hold::BuyAndHold;
-pub use intent::OrderIntent;
+pub use intent::{IntentError, OrderIntent};
 pub use rsi_reversal::RsiReversal;
 pub use runner::StrategyRunner;
 pub use sma_crossover::SmaCrossover;

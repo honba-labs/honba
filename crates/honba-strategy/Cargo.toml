@@ -12,8 +12,10 @@ honba-messages.workspace = true
 honba-entities.workspace = true
 honba-engine.workspace = true
 honba-indicators.workspace = true
+serde.workspace = true
 
 [dev-dependencies]
+serde_json.workspace = true
 honba-testing.workspace = true
 honba-sim.workspace = true
 honba-analytics.workspace = true
