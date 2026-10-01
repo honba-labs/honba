@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::events::timestamp::UnixNanos;
 use crate::identifiers::InstrumentId;
+use crate::validation::{finite, non_negative, serialize_finite, InvariantError};
 
 /// How a bar aggregates its underlying data.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -50,17 +51,43 @@ pub enum PriceType {
 /// assert_eq!(spec.step(), 1);
 /// assert_eq!(spec.aggregation(), BarAggregation::Minute);
 /// ```
+///
+/// `step` must be at least 1; deserializing a zero step fails.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "BarSpecificationRepr")]
 pub struct BarSpecification {
     step: usize,
     aggregation: BarAggregation,
     price_type: PriceType,
 }
 
+/// The raw wire form, validated into a [`BarSpecification`].
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BarSpecificationRepr {
+    step: usize,
+    aggregation: BarAggregation,
+    price_type: PriceType,
+}
+
+impl TryFrom<BarSpecificationRepr> for BarSpecification {
+    type Error = InvariantError;
+
+    fn try_from(r: BarSpecificationRepr) -> Result<Self, Self::Error> {
+        if r.step == 0 {
+            return Err(InvariantError::NotPositive {
+                field: "step",
+                value: 0.0,
+            });
+        }
+        Ok(Self::new(r.step, r.aggregation, r.price_type))
+    }
+}
+
 impl BarSpecification {
-    /// Creates a new specification.
+    /// Creates a new specification. `step` must be at least 1.
     pub const fn new(step: usize, aggregation: BarAggregation, price_type: PriceType) -> Self {
+        debug_assert!(step > 0, "bar step must be at least 1");
         Self {
             step,
             aggregation,
@@ -133,9 +160,32 @@ impl BarType {
 /// assert_eq!(bar.open(), 22_000.0);
 /// assert_eq!(bar.close(), 22_020.0);
 /// ```
+///
+/// Invariants (checked by [`Bar::validate`] and on deserialization): all
+/// prices and the volume are finite, `low <= open, close <= high`, and
+/// `volume >= 0`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "BarRepr")]
 pub struct Bar {
+    bar_type: BarType,
+    #[serde(serialize_with = "serialize_finite")]
+    open: f64,
+    #[serde(serialize_with = "serialize_finite")]
+    high: f64,
+    #[serde(serialize_with = "serialize_finite")]
+    low: f64,
+    #[serde(serialize_with = "serialize_finite")]
+    close: f64,
+    #[serde(serialize_with = "serialize_finite")]
+    volume: f64,
+    ts_event: UnixNanos,
+    ts_init: UnixNanos,
+}
+
+/// The raw wire form, validated into a [`Bar`].
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BarRepr {
     bar_type: BarType,
     open: f64,
     high: f64,
@@ -144,6 +194,25 @@ pub struct Bar {
     volume: f64,
     ts_event: UnixNanos,
     ts_init: UnixNanos,
+}
+
+impl TryFrom<BarRepr> for Bar {
+    type Error = InvariantError;
+
+    fn try_from(r: BarRepr) -> Result<Self, Self::Error> {
+        let bar = Bar {
+            bar_type: r.bar_type,
+            open: r.open,
+            high: r.high,
+            low: r.low,
+            close: r.close,
+            volume: r.volume,
+            ts_event: r.ts_event,
+            ts_init: r.ts_init,
+        };
+        bar.validate()?;
+        Ok(bar)
+    }
 }
 
 impl Bar {
@@ -159,8 +228,7 @@ impl Bar {
         ts_event: UnixNanos,
         ts_init: UnixNanos,
     ) -> Self {
-        debug_assert!(high >= low, "bar high ({high}) must be >= low ({low})");
-        Self {
+        let bar = Self {
             bar_type,
             open,
             high,
@@ -169,7 +237,34 @@ impl Bar {
             volume,
             ts_event,
             ts_init,
+        };
+        debug_assert!(bar.validate().is_ok(), "invalid bar: {:?}", bar.validate());
+        bar
+    }
+
+    /// Checks the bar's invariants (see [`Bar`]).
+    pub fn validate(&self) -> Result<(), InvariantError> {
+        for (field, value) in [
+            ("open", self.open),
+            ("high", self.high),
+            ("low", self.low),
+            ("close", self.close),
+        ] {
+            finite(field, value)?;
         }
+        non_negative("volume", self.volume)?;
+        if self.low > self.high {
+            return Err(InvariantError::Crossed {
+                lower: "low",
+                upper: "high",
+            });
+        }
+        for (field, value) in [("open", self.open), ("close", self.close)] {
+            if value < self.low || value > self.high {
+                return Err(InvariantError::OutsideRange { field });
+            }
+        }
+        Ok(())
     }
 
     /// Returns the bar type.
@@ -210,5 +305,101 @@ impl Bar {
     /// Returns the Honba timestamp.
     pub fn ts_init(&self) -> UnixNanos {
         self.ts_init
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::identifiers::Venue;
+    use crate::validation::InvariantError::{self, *};
+
+    fn spec(step: usize) -> BarSpecification {
+        BarSpecification::new(step, BarAggregation::Minute, PriceType::Last)
+    }
+
+    fn valid() -> Bar {
+        let bar_type = BarType::new(InstrumentId::new("X", Venue::new("NSE")), spec(1));
+        Bar::new(bar_type, 10.0, 12.0, 9.0, 11.0, 5.0, 1.into(), 1.into())
+    }
+
+    #[test]
+    fn validate_reports_typed_errors() {
+        let cases: [(Bar, InvariantError); 5] = [
+            (
+                Bar {
+                    high: 8.0,
+                    ..valid()
+                },
+                Crossed {
+                    lower: "low",
+                    upper: "high",
+                },
+            ),
+            (
+                Bar {
+                    close: 13.0,
+                    ..valid()
+                },
+                OutsideRange { field: "close" },
+            ),
+            (
+                Bar {
+                    open: 8.5,
+                    ..valid()
+                },
+                OutsideRange { field: "open" },
+            ),
+            (
+                Bar {
+                    volume: -1.0,
+                    ..valid()
+                },
+                Negative {
+                    field: "volume",
+                    value: -1.0,
+                },
+            ),
+            (
+                Bar {
+                    close: f64::NAN,
+                    ..valid()
+                },
+                NonFinite { field: "close" },
+            ),
+        ];
+        assert_eq!(valid().validate(), Ok(()));
+        for (bar, err) in cases {
+            assert_eq!(bar.validate(), Err(err), "{bar:?}");
+        }
+    }
+
+    #[test]
+    fn deserialize_rejects_invalid_bars_with_the_reason() {
+        let mut json = serde_json::to_value(valid()).unwrap();
+        json["high"] = 8.0.into();
+        let err = serde_json::from_value::<Bar>(json).unwrap_err().to_string();
+        assert!(err.contains("low") && err.contains("high"), "{err}");
+
+        let mut json = serde_json::to_value(valid()).unwrap();
+        json["bar_type"]["spec"]["step"] = 0.into();
+        let err = serde_json::from_value::<Bar>(json).unwrap_err().to_string();
+        assert!(err.contains("step"), "{err}");
+    }
+
+    #[test]
+    fn non_finite_values_never_serialize_as_null() {
+        for bar in [
+            Bar {
+                close: f64::NAN,
+                ..valid()
+            },
+            Bar {
+                volume: f64::INFINITY,
+                ..valid()
+            },
+        ] {
+            assert!(serde_json::to_string(&bar).is_err(), "{bar:?}");
+        }
     }
 }

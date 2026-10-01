@@ -43,6 +43,7 @@ pub mod events;
 pub mod identifiers;
 pub mod market_data;
 pub mod orders;
+pub mod validation;
 
 pub use events::{timestamp::UnixNanos, Event, Message, SCHEMA_VERSION};
 pub use identifiers::{InstrumentId, OrderId, TradeId, Venue};
@@ -51,3 +52,4 @@ pub use market_data::{
     tick::{AggressorSide, QuoteTick, Tick, TradeTick},
 };
 pub use orders::order::{Order, OrderSide, OrderStatus, OrderType, TimeInForce};
+pub use validation::InvariantError;

@@ -139,6 +139,108 @@
         "order_id": 7,
         "ts_event": 1
       }
+    },
+    {
+      "name": "quote_ask_below_bid",
+      "value": {
+        "type": "quote",
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "venue": "NSE"
+        },
+        "bid_price": 22000.0,
+        "ask_price": 21999.0,
+        "bid_size": 50.0,
+        "ask_size": 75.0,
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000000
+      }
+    },
+    {
+      "name": "quote_negative_size",
+      "value": {
+        "type": "quote",
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "venue": "NSE"
+        },
+        "bid_price": 22000.0,
+        "ask_price": 22001.0,
+        "bid_size": -50.0,
+        "ask_size": 75.0,
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000000
+      }
+    },
+    {
+      "name": "trade_tick_negative_size",
+      "value": {
+        "type": "trade",
+        "instrument_id": {
+          "symbol": "RELIANCE",
+          "venue": "NSE"
+        },
+        "price": 2950.5,
+        "size": -100.0,
+        "aggressor_side": "seller",
+        "trade_id": "T-42",
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000000
+      }
+    },
+    {
+      "name": "bar_high_below_low",
+      "value": {
+        "type": "bar",
+        "bar_type": {
+          "instrument_id": {
+            "symbol": "BANKNIFTY",
+            "venue": "NSE"
+          },
+          "spec": {
+            "step": 5,
+            "aggregation": "minute",
+            "price_type": "last"
+          }
+        },
+        "open": 48000.0,
+        "high": 47000.0,
+        "low": 47900.05,
+        "close": 48150.3,
+        "volume": 12345.0,
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000001
+      }
+    },
+    {
+      "name": "order_negative_quantity",
+      "value": {
+        "type": "order",
+        "order_id": "O-4",
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "venue": "NSE"
+        },
+        "side": "buy",
+        "order_type": "stop_limit",
+        "quantity": -75.0,
+        "price": 22010.0,
+        "trigger_price": 22000.0,
+        "status": "initialized",
+        "time_in_force": "day",
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000000
+      }
+    },
+    {
+      "name": "order_filled_zero_qty",
+      "value": {
+        "type": "order_filled",
+        "order_id": "O-1",
+        "last_qty": 0.0,
+        "last_px": 22000.05,
+        "ts_event": 1700000060000000000
+      }
     }
   ]
 }

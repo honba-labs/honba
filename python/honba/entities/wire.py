@@ -30,6 +30,10 @@ UnixNanos = Annotated[int, Strict(), Field(ge=0, le=_U64_MAX)]
 Float = Annotated[float, Strict()]
 """A finite f64 (ints are accepted and widened, strings are not)."""
 Str = Annotated[str, Strict()]
+PositiveFloat = Annotated[float, Strict(), Field(gt=0)]
+"""A finite f64 that must be > 0."""
+NonNegativeFloat = Annotated[float, Strict(), Field(ge=0)]
+"""A finite f64 that must be >= 0."""
 
 
 def _canonical(enum: type[Enum]) -> BeforeValidator:
@@ -101,7 +105,7 @@ class InstrumentId(_Wire):
 
 
 class BarSpecification(_Wire):
-    step: Annotated[int, Strict(), Field(ge=0, le=_U64_MAX)]
+    step: Annotated[int, Strict(), Field(ge=1, le=_U64_MAX)]
     aggregation: BarAggregation
     price_type: PriceType
 
@@ -112,30 +116,49 @@ class BarType(_Wire):
 
 
 class Bar(_Wire):
+    """OHLCV bar; ``low <= open, close <= high`` and ``volume >= 0``."""
+
     bar_type: BarType
     open: Float
     high: Float
     low: Float
     close: Float
-    volume: Float
+    volume: NonNegativeFloat
     ts_event: UnixNanos
     ts_init: UnixNanos
+
+    @model_validator(mode="after")
+    def _check_range(self) -> Bar:
+        if self.low > self.high:
+            raise ValueError("low must be <= high")
+        for name in ("open", "close"):
+            if not self.low <= getattr(self, name) <= self.high:
+                raise ValueError(f"{name} must lie within [low, high]")
+        return self
 
 
 class QuoteTick(_Wire):
+    """Top-of-book quote; ``bid_price <= ask_price`` and sizes ``>= 0``."""
+
     instrument_id: InstrumentId
     bid_price: Float
     ask_price: Float
-    bid_size: Float
-    ask_size: Float
+    bid_size: NonNegativeFloat
+    ask_size: NonNegativeFloat
     ts_event: UnixNanos
     ts_init: UnixNanos
+
+    @model_validator(mode="after")
+    def _check_spread(self) -> QuoteTick:
+        if self.bid_price > self.ask_price:
+            raise ValueError("bid_price must be <= ask_price")
+        return self
 
 
 class TradeTick(_Wire):
     instrument_id: InstrumentId
     price: Float
-    size: Float
+    size: NonNegativeFloat
     aggressor_side: AggressorSide
     trade_id: Str
     ts_event: UnixNanos
@@ -143,11 +166,13 @@ class TradeTick(_Wire):
 
 
 class Order(_Wire):
+    """A client order record; ``quantity > 0`` (``side`` may be ``no_order_side``)."""
+
     order_id: Str
     instrument_id: InstrumentId
     side: WireOrderSide
     order_type: WireOrderType
-    quantity: Float
+    quantity: PositiveFloat
     price: Float | None = None
     trigger_price: Float | None = None
     status: OrderStatus
@@ -251,7 +276,7 @@ class OrderRejected(_Wire):
 class OrderFilled(_Wire):
     type: Literal["order_filled"] = "order_filled"
     order_id: Str
-    last_qty: Float
+    last_qty: PositiveFloat
     last_px: Float
     ts_event: UnixNanos
 

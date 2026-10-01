@@ -4,6 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::events::timestamp::UnixNanos;
 use crate::identifiers::{InstrumentId, OrderId};
+use crate::validation::{
+    finite_opt, positive, serialize_finite, serialize_finite_opt, InvariantError,
+};
 
 /// Which side of the book an order sits on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -95,21 +98,68 @@ pub enum TimeInForce {
 /// assert_eq!(order.status(), OrderStatus::Initialized);
 /// assert_eq!(order.quantity(), 75.0);
 /// ```
+///
+/// Invariants (checked by [`Order::validate`] and on deserialization):
+/// `quantity` is finite and `> 0`; `price` and `trigger_price` are finite
+/// when present. An order is a record (it may come back from a venue), so
+/// `side` may be `no_order_side`; intents are stricter.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "OrderRepr")]
 pub struct Order {
+    order_id: OrderId,
+    instrument_id: InstrumentId,
+    side: OrderSide,
+    order_type: OrderType,
+    #[serde(serialize_with = "serialize_finite")]
+    quantity: f64,
+    #[serde(serialize_with = "serialize_finite_opt")]
+    price: Option<f64>,
+    /// Stop trigger price; `None` unless the order is a stop order.
+    #[serde(serialize_with = "serialize_finite_opt")]
+    trigger_price: Option<f64>,
+    status: OrderStatus,
+    time_in_force: TimeInForce,
+    ts_event: UnixNanos,
+    ts_init: UnixNanos,
+}
+
+/// The raw wire form, validated into an [`Order`].
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OrderRepr {
     order_id: OrderId,
     instrument_id: InstrumentId,
     side: OrderSide,
     order_type: OrderType,
     quantity: f64,
     price: Option<f64>,
-    /// Stop trigger price; `None` unless the order is a stop order.
     trigger_price: Option<f64>,
     status: OrderStatus,
     time_in_force: TimeInForce,
     ts_event: UnixNanos,
     ts_init: UnixNanos,
+}
+
+impl TryFrom<OrderRepr> for Order {
+    type Error = InvariantError;
+
+    fn try_from(r: OrderRepr) -> Result<Self, Self::Error> {
+        let order = Order {
+            order_id: r.order_id,
+            instrument_id: r.instrument_id,
+            side: r.side,
+            order_type: r.order_type,
+            quantity: r.quantity,
+            price: r.price,
+            trigger_price: r.trigger_price,
+            status: r.status,
+            time_in_force: r.time_in_force,
+            ts_event: r.ts_event,
+            ts_init: r.ts_init,
+        };
+        order.validate()?;
+        Ok(order)
+    }
 }
 
 impl Order {
@@ -126,8 +176,7 @@ impl Order {
         ts_event: UnixNanos,
         ts_init: UnixNanos,
     ) -> Self {
-        debug_assert!(quantity > 0.0, "order quantity must be positive");
-        Self {
+        let order = Self {
             order_id,
             instrument_id,
             side,
@@ -139,7 +188,21 @@ impl Order {
             time_in_force,
             ts_event,
             ts_init,
-        }
+        };
+        debug_assert!(
+            order.validate().is_ok(),
+            "invalid order: {:?}",
+            order.validate()
+        );
+        order
+    }
+
+    /// Checks the order's invariants (see [`Order`]).
+    pub fn validate(&self) -> Result<(), InvariantError> {
+        positive("quantity", self.quantity)?;
+        finite_opt("price", self.price)?;
+        finite_opt("trigger_price", self.trigger_price)?;
+        Ok(())
     }
 
     /// Returns the order id.
@@ -227,5 +290,67 @@ impl Order {
     pub fn with_status(mut self, status: OrderStatus) -> Self {
         self.status = status;
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::identifiers::Venue;
+    use crate::validation::InvariantError::*;
+
+    fn order() -> Order {
+        Order::new(
+            OrderId::new("O"),
+            InstrumentId::new("X", Venue::new("NSE")),
+            OrderSide::Buy,
+            OrderType::Limit,
+            5.0,
+            Some(10.0),
+            TimeInForce::Day,
+            1.into(),
+            1.into(),
+        )
+    }
+
+    #[test]
+    fn validate_reports_typed_errors() {
+        assert_eq!(order().validate(), Ok(()));
+        let negative = Order {
+            quantity: -5.0,
+            ..order()
+        };
+        assert_eq!(
+            negative.validate(),
+            Err(NotPositive {
+                field: "quantity",
+                value: -5.0,
+            })
+        );
+        let json = serde_json::to_value(negative).unwrap();
+        let err = serde_json::from_value::<Order>(json)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("quantity"), "{err}");
+    }
+
+    #[test]
+    fn non_finite_prices_never_serialize_as_null() {
+        let nan_trigger = order().with_trigger_price(f64::NAN);
+        assert!(serde_json::to_string(&nan_trigger).is_err());
+        let inf_price = Order {
+            price: Some(f64::INFINITY),
+            ..order()
+        };
+        assert!(serde_json::to_string(&inf_price).is_err());
+        // `None` is still written as `null`.
+        let market = Order {
+            price: None,
+            ..order()
+        };
+        assert_eq!(
+            serde_json::to_value(market).unwrap()["price"],
+            serde_json::Value::Null
+        );
     }
 }

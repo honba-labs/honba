@@ -6,6 +6,16 @@ use crate::events::timestamp::UnixNanos;
 use crate::identifiers::OrderId;
 use crate::market_data::{Bar, QuoteTick, TradeTick};
 use crate::orders::Order;
+use crate::validation::{deserialize_positive, finite, serialize_finite};
+
+fn last_qty<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
+    deserialize_positive("last_qty", d)
+}
+
+fn last_px<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
+    let value: f64 = Deserialize::deserialize(d)?;
+    finite("last_px", value).map_err(serde::de::Error::custom)
+}
 
 /// Version of the JSON wire contract carried by every [`Message`].
 ///
@@ -57,9 +67,11 @@ pub enum Event {
     OrderFilled {
         /// The client order identifier.
         order_id: OrderId,
-        /// The quantity filled in this event.
+        /// The quantity filled in this event (finite, `> 0`).
+        #[serde(serialize_with = "serialize_finite", deserialize_with = "last_qty")]
         last_qty: f64,
-        /// The price at which this fill occurred.
+        /// The price at which this fill occurred (finite).
+        #[serde(serialize_with = "serialize_finite", deserialize_with = "last_px")]
         last_px: f64,
         /// The venue timestamp at which the fill occurred.
         ts_event: UnixNanos,
@@ -186,6 +198,20 @@ mod tests {
         assert!(SchemaVersion::try_from(SCHEMA_VERSION).is_ok());
         let err = SchemaVersion::try_from(SCHEMA_VERSION + 1).unwrap_err();
         assert!(err.contains("unsupported schema_version"), "{err}");
+    }
+
+    #[test]
+    fn order_filled_rejects_non_positive_qty_and_never_serializes_nan() {
+        let filled = |qty: f64, px: f64| Event::OrderFilled {
+            order_id: OrderId::new("O-1"),
+            last_qty: qty,
+            last_px: px,
+            ts_event: UnixNanos::from_u64(1),
+        };
+        let json = serde_json::to_value(filled(0.0, 10.0)).unwrap();
+        assert!(serde_json::from_value::<Event>(json).is_err());
+        assert!(serde_json::to_string(&filled(1.0, f64::NAN)).is_err());
+        assert!(serde_json::to_string(&filled(f64::INFINITY, 1.0)).is_err());
     }
 
     #[test]

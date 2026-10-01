@@ -41,7 +41,18 @@ Python. Before this ADR:
    - `UnixNanos` is a JSON integer (u64). Values above 2^53 are exact in Rust and Python but not in JavaScript;
      JS/HTTP consumers must use a big-integer-aware parser (revisit in the OpenAPI/MCP stories).
    - Prices and quantities are finite `f64`. serde_json is built with `float_roundtrip` so parsing is exact.
-     NaN/inf are not part of the contract.
+     NaN/inf are not part of the contract: serializing a non-finite field fails
+     (`honba_messages::validation::serialize_finite`) instead of serde_json's default of writing `null`, so a NaN
+     can never be read back as an absent optional.
+   - **Value invariants are part of the contract.** Each type has a `validate()` returning a typed
+     `honba_messages::InvariantError`; constructors `debug_assert` it and deserialization (`#[serde(try_from)]` over a
+     private raw struct) enforces it, so an invalid payload is rejected rather than producing a broken value. The
+     Python wire models enforce the same rules, and every `invalid` golden case is run by both test suites:
+     - `BarSpecification`: `step >= 1`.
+     - `Bar`: finite OHLCV, `low <= open, close <= high`, `volume >= 0`.
+     - `QuoteTick`: finite, `bid_price <= ask_price`, sizes `>= 0`. `TradeTick`: finite, `size >= 0`.
+     - `Order`: `quantity > 0`, prices finite; `side` may be `no_order_side` (an order is a record).
+     - `Event::OrderFilled`: `last_qty > 0`, `last_px` finite.
    - `Event` is internally tagged: `{"type": "<variant>", ...fields}` with variants `quote`, `trade`, `bar`, `order`,
      `order_accepted`, `order_rejected`, `order_filled`, `order_cancelled`. Order lifecycle events use `OrderId`.
    - `Message` is the versioned envelope: `{"schema_version": 1, "event": {...}, "ts_init": n}`. A reader rejects any

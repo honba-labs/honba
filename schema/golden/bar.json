@@ -48,5 +48,146 @@
         "ts_init": 18446744073709551615
       }
     }
+  ],
+  "invalid": [
+    {
+      "name": "high_below_low",
+      "value": {
+        "bar_type": {
+          "instrument_id": {
+            "symbol": "BANKNIFTY",
+            "venue": "NSE"
+          },
+          "spec": {
+            "step": 5,
+            "aggregation": "minute",
+            "price_type": "last"
+          }
+        },
+        "open": 48000.0,
+        "high": 47000.0,
+        "low": 47900.05,
+        "close": 48150.3,
+        "volume": 12345.0,
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000001
+      }
+    },
+    {
+      "name": "close_above_high",
+      "value": {
+        "bar_type": {
+          "instrument_id": {
+            "symbol": "BANKNIFTY",
+            "venue": "NSE"
+          },
+          "spec": {
+            "step": 5,
+            "aggregation": "minute",
+            "price_type": "last"
+          }
+        },
+        "open": 48000.0,
+        "high": 48200.5,
+        "low": 47900.05,
+        "close": 48300.0,
+        "volume": 12345.0,
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000001
+      }
+    },
+    {
+      "name": "open_below_low",
+      "value": {
+        "bar_type": {
+          "instrument_id": {
+            "symbol": "BANKNIFTY",
+            "venue": "NSE"
+          },
+          "spec": {
+            "step": 5,
+            "aggregation": "minute",
+            "price_type": "last"
+          }
+        },
+        "open": 47800.0,
+        "high": 48200.5,
+        "low": 47900.05,
+        "close": 48150.3,
+        "volume": 12345.0,
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000001
+      }
+    },
+    {
+      "name": "negative_volume",
+      "value": {
+        "bar_type": {
+          "instrument_id": {
+            "symbol": "BANKNIFTY",
+            "venue": "NSE"
+          },
+          "spec": {
+            "step": 5,
+            "aggregation": "minute",
+            "price_type": "last"
+          }
+        },
+        "open": 48000.0,
+        "high": 48200.5,
+        "low": 47900.05,
+        "close": 48150.3,
+        "volume": -1.0,
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000001
+      }
+    },
+    {
+      "name": "step_zero",
+      "value": {
+        "bar_type": {
+          "instrument_id": {
+            "symbol": "BANKNIFTY",
+            "venue": "NSE"
+          },
+          "spec": {
+            "step": 0,
+            "aggregation": "minute",
+            "price_type": "last"
+          }
+        },
+        "open": 48000.0,
+        "high": 48200.5,
+        "low": 47900.05,
+        "close": 48150.3,
+        "volume": 12345.0,
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000001
+      }
+    },
+    {
+      "name": "unknown_field",
+      "value": {
+        "bar_type": {
+          "instrument_id": {
+            "symbol": "BANKNIFTY",
+            "venue": "NSE"
+          },
+          "spec": {
+            "step": 5,
+            "aggregation": "minute",
+            "price_type": "last"
+          }
+        },
+        "open": 48000.0,
+        "high": 48200.5,
+        "low": 47900.05,
+        "close": 48150.3,
+        "volume": 12345.0,
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000001,
+        "vwap": 48100.0
+      }
+    }
   ]
 }
