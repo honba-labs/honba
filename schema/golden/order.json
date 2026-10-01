@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "type": "Order",
+  "cases": [
+    {
+      "name": "market_buy_initialized",
+      "value": {
+        "order_id": "O-1",
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "venue": "NSE"
+        },
+        "side": "buy",
+        "order_type": "market",
+        "quantity": 75.0,
+        "price": null,
+        "trigger_price": null,
+        "status": "initialized",
+        "time_in_force": "day",
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000000
+      }
+    },
+    {
+      "name": "limit_sell_accepted",
+      "value": {
+        "order_id": "O-2",
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "venue": "NSE"
+        },
+        "side": "sell",
+        "order_type": "limit",
+        "quantity": 50.0,
+        "price": 22000.05,
+        "trigger_price": null,
+        "status": "accepted",
+        "time_in_force": "gtc",
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000000
+      }
+    },
+    {
+      "name": "stop_market_submitted",
+      "value": {
+        "order_id": "O-3",
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "venue": "NSE"
+        },
+        "side": "buy",
+        "order_type": "stop_market",
+        "quantity": 75.0,
+        "price": null,
+        "trigger_price": 21950.0,
+        "status": "submitted",
+        "time_in_force": "ioc",
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000000
+      }
+    },
+    {
+      "name": "stop_limit_partially_filled",
+      "value": {
+        "order_id": "O-4",
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "venue": "NSE"
+        },
+        "side": "sell",
+        "order_type": "stop_limit",
+        "quantity": 75.0,
+        "price": 22010.0,
+        "trigger_price": 22000.0,
+        "status": "partially_filled",
+        "time_in_force": "fok",
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000000
+      }
+    },
+    {
+      "name": "gtd_expired_no_side",
+      "value": {
+        "order_id": "O-5",
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "venue": "NSE"
+        },
+        "side": "no_order_side",
+        "order_type": "limit",
+        "quantity": 1.0,
+        "price": 1.0,
+        "trigger_price": null,
+        "status": "expired",
+        "time_in_force": "gtd",
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000000
+      }
+    }
+  ]
+}

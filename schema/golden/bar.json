@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "type": "Bar",
+  "cases": [
+    {
+      "name": "banknifty_5m_last",
+      "value": {
+        "bar_type": {
+          "instrument_id": {
+            "symbol": "BANKNIFTY",
+            "venue": "NSE"
+          },
+          "spec": {
+            "step": 5,
+            "aggregation": "minute",
+            "price_type": "last"
+          }
+        },
+        "open": 48000.0,
+        "high": 48200.5,
+        "low": 47900.05,
+        "close": 48150.3,
+        "volume": 12345.0,
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000001
+      }
+    },
+    {
+      "name": "float_and_u64_edges",
+      "value": {
+        "bar_type": {
+          "instrument_id": {
+            "symbol": "RELIANCE",
+            "venue": "NSE"
+          },
+          "spec": {
+            "step": 1,
+            "aggregation": "day",
+            "price_type": "mid"
+          }
+        },
+        "open": 0.1,
+        "high": 0.30000000000000004,
+        "low": 1e-07,
+        "close": 0.2,
+        "volume": 0.0,
+        "ts_event": 0,
+        "ts_init": 18446744073709551615
+      }
+    }
+  ]
+}

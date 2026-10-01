@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "type": "Message",
+  "cases": [
+    {
+      "name": "order_filled",
+      "value": {
+        "schema_version": 1,
+        "event": {
+          "type": "order_filled",
+          "order_id": "O-1",
+          "last_qty": 75.0,
+          "last_px": 22000.0,
+          "ts_event": 1700000060000000000
+        },
+        "ts_init": 1700000060000000010
+      }
+    },
+    {
+      "name": "quote",
+      "value": {
+        "schema_version": 1,
+        "event": {
+          "type": "quote",
+          "instrument_id": {
+            "symbol": "NIFTY50",
+            "venue": "NSE"
+          },
+          "bid_price": 22000.0,
+          "ask_price": 22001.0,
+          "bid_size": 50.0,
+          "ask_size": 75.0,
+          "ts_event": 1700000060000000000,
+          "ts_init": 1700000060000000000
+        },
+        "ts_init": 1700000060000000001
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "future_schema_version",
+      "value": {
+        "schema_version": 2,
+        "event": {
+          "type": "order_cancelled",
+          "order_id": "O-3",
+          "ts_event": 1700000060000000000
+        },
+        "ts_init": 1700000060000000000
+      }
+    },
+    {
+      "name": "missing_schema_version",
+      "value": {
+        "event": {
+          "type": "order_cancelled",
+          "order_id": "O-3",
+          "ts_event": 1700000060000000000
+        },
+        "ts_init": 1700000060000000000
+      }
+    }
+  ]
+}

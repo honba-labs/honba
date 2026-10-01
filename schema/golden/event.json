@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "type": "Event",
+  "cases": [
+    {
+      "name": "quote",
+      "value": {
+        "type": "quote",
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "venue": "NSE"
+        },
+        "bid_price": 22000.0,
+        "ask_price": 22001.0,
+        "bid_size": 50.0,
+        "ask_size": 75.0,
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000000
+      }
+    },
+    {
+      "name": "trade_tick",
+      "value": {
+        "type": "trade",
+        "instrument_id": {
+          "symbol": "RELIANCE",
+          "venue": "NSE"
+        },
+        "price": 2950.5,
+        "size": 100.0,
+        "aggressor_side": "seller",
+        "trade_id": "T-42",
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000000
+      }
+    },
+    {
+      "name": "bar",
+      "value": {
+        "type": "bar",
+        "bar_type": {
+          "instrument_id": {
+            "symbol": "BANKNIFTY",
+            "venue": "NSE"
+          },
+          "spec": {
+            "step": 5,
+            "aggregation": "minute",
+            "price_type": "last"
+          }
+        },
+        "open": 48000.0,
+        "high": 48200.5,
+        "low": 47900.05,
+        "close": 48150.3,
+        "volume": 12345.0,
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000001
+      }
+    },
+    {
+      "name": "order",
+      "value": {
+        "type": "order",
+        "order_id": "O-4",
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "venue": "NSE"
+        },
+        "side": "buy",
+        "order_type": "stop_limit",
+        "quantity": 75.0,
+        "price": 22010.0,
+        "trigger_price": 22000.0,
+        "status": "initialized",
+        "time_in_force": "day",
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000000
+      }
+    },
+    {
+      "name": "order_accepted",
+      "value": {
+        "type": "order_accepted",
+        "order_id": "O-1",
+        "ts_event": 1700000060000000000
+      }
+    },
+    {
+      "name": "order_rejected",
+      "value": {
+        "type": "order_rejected",
+        "order_id": "O-2",
+        "reason": "insufficient margin",
+        "ts_event": 1700000060000000000
+      }
+    },
+    {
+      "name": "order_filled",
+      "value": {
+        "type": "order_filled",
+        "order_id": "O-1",
+        "last_qty": 25.0,
+        "last_px": 22000.05,
+        "ts_event": 1700000060000000000
+      }
+    },
+    {
+      "name": "order_cancelled",
+      "value": {
+        "type": "order_cancelled",
+        "order_id": "O-3",
+        "ts_event": 1700000060000000000
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "unknown_type",
+      "value": {
+        "type": "order_exploded",
+        "order_id": "O-1",
+        "ts_event": 1700000060000000000
+      }
+    }
+  ]
+}

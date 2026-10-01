@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "type": "Trade",
+  "cases": [
+    {
+      "name": "buy_with_costs",
+      "value": {
+        "order_id": "O-1",
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "venue": "NSE"
+        },
+        "side": "buy",
+        "quantity": 75.0,
+        "price": 22000.0,
+        "costs": 45.67,
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000005
+      }
+    },
+    {
+      "name": "sell_zero_costs",
+      "value": {
+        "order_id": "O-2",
+        "instrument_id": {
+          "symbol": "RELIANCE",
+          "venue": "NSE"
+        },
+        "side": "sell",
+        "quantity": 10.0,
+        "price": 2950.05,
+        "costs": 0.0,
+        "ts_event": 1700000060000000000,
+        "ts_init": 1700000060000000000
+      }
+    }
+  ]
+}

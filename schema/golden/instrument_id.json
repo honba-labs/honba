@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "type": "InstrumentId",
+  "cases": [
+    {
+      "name": "nse_equity",
+      "value": {
+        "symbol": "RELIANCE",
+        "venue": "NSE"
+      }
+    },
+    {
+      "name": "bse_index",
+      "value": {
+        "symbol": "SENSEX",
+        "venue": "BSE"
+      }
+    }
+  ]
+}
