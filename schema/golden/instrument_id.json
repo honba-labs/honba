@@ -16,5 +16,11 @@
         "venue": "BSE"
       }
     }
+  ],
+  "invalid_text": [
+    {
+      "name": "duplicate_symbol",
+      "text": "{\"symbol\":\"RELIANCE\",\"venue\":\"NSE\",\"symbol\":\"TCS\"}"
+    }
   ]
 }

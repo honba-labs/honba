@@ -215,5 +215,11 @@
         "time_in_force": "day"
       }
     }
+  ],
+  "invalid_text": [
+    {
+      "name": "duplicate_quantity",
+      "text": "{\"instrument_id\":{\"symbol\":\"NIFTY50\",\"venue\":\"NSE\"},\"side\":\"buy\",\"quantity\":-1.0,\"order_type\":\"market\",\"price\":null,\"trigger_price\":null,\"time_in_force\":\"day\",\"quantity\":75.0}"
+    }
   ]
 }

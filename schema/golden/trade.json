@@ -99,5 +99,11 @@
         "ts_init": 1700000060000000005
       }
     }
+  ],
+  "invalid_text": [
+    {
+      "name": "duplicate_price",
+      "text": "{\"order_id\":\"O-1\",\"instrument_id\":{\"symbol\":\"NIFTY50\",\"venue\":\"NSE\"},\"side\":\"buy\",\"quantity\":75.0,\"price\":22000.0,\"price\":22001.0,\"costs\":0.0,\"ts_event\":1,\"ts_init\":1}"
+    }
   ]
 }

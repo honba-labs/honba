@@ -33,6 +33,13 @@ def _cases(key: str):
             yield pytest.param(doc["type"], case["value"], id=f"{file}:{case['name']}")
 
 
+def _text_cases():
+    for file in FILES:
+        doc = _load(file)
+        for case in doc.get("invalid_text", []):
+            yield pytest.param(doc["type"], case["text"], id=f"{file}:{case['name']}")
+
+
 def test_golden_files_exist_for_every_model():
     types = {_load(f)["type"] for f in FILES}
     assert types == set(wire.MODELS)
@@ -53,10 +60,54 @@ def test_golden_case_roundtrips(kind, value):
     assert again == model
 
 
+@pytest.mark.parametrize(("kind", "value"), list(_cases("cases")))
+def test_golden_case_parses_from_text(kind, value):
+    assert wire.loads(kind, json.dumps(value)) == ADAPTERS[kind].validate_python(value)
+
+
 @pytest.mark.parametrize(("kind", "value"), list(_cases("invalid")))
 def test_golden_invalid_case_rejected(kind, value):
     with pytest.raises(ValidationError):
         ADAPTERS[kind].validate_python(value)
+    with pytest.raises(ValueError):
+        wire.loads(kind, json.dumps(value))
+
+
+def test_golden_has_raw_text_cases():
+    assert list(_text_cases())
+
+
+@pytest.mark.parametrize(("kind", "text"), list(_text_cases()))
+def test_golden_invalid_text_rejected(kind, text):
+    with pytest.raises(ValueError):
+        wire.loads(kind, text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        '{"symbol": "A", "venue": "NSE", "symbol": "B"}',
+        '{"symbol": "A", "venue": {"x": 1, "x": 2}}',
+    ],
+)
+def test_loads_rejects_duplicate_keys_at_any_depth(text):
+    with pytest.raises(ValueError, match="duplicate key"):
+        wire.loads("InstrumentId", text)
+
+
+@pytest.mark.parametrize("literal", ["NaN", "Infinity", "-Infinity", "1e999"])
+def test_loads_rejects_non_finite_numbers(literal):
+    text = (
+        '{"type": "order_filled", "order_id": "O-1", "last_qty": 1.0, '
+        f'"last_px": {literal}, "ts_event": 1}}'
+    )
+    with pytest.raises(ValueError):
+        wire.loads("Event", text)
+
+
+def test_loads_rejects_unknown_kind():
+    with pytest.raises(ValueError, match="unknown wire kind"):
+        wire.loads("Nope", "{}")
 
 
 def test_event_ids_are_order_ids():

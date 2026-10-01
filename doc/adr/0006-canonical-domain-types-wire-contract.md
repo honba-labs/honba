@@ -29,6 +29,11 @@ Python. Before this ADR:
    - a cross-language round trip through the extension (`honba._honba.canonical_json(kind, json)` parses with Rust
      serde and re-serializes): golden -> Rust -> JSON -> Python -> JSON -> Rust must be lossless
      (`python/tests/integration/test_wire_roundtrip.py`).
+   Golden files hold `cases` (must round-trip), `invalid` (JSON values both sides must reject) and `invalid_text`
+   (raw JSON text both sides must reject, for faults a parsed value cannot carry, such as duplicate keys).
+   - **Duplicate keys are invalid.** serde rejects a duplicated field; pydantic's `validate_json` silently keeps the
+     last one. Payloads from other processes must therefore be parsed with `honba.entities.wire.loads(kind, text)`,
+     which rejects duplicate keys at any depth (and the non-standard `NaN`/`Infinity` literals) before validating.
    The existing dataclasses stay as the strategy-facing API; `wire` models offer `to_domain()` / `from_domain()` where
    the mapping is lossless.
 3. **Representation rules.**

@@ -11,10 +11,19 @@ API; ``from_domain`` / ``to_domain`` convert where the mapping is lossless.
 
 from __future__ import annotations
 
+import json
 from enum import Enum
 from typing import Annotated, Any, Final, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, Strict, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    Strict,
+    TypeAdapter,
+    model_validator,
+)
 
 from honba.entities import instrument as _instrument
 from honba.entities import order as _order
@@ -344,3 +353,36 @@ MODELS: Final[dict[str, Any]] = {
     "Message": Message,
 }
 """Wire-contract type name (as in the golden files and ``canonical_json``) to model."""
+
+_ADAPTERS: Final[dict[str, TypeAdapter[Any]]] = {
+    name: TypeAdapter(model) for name, model in MODELS.items()
+}
+
+
+def _no_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    obj: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in obj:
+            raise ValueError(f"duplicate key {key!r}")
+        obj[key] = value
+    return obj
+
+
+def _no_constant(name: str) -> Any:
+    raise ValueError(f"{name} is not valid wire JSON (numbers must be finite)")
+
+
+def loads(kind: str, data: str | bytes) -> Any:
+    """Parse wire JSON text as the model for ``kind`` (a key of ``MODELS``).
+
+    This is the strict parse path for payloads from other processes. Unlike
+    ``TypeAdapter.validate_json`` (which keeps the last of duplicated keys) it
+    rejects duplicate object keys at any depth, as Rust's serde does, and the
+    non-standard ``NaN`` / ``Infinity`` literals. Raises ``ValueError``
+    (``pydantic.ValidationError`` for schema violations).
+    """
+    adapter = _ADAPTERS.get(kind)
+    if adapter is None:
+        raise ValueError(f"unknown wire kind {kind!r}; expected one of {sorted(MODELS)}")
+    obj = json.loads(data, object_pairs_hook=_no_duplicate_keys, parse_constant=_no_constant)
+    return adapter.validate_python(obj)

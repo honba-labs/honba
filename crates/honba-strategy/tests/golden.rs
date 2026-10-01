@@ -70,6 +70,18 @@ fn order_intent_invalid_cases_are_rejected() {
 }
 
 #[test]
+fn order_intent_invalid_text_is_rejected() {
+    let doc = golden();
+    let cases = doc["invalid_text"].as_array().unwrap();
+    assert!(!cases.is_empty());
+    for case in cases {
+        let name = case["name"].as_str().unwrap();
+        let res: Result<OrderIntent, _> = serde_json::from_str(case["text"].as_str().unwrap());
+        assert!(res.is_err(), "{name}: invalid text was accepted");
+    }
+}
+
+#[test]
 fn stop_limit_intent_becomes_order_with_both_prices() {
     let intent = OrderIntent::stop_limit_buy(nifty(), 75.0, 22_000.0, 22_010.0);
     let order = intent

@@ -21,6 +21,9 @@ const TS: u64 = 1_700_000_060_000_000_000;
 struct Golden {
     cases: BTreeMap<String, Value>,
     invalid: BTreeMap<String, Value>,
+    /// Raw JSON text that must be rejected (e.g. duplicate keys, which a
+    /// parsed `Value` cannot represent).
+    invalid_text: BTreeMap<String, String>,
 }
 
 fn load(file: &str, type_name: &str) -> Golden {
@@ -42,9 +45,20 @@ fn load(file: &str, type_name: &str) -> Golden {
             })
             .unwrap_or_default()
     };
+    let invalid_text = doc
+        .get("invalid_text")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .map(|c| {
+            let name = c["name"].as_str().unwrap().to_owned();
+            (name, c["text"].as_str().unwrap().to_owned())
+        })
+        .collect();
     Golden {
         cases: collect("cases"),
         invalid: collect("invalid"),
+        invalid_text,
     }
 }
 
@@ -77,6 +91,10 @@ where
     for (name, json) in &golden.invalid {
         let res: Result<T, _> = serde_json::from_value(json.clone());
         assert!(res.is_err(), "{file}/{name}: invalid case was accepted");
+    }
+    for (name, text) in &golden.invalid_text {
+        let res: Result<T, _> = serde_json::from_str(text);
+        assert!(res.is_err(), "{file}/{name}: invalid text was accepted");
     }
 }
 

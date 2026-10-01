@@ -23,6 +23,23 @@ fn load_invalid(file: &str, type_name: &str) -> BTreeMap<String, Value> {
     load(file, type_name, "invalid")
 }
 
+/// Loads the `invalid_text` cases: raw JSON text (e.g. with duplicate keys).
+fn load_invalid_text(file: &str) -> Vec<(String, String)> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../schema/golden")
+        .join(file);
+    let doc: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    doc.get("invalid_text")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .map(|c| {
+            let name = c["name"].as_str().unwrap().to_owned();
+            (name, c["text"].as_str().unwrap().to_owned())
+        })
+        .collect()
+}
+
 fn load(file: &str, type_name: &str, key: &str) -> BTreeMap<String, Value> {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../schema/golden")
@@ -65,6 +82,10 @@ where
         );
         let again: T = serde_json::from_str(&serde_json::to_string(&got).unwrap()).unwrap();
         assert_eq!(&again, want, "{file}/{name}: text round trip");
+    }
+    for (name, text) in load_invalid_text(file) {
+        let res: Result<T, _> = serde_json::from_str(&text);
+        assert!(res.is_err(), "{file}/{name}: invalid text was accepted");
     }
     let invalid = load_invalid(file, type_name);
     assert!(!invalid.is_empty(), "{file}: expected invalid cases");

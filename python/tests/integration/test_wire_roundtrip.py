@@ -53,6 +53,23 @@ def test_rust_and_python_reject_the_same_payloads(kind, bad):
         _honba.canonical_json(kind, payload)
     with pytest.raises(ValidationError):
         TypeAdapter(wire.MODELS[kind]).validate_json(payload)
+    with pytest.raises(ValueError):
+        wire.loads(kind, payload)
+
+
+def _text_cases():
+    for path in sorted(GOLDEN.glob("*.json")):
+        doc = json.loads(path.read_text())
+        for case in doc.get("invalid_text", []):
+            yield pytest.param(doc["type"], case["text"], id=f"{path.name}:{case['name']}")
+
+
+@pytest.mark.parametrize(("kind", "text"), list(_text_cases()))
+def test_rust_and_python_reject_the_same_raw_text(kind, text):
+    with pytest.raises(ValueError):
+        _honba.canonical_json(kind, text)
+    with pytest.raises(ValueError):
+        wire.loads(kind, text)
 
 
 def test_strategy_intent_survives_rust_roundtrip():

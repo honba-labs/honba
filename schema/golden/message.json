@@ -61,5 +61,11 @@
         "ts_init": 1700000060000000000
       }
     }
+  ],
+  "invalid_text": [
+    {
+      "name": "duplicate_key_in_nested_event",
+      "text": "{\"schema_version\":1,\"event\":{\"type\":\"order_cancelled\",\"order_id\":\"O-1\",\"order_id\":\"O-2\",\"ts_event\":1},\"ts_init\":1}"
+    }
   ]
 }

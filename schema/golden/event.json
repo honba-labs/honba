@@ -242,5 +242,11 @@
         "ts_event": 1700000060000000000
       }
     }
+  ],
+  "invalid_text": [
+    {
+      "name": "duplicate_type",
+      "text": "{\"type\":\"order_accepted\",\"order_id\":\"O-1\",\"ts_event\":1,\"type\":\"order_cancelled\"}"
+    }
   ]
 }
