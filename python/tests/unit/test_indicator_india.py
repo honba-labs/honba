@@ -26,6 +26,7 @@ def test_session_day_rolls_over_at_ist_midnight_not_utc():
 
 def test_minute_of_day_in_ist_and_hhmm_parsing():
     import pytest
+
     from honba.strategies.indicators._india import hhmm_to_minutes, ist_minute_of_day
 
     d0 = 20_000 * DAY

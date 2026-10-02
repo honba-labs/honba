@@ -133,7 +133,7 @@ def test_kama_hand_value_and_config():
     out = feed(Kama(2), [10, 11, 13])
     assert out[:2] == [None, None] and out[2] == pytest.approx(107 / 9)
     assert feed(Kama(2), [5, 5, 5, 5])[-1] == 5.0  # no movement: er = 0 handled
-    for bad in (dict(period=0), dict(fast=0), dict(fast=30, slow=30)):
+    for bad in ({"period": 0}, {"fast": 0}, {"fast": 30, "slow": 30}):
         with pytest.raises(ValueError):
             Kama(**bad)
     base = last(Kama(), CLOSE)
@@ -147,7 +147,7 @@ def test_mcginley_hand_value_and_config():
     out = feed(McGinleyDynamic(2), [100, 110])
     assert out[0] == 100 and out[1] == pytest.approx(100 + 10 / (1.2 * 1.1**4))
     assert McGinleyDynamic(2).update(0.0) == 0.0
-    for bad in (dict(period=0), dict(k=0.0)):
+    for bad in ({"period": 0}, {"k": 0.0}):
         with pytest.raises(ValueError):
             McGinleyDynamic(**bad)
     assert last(McGinleyDynamic(k=0.3), CLOSE) != pytest.approx(last(McGinleyDynamic(k=0.9), CLOSE))
@@ -167,7 +167,7 @@ def test_alma_hand_value_and_config():
     assert last(Alma(3, offset=1.0, sigma=3.0), [1, 2, 6]) == pytest.approx(
         (w[0] + 2 * w[1] + 6 * w[2]) / sum(w)
     )
-    for bad in (dict(period=0), dict(offset=1.5), dict(offset=-0.1), dict(sigma=0)):
+    for bad in ({"period": 0}, {"offset": 1.5}, {"offset": -0.1}, {"sigma": 0}):
         with pytest.raises(ValueError):
             Alma(**bad)
     base = last(Alma(), CLOSE)
@@ -180,7 +180,7 @@ def test_lsma_hand_value_and_config():
     # 1,2,4: slope (4-1)/2 = 1.5, mean 7/3 -> intercept 7/3 - 1.5 = 5/6; endpoint 5/6 + 3 = 23/6; offset 1 -> 5/6 + 1.5 = 7/3
     assert last(Lsma(3), [1, 2, 4]) == pytest.approx(23 / 6)
     assert last(Lsma(3, offset=1), [1, 2, 4]) == pytest.approx(7 / 3)
-    for bad in (dict(period=1), dict(period=0)):
+    for bad in ({"period": 1}, {"period": 0}):
         with pytest.raises(ValueError):
             Lsma(**bad)
     assert last(Lsma(offset=3), CLOSE) != pytest.approx(last(Lsma(), CLOSE))
@@ -198,7 +198,7 @@ def test_adx_hand_value_and_config():
     assert (out[2].adx, out[2].plus_di, out[2].minus_di) == pytest.approx((100.0, 50.0, 0.0))
     flat = last(Adx(2, 1), [5] * 6, [5] * 6, [5] * 6)  # zero range: all zero, finite
     assert (flat.adx, flat.plus_di, flat.minus_di) == (0.0, 0.0, 0.0)
-    for bad in (dict(di_length=0), dict(adx_smoothing=0)):
+    for bad in ({"di_length": 0}, {"adx_smoothing": 0}):
         with pytest.raises(ValueError):
             Adx(**bad)
     base = last(Adx(), HIGH, LOW, CLOSE)
@@ -230,7 +230,7 @@ def test_parabolic_sar_hand_values_and_config():
     assert last(ParabolicSar(), [10, 11, 9.5], [8, 9, 7]) == 11.0
     # falling start -> short: SAR = first high
     assert feed(ParabolicSar(), [10, 9], [8, 6])[1] == 10.0
-    for bad in (dict(start=0), dict(increment=0), dict(start=0.3, maximum=0.2)):
+    for bad in ({"start": 0}, {"increment": 0}, {"start": 0.3, "maximum": 0.2}):
         with pytest.raises(ValueError):
             ParabolicSar(**bad)
     base = last(ParabolicSar(), HIGH, LOW)
@@ -246,7 +246,7 @@ def test_supertrend_hand_values_and_config():
     out = feed(Supertrend(1, 1.0), [10, 12], [8, 10], [9, 11.5])
     assert (out[0].value, out[0].direction) == (11.0, -1.0)
     assert (out[1].value, out[1].direction) == (8.0, 1.0)
-    for bad in (dict(atr_period=0), dict(factor=0)):
+    for bad in ({"atr_period": 0}, {"factor": 0}):
         with pytest.raises(ValueError):
             Supertrend(**bad)
     base = last(Supertrend(), HIGH, LOW, CLOSE)
@@ -278,7 +278,7 @@ def test_chande_kroll_stop_hand_values_and_config():
     one = last(ChandeKrollStop(1, 1.0, 1), [10], [8], [9])
     assert (one.long_stop, one.short_stop) == (8.0, 10.0)
     assert ChandeKrollStop(10, 1.0, 9).warmup == 18
-    for bad in (dict(p=0), dict(q=0), dict(x=0)):
+    for bad in ({"p": 0}, {"q": 0}, {"x": 0}):
         with pytest.raises(ValueError):
             ChandeKrollStop(**bad)
     base = last(ChandeKrollStop(), HIGH, LOW, CLOSE)
@@ -296,7 +296,7 @@ def test_linear_regression_hand_values_and_config():
     assert out.lower == pytest.approx(23 / 6 - 1 * std)
     perfect = last(LinearRegression(4), [1, 2, 3, 4])  # exact line: zero-width channel
     assert perfect.upper == pytest.approx(perfect.value) == pytest.approx(4.0)
-    for bad in (dict(length=1), dict(upper_deviation=-1), dict(lower_deviation=-1)):
+    for bad in ({"length": 1}, {"upper_deviation": -1}, {"lower_deviation": -1}):
         with pytest.raises(ValueError):
             LinearRegression(**bad)
     base = last(LinearRegression(50), CLOSE)

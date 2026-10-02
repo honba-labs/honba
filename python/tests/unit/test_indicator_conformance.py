@@ -116,7 +116,7 @@ def test_reset_restores_fresh_state(kind):
 
 @pytest.mark.parametrize("kind", KINDS)
 def test_update_bar_matches_update(kind):
-    bars, extra = synth(250)
+    bars, _extra = synth(250)
     ind = build_indicator(kind)
     if not all(hasattr(bars[0], f) for f in ind.inputs):
         pytest.skip("indicator needs non-bar inputs")
@@ -155,7 +155,7 @@ def test_explicit_none_warmup_is_data_dependent_but_omitting_is_an_error():
     try:
         assert Tmp().warmup is None
         with pytest.raises(NotImplementedError):
-            Missing().warmup
+            Missing().warmup  # noqa: B018  (property access must raise)
     finally:
         _base._REGISTRY.pop("tmp_session", None)
         _base._REGISTRY.pop("tmp_missing", None)

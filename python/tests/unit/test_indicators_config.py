@@ -32,9 +32,7 @@ def _case_id(c):
 def _feed(kind, ind, h, l, c):
     """Yields one output dict (or None while warming up) per bar."""
     for hi, lo, cl in zip(h, l, c):
-        if kind in ("sma", "ema", "rsi", "bollinger"):
-            v = ind.update(cl)
-        elif kind == "macd":
+        if kind in ("sma", "ema", "rsi", "bollinger") or kind == "macd":
             v = ind.update(cl)
         elif kind == "atr":
             v = ind.update(hi, lo, cl)
@@ -196,8 +194,15 @@ def test_every_indicator_builds_with_defaults(kind):
 
 
 def test_indicators_are_grouped_by_family():
-    from honba.strategies.indicators import FAMILIES, indicator_family, list_indicators
-    from honba.strategies.indicators import momentum, moving_average, trend, volatility
+    from honba.strategies.indicators import (
+        FAMILIES,
+        indicator_family,
+        list_indicators,
+        momentum,
+        moving_average,
+        trend,
+        volatility,
+    )
 
     assert FAMILIES == (
         "moving_average",
