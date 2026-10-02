@@ -1,4 +1,5 @@
 """Contract tests for the Python Strategy interface (mirrors honba-algo-strategies)."""
+
 import pytest
 
 from honba.entities.bar import Bar

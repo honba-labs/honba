@@ -1,4 +1,5 @@
 """Tests ensuring honba._honba native module is properly built and matches stubs."""
+
 import importlib
 import pytest
 

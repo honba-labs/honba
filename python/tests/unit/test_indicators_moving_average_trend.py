@@ -6,6 +6,7 @@ match TradingView; dema/tema (Jesse seeds EMAs with the first value), adx, aroon
 differ in seeding/window, so they rely on hand-checked textbook values only.
 Regenerate the golden file with tests/fixtures/gen_jesse_golden_moving_average_trend.py.
 """
+
 import json
 import math
 import random
@@ -14,12 +15,31 @@ from pathlib import Path
 import pytest
 
 from honba.strategies.indicators import build_indicator
-from honba.strategies.indicators.moving_average import Alma, Dema, Hma, Kama, Lsma, McGinleyDynamic, Tema, Vwma
+from honba.strategies.indicators.moving_average import (
+    Alma,
+    Dema,
+    Hma,
+    Kama,
+    Lsma,
+    McGinleyDynamic,
+    Tema,
+    Vwma,
+)
 from honba.strategies.indicators.trend import (
-    Adx, Aroon, ChandeKrollStop, LinearRegression, ParabolicSar, Supertrend, Vortex,
+    Adx,
+    Aroon,
+    ChandeKrollStop,
+    LinearRegression,
+    ParabolicSar,
+    Supertrend,
+    Vortex,
 )
 
-GOLDEN = json.loads((Path(__file__).parent.parent / "fixtures" / "jesse_golden_moving_average_trend.json").read_text())
+GOLDEN = json.loads(
+    (
+        Path(__file__).parent.parent / "fixtures" / "jesse_golden_moving_average_trend.json"
+    ).read_text()
+)
 H, L, C, V = GOLDEN["high"], GOLDEN["low"], GOLDEN["close"], GOLDEN["volume"]
 
 
@@ -125,13 +145,15 @@ def test_kama_hand_value_and_config():
 def test_mcginley_hand_value_and_config():
     # period 2, k 0.6 on 100,110: 100 + 10 / (0.6*2*(110/100)^4)
     out = feed(McGinleyDynamic(2), [100, 110])
-    assert out[0] == 100 and out[1] == pytest.approx(100 + 10 / (1.2 * 1.1 ** 4))
+    assert out[0] == 100 and out[1] == pytest.approx(100 + 10 / (1.2 * 1.1**4))
     assert McGinleyDynamic(2).update(0.0) == 0.0
     for bad in (dict(period=0), dict(k=0.0)):
         with pytest.raises(ValueError):
             McGinleyDynamic(**bad)
     assert last(McGinleyDynamic(k=0.3), CLOSE) != pytest.approx(last(McGinleyDynamic(k=0.9), CLOSE))
-    assert last(McGinleyDynamic(period=5), CLOSE) != pytest.approx(last(McGinleyDynamic(period=30), CLOSE))
+    assert last(McGinleyDynamic(period=5), CLOSE) != pytest.approx(
+        last(McGinleyDynamic(period=30), CLOSE)
+    )
     assert McGinleyDynamic().update(50.0) == 50.0  # non-positive ratio guard
 
 
@@ -142,7 +164,9 @@ def test_alma_hand_value_and_config():
     assert last(Alma(3, offset=1.0, sigma=1e-6), [1, 2, 6]) == pytest.approx(3.0)
     # offset 1, sigma 3 (s=1, m=2): weights e^-2, e^-0.5, 1 on 1,2,6
     w = [math.exp(-2), math.exp(-0.5), 1.0]
-    assert last(Alma(3, offset=1.0, sigma=3.0), [1, 2, 6]) == pytest.approx((w[0] + 2 * w[1] + 6 * w[2]) / sum(w))
+    assert last(Alma(3, offset=1.0, sigma=3.0), [1, 2, 6]) == pytest.approx(
+        (w[0] + 2 * w[1] + 6 * w[2]) / sum(w)
+    )
     for bad in (dict(period=0), dict(offset=1.5), dict(offset=-0.1), dict(sigma=0)):
         with pytest.raises(ValueError):
             Alma(**bad)
@@ -228,7 +252,8 @@ def test_supertrend_hand_values_and_config():
     base = last(Supertrend(), HIGH, LOW, CLOSE)
     assert last(Supertrend(factor=1.0), HIGH, LOW, CLOSE).value != pytest.approx(base.value)
     assert last(Supertrend(atr_period=20, factor=1.0), HIGH, LOW, CLOSE).value != pytest.approx(
-        last(Supertrend(factor=1.0), HIGH, LOW, CLOSE).value)
+        last(Supertrend(factor=1.0), HIGH, LOW, CLOSE).value
+    )
 
 
 def test_vortex_hand_value_and_config():
@@ -239,7 +264,9 @@ def test_vortex_hand_value_and_config():
     assert Vortex(14).warmup == 15
     with pytest.raises(ValueError):
         Vortex(0)
-    assert last(Vortex(7), HIGH, LOW, CLOSE).plus != pytest.approx(last(Vortex(21), HIGH, LOW, CLOSE).plus)
+    assert last(Vortex(7), HIGH, LOW, CLOSE).plus != pytest.approx(
+        last(Vortex(21), HIGH, LOW, CLOSE).plus
+    )
 
 
 def test_chande_kroll_stop_hand_values_and_config():

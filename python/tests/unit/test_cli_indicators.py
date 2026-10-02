@@ -1,4 +1,5 @@
 """`honba indicators ...`: discovery for humans (tables) and agents (--json)."""
+
 import json
 
 from typer.testing import CliRunner

@@ -6,6 +6,7 @@ Only kernels verified to equal the TradingView/textbook definition are included:
 stoch (SMA smoothing), willr, cci (mean absolute deviation, 0.015), cmo (simple sums).
 Candles are Jesse-format columns [ts, open, close, high, low, volume].
 """
+
 import json
 
 import jesse_rust as j
@@ -27,13 +28,30 @@ def lst(a):
 cases = []
 for k, ks, ds in ((14, 1, 3), (14, 3, 3), (5, 3, 2)):
     kk, dd = j.stoch(candles, k, ks, 0, ds, 0)
-    cases.append({"kind": "stochastic", "params": {"k_length": k, "k_smooth": ks, "d_smooth": ds},
-                  "out": {"k": lst(kk), "d": lst(dd)}})
+    cases.append(
+        {
+            "kind": "stochastic",
+            "params": {"k_length": k, "k_smooth": ks, "d_smooth": ds},
+            "out": {"k": lst(kk), "d": lst(dd)},
+        }
+    )
 for p in (5, 14, 30):
-    cases.append({"kind": "williams_r", "params": {"length": p}, "out": {"value": lst(j.willr(candles, p))}})
+    cases.append(
+        {"kind": "williams_r", "params": {"length": p}, "out": {"value": lst(j.willr(candles, p))}}
+    )
 for p in (10, 20):
     cases.append({"kind": "cci", "params": {"length": p}, "out": {"value": lst(j.cci(candles, p))}})
 for p in (5, 9, 20):
     cases.append({"kind": "cmo", "params": {"length": p}, "out": {"value": lst(j.cmo(close, p))}})
 
-print(json.dumps({"source": "jesse-rust 1.2.0", "high": lst(high), "low": lst(low), "close": lst(close), "cases": cases}))
+print(
+    json.dumps(
+        {
+            "source": "jesse-rust 1.2.0",
+            "high": lst(high),
+            "low": lst(low),
+            "close": lst(close),
+            "cases": cases,
+        }
+    )
+)

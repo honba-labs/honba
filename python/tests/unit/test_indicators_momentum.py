@@ -5,6 +5,7 @@ TradingView/textbook definitions. The others (stoch_rsi, tsi, ao, uo, fisher, ks
 connors_rsi, rvgi, roc, momentum) differ from or are absent in Jesse, so they rely on hand-checked
 textbook arithmetic below.
 """
+
 import inspect
 import json
 import math
@@ -15,7 +16,9 @@ import pytest
 
 from honba.strategies.indicators import build_indicator
 
-GOLDEN = json.loads((Path(__file__).parent.parent / "fixtures" / "jesse_golden_momentum.json").read_text())
+GOLDEN = json.loads(
+    (Path(__file__).parent.parent / "fixtures" / "jesse_golden_momentum.json").read_text()
+)
 
 
 def feed(kind, rows, **params):
@@ -52,9 +55,12 @@ def rows_for(kind):
 
 # ---------- hand-verifiable values ----------
 
+
 def test_stochastic_hand():
     # window of 3: hh=12, ll=7, close=10 -> 100*(10-7)/(12-7)=60
-    out = last("stochastic", [(10, 8, 9), (12, 9, 11), (11, 7, 10)], k_length=3, k_smooth=1, d_smooth=1)
+    out = last(
+        "stochastic", [(10, 8, 9), (12, 9, 11), (11, 7, 10)], k_length=3, k_smooth=1, d_smooth=1
+    )
     assert approx(out.k, 60.0) and approx(out.d, 60.0)
 
 
@@ -66,7 +72,14 @@ def test_stochastic_flat_window_is_zero():
 def test_stoch_rsi_hand():
     # RSI(2) on 10,11,10,11,10: u3 50 (gain .5/loss .5); u4 gain .75/loss .25 -> 75; u5 gain .375/loss .625 -> 37.5
     # stoch window 2: u4 [50,75] cur 75 -> 100 ; u5 [75,37.5] cur 37.5 -> 0
-    outs = feed("stoch_rsi", [(x,) for x in (10, 11, 10, 11, 10)], rsi_length=2, stoch_length=2, k_smooth=1, d_smooth=1)
+    outs = feed(
+        "stoch_rsi",
+        [(x,) for x in (10, 11, 10, 11, 10)],
+        rsi_length=2,
+        stoch_length=2,
+        k_smooth=1,
+        d_smooth=1,
+    )
     assert outs[:3] == [None] * 3
     assert approx(outs[3].k, 100.0) and approx(outs[4].k, 0.0)
 
@@ -92,9 +105,13 @@ def test_roc_and_momentum_hand():
 
 def test_tsi_hand():
     # strictly +1 per bar: dx=1 always, EMA ratio = 1 -> tsi = 100, signal 100; down-trend -> -100
-    up = last("tsi", [(float(i),) for i in range(20)], long_length=3, short_length=2, signal_length=2)
+    up = last(
+        "tsi", [(float(i),) for i in range(20)], long_length=3, short_length=2, signal_length=2
+    )
     assert approx(up.tsi, 100.0) and approx(up.signal, 100.0)
-    dn = last("tsi", [(float(-i),) for i in range(20)], long_length=3, short_length=2, signal_length=2)
+    dn = last(
+        "tsi", [(float(-i),) for i in range(20)], long_length=3, short_length=2, signal_length=2
+    )
     assert approx(dn.tsi, -100.0)
     assert last("tsi", [(5.0,)] * 20, long_length=3, short_length=2, signal_length=2).tsi == 0.0
 
@@ -126,13 +143,27 @@ def test_fisher_transform_hand():
 
 def test_kst_hand():
     # all lengths 1: kst = (1+2+3+4)*ROC1 = 10 * 10% = 100 ; signal SMA1 = 100
-    out = last("kst", [(100,), (110,)], roc1=1, roc2=1, roc3=1, roc4=1, sma1=1, sma2=1, sma3=1, sma4=1, signal=1)
+    out = last(
+        "kst",
+        [(100,), (110,)],
+        roc1=1,
+        roc2=1,
+        roc3=1,
+        roc4=1,
+        sma1=1,
+        sma2=1,
+        sma3=1,
+        sma4=1,
+        signal=1,
+    )
     assert approx(out.kst, 100.0) and approx(out.signal, 100.0)
 
 
 def test_coppock_hand():
     # 100,110,121: ROC(2)=21, ROC(1)=10 -> WMA(1) = 31
-    assert approx(last("coppock_curve", [(100,), (110,), (121,)], wma_length=1, long_roc=2, short_roc=1), 31.0)
+    assert approx(
+        last("coppock_curve", [(100,), (110,), (121,)], wma_length=1, long_roc=2, short_roc=1), 31.0
+    )
 
 
 def test_cmo_hand():
@@ -144,7 +175,9 @@ def test_cmo_hand():
 def test_connors_rsi_hand():
     # closes 10,11,12,11 with (2,2,2): RSI(2)=50 ; streaks +1,+2,-1 -> RSI(2)=25 ;
     # ROC 10, 9.09, -8.33: rank of -8.33 among previous two = 0 -> (50+25+0)/3 = 25
-    outs = feed("connors_rsi", [(10,), (11,), (12,), (11,)], rsi_length=2, streak_length=2, rank_length=2)
+    outs = feed(
+        "connors_rsi", [(10,), (11,), (12,), (11,)], rsi_length=2, streak_length=2, rank_length=2
+    )
     assert outs[:3] == [None] * 3 and approx(outs[3], 25.0)
 
 
@@ -160,7 +193,10 @@ def test_rvgi_hand():
 INT_PARAMS = {
     "stochastic": ("k_length", "k_smooth", "d_smooth"),
     "stoch_rsi": ("rsi_length", "stoch_length", "k_smooth", "d_smooth"),
-    "williams_r": ("length",), "cci": ("length",), "roc": ("length",), "momentum": ("length",),
+    "williams_r": ("length",),
+    "cci": ("length",),
+    "roc": ("length",),
+    "momentum": ("length",),
     "tsi": ("long_length", "short_length", "signal_length"),
     "awesome_oscillator": ("fast", "slow"),
     "ultimate_oscillator": ("fast", "middle", "slow"),
@@ -182,6 +218,7 @@ def test_non_positive_periods_rejected(kind, param):
 
 
 # ---------- configurability: every parameter changes the output ----------
+
 
 def _sample(out):
     o = out[-1]
@@ -205,6 +242,7 @@ def test_stochastic_k_smooth_default_is_raw_k():
 
 
 # ---------- Jesse kernel golden ----------
+
 
 def _case_id(c):
     return c["kind"] + "-" + "-".join(str(v) for v in c["params"].values())

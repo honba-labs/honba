@@ -7,6 +7,7 @@ vortex) are included. dema/tema (Jesse seeds EMAs with the first value), adx, ar
 differ from TradingView/Wilder in seeding/window and are covered by hand-checked values instead.
 Candles are Jesse-format columns [ts, open, close, high, low, volume].
 """
+
 import json
 
 import jesse_rust as j
@@ -30,19 +31,49 @@ cases = []
 for p in (4, 9, 16):
     cases.append({"kind": "hma", "params": {"period": p}, "out": {"value": lst(j.hma(close, p))}})
 for p in (5, 20):
-    cases.append({"kind": "vwma", "params": {"period": p}, "out": {"value": lst(j.vwma(candles, p))}})
+    cases.append(
+        {"kind": "vwma", "params": {"period": p}, "out": {"value": lst(j.vwma(candles, p))}}
+    )
 for p, f, s in ((10, 2, 30), (5, 3, 20)):
-    cases.append({"kind": "kama", "params": {"period": p, "fast": f, "slow": s}, "out": {"value": lst(j.kama(close, p, f, s))}})
+    cases.append(
+        {
+            "kind": "kama",
+            "params": {"period": p, "fast": f, "slow": s},
+            "out": {"value": lst(j.kama(close, p, f, s))},
+        }
+    )
 for p, k in ((14, 0.6), (5, 0.4)):
-    cases.append({"kind": "mcginley_dynamic", "params": {"period": p, "k": k}, "out": {"value": lst(j.mcginley_dynamic(close, p, k))}})
+    cases.append(
+        {
+            "kind": "mcginley_dynamic",
+            "params": {"period": p, "k": k},
+            "out": {"value": lst(j.mcginley_dynamic(close, p, k))},
+        }
+    )
 for p in (5, 25):
-    cases.append({"kind": "lsma", "params": {"period": p}, "out": {"value": lst(j.linearreg(close, p))}})
+    cases.append(
+        {"kind": "lsma", "params": {"period": p}, "out": {"value": lst(j.linearreg(close, p))}}
+    )
 for p, f in ((10, 3.0), (7, 2.0)):
     st = j.supertrend(candles, p, f)[0]
-    cases.append({"kind": "supertrend", "params": {"atr_period": p, "factor": f}, "out": {"value": lst(st)}})
+    cases.append(
+        {"kind": "supertrend", "params": {"atr_period": p, "factor": f}, "out": {"value": lst(st)}}
+    )
 for p in (14, 7):
     plus, minus = j.vi(candles, p, True)
-    cases.append({"kind": "vortex", "params": {"period": p}, "out": {"plus": lst(plus), "minus": lst(minus)}})
+    cases.append(
+        {"kind": "vortex", "params": {"period": p}, "out": {"plus": lst(plus), "minus": lst(minus)}}
+    )
 
-print(json.dumps({"source": "jesse-rust 1.2.0", "high": lst(high), "low": lst(low), "close": lst(close),
-                  "volume": lst(vol), "cases": cases}))
+print(
+    json.dumps(
+        {
+            "source": "jesse-rust 1.2.0",
+            "high": lst(high),
+            "low": lst(low),
+            "close": lst(close),
+            "volume": lst(vol),
+            "cases": cases,
+        }
+    )
+)

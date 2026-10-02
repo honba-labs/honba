@@ -3,6 +3,7 @@
 No jesse_rust kernel golden tests: none of these has a verified TradingView-identical kernel,
 so numeric checks are hand-computed textbook values (arithmetic shown in comments).
 """
+
 import math
 
 import pytest
@@ -36,7 +37,8 @@ def test_pivot_standard():
     v = pivot("standard")
     p = 31 / 3
     assert (v.pp, v.r1, v.s1, v.r2, v.s2, v.r3, v.s3) == pytest.approx(
-        (p, 2 * p - 8, 2 * p - 12, p + 4, p - 4, 12 + 2 * (p - 8), 8 - 2 * (12 - p)))
+        (p, 2 * p - 8, 2 * p - 12, p + 4, p - 4, 12 + 2 * (p - 8), 8 - 2 * (12 - p))
+    )
     assert v.r1 == pytest.approx(12.6667, abs=1e-4) and v.s3 == pytest.approx(4.6667, abs=1e-4)
 
 
@@ -45,21 +47,25 @@ def test_pivot_fibonacci():
     v = pivot("fibonacci")
     p = 31 / 3
     assert (v.r1, v.r2, v.r3, v.s1, v.s3) == pytest.approx(
-        (p + 1.528, p + 2.472, p + 4, p - 1.528, p - 4))
+        (p + 1.528, p + 2.472, p + 4, p - 1.528, p - 4)
+    )
 
 
 def test_pivot_camarilla():
     # C=11, R=4, k=1.1*4=4.4; R1=11+4.4/12, R2=11+4.4/6, R3=11+4.4/4, S mirror
     v = pivot("camarilla")
     assert (v.r1, v.r2, v.r3, v.s1, v.s2, v.s3) == pytest.approx(
-        (11 + 4.4 / 12, 11 + 4.4 / 6, 12.1, 11 - 4.4 / 12, 11 - 4.4 / 6, 9.9))
+        (11 + 4.4 / 12, 11 + 4.4 / 6, 12.1, 11 - 4.4 / 12, 11 - 4.4 / 6, 9.9)
+    )
     assert v.pp == pytest.approx(31 / 3)
 
 
 def test_pivot_woodie():
     # P=(12+8+2*11)/4=10.5; R1=2P-L=13; S1=2P-H=9; R2=P+4=14.5; R3=12+2*(10.5-8)=17; S3=8-2*(12-10.5)=5
     v = pivot("woodie")
-    assert (v.pp, v.r1, v.s1, v.r2, v.s2, v.r3, v.s3) == pytest.approx((10.5, 13, 9, 14.5, 6.5, 17, 5))
+    assert (v.pp, v.r1, v.s1, v.r2, v.s2, v.r3, v.s3) == pytest.approx(
+        (10.5, 13, 9, 14.5, 6.5, 17, 5)
+    )
 
 
 def test_pivot_session_semantics():
@@ -83,7 +89,8 @@ def test_fib_retracement():
     assert out[:2] == [None, None]
     v = out[2]
     assert (v.l0, v.l236, v.l382, v.l500, v.l618, v.l786, v.l1000) == pytest.approx(
-        (110, 107.64, 106.18, 105, 103.82, 102.14, 100))
+        (110, 107.64, 106.18, 105, 103.82, 102.14, 100)
+    )
 
 
 def test_fib_validation_and_length_config():
@@ -99,7 +106,9 @@ def test_fractals():
     # highs 1,2,5,2,1 -> bar3 (5) is an up fractal, confirmed on bar 5; lows 5,4,1,4,5 -> down
     out = feed("williams_fractals", [(1, 5), (2, 4), (5, 1), (2, 4), (1, 5)])
     assert out[:4] == [None] * 4 and (out[4].up, out[4].down) == (1.0, 1.0)
-    out = feed("williams_fractals", [(1, 5), (2, 4), (2, 4), (2, 4), (1, 5)])  # ties are not fractals
+    out = feed(
+        "williams_fractals", [(1, 5), (2, 4), (2, 4), (2, 4), (1, 5)]
+    )  # ties are not fractals
     assert (out[4].up, out[4].down) == (0.0, 0.0)
 
 
@@ -128,7 +137,10 @@ def test_mcclellan_validation_and_config():
     with pytest.raises(ValueError):
         build_indicator("mcclellan_oscillator", fast=0)
     rows = [(20 + i % 7, 10) for i in range(30)]
-    assert feed("mcclellan_oscillator", rows)[-1] != feed("mcclellan_oscillator", rows, fast=5, slow=10)[-1]
+    assert (
+        feed("mcclellan_oscillator", rows)[-1]
+        != feed("mcclellan_oscillator", rows, fast=5, slow=10)[-1]
+    )
 
 
 def test_updown_volume_ratio():
@@ -138,7 +150,10 @@ def test_updown_volume_ratio():
 def test_put_call_ratio():
     # raw: 80/100=.8, 120/100=1.2; SMA2 = 1.0
     assert feed("put_call_ratio", [(80, 100), (120, 100)]) == pytest.approx([0.8, 1.2])
-    assert feed("put_call_ratio", [(80, 100), (120, 100)], smoothing=2) == [None, pytest.approx(1.0)]
+    assert feed("put_call_ratio", [(80, 100), (120, 100)], smoothing=2) == [
+        None,
+        pytest.approx(1.0),
+    ]
     assert feed("put_call_ratio", [(1, 0)]) == [1.0]
     with pytest.raises(ValueError):
         build_indicator("put_call_ratio", smoothing=0)

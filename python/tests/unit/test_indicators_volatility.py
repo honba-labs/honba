@@ -1,6 +1,7 @@
 """Volatility-family indicators: hand-checked values, validation, configurability, Jesse-kernel parity
 (bollinger_bandwidth, standard_deviation, choppiness_index only; the rest follow TradingView and have no
 faithful kernel equivalent)."""
+
 import json
 import math
 from pathlib import Path
@@ -9,7 +10,9 @@ import pytest
 
 from honba.strategies.indicators import build_indicator
 
-G = json.loads((Path(__file__).parent.parent / "fixtures" / "jesse_golden_volatility.json").read_text())
+G = json.loads(
+    (Path(__file__).parent.parent / "fixtures" / "jesse_golden_volatility.json").read_text()
+)
 H, L, C = G["high"], G["low"], G["close"]
 
 
@@ -23,7 +26,10 @@ def mk(kind, **kw):
 
 # -- kernel parity ------------------------------------------------------------
 
-@pytest.mark.parametrize("case", G["cases"], ids=lambda c: c["kind"] + str(list(c["params"].values())))
+
+@pytest.mark.parametrize(
+    "case", G["cases"], ids=lambda c: c["kind"] + str(list(c["params"].values()))
+)
 def test_matches_jesse_kernel(case):
     ind = mk(case["kind"], **case["params"])
     cols = (H, L, C) if case["kind"] == "choppiness_index" else (C,)
@@ -36,6 +42,7 @@ def test_matches_jesse_kernel(case):
 
 
 # -- keltner ------------------------------------------------------------------
+
 
 def test_keltner_hand_values():
     # EMA(2) SMA-seeded on closes 10,12,14: seed 11, then 14*(2/3)+11/3 = 13. ATR(1): TR bar2=max(4-... see below
@@ -63,6 +70,7 @@ def test_keltner_config_and_validation():
 
 # -- bollinger %B / bandwidth -------------------------------------------------
 
+
 def test_percent_b_hand_values():
     # window 1,2,3: mean 2, pop sd sqrt(2/3)=0.8165; mult 1 -> lower 1.1835 upper 2.8165; close 3 -> 1.8165/1.633
     sd = math.sqrt(2 / 3)
@@ -75,7 +83,9 @@ def test_percent_b_hand_values():
 def test_bandwidth_hand_values():
     # window 1,2,3: 100 * 2*mult*sd/mean = 100*2*1*0.8165/2
     sd = math.sqrt(2 / 3)
-    assert feed(mk("bollinger_bandwidth", period=3, mult=1.0), [1, 2, 3])[-1] == pytest.approx(100 * sd)
+    assert feed(mk("bollinger_bandwidth", period=3, mult=1.0), [1, 2, 3])[-1] == pytest.approx(
+        100 * sd
+    )
     assert feed(mk("bollinger_bandwidth", period=3), [-1, 0, 1])[-1] == 0.0  # zero mean convention
 
 
@@ -90,6 +100,7 @@ def test_bollinger_variants_config_and_validation(kind):
 
 
 # -- envelope -----------------------------------------------------------------
+
 
 def test_envelope_hand_values_and_ma_type():
     # SMA(3) of 1,2,3,4 = 3; +/-10% -> 3.3 / 2.7. EMA(3): seed 2, alpha .5 -> 3.
@@ -112,11 +123,17 @@ def test_envelope_ema_differs_and_validation():
 
 # -- standard deviation / historical volatility -------------------------------
 
+
 def test_standard_deviation_hand_value_and_validation():
     # 2,4,4,4,5,5,7,9 -> mean 5, population variance 4 -> sd 2
-    assert feed(mk("standard_deviation", length=8), [2, 4, 4, 4, 5, 5, 7, 9])[-1] == pytest.approx(2.0)
+    assert feed(mk("standard_deviation", length=8), [2, 4, 4, 4, 5, 5, 7, 9])[-1] == pytest.approx(
+        2.0
+    )
     assert feed(mk("standard_deviation", length=2), [1, 3])[-1] == pytest.approx(1.0)
-    assert feed(mk("standard_deviation", length=3), C)[-1] != feed(mk("standard_deviation", length=6), C)[-1]
+    assert (
+        feed(mk("standard_deviation", length=3), C)[-1]
+        != feed(mk("standard_deviation", length=6), C)[-1]
+    )
     with pytest.raises(ValueError):
         mk("standard_deviation", length=0)
 
@@ -126,9 +143,13 @@ def test_historical_volatility_hand_value_and_config():
     out = feed(mk("historical_volatility", length=2), [1, 2, 1])
     assert out[:2] == [None, None]
     assert out[2] == pytest.approx(100 * math.log(2) * math.sqrt(252))
-    assert feed(mk("historical_volatility", length=2, periods_per_year=365), [1, 2, 1])[2] == \
-        pytest.approx(100 * math.log(2) * math.sqrt(365))
-    assert feed(mk("historical_volatility", length=5), C)[-1] != feed(mk("historical_volatility", length=9), C)[-1]
+    assert feed(mk("historical_volatility", length=2, periods_per_year=365), [1, 2, 1])[
+        2
+    ] == pytest.approx(100 * math.log(2) * math.sqrt(365))
+    assert (
+        feed(mk("historical_volatility", length=5), C)[-1]
+        != feed(mk("historical_volatility", length=9), C)[-1]
+    )
     assert mk("historical_volatility").warmup == 11
     for kw in ({"length": 0}, {"periods_per_year": 0}):
         with pytest.raises(ValueError):
@@ -136,6 +157,7 @@ def test_historical_volatility_hand_value_and_config():
 
 
 # -- chaikin volatility -------------------------------------------------------
+
 
 def test_chaikin_volatility_hand_value():
     # ranges 2,4,6: EMA(2) seed (2+4)/2=3 at bar2, bar3 = 6*(2/3)+3/3 = 5. ROC(1) = 100*(5-3)/3
@@ -157,6 +179,7 @@ def test_chaikin_volatility_config_validation():
 
 # -- choppiness ---------------------------------------------------------------
 
+
 def test_choppiness_hand_value():
     # 2 bars: (h,l,c) (10,8,9), (11,9,10): TR1=2 (h-l), TR2=max(2,2,0)=2 -> sum 4; range 11-8=3
     out = feed(mk("choppiness_index", length=2), [10, 11], [8, 9], [9, 10])
@@ -165,13 +188,17 @@ def test_choppiness_hand_value():
 
 
 def test_choppiness_config_validation():
-    assert feed(mk("choppiness_index", length=5), H, L, C)[-1] != feed(mk("choppiness_index"), H, L, C)[-1]
+    assert (
+        feed(mk("choppiness_index", length=5), H, L, C)[-1]
+        != feed(mk("choppiness_index"), H, L, C)[-1]
+    )
     for n in (0, 1):
         with pytest.raises(ValueError):
             mk("choppiness_index", length=n)
 
 
 # -- volatility stop ----------------------------------------------------------
+
 
 def test_volatility_stop_hand_values():
     # length 1 (ATR = TR, first TR = h-l), mult 1. Bar1 (h11,l9,c10): ATR=2, seed stop=10-2=8, up.

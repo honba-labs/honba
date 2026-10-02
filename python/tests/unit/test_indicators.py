@@ -1,4 +1,5 @@
 """Streaming indicators: hand-checked values and warm-up behaviour."""
+
 import math
 
 import pytest

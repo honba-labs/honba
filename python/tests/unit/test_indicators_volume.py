@@ -1,12 +1,22 @@
 """Volume-family indicators: hand-checked values, validation, configurability, textbook/TradingView values (no Jesse kernel golden: its efi/adosc/emv seed differently)."""
+
 import math
 
 import pytest
 
 from honba.strategies.indicators import build_indicator
 from honba.strategies.indicators.volume import (
-    AccumulationDistribution, ChaikinMoneyFlow, ChaikinOscillator, EaseOfMovement, ForceIndex,
-    KlingerOscillator, MoneyFlowIndex, Obv, PriceVolumeTrend, VolumeOscillator, Vwap,
+    AccumulationDistribution,
+    ChaikinMoneyFlow,
+    ChaikinOscillator,
+    EaseOfMovement,
+    ForceIndex,
+    KlingerOscillator,
+    MoneyFlowIndex,
+    Obv,
+    PriceVolumeTrend,
+    VolumeOscillator,
+    Vwap,
 )
 
 DAY = 86_400_000_000_000
@@ -114,13 +124,24 @@ def test_vwap_session_reset_and_bands():
     assert Vwap().update(7, 7, 7, 0, t0).vwap == 7.0  # zero-volume convention
 
 
-@pytest.mark.parametrize("cls,kw", [
-    (ChaikinMoneyFlow, {"period": 0}), (MoneyFlowIndex, {"period": 0}), (VolumeOscillator, {"short": 0}),
-    (VolumeOscillator, {"long": 0}), (KlingerOscillator, {"fast": 0}), (KlingerOscillator, {"slow": 0}),
-    (KlingerOscillator, {"signal": 0}), (EaseOfMovement, {"period": 0}), (EaseOfMovement, {"divisor": 0}),
-    (ForceIndex, {"period": 0}), (ChaikinOscillator, {"fast": 0}), (ChaikinOscillator, {"slow": 0}),
-    (Vwap, {"band_mult": -1}),
-])
+@pytest.mark.parametrize(
+    "cls,kw",
+    [
+        (ChaikinMoneyFlow, {"period": 0}),
+        (MoneyFlowIndex, {"period": 0}),
+        (VolumeOscillator, {"short": 0}),
+        (VolumeOscillator, {"long": 0}),
+        (KlingerOscillator, {"fast": 0}),
+        (KlingerOscillator, {"slow": 0}),
+        (KlingerOscillator, {"signal": 0}),
+        (EaseOfMovement, {"period": 0}),
+        (EaseOfMovement, {"divisor": 0}),
+        (ForceIndex, {"period": 0}),
+        (ChaikinOscillator, {"fast": 0}),
+        (ChaikinOscillator, {"slow": 0}),
+        (Vwap, {"band_mult": -1}),
+    ],
+)
 def test_param_validation(cls, kw):
     with pytest.raises(ValueError):
         cls(**kw)
@@ -130,7 +151,15 @@ def _bars(n=80):
     out = []
     for i in range(n):
         c = 100 + 5 * math.sin(i / 4) + 0.1 * i
-        out.append((c + 1 + (i % 3) * 0.2, c - 1, c + 0.3 * math.cos(i), 500 + 37 * (i % 7), DAY * 50 + i * 60_000_000_000))
+        out.append(
+            (
+                c + 1 + (i % 3) * 0.2,
+                c - 1,
+                c + 0.3 * math.cos(i),
+                500 + 37 * (i % 7),
+                DAY * 50 + i * 60_000_000_000,
+            )
+        )
     return out
 
 
@@ -143,17 +172,24 @@ def _last(ind, cols):
     return r
 
 
-@pytest.mark.parametrize("kind,a,b", [
-    ("chaikin_money_flow", {"period": 5}, {"period": 20}),
-    ("money_flow_index", {"period": 5}, {"period": 14}),
-    ("volume_oscillator", {"short": 3, "long": 10}, {"short": 5, "long": 20}),
-    ("klinger_oscillator", {"fast": 5, "slow": 10, "signal": 3}, {"fast": 8, "slow": 20, "signal": 5}),
-    ("ease_of_movement", {"period": 5}, {"period": 14}),
-    ("ease_of_movement", {"divisor": 1000.0}, {"divisor": 10000.0}),
-    ("force_index", {"period": 3}, {"period": 13}),
-    ("chaikin_oscillator", {"fast": 2, "slow": 5}, {"fast": 3, "slow": 10}),
-    ("vwap", {"band_mult": 1.0}, {"band_mult": 2.0}),
-])
+@pytest.mark.parametrize(
+    "kind,a,b",
+    [
+        ("chaikin_money_flow", {"period": 5}, {"period": 20}),
+        ("money_flow_index", {"period": 5}, {"period": 14}),
+        ("volume_oscillator", {"short": 3, "long": 10}, {"short": 5, "long": 20}),
+        (
+            "klinger_oscillator",
+            {"fast": 5, "slow": 10, "signal": 3},
+            {"fast": 8, "slow": 20, "signal": 5},
+        ),
+        ("ease_of_movement", {"period": 5}, {"period": 14}),
+        ("ease_of_movement", {"divisor": 1000.0}, {"divisor": 10000.0}),
+        ("force_index", {"period": 3}, {"period": 13}),
+        ("chaikin_oscillator", {"fast": 2, "slow": 5}, {"fast": 3, "slow": 10}),
+        ("vwap", {"band_mult": 1.0}, {"band_mult": 2.0}),
+    ],
+)
 def test_configurability(kind, a, b):
     ra, rb = _last(build_indicator(kind, **a), None), _last(build_indicator(kind, **b), None)
     assert ra != rb

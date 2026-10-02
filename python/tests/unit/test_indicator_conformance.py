@@ -1,4 +1,5 @@
 """Every registered indicator must honour the Honba Indicator contract."""
+
 import json
 import math
 
@@ -7,7 +8,12 @@ import pytest
 from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
 from honba.strategies.indicators import (
-    FAMILIES, Indicator, build_indicator, indicator_family, indicator_spec, list_indicators,
+    FAMILIES,
+    Indicator,
+    build_indicator,
+    indicator_family,
+    indicator_spec,
+    list_indicators,
 )
 
 KINDS = list_indicators()
@@ -24,7 +30,13 @@ def synth(n=400):
         price *= 1 + 0.01 * math.sin(i / 7) + 0.003 * math.cos(i / 3)
         o = price * (1 + 0.002 * math.sin(i))
         hi, lo = max(o, price) * 1.004, min(o, price) * 0.996
-        ts = (i // 6) * DAY + (i % 6) * 3_600_000_000_000 + 3_600_000_000_000 * 3 + 900_000_000_000 - IST
+        ts = (
+            (i // 6) * DAY
+            + (i % 6) * 3_600_000_000_000
+            + 3_600_000_000_000 * 3
+            + 900_000_000_000
+            - IST
+        )
         bars.append(Bar(IID, ts, o, hi, lo, price, 1000.0 + 50 * (i % 11)))
         closes.append(price)
     extra = {
@@ -84,9 +96,13 @@ def test_warmup_matches_first_value(kind):
     first = next((i for i, o in enumerate(outs) if o is not None), None)
     assert first is not None, f"{kind} never produced a value on 400 bars"
     assert all(o is not None for o in outs[first:]), f"{kind} returned None after warming up"
-    assert all(len(o) == len(ind.outputs) for o in outs[first:] if o), "output arity != declared outputs"
+    assert all(len(o) == len(ind.outputs) for o in outs[first:] if o), (
+        "output arity != declared outputs"
+    )
     if ind.warmup is not None:  # session/data-dependent indicators may declare None
-        assert first == ind.warmup - 1, f"{kind}: warmup={ind.warmup} but first value at bar {first + 1}"
+        assert first == ind.warmup - 1, (
+            f"{kind}: warmup={ind.warmup} but first value at bar {first + 1}"
+        )
 
 
 @pytest.mark.parametrize("kind", KINDS)

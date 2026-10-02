@@ -3,13 +3,22 @@
 `tests/fixtures/jesse_golden.json` holds kernel outputs for several parameter sets;
 regenerate with `tests/fixtures/gen_jesse_golden.py`.
 """
+
 import json
 from pathlib import Path
 
 import pytest
 
 from honba.strategies.indicators import (
-    Atr, Bollinger, Ema, Kdj, Macd, Rsi, Sma, build_indicator, make_ma,
+    Atr,
+    Bollinger,
+    Ema,
+    Kdj,
+    Macd,
+    Rsi,
+    Sma,
+    build_indicator,
+    make_ma,
 )
 
 GOLDEN = json.loads((Path(__file__).parent.parent / "fixtures" / "jesse_golden.json").read_text())
@@ -41,11 +50,16 @@ def _fields(kind, v):
         return {"value": v}
     if kind == "ichimoku":
         return {"span_a": v[0], "span_b": v[1]}
-    return {k: getattr(v, k) for k in ("macd", "signal", "histogram", "upper", "middle", "lower")
-            if hasattr(v, k)}
+    return {
+        k: getattr(v, k)
+        for k in ("macd", "signal", "histogram", "upper", "middle", "lower")
+        if hasattr(v, k)
+    }
 
 
-@pytest.mark.parametrize("case", [c for c in GOLDEN["cases"] if c["kind"] != "ichimoku"], ids=_case_id)
+@pytest.mark.parametrize(
+    "case", [c for c in GOLDEN["cases"] if c["kind"] != "ichimoku"], ids=_case_id
+)
 def test_matches_jesse_kernel(case):
     kind = case["kind"]
     ind = build_indicator(kind, **case["params"])
@@ -60,7 +74,9 @@ def test_matches_jesse_kernel(case):
                 assert mine == pytest.approx(exp, rel=1e-9, abs=1e-9), f"{kind}.{name}[{i}]"
 
 
-@pytest.mark.parametrize("case", [c for c in GOLDEN["cases"] if c["kind"] == "ichimoku"], ids=_case_id)
+@pytest.mark.parametrize(
+    "case", [c for c in GOLDEN["cases"] if c["kind"] == "ichimoku"], ids=_case_id
+)
 def test_ichimoku_matches_jesse_kernel(case):
     ind = build_indicator("ichimoku", **case["params"])
     w = case["window"]
@@ -73,6 +89,7 @@ def test_ichimoku_matches_jesse_kernel(case):
 
 
 # -- configurability ----------------------------------------------------------
+
 
 def test_ema_seed_option():
     assert feed_all(Ema(3, seed="first"), [1, 2, 3, 4])[0] == 1
@@ -100,12 +117,15 @@ def test_bollinger_asymmetric_multipliers():
     assert v.upper == pytest.approx(2 + 2 * sd) and v.lower == pytest.approx(2 - 1 * sd)
 
 
-@pytest.mark.parametrize("kind,xs,expected", [
-    ("sma", [1, 2, 3, 4], 3.0),
-    ("wma", [1, 2, 3], 14 / 6),          # (1*1 + 2*2 + 3*3) / 6
-    ("rma", [1, 2, 3, 4], 8 / 3),        # SMA seed 2, then (2*2 + 4) / 3
-    ("ema", [1, 2, 3, 4], 3.0),          # SMA seed 2, alpha 0.5
-])
+@pytest.mark.parametrize(
+    "kind,xs,expected",
+    [
+        ("sma", [1, 2, 3, 4], 3.0),
+        ("wma", [1, 2, 3], 14 / 6),  # (1*1 + 2*2 + 3*3) / 6
+        ("rma", [1, 2, 3, 4], 8 / 3),  # SMA seed 2, then (2*2 + 4) / 3
+        ("ema", [1, 2, 3, 4], 3.0),  # SMA seed 2, alpha 0.5
+    ],
+)
 def test_make_ma_kinds(kind, xs, expected):
     ma = make_ma(kind, 3)
     assert feed_all(ma, xs)[-1] == pytest.approx(expected)
@@ -119,7 +139,10 @@ def test_make_ma_rejects_unknown_kind():
 def test_kdj_smoothing_is_configurable():
     bars = [(5, 1, 3), (6, 2, 5), (7, 3, 4), (8, 4, 8), (9, 5, 6), (9, 3, 4)]
     sma_out = [Kdj(2, 3, 3).update(*b) for b in bars]  # fresh instances are not warm
-    a, b = Kdj(2, 3, 3, slowk_ma="sma", slowd_ma="sma"), Kdj(2, 3, 3, slowk_ma="ema", slowd_ma="ema")
+    a, b = (
+        Kdj(2, 3, 3, slowk_ma="sma", slowd_ma="sma"),
+        Kdj(2, 3, 3, slowk_ma="ema", slowd_ma="ema"),
+    )
     ra = [a.update(*x) for x in bars]
     rb = [b.update(*x) for x in bars]
     assert ra[-1] is not None and rb[-1] is not None
@@ -141,31 +164,50 @@ def test_build_indicator_rejects_unknown_kind_and_params():
         build_indicator("sma", period=3, bogus=1)
 
 
-@pytest.mark.parametrize("kind,bad", [
-    ("sma", {"period": 0}), ("ema", {"period": -1}), ("rsi", {"period": 0}), ("atr", {"period": 0}),
-    ("bollinger", {"period": 0}), ("bollinger", {"period": 3, "mult": -1.0}),
-    ("donchian", {"period": 0}), ("macd", {"fast": 26, "slow": 12}),
-    ("ichimoku", {"tenkan": 0}), ("ichimoku", {"displacement": 0}), ("kdj", {"fastk": 0}),
-])
+@pytest.mark.parametrize(
+    "kind,bad",
+    [
+        ("sma", {"period": 0}),
+        ("ema", {"period": -1}),
+        ("rsi", {"period": 0}),
+        ("atr", {"period": 0}),
+        ("bollinger", {"period": 0}),
+        ("bollinger", {"period": 3, "mult": -1.0}),
+        ("donchian", {"period": 0}),
+        ("macd", {"fast": 26, "slow": 12}),
+        ("ichimoku", {"tenkan": 0}),
+        ("ichimoku", {"displacement": 0}),
+        ("kdj", {"fastk": 0}),
+    ],
+)
 def test_invalid_parameters_rejected(kind, bad):
     with pytest.raises(ValueError):
         build_indicator(kind, **bad)
 
 
-@pytest.mark.parametrize("kind", ["sma", "ema", "rsi", "atr", "bollinger", "donchian", "macd", "ichimoku", "kdj"])
+@pytest.mark.parametrize(
+    "kind", ["sma", "ema", "rsi", "atr", "bollinger", "donchian", "macd", "ichimoku", "kdj"]
+)
 def test_every_indicator_builds_with_defaults(kind):
     assert build_indicator(kind) is not None
 
 
 # -- families (TradingView-style taxonomy) -------------------------------------
 
+
 def test_indicators_are_grouped_by_family():
     from honba.strategies.indicators import FAMILIES, indicator_family, list_indicators
     from honba.strategies.indicators import momentum, moving_average, trend, volatility
 
     assert FAMILIES == (
-        "moving_average", "trend", "momentum", "volatility",
-        "volume", "support_resistance", "breadth", "statistical",
+        "moving_average",
+        "trend",
+        "momentum",
+        "volatility",
+        "volume",
+        "support_resistance",
+        "breadth",
+        "statistical",
     )
     assert moving_average.Sma is Sma and moving_average.make_ma is make_ma
     assert trend.Macd is Macd and momentum.Rsi is Rsi and momentum.Kdj is Kdj

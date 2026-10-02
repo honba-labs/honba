@@ -1,4 +1,5 @@
 """Config-driven indicators: StrategyConfig [indicators.*] tables -> IndicatorBank."""
+
 import pytest
 
 from honba.entities.bar import Bar
