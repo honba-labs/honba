@@ -133,6 +133,8 @@ def run_rust(scenario: dict[str, Any]) -> dict[str, Any]:
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s["name"])
 def test_rust_strategy_through_the_binding_matches_python_and_the_fixture(scenario):
     rust, python = run_rust(scenario), run_python(scenario)
+    # Rust also reports typed ``rejections``; every fixture scenario is a valid run.
+    assert rust.pop("rejections") == [], scenario["name"]
     assert rust == python, scenario["name"]
     assert rust == scenario["expected"], scenario["name"]
 

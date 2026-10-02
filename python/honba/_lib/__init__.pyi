@@ -18,7 +18,9 @@ def run_strategy(
     ``strategy`` is ``"contract_probe"``, ``"buy_and_hold"`` or ``"sma_crossover"``;
     ``params``, ``events`` (a list of wire ``Message``) and ``instruments`` are JSON.
     Orders fill at the last bar close (``BarFillEngine``). Returns JSON with
-    ``intents``, ``fills``, ``observations``, ``positions`` and ``cash``.
+    ``intents``, ``rejections`` (intents refused for breaking an invariant, each
+    ``{"ts_init", "intent", "error": {"kind", "message"}}``), ``fills``,
+    ``observations``, ``positions`` and ``cash``.
     Raises ``ValueError`` for an unknown strategy or invalid JSON.
     """
 

@@ -14,7 +14,7 @@ use honba_entities::{Currency, Instrument, InstrumentKind, Trade};
 use honba_messages::{InstrumentId, Message, Order};
 use honba_sim::BarFillEngine;
 use honba_strategy::{
-    BuyAndHold, ContractProbe, LedgerContext, SmaCrossover, Strategy, StrategyContext,
+    BuyAndHold, ContractProbe, IntentError, LedgerContext, SmaCrossover, Strategy, StrategyContext,
     StrategyRunner,
 };
 use pyo3::exceptions::PyValueError;
@@ -107,6 +107,20 @@ impl ExecutionEngine for PricedBarFill {
     }
 }
 
+/// Stable machine-readable name of an [`IntentError`] variant.
+fn intent_error_kind(e: &IntentError) -> &'static str {
+    match e {
+        IntentError::NonPositiveQuantity(_) => "non_positive_quantity",
+        IntentError::NoSide => "no_side",
+        IntentError::NonFinitePrice => "non_finite_price",
+        IntentError::MissingPrice(_) => "missing_price",
+        IntentError::UnexpectedPrice(_) => "unexpected_price",
+        IntentError::MissingTriggerPrice(_) => "missing_trigger_price",
+        IntentError::UnexpectedTriggerPrice(_) => "unexpected_trigger_price",
+        _ => "invalid_intent",
+    }
+}
+
 fn drive<S: Strategy>(
     strategy: S,
     ctx: LedgerContext,
@@ -129,6 +143,17 @@ fn drive<S: Strategy>(
         .iter()
         .map(|s| json!({"ts_init": s.ts_init, "intent": s.intent}))
         .collect();
+    let rejections: Vec<Value> = runner
+        .rejections()
+        .iter()
+        .map(|r| {
+            json!({
+                "ts_init": r.ts_init,
+                "intent": r.intent,
+                "error": {"kind": intent_error_kind(&r.error), "message": r.error.to_string()},
+            })
+        })
+        .collect();
     let fills = serde_json::to_value(runner.fills()).map_err(|e| e.to_string())?;
     let positions: Vec<Value> = runner
         .context()
@@ -138,6 +163,7 @@ fn drive<S: Strategy>(
         .collect();
     let outcome = json!({
         "intents": intents,
+        "rejections": rejections,
         "fills": fills,
         "observations": [],
         "positions": positions,
@@ -196,8 +222,8 @@ pub fn run_strategy_json(
 
 /// Run a Rust reference strategy over JSON wire messages (ADR 008).
 ///
-/// Returns JSON with `intents`, `fills`, `observations`, `positions` and
-/// `cash`. Raises `ValueError` for an unknown strategy, invalid JSON or a
+/// Returns JSON with `intents`, `rejections` (intents the runner refused, each
+/// with a typed `error`), `fills`, `observations`, `positions` and `cash`. Raises `ValueError` for an unknown strategy, invalid JSON or a
 /// failed run.
 #[pyfunction]
 #[pyo3(signature = (strategy, params, events, instruments="[]", initial_cash=0.0))]

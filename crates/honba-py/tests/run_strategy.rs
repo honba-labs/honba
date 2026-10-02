@@ -22,7 +22,43 @@ fn run_strategy_matches_every_conformance_scenario() {
             s["initial_cash"].as_f64().unwrap(),
         )
         .unwrap_or_else(|e| panic!("{name}: {e}"));
-        let got: Value = serde_json::from_str(&out).unwrap();
+        let mut got: Value = serde_json::from_str(&out).unwrap();
+        // `rejections` is Rust-reported only (typed errors); the fixture
+        // scenarios are all valid runs, so it must be empty.
+        let rejections = got.as_object_mut().unwrap().remove("rejections");
+        assert_eq!(rejections, Some(serde_json::json!([])), "{name}");
         assert_eq!(got, s["expected"], "{name}");
     }
+}
+
+const BAR: &str = r#"[{"schema_version": 1, "event": {"type": "bar", "bar_type": {"instrument_id": {"symbol": "RELIANCE", "venue": "NSE"}, "spec": {"step": 1, "aggregation": "minute", "price_type": "last"}}, "open": 2945.0, "high": 2955.0, "low": 2940.0, "close": 2950.0, "volume": 1000.0, "ts_event": 1000, "ts_init": 1000}, "ts_init": 1000}]"#;
+const BUY_AND_HOLD: &str =
+    r#"{"instrument_id": {"symbol": "RELIANCE", "venue": "NSE"}, "quantity": QTY}"#;
+
+fn run_buy_and_hold(quantity: &str) -> Value {
+    let params = BUY_AND_HOLD.replace("QTY", quantity);
+    let out = run_strategy_json("buy_and_hold", &params, BAR, "[]", 0.0).unwrap();
+    serde_json::from_str(&out).unwrap()
+}
+
+#[test]
+fn run_strategy_reports_rejected_intents() {
+    let got = run_buy_and_hold("-1.0");
+    assert_eq!(got["intents"], serde_json::json!([]));
+    let rejections = got["rejections"].as_array().expect("rejections array");
+    assert_eq!(rejections.len(), 1);
+    assert_eq!(rejections[0]["ts_init"], 1000);
+    assert_eq!(rejections[0]["intent"]["quantity"], -1.0);
+    assert_eq!(rejections[0]["error"]["kind"], "non_positive_quantity");
+    assert_eq!(
+        rejections[0]["error"]["message"],
+        "quantity must be positive, got -1"
+    );
+}
+
+#[test]
+fn run_strategy_has_an_empty_rejections_array_for_valid_runs() {
+    let got = run_buy_and_hold("10.0");
+    assert_eq!(got["rejections"], serde_json::json!([]));
+    assert_eq!(got["intents"].as_array().unwrap().len(), 1);
 }
