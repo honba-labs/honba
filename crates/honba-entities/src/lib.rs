@@ -45,9 +45,9 @@ pub use instrument::{Currency, Instrument, InstrumentKind, Money};
 pub use portfolio::{Account, Portfolio};
 pub use position::{Position, PositionSide};
 pub use screener::{
-    check_predicate_value, FilterOp, MetricKeySpec, MetricPeriod, MetricRef, MetricValue,
-    ScreenerFilterGroup, ScreenerFilterPredicate, ScreenerRow, ScreenerScanResponse, SortSpec,
-    Timeframe, UnitType, ValueType,
+    check_predicate_value, FilterOp, MetricDefinition, MetricKeySpec, MetricPeriod, MetricRef,
+    MetricValue, ScreenerFilterGroup, ScreenerFilterPredicate, ScreenerRow, ScreenerScanRequest,
+    ScreenerScanResponse, SortSpec, Timeframe, UnitType, ValueType,
 };
 pub use trade::Trade;
 

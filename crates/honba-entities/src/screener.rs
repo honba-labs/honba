@@ -56,9 +56,6 @@ pub enum MetricPeriod {
     H1,
     /// Current point-in-time value.
     Current,
-    /// Custom period identifier.
-    #[serde(untagged)]
-    Custom(String),
 }
 
 /// Bar or indicator timeframe dimension for technical metrics.
@@ -95,9 +92,6 @@ pub enum Timeframe {
     /// 1 month
     #[serde(rename = "1M")]
     Month1,
-    /// Custom timeframe string
-    #[serde(untagged)]
-    Custom(String),
 }
 
 /// Specification of a requested metric with its evaluation dimensions.
@@ -372,3 +366,86 @@ pub struct ScreenerScanResponse {
     /// Rows of instrument data.
     pub rows: Vec<ScreenerRow>,
 }
+
+/// Catalog definition of a metric (mirrors Python MetricDefinition).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetricDefinition {
+    /// Unique metric key sent to the backend.
+    pub key: String,
+    /// Human-readable label.
+    pub label: String,
+    /// Metric catalog group.
+    pub group: String,
+    /// Data type of the metric value.
+    pub value_type: ValueType,
+    /// Optional unit of measurement.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit: Option<UnitType>,
+    /// Human-readable description.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Whether this metric supports evaluation period dimension.
+    #[serde(default)]
+    pub has_period: bool,
+    /// Whether this metric supports timeframe dimension.
+    #[serde(default)]
+    pub has_timeframe: bool,
+    /// Default evaluation period if unspecified.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_period: Option<MetricPeriod>,
+    /// Default timeframe if unspecified.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_timeframe: Option<Timeframe>,
+    /// Whether this metric can be filtered upon in scans.
+    #[serde(default = "default_true")]
+    pub filterable: bool,
+    /// Whether this metric can be sorted upon in scans.
+    #[serde(default = "default_true")]
+    pub sortable: bool,
+    /// Data source provenance.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+}
+
+const fn default_true() -> bool {
+    true
+}
+
+/// Request payload for POST /api/v1/screener/scan (mirrors Python ScreenerScanRequest).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScreenerScanRequest {
+    /// Market identifier (e.g. "india").
+    pub market: String,
+    /// Instrument asset types to scan (defaults to ["EQUITY"]).
+    #[serde(default = "default_equity_types")]
+    pub types: Vec<String>,
+    /// Whether to only scan primary listings.
+    #[serde(default = "default_true")]
+    pub primary_only: bool,
+    /// Predefined column set preset name.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub column_set: Option<String>,
+    /// Explicit column specifications requested.
+    #[serde(default)]
+    pub columns: Vec<MetricKeySpec>,
+    /// Filter expression group.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filters: Option<ScreenerFilterGroup>,
+    /// Sorting specification.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort: Option<SortSpec>,
+    /// Result pagination range (offset, limit).
+    #[serde(default = "default_range")]
+    pub range: (usize, usize),
+}
+
+fn default_equity_types() -> Vec<String> {
+    vec!["EQUITY".to_string()]
+}
+
+const fn default_range() -> (usize, usize) {
+    (0, 50)
+}
+

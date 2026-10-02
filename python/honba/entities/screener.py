@@ -184,6 +184,18 @@ def _check_value(op: FilterOp, value: Any) -> Any:
     return value
 
 
+PredicateValue = (
+    Annotated[float, Strict()]
+    | Str
+    | Annotated[bool, Strict()]
+    | None
+    | MetricRef
+    | list[Any]
+    | dict[str, Any]
+)
+"""Typed predicate operand matching the supported scalar, MetricRef, array, or object values."""
+
+
 class ScreenerFilterPredicate(_Wire):
     """Filter predicate for screening instruments.
 
@@ -195,7 +207,7 @@ class ScreenerFilterPredicate(_Wire):
 
     key: Str
     op: WireFilterOp
-    value: Any
+    value: PredicateValue
     period: WireMetricPeriod | None = None
     timeframe: WireTimeframe | None = None
 

@@ -139,6 +139,12 @@ impl std::ops::Sub for Money {
 pub enum InstrumentKind {
     /// A cash equity.
     Equity,
+    /// An exchange-traded fund.
+    Etf,
+    /// A bond or fixed-income security.
+    Bond,
+    /// An initial public offering listing.
+    Ipo,
     /// A futures contract.
     Future,
     /// An options contract.

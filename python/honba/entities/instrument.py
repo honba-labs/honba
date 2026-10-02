@@ -22,6 +22,9 @@ class InstrumentKind(Enum):
     """The kind of instrument (mirrors ``honba_entities::InstrumentKind``)."""
 
     EQUITY = "equity"
+    ETF = "etf"
+    BOND = "bond"
+    IPO = "ipo"
     FUTURE = "future"
     OPTION = "option"
     FX = "fx"

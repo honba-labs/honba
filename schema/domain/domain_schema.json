@@ -1005,6 +1005,43 @@
       "title": "MetricPeriod",
       "type": "string"
     },
+    "MetricRef": {
+      "additionalProperties": false,
+      "description": "A metric used as the right-hand operand of a predicate.\n\nMakes metric-to-metric comparisons expressible on the wire, e.g.\n``SMA50 crosses_above {\"key\": \"SMA200\"}``. ``key`` is the wire key, never a UI id.",
+      "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "period": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MetricPeriod"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "timeframe": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Timeframe"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "title": "MetricRef",
+      "type": "object"
+    },
     "Timeframe": {
       "enum": [
         "1",
@@ -1033,6 +1070,31 @@
           "$ref": "#/$defs/FilterOp"
         },
         "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/$defs/MetricRef"
+            },
+            {
+              "items": {},
+              "type": "array"
+            },
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "title": "Value"
         },
         "period": {
@@ -1101,43 +1163,6 @@
         "key"
       ],
       "title": "MetricKeySpec",
-      "type": "object"
-    },
-    "MetricRef": {
-      "additionalProperties": false,
-      "description": "A metric used as the right-hand operand of a predicate.\n\nMakes metric-to-metric comparisons expressible on the wire, e.g.\n``SMA50 crosses_above {\"key\": \"SMA200\"}``. ``key`` is the wire key, never a UI id.",
-      "properties": {
-        "key": {
-          "title": "Key",
-          "type": "string"
-        },
-        "period": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/MetricPeriod"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
-        "timeframe": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Timeframe"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        }
-      },
-      "required": [
-        "key"
-      ],
-      "title": "MetricRef",
       "type": "object"
     },
     "UnitType": {
