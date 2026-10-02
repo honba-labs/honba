@@ -185,7 +185,8 @@ def _check_value(op: FilterOp, value: Any) -> Any:
 
 
 PredicateValue = (
-    Annotated[float, Strict()]
+    Annotated[int, Strict()]
+    | Annotated[float, Strict()]
     | Str
     | Annotated[bool, Strict()]
     | None

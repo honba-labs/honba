@@ -28,4 +28,6 @@ def _canonical(enum: type[Enum]) -> BeforeValidator:
 
 
 class _Wire(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
+    model_config = ConfigDict(
+        extra="forbid", frozen=True, allow_inf_nan=False, populate_by_name=True
+    )

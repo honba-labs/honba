@@ -83,6 +83,9 @@ def test_instrument_metadata_invariants():
     assert (inst.lot_size, inst.tick_size, inst.currency) == (75.0, 0.05, "INR")
     assert [k.value for k in InstrumentKind] == [
         "equity",
+        "etf",
+        "bond",
+        "ipo",
         "future",
         "option",
         "fx",
