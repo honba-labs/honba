@@ -15,7 +15,9 @@ import json
 import subprocess
 from pathlib import Path
 
+from honba.entities import screener
 from honba.entities import wire
+from pydantic import TypeAdapter
 
 
 def export_json_schema(output_dir: Path) -> Path:
@@ -36,11 +38,32 @@ def export_json_schema(output_dir: Path) -> Path:
             "position": {"$ref": "#/$defs/Position"},
             "bar": {"$ref": "#/$defs/Bar"},
             "instrument_id": {"$ref": "#/$defs/InstrumentId"},
+            "metric_key_spec": {"$ref": "#/$defs/MetricKeySpec"},
+            "metric_definition": {"$ref": "#/$defs/MetricDefinition"},
+            "screener_filter_predicate": {"$ref": "#/$defs/ScreenerFilterPredicate"},
+            "screener_filter_group": {"$ref": "#/$defs/ScreenerFilterGroup"},
+            "screener_sort_spec": {"$ref": "#/$defs/ScreenerSortSpec"},
+            "screener_scan_request": {"$ref": "#/$defs/ScreenerScanRequest"},
+            "screener_row": {"$ref": "#/$defs/ScreenerRow"},
+            "screener_scan_response": {"$ref": "#/$defs/ScreenerScanResponse"},
         },
         "$defs": {},
     }
 
-    for name, adapter in wire._ADAPTERS.items():
+    all_adapters = dict(wire._ADAPTERS)
+    screener_adapters = {
+        "MetricKeySpec": TypeAdapter(screener.MetricKeySpec),
+        "MetricDefinition": TypeAdapter(screener.MetricDefinition),
+        "ScreenerFilterPredicate": TypeAdapter(screener.ScreenerFilterPredicate),
+        "ScreenerFilterGroup": TypeAdapter(screener.ScreenerFilterGroup),
+        "ScreenerSortSpec": TypeAdapter(screener.ScreenerSortSpec),
+        "ScreenerScanRequest": TypeAdapter(screener.ScreenerScanRequest),
+        "ScreenerRow": TypeAdapter(screener.ScreenerRow),
+        "ScreenerScanResponse": TypeAdapter(screener.ScreenerScanResponse),
+    }
+    all_adapters.update(screener_adapters)
+
+    for name, adapter in all_adapters.items():
         s = adapter.json_schema()
         if "$defs" in s:
             for def_name, def_schema in s["$defs"].items():

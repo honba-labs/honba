@@ -37,12 +37,18 @@ pub mod error;
 pub mod instrument;
 pub mod portfolio;
 pub mod position;
+pub mod screener;
 pub mod trade;
 
 pub use error::{EntitiesError, Result};
 pub use instrument::{Currency, Instrument, InstrumentKind, Money};
 pub use portfolio::{Account, Portfolio};
 pub use position::{Position, PositionSide};
+pub use screener::{
+    FilterOp, MetricKeySpec, MetricPeriod, MetricValue, ScreenerFilterGroup,
+    ScreenerFilterPredicate, ScreenerRow, ScreenerScanResponse, SortSpec, Timeframe, UnitType,
+    ValueType,
+};
 pub use trade::Trade;
 
 #[cfg(test)]

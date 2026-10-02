@@ -2,6 +2,7 @@
 
 mod instrument;
 mod position;
+mod screener;
 mod trade;
 
 use honba_messages::{InstrumentId, Venue};

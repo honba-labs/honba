@@ -27,6 +27,30 @@
     },
     "instrument_id": {
       "$ref": "#/$defs/InstrumentId"
+    },
+    "metric_key_spec": {
+      "$ref": "#/$defs/MetricKeySpec"
+    },
+    "metric_definition": {
+      "$ref": "#/$defs/MetricDefinition"
+    },
+    "screener_filter_predicate": {
+      "$ref": "#/$defs/ScreenerFilterPredicate"
+    },
+    "screener_filter_group": {
+      "$ref": "#/$defs/ScreenerFilterGroup"
+    },
+    "screener_sort_spec": {
+      "$ref": "#/$defs/ScreenerSortSpec"
+    },
+    "screener_scan_request": {
+      "$ref": "#/$defs/ScreenerScanRequest"
+    },
+    "screener_row": {
+      "$ref": "#/$defs/ScreenerRow"
+    },
+    "screener_scan_response": {
+      "$ref": "#/$defs/ScreenerScanResponse"
     }
   },
   "$defs": {
@@ -945,6 +969,500 @@
         "ts_init"
       ],
       "title": "Message",
+      "type": "object"
+    },
+    "MetricPeriod": {
+      "enum": [
+        "SNAPSHOT",
+        "TTM",
+        "FY",
+        "FQ",
+        "H1",
+        "CURRENT"
+      ],
+      "title": "MetricPeriod",
+      "type": "string"
+    },
+    "Timeframe": {
+      "enum": [
+        "1",
+        "5",
+        "15",
+        "30",
+        "60",
+        "120",
+        "240",
+        "1D",
+        "1W",
+        "1M"
+      ],
+      "title": "Timeframe",
+      "type": "string"
+    },
+    "MetricKeySpec": {
+      "additionalProperties": false,
+      "description": "Specification of a metric with optional period and timeframe dimensions.",
+      "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "period": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MetricPeriod"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "timeframe": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Timeframe"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "title": "MetricKeySpec",
+      "type": "object"
+    },
+    "UnitType": {
+      "enum": [
+        "PCT",
+        "PRICE",
+        "RATIO",
+        "SHARES",
+        "CURRENCY"
+      ],
+      "title": "UnitType",
+      "type": "string"
+    },
+    "ValueType": {
+      "enum": [
+        "NUMBER",
+        "STRING",
+        "ENUM",
+        "BOOL",
+        "DATE",
+        "MONEY"
+      ],
+      "title": "ValueType",
+      "type": "string"
+    },
+    "MetricDefinition": {
+      "additionalProperties": false,
+      "description": "Catalog definition of a metric.",
+      "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "group": {
+          "title": "Group",
+          "type": "string"
+        },
+        "valueType": {
+          "$ref": "#/$defs/ValueType"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UnitType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "hasPeriod": {
+          "default": false,
+          "title": "Hasperiod",
+          "type": "boolean"
+        },
+        "hasTimeframe": {
+          "default": false,
+          "title": "Hastimeframe",
+          "type": "boolean"
+        },
+        "defaultPeriod": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Defaultperiod"
+        },
+        "defaultTimeframe": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Defaulttimeframe"
+        },
+        "filterable": {
+          "default": true,
+          "title": "Filterable",
+          "type": "boolean"
+        },
+        "sortable": {
+          "default": true,
+          "title": "Sortable",
+          "type": "boolean"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        }
+      },
+      "required": [
+        "key",
+        "label",
+        "group",
+        "valueType"
+      ],
+      "title": "MetricDefinition",
+      "type": "object"
+    },
+    "FilterOp": {
+      "enum": [
+        "eq",
+        "neq",
+        "gt",
+        "gte",
+        "lt",
+        "lte",
+        "between",
+        "in",
+        "not_in",
+        "like",
+        "has",
+        "crosses_above",
+        "crosses_below"
+      ],
+      "title": "FilterOp",
+      "type": "string"
+    },
+    "ScreenerFilterPredicate": {
+      "additionalProperties": false,
+      "description": "Filter predicate for screening instruments.",
+      "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "op": {
+          "$ref": "#/$defs/FilterOp"
+        },
+        "value": {
+          "title": "Value"
+        },
+        "period": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MetricPeriod"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "timeframe": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Timeframe"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "key",
+        "op",
+        "value"
+      ],
+      "title": "ScreenerFilterPredicate",
+      "type": "object"
+    },
+    "ScreenerFilterGroup": {
+      "additionalProperties": false,
+      "description": "Logical group of filter predicates.",
+      "properties": {
+        "operator": {
+          "default": "AND",
+          "enum": [
+            "AND",
+            "OR"
+          ],
+          "title": "Operator",
+          "type": "string"
+        },
+        "items": {
+          "items": {},
+          "title": "Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "ScreenerFilterGroup",
+      "type": "object"
+    },
+    "ScreenerSortSpec": {
+      "additionalProperties": false,
+      "description": "Sorting specification for screener results.",
+      "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "dir": {
+          "default": "desc",
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "title": "Dir",
+          "type": "string"
+        },
+        "period": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MetricPeriod"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "timeframe": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Timeframe"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "title": "ScreenerSortSpec",
+      "type": "object"
+    },
+    "ScreenerScanRequest": {
+      "additionalProperties": false,
+      "description": "Request payload for POST /api/v1/screener/scan.",
+      "properties": {
+        "market": {
+          "title": "Market",
+          "type": "string"
+        },
+        "types": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Types",
+          "type": "array"
+        },
+        "primaryOnly": {
+          "default": true,
+          "title": "Primaryonly",
+          "type": "boolean"
+        },
+        "columnSet": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Columnset"
+        },
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/MetricKeySpec"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "filters": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScreenerFilterGroup"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "sort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScreenerSortSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "range": {
+          "default": [
+            0,
+            50
+          ],
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Range",
+          "type": "array"
+        }
+      },
+      "required": [
+        "market"
+      ],
+      "title": "ScreenerScanRequest",
+      "type": "object"
+    },
+    "ScreenerRow": {
+      "additionalProperties": false,
+      "description": "A row of screened instrument results.",
+      "properties": {
+        "fullSymbol": {
+          "title": "Fullsymbol",
+          "type": "string"
+        },
+        "instrumentId": {
+          "title": "Instrumentid",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "values": {
+          "additionalProperties": true,
+          "title": "Values",
+          "type": "object"
+        }
+      },
+      "required": [
+        "fullSymbol",
+        "instrumentId",
+        "name",
+        "values"
+      ],
+      "title": "ScreenerRow",
+      "type": "object"
+    },
+    "ScreenerScanResponse": {
+      "additionalProperties": false,
+      "description": "Response payload for POST /api/v1/screener/scan.",
+      "properties": {
+        "total": {
+          "title": "Total",
+          "type": "integer"
+        },
+        "range": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Range",
+          "type": "array"
+        },
+        "columns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ScreenerRow"
+          },
+          "title": "Rows",
+          "type": "array"
+        }
+      },
+      "required": [
+        "total",
+        "range",
+        "columns",
+        "rows"
+      ],
+      "title": "ScreenerScanResponse",
       "type": "object"
     }
   }
