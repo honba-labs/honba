@@ -478,3 +478,46 @@ alongside the in-process path, so one knowledge pack serves both:
 What we add beyond a prose skill: generated content, parser validation of whatever the model produces, and
 grammar-constrained decoding on the local path.
 
+
+### 13.10 MCP gateway (reference: Jesse's `jesse/mcp`)
+
+Reference: `jesse-ai/jesse`, `jesse/mcp/`. Read from `agent_rules.md`, `USAGE_LIMITS.md`, `server.py` and the folder
+listing through a summarizing fetch, not the full code. Jesse runs a FastMCP server over streamable HTTP, registers
+`tools/` (one module each for backtest, candles, indicator, strategy, Monte Carlo, optimization, significance test,
+config) and `resources/` (`jesse://strategy` and others), and ships a rules file for the agent. We already plan an MCP
+gateway at `honba/ai/mcp`; these are the patterns we take from it.
+
+1. **Fire and poll for long operations.** `run_backtest` returns immediately and `get_backtest_session` is polled to a
+   terminal status; candle import returns an `import_id` that can be resumed. Honba uses the same shape for anything
+   that can take long (a universe scan with gap fill, a bulk fetch):
+   - `screener_scan_start(text | request)` returns `{scan_id}`;
+   - `screener_scan_get(scan_id)` returns `status` (`queued`, `fetching`, `running`, `done`, `failed`), progress, the
+     fetch plan, and the `ScreenerScanResponse` when done;
+   - `data_fetch_start` and `data_fetch_get` work the same way and are resumable by id.
+   Small scans accept `wait=true` with a timeout and return the result directly.
+2. **Gap fill stays in the app, not in the agent.** Jesse tells the agent not to pre-check candles, to let the backtest
+   fail on missing data, then import from about two months before the start date and retry. That puts a retry loop and a
+   guessed warmup in the agent. Honba's `DataService` (section 12) fills gaps deterministically with the exact lookback
+   per metric, and the agent only sees the structured fetch plan and result. `--fetch never` remains for agents that
+   want control.
+3. **Discovery before generation.** Jesse requires `list_indicators` then `get_indicator_details` before writing
+   indicator code. Honba exposes `screener_metrics_list`, `screener_metric_get` and `screener_presets_list`, plus the
+   knowledge pack as resources (`honba://knowledge/grammar`, `/metrics`, `/units`, `/examples`) so agents look up
+   metric keys and units instead of guessing.
+4. **Agent rules shipped with the server.** A versioned `honba://rules` resource, also placed in the server
+   instructions and in the skill file from 13.9. Rules adopted from Jesse: use the tools rather than working around
+   them; surface tool errors instead of patching around them; never invent results, and say what data is missing; if
+   the tool server is unavailable, stop and tell the user; always give the user the result id or link.
+5. **Structured results, not exceptions.** Errors and refusals return typed payloads (code, message, parse position,
+   suggestions, `budget_exhausted` with a reset time) so an agent can act on them. This matches the exit codes and
+   caret messages in 3.3.
+6. **Budgets for expensive operations.** Jesse meters four heavy tools with daily credits. Honba is local and open
+   source, so the goal is to protect against runaway agents, not to bill: configurable per-session limits on
+   instruments fetched, provider requests and LLM calls (`--max-fetch` and its MCP equivalent), reported as
+   `budget_exhausted` rather than an error.
+7. **Thin tools over services.** One tool module per area (`screener`, `data`, `knowledge`) calling the same services
+   as the CLI. No logic in the tool layer, mirroring Jesse's `tools/` over `tools/services/`.
+8. **Results link back to the UI.** A completed scan has a `scan_id` the frontend can open, as Jesse includes
+   dashboard URLs in replies. The journal entry (section 8) is keyed by the same id.
+9. **Transport and auth.** Stdio for local use, streamable HTTP for the frontend and remote agents, with a token passed
+   at startup. Nothing binds beyond localhost by default (Jesse's server listens on `0.0.0.0`; we do not copy that).
