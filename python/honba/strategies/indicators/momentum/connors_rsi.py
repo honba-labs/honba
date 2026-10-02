@@ -9,8 +9,11 @@ from honba.strategies.indicators._util import check as _check
 from honba.strategies.indicators.momentum.rsi import Rsi
 
 
-@indicator("connors_rsi", "momentum",
-           warmup=lambda s: max(s.rsi_length + 1, s.streak_length + 2, s.rank_length + 2))
+@indicator(
+    "connors_rsi",
+    "momentum",
+    warmup=lambda s: max(s.rsi_length + 1, s.streak_length + 2, s.rank_length + 2),
+)
 class ConnorsRsi(Indicator):
     """Connors RSI (TradingView): mean of RSI(close, rsi_length), RSI(up/down streak, streak_length) and PercentRank(ROC(1), rank_length).
 

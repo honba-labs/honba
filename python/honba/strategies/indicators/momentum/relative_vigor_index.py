@@ -19,8 +19,13 @@ def _swma(a: float, b: float, c: float, d: float) -> float:
     return (a + 2 * b + 2 * c + d) / 6.0
 
 
-@indicator("relative_vigor_index", "momentum", inputs=("open", "high", "low", "close"),
-           outputs=("rvgi", "signal"), warmup=lambda s: s.length + 6)
+@indicator(
+    "relative_vigor_index",
+    "momentum",
+    inputs=("open", "high", "low", "close"),
+    outputs=("rvgi", "signal"),
+    warmup=lambda s: s.length + 6,
+)
 class RelativeVigorIndex(Indicator):
     """Relative Vigor Index (TradingView RVGI): SMA(SWMA(close-open), n) / SMA(SWMA(high-low), n); signal = SWMA(rvgi).
 

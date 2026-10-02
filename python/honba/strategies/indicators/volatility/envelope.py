@@ -1,4 +1,5 @@
 """Moving-average envelope (volatility family)."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -15,7 +16,9 @@ class EnvelopeValue:
     lower: float
 
 
-@indicator("envelope", "volatility", outputs=("upper", "middle", "lower"), warmup=lambda s: s.length)
+@indicator(
+    "envelope", "volatility", outputs=("upper", "middle", "lower"), warmup=lambda s: s.length
+)
 class Envelope(Indicator):
     """Envelope: MA(close, length) * (1 +/- percent/100); ``ma_type`` is 'sma' (default) or 'ema' (SMA-seeded)."""
 

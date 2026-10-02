@@ -1,4 +1,5 @@
 """Rolling Pearson correlation of price with a benchmark (statistical family)."""
+
 from __future__ import annotations
 
 import math

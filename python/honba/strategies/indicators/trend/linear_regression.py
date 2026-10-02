@@ -1,4 +1,5 @@
 """Linear regression channel."""
+
 from __future__ import annotations
 
 import math
@@ -16,8 +17,12 @@ class LinearRegressionValue:
     lower: float
 
 
-@indicator("linear_regression", "trend", outputs=("value", "slope", "upper", "lower"),
-           warmup=lambda s: s.length)
+@indicator(
+    "linear_regression",
+    "trend",
+    outputs=("value", "slope", "upper", "lower"),
+    warmup=lambda s: s.length,
+)
 class LinearRegression(Indicator):
     """Linear regression channel over ``length`` closes.
 

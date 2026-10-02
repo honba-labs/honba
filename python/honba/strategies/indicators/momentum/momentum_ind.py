@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from honba.strategies.indicators._base import Indicator, indicator
 from honba.strategies.indicators._util import check as _check
 
+
 @indicator("momentum", "momentum", warmup=lambda s: s.length + 1)
 class Momentum(Indicator):
     """Momentum (TradingView): x - x[length] (price difference, not percent)."""

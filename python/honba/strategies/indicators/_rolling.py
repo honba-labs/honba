@@ -349,8 +349,12 @@ class RollingPairMoments:
         if p is None:
             return None
         a, b = p
-        if -_HUGE <= x <= _HUGE and -_HUGE <= y <= _HUGE and -_HUGE <= a <= _HUGE \
-                and -_HUGE <= b <= _HUGE:
+        if (
+            -_HUGE <= x <= _HUGE
+            and -_HUGE <= y <= _HUGE
+            and -_HUGE <= a <= _HUGE
+            and -_HUGE <= b <= _HUGE
+        ):
             dx, dy = x - a, y - b
             d = 2.0 * self._d
             return (a + dx / 2.0, b + dy / 2.0, dx * dx / d, dy * dy / d, dx * dy / d)

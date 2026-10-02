@@ -1,4 +1,5 @@
 """Session pivot points (support_resistance family)."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -20,8 +21,13 @@ class PivotPointsValue:
     s3: float
 
 
-@indicator("pivot_points", "support_resistance", inputs=("high", "low", "close", "ts"),
-           outputs=("pp", "r1", "r2", "r3", "s1", "s2", "s3"), warmup=None)
+@indicator(
+    "pivot_points",
+    "support_resistance",
+    inputs=("high", "low", "close", "ts"),
+    outputs=("pp", "r1", "r2", "r3", "s1", "s2", "s3"),
+    warmup=None,
+)
 class PivotPoints(Indicator):
     """Pivot levels for the current IST session from the previous IST session's H/L/C.
 
@@ -53,11 +59,17 @@ class PivotPoints(Indicator):
         else:
             p = (h + l + c) / 3
         if self.mode in ("standard", "woodie"):
-            return PivotPointsValue(p, 2 * p - l, p + r, h + 2 * (p - l), 2 * p - h, p - r, l - 2 * (h - p))
+            return PivotPointsValue(
+                p, 2 * p - l, p + r, h + 2 * (p - l), 2 * p - h, p - r, l - 2 * (h - p)
+            )
         if self.mode == "fibonacci":
-            return PivotPointsValue(p, p + 0.382 * r, p + 0.618 * r, p + r, p - 0.382 * r, p - 0.618 * r, p - r)
+            return PivotPointsValue(
+                p, p + 0.382 * r, p + 0.618 * r, p + r, p - 0.382 * r, p - 0.618 * r, p - r
+            )
         k = 1.1 * r
-        return PivotPointsValue(p, c + k / 12, c + k / 6, c + k / 4, c - k / 12, c - k / 6, c - k / 4)
+        return PivotPointsValue(
+            p, c + k / 12, c + k / 6, c + k / 4, c - k / 12, c - k / 6, c - k / 4
+        )
 
     def update(self, high: float, low: float, close: float, ts: float) -> PivotPointsValue | None:
         day = ist_session_day(int(ts))

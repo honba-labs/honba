@@ -10,6 +10,7 @@ A strategy's ``config.toml`` declares indicators as tables::
 and the strategy builds them with ``IndicatorBank(config.indicators)`` and feeds each
 bar with ``bank.update(bar)``. Changing an indicator or its parameters is a config change.
 """
+
 from __future__ import annotations
 
 from typing import Any, Mapping

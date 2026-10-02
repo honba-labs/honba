@@ -1,4 +1,5 @@
 """Rolling Fibonacci retracement levels (support_resistance family)."""
+
 from __future__ import annotations
 
 from collections import deque
@@ -22,8 +23,13 @@ class FibonacciRetracementValue:
 _RATIOS = (0.0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0)
 
 
-@indicator("fibonacci_retracement", "support_resistance", inputs=("high", "low"),
-           outputs=("l0", "l236", "l382", "l500", "l618", "l786", "l1000"), warmup=lambda s: s.length)
+@indicator(
+    "fibonacci_retracement",
+    "support_resistance",
+    inputs=("high", "low"),
+    outputs=("l0", "l236", "l382", "l500", "l618", "l786", "l1000"),
+    warmup=lambda s: s.length,
+)
 class FibonacciRetracement(Indicator):
     """Fibonacci levels of the rolling ``length``-bar range: level = highest high - range * ratio.
 

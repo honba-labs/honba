@@ -16,18 +16,49 @@ class KstValue:
     signal: float
 
 
-@indicator("kst", "momentum", outputs=("kst", "signal"),
-           warmup=lambda s: max(a + b for a, b in zip((s.roc1, s.roc2, s.roc3, s.roc4), (s.sma1, s.sma2, s.sma3, s.sma4))) + s.signal - 1)
+@indicator(
+    "kst",
+    "momentum",
+    outputs=("kst", "signal"),
+    warmup=lambda s: (
+        max(
+            a + b
+            for a, b in zip((s.roc1, s.roc2, s.roc3, s.roc4), (s.sma1, s.sma2, s.sma3, s.sma4))
+        )
+        + s.signal
+        - 1
+    ),
+)
 class Kst(Indicator):
     """Know Sure Thing (TradingView): 1*SMA(ROC1,S1) + 2*SMA(ROC2,S2) + 3*SMA(ROC3,S3) + 4*SMA(ROC4,S4); signal = SMA(kst, signal).
 
     Defaults ROC 10/15/20/30, SMA 10/10/10/15, signal 9. ROC is percent (see ``roc``).
     """
 
-    def __init__(self, roc1: int = 10, roc2: int = 15, roc3: int = 20, roc4: int = 30,
-                 sma1: int = 10, sma2: int = 10, sma3: int = 10, sma4: int = 15, signal: int = 9) -> None:
-        self.roc1, self.roc2, self.roc3, self.roc4 = _check(roc1), _check(roc2), _check(roc3), _check(roc4)
-        self.sma1, self.sma2, self.sma3, self.sma4 = _check(sma1), _check(sma2), _check(sma3), _check(sma4)
+    def __init__(
+        self,
+        roc1: int = 10,
+        roc2: int = 15,
+        roc3: int = 20,
+        roc4: int = 30,
+        sma1: int = 10,
+        sma2: int = 10,
+        sma3: int = 10,
+        sma4: int = 15,
+        signal: int = 9,
+    ) -> None:
+        self.roc1, self.roc2, self.roc3, self.roc4 = (
+            _check(roc1),
+            _check(roc2),
+            _check(roc3),
+            _check(roc4),
+        )
+        self.sma1, self.sma2, self.sma3, self.sma4 = (
+            _check(sma1),
+            _check(sma2),
+            _check(sma3),
+            _check(sma4),
+        )
         self.signal = _check(signal)
         self._rocs = [Roc(r) for r in (roc1, roc2, roc3, roc4)]
         self._smas = [Sma(s) for s in (sma1, sma2, sma3, sma4)]

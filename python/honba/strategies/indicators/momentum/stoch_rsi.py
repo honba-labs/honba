@@ -16,15 +16,21 @@ class StochRsiValue:
     d: float
 
 
-@indicator("stoch_rsi", "momentum", outputs=("k", "d"),
-           warmup=lambda s: s.rsi_length + s.stoch_length + s.k_smooth + s.d_smooth - 2)
+@indicator(
+    "stoch_rsi",
+    "momentum",
+    outputs=("k", "d"),
+    warmup=lambda s: s.rsi_length + s.stoch_length + s.k_smooth + s.d_smooth - 2,
+)
 class StochRsi(Indicator):
     """Stochastic RSI (TradingView): stochastic of Wilder RSI over ``stoch_length``, K = SMA(raw, k_smooth), D = SMA(K, d_smooth).
 
     raw = 100 * (rsi - min rsi) / (max rsi - min rsi); a flat RSI window gives 0.
     """
 
-    def __init__(self, rsi_length: int = 14, stoch_length: int = 14, k_smooth: int = 3, d_smooth: int = 3) -> None:
+    def __init__(
+        self, rsi_length: int = 14, stoch_length: int = 14, k_smooth: int = 3, d_smooth: int = 3
+    ) -> None:
         self.rsi_length = _check(rsi_length)
         self.stoch_length = _check(stoch_length)
         self.k_smooth = _check(k_smooth)

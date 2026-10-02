@@ -6,14 +6,21 @@ it returns ``None`` until warmed up. Indicators declare, as class metadata, thei
 ``kind`` (config name), ``family``, ``inputs`` and ``outputs``, and expose a JSON
 ``spec()`` so configs, the CLI and AI agents (MCP) can discover and parameterise them.
 """
+
 from __future__ import annotations
 
 import inspect
 from typing import Any, Callable, ClassVar
 
 FAMILIES = (
-    "moving_average", "trend", "momentum", "volatility",
-    "volume", "support_resistance", "breadth", "statistical",
+    "moving_average",
+    "trend",
+    "momentum",
+    "volatility",
+    "volume",
+    "support_resistance",
+    "breadth",
+    "statistical",
 )
 
 _REGISTRY: dict[str, type[Indicator]] = {}
@@ -95,10 +102,18 @@ def spec(kind: str) -> dict:
         if p.default is not inspect.Parameter.empty:
             entry["default"] = p.default
         if p.annotation is not inspect.Parameter.empty:
-            entry["type"] = p.annotation if isinstance(p.annotation, str) else getattr(p.annotation, "__name__", str(p.annotation))
+            entry["type"] = (
+                p.annotation
+                if isinstance(p.annotation, str)
+                else getattr(p.annotation, "__name__", str(p.annotation))
+            )
         params.append(entry)
     doc = (inspect.getdoc(cls) or "").strip().splitlines()
     return {
-        "kind": kind, "family": cls.family, "inputs": list(cls.inputs), "outputs": list(cls.outputs),
-        "params": params, "summary": doc[0] if doc else "",
+        "kind": kind,
+        "family": cls.family,
+        "inputs": list(cls.inputs),
+        "outputs": list(cls.outputs),
+        "params": params,
+        "summary": doc[0] if doc else "",
     }

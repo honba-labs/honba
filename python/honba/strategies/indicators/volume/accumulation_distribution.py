@@ -1,4 +1,5 @@
 """Accumulation/distribution line."""
+
 from __future__ import annotations
 
 from honba.strategies.indicators._base import Indicator, indicator
@@ -12,7 +13,12 @@ def clv_volume(high: float, low: float, close: float, volume: float) -> float:
     return ((close - low) - (high - close)) / rng * volume
 
 
-@indicator("accumulation_distribution", "volume", inputs=("high", "low", "close", "volume"), warmup=lambda s: 1)
+@indicator(
+    "accumulation_distribution",
+    "volume",
+    inputs=("high", "low", "close", "volume"),
+    warmup=lambda s: 1,
+)
 class AccumulationDistribution(Indicator):
     """Accumulation/distribution: cumulative close-location-value times volume (CLV = 0 when high == low)."""
 

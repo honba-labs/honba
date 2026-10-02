@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from honba.strategies.indicators._base import Indicator, indicator
 from honba.strategies.indicators._util import check as _check
 
+
 @indicator("williams_r", "momentum", inputs=("high", "low", "close"), warmup=lambda s: s.length)
 class WilliamsR(Indicator):
     """Williams %R (TradingView): 100 * (close - highest high) / (highest high - lowest low), range -100..0.

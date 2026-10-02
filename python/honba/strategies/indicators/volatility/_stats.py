@@ -1,4 +1,5 @@
 """Shared rolling helpers for the volatility family (O(1) per update, numerically stable)."""
+
 from __future__ import annotations
 
 from honba.strategies.indicators._rolling import RollingMoments

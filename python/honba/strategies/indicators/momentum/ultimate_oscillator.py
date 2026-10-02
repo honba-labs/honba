@@ -6,8 +6,13 @@ from dataclasses import dataclass
 from honba.strategies.indicators._base import Indicator, indicator
 from honba.strategies.indicators._util import check as _check
 
-@indicator("ultimate_oscillator", "momentum", inputs=("high", "low", "close"),
-           warmup=lambda s: max(s.fast, s.middle, s.slow) + 1)
+
+@indicator(
+    "ultimate_oscillator",
+    "momentum",
+    inputs=("high", "low", "close"),
+    warmup=lambda s: max(s.fast, s.middle, s.slow) + 1,
+)
 class UltimateOscillator(Indicator):
     """Ultimate Oscillator (TradingView): 100 * (4*A_fast + 2*A_middle + A_slow) / 7, A_n = sum(BP, n) / sum(TR, n).
 
@@ -35,4 +40,8 @@ class UltimateOscillator(Indicator):
         self._tr.append(hi - lo)
         if len(self._tr) < self._tr.maxlen:
             return None
-        return 100.0 * (4 * self._avg(self.fast) + 2 * self._avg(self.middle) + self._avg(self.slow)) / 7.0
+        return (
+            100.0
+            * (4 * self._avg(self.fast) + 2 * self._avg(self.middle) + self._avg(self.slow))
+            / 7.0
+        )

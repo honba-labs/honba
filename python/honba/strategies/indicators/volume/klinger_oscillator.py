@@ -1,4 +1,5 @@
 """Klinger volume oscillator."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -14,8 +15,13 @@ class KlingerValue:
     signal: float
 
 
-@indicator("klinger_oscillator", "volume", inputs=("high", "low", "close", "volume"),
-           outputs=("klinger", "signal"), warmup=lambda s: max(s.fast, s.slow) + s.signal)
+@indicator(
+    "klinger_oscillator",
+    "volume",
+    inputs=("high", "low", "close", "volume"),
+    outputs=("klinger", "signal"),
+    warmup=lambda s: max(s.fast, s.slow) + s.signal,
+)
 class KlingerOscillator(Indicator):
     """Klinger oscillator (TradingView form): signed volume = +V if hlc3 >= previous hlc3 else -V;
     klinger = EMA(sv, fast) - EMA(sv, slow); signal = EMA(klinger, signal). EMAs are SMA-seeded;

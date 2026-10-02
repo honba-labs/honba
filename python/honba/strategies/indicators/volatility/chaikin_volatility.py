@@ -1,4 +1,5 @@
 """Chaikin volatility (volatility family)."""
+
 from __future__ import annotations
 
 from honba.strategies.indicators._base import Indicator, indicator
@@ -6,7 +7,12 @@ from honba.strategies.indicators._util import check as _check
 from honba.strategies.indicators.moving_average.averages import Ema
 
 
-@indicator("chaikin_volatility", "volatility", inputs=("high", "low"), warmup=lambda s: s.length + s.roc_length)
+@indicator(
+    "chaikin_volatility",
+    "volatility",
+    inputs=("high", "low"),
+    warmup=lambda s: s.length + s.roc_length,
+)
 class ChaikinVolatility(Indicator):
     """Chaikin volatility: percent rate of change over ``roc_length`` of the SMA-seeded EMA(high - low, length).
 

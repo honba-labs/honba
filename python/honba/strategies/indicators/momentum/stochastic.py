@@ -15,8 +15,13 @@ class StochasticValue:
     d: float
 
 
-@indicator("stochastic", "momentum", inputs=("high", "low", "close"), outputs=("k", "d"),
-           warmup=lambda s: s.k_length + s.k_smooth + s.d_smooth - 2)
+@indicator(
+    "stochastic",
+    "momentum",
+    inputs=("high", "low", "close"),
+    outputs=("k", "d"),
+    warmup=lambda s: s.k_length + s.k_smooth + s.d_smooth - 2,
+)
 class Stochastic(Indicator):
     """Stochastic oscillator (TradingView): raw %K over ``k_length`` bars, %K = SMA(raw, k_smooth), %D = SMA(%K, d_smooth).
 

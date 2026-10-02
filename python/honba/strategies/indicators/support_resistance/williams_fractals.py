@@ -1,4 +1,5 @@
 """Williams fractals (support_resistance family)."""
+
 from __future__ import annotations
 
 from collections import deque
@@ -13,8 +14,13 @@ class WilliamsFractalsValue:
     down: float
 
 
-@indicator("williams_fractals", "support_resistance", inputs=("high", "low"),
-           outputs=("up", "down"), warmup=lambda s: 5)
+@indicator(
+    "williams_fractals",
+    "support_resistance",
+    inputs=("high", "low"),
+    outputs=("up", "down"),
+    warmup=lambda s: 5,
+)
 class WilliamsFractals(Indicator):
     """5-bar Williams fractals, confirmed two bars late; flags 1.0/0.0 refer to bar t-2.
 

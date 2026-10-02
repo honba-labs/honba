@@ -1,4 +1,5 @@
 """Chaikin oscillator."""
+
 from __future__ import annotations
 
 from honba.strategies.indicators._util import check as _check
@@ -7,7 +8,12 @@ from honba.strategies.indicators.moving_average import Ema
 from .accumulation_distribution import AccumulationDistribution
 
 
-@indicator("chaikin_oscillator", "volume", inputs=("high", "low", "close", "volume"), warmup=lambda s: max(s.fast, s.slow))
+@indicator(
+    "chaikin_oscillator",
+    "volume",
+    inputs=("high", "low", "close", "volume"),
+    warmup=lambda s: max(s.fast, s.slow),
+)
 class ChaikinOscillator(Indicator):
     """Chaikin oscillator: EMA(A/D line, fast) - EMA(A/D line, slow), SMA-seeded EMAs (TradingView)."""
 

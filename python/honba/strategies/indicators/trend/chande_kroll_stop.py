@@ -1,4 +1,5 @@
 """Chande Kroll stop."""
+
 from __future__ import annotations
 
 from collections import deque
@@ -15,8 +16,13 @@ class ChandeKrollStopValue:
     short_stop: float
 
 
-@indicator("chande_kroll_stop", "trend", inputs=("high", "low", "close"), outputs=("long_stop", "short_stop"),
-           warmup=lambda s: s.p + s.q - 1)
+@indicator(
+    "chande_kroll_stop",
+    "trend",
+    inputs=("high", "low", "close"),
+    outputs=("long_stop", "short_stop"),
+    warmup=lambda s: s.p + s.q - 1,
+)
 class ChandeKrollStop(Indicator):
     """Chande Kroll stop: long_stop = highest(highest(high,p) - x*ATR(p), q);
     short_stop = lowest(lowest(low,p) + x*ATR(p), q). ATR is Wilder (first TR = high-low).

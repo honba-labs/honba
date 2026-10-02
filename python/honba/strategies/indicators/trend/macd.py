@@ -1,4 +1,5 @@
 """MACD (trend family)."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -15,12 +16,21 @@ class MacdValue:
     histogram: float
 
 
-@indicator("macd", "trend", outputs=("macd", "signal", "histogram"), warmup=lambda s: s._slow.warmup + s._signal.warmup - 1)
+@indicator(
+    "macd",
+    "trend",
+    outputs=("macd", "signal", "histogram"),
+    warmup=lambda s: s._slow.warmup + s._signal.warmup - 1,
+)
 class Macd(Indicator):
     def __init__(self, fast: int = 12, slow: int = 26, signal: int = 9, seed: str = "sma") -> None:
         if not 0 < _check(fast) < _check(slow):
             raise ValueError(f"fast must be less than slow, got {fast} and {slow}")
-        self._fast, self._slow, self._signal = Ema(fast, seed), Ema(slow, seed), Ema(_check(signal), seed)
+        self._fast, self._slow, self._signal = (
+            Ema(fast, seed),
+            Ema(slow, seed),
+            Ema(_check(signal), seed),
+        )
 
     def update(self, x: float) -> MacdValue | None:
         f, s = self._fast.update(x), self._slow.update(x)

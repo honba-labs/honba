@@ -1,4 +1,5 @@
 """Chaikin money flow."""
+
 from __future__ import annotations
 
 from collections import deque
@@ -8,7 +9,12 @@ from honba.strategies.indicators._base import Indicator, indicator
 from .accumulation_distribution import clv_volume
 
 
-@indicator("chaikin_money_flow", "volume", inputs=("high", "low", "close", "volume"), warmup=lambda s: s.period)
+@indicator(
+    "chaikin_money_flow",
+    "volume",
+    inputs=("high", "low", "close", "volume"),
+    warmup=lambda s: s.period,
+)
 class ChaikinMoneyFlow(Indicator):
     """Chaikin money flow: sum(CLV*volume, n) / sum(volume, n); 0 when the window volume is 0."""
 

@@ -1,4 +1,5 @@
 """McClellan oscillator (breadth family)."""
+
 from __future__ import annotations
 
 from honba.strategies.indicators.moving_average import Ema

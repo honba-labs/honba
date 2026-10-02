@@ -1,4 +1,5 @@
 """McGinley Dynamic."""
+
 from __future__ import annotations
 
 from honba.strategies.indicators._base import Indicator, indicator
@@ -25,7 +26,7 @@ class McGinleyDynamic(Indicator):
             return self.value
         md = self.value
         ratio = x / md if md > 0 else 1.0
-        den = self.k * self.period * ratio ** 4
+        den = self.k * self.period * ratio**4
         if den > 0:
             self.value = md + (x - md) / den
         return self.value

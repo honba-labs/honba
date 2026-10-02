@@ -15,15 +15,21 @@ class TsiValue:
     signal: float
 
 
-@indicator("tsi", "momentum", outputs=("tsi", "signal"),
-           warmup=lambda s: s.long_length + s.short_length + s.signal_length - 1)
+@indicator(
+    "tsi",
+    "momentum",
+    outputs=("tsi", "signal"),
+    warmup=lambda s: s.long_length + s.short_length + s.signal_length - 1,
+)
 class Tsi(Indicator):
     """True Strength Index (TradingView): 100 * EMA_short(EMA_long(dx)) / EMA_short(EMA_long(|dx|)), dx = close change.
 
     EMAs are SMA-seeded (TradingView ta.ema); signal = EMA(tsi, signal_length). Zero denominator gives 0.
     """
 
-    def __init__(self, long_length: int = 25, short_length: int = 13, signal_length: int = 13) -> None:
+    def __init__(
+        self, long_length: int = 25, short_length: int = 13, signal_length: int = 13
+    ) -> None:
         self.long_length = _check(long_length)
         self.short_length = _check(short_length)
         self.signal_length = _check(signal_length)

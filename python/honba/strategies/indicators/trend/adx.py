@@ -1,4 +1,5 @@
 """Average directional index (Wilder)."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -15,8 +16,13 @@ class AdxValue:
     minus_di: float
 
 
-@indicator("adx", "trend", inputs=("high", "low", "close"), outputs=("adx", "plus_di", "minus_di"),
-           warmup=lambda s: s.di_length + s.adx_smoothing)
+@indicator(
+    "adx",
+    "trend",
+    inputs=("high", "low", "close"),
+    outputs=("adx", "plus_di", "minus_di"),
+    warmup=lambda s: s.di_length + s.adx_smoothing,
+)
 class Adx(Indicator):
     """ADX/DMI (TradingView ta.dmi): Wilder RMA of TR, +DM, -DM; DI = 100*RMA(DM)/RMA(TR);
     ADX = RMA(100*|+DI - -DI| / (+DI + -DI), adx_smoothing).

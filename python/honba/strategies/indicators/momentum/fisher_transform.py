@@ -15,8 +15,13 @@ class FisherValue:
     trigger: float
 
 
-@indicator("fisher_transform", "momentum", inputs=("high", "low"), outputs=("fisher", "trigger"),
-           warmup=lambda s: s.length)
+@indicator(
+    "fisher_transform",
+    "momentum",
+    inputs=("high", "low"),
+    outputs=("fisher", "trigger"),
+    warmup=lambda s: s.length,
+)
 class FisherTransform(Indicator):
     """Fisher Transform (TradingView): fisher = 0.5*ln((1+v)/(1-v)) + 0.5*fisher[1]; trigger = fisher[1].
 

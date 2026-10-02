@@ -1,4 +1,5 @@
 """Aroon."""
+
 from __future__ import annotations
 
 from collections import deque
@@ -15,8 +16,13 @@ class AroonValue:
     oscillator: float
 
 
-@indicator("aroon", "trend", inputs=("high", "low"), outputs=("up", "down", "oscillator"),
-           warmup=lambda s: s.length + 1)
+@indicator(
+    "aroon",
+    "trend",
+    inputs=("high", "low"),
+    outputs=("up", "down", "oscillator"),
+    warmup=lambda s: s.length + 1,
+)
 class Aroon(Indicator):
     """Aroon over the last ``length + 1`` bars: up = 100*(length - bars since highest high)/length
     (down likewise with lowest low), oscillator = up - down. Ties resolve to the most recent bar.

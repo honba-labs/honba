@@ -1,4 +1,5 @@
 """Stochastic KDJ (momentum family)."""
+
 from __future__ import annotations
 
 from collections import deque
@@ -8,7 +9,13 @@ from honba.strategies.indicators._base import Indicator, indicator
 from honba.strategies.indicators.moving_average.averages import make_ma
 
 
-@indicator("kdj", "momentum", inputs=("high", "low", "close"), outputs=("k", "d", "j"), warmup=lambda s: s._h.maxlen + s._k.period + s._d.period - 2)
+@indicator(
+    "kdj",
+    "momentum",
+    inputs=("high", "low", "close"),
+    outputs=("k", "d", "j"),
+    warmup=lambda s: s._h.maxlen + s._k.period + s._d.period - 2,
+)
 class Kdj(Indicator):
     """Stochastic KDJ: RSV over ``fastk`` bars, K = MA(RSV), D = MA(K), J = 3K - 2D.
 
@@ -18,8 +25,12 @@ class Kdj(Indicator):
     """
 
     def __init__(
-        self, fastk: int = 9, slowk: int = 3, slowd: int = 3,
-        slowk_ma: str = "sma", slowd_ma: str = "sma",
+        self,
+        fastk: int = 9,
+        slowk: int = 3,
+        slowd: int = 3,
+        slowk_ma: str = "sma",
+        slowd_ma: str = "sma",
     ) -> None:
         self._h: deque[float] = deque(maxlen=_check(fastk))
         self._l: deque[float] = deque(maxlen=fastk)

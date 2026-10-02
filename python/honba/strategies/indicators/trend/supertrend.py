@@ -1,4 +1,5 @@
 """SuperTrend."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -13,8 +14,13 @@ class SupertrendValue:
     direction: float  # +1 uptrend (value is the lower band), -1 downtrend (upper band)
 
 
-@indicator("supertrend", "trend", inputs=("high", "low", "close"), outputs=("value", "direction"),
-           warmup=lambda s: s.atr_period)
+@indicator(
+    "supertrend",
+    "trend",
+    inputs=("high", "low", "close"),
+    outputs=("value", "direction"),
+    warmup=lambda s: s.atr_period,
+)
 class Supertrend(Indicator):
     """SuperTrend (TradingView): bands = hl2 -/+ factor*ATR (Wilder, first TR = high-low),
     ratcheted against the previous close; direction flips when close crosses the active band.

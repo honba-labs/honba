@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from honba.strategies.indicators._base import Indicator, indicator
 from honba.strategies.indicators._util import check as _check
 
+
 @indicator("roc", "momentum", warmup=lambda s: s.length + 1)
 class Roc(Indicator):
     """Rate of change (TradingView): 100 * (x - x[length]) / x[length], in percent.

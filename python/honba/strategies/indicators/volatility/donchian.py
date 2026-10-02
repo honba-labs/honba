@@ -1,4 +1,5 @@
 """Donchian channel (volatility family)."""
+
 from __future__ import annotations
 
 from collections import deque
@@ -14,7 +15,13 @@ class DonchianValue:
     lower: float
 
 
-@indicator("donchian", "volatility", inputs=("high", "low"), outputs=("upper", "lower"), warmup=lambda s: s.period)
+@indicator(
+    "donchian",
+    "volatility",
+    inputs=("high", "low"),
+    outputs=("upper", "lower"),
+    warmup=lambda s: s.period,
+)
 class Donchian(Indicator):
     """Highest high / lowest low over the last ``period`` bars, including the current one."""
 

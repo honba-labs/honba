@@ -1,4 +1,5 @@
 """Volume-weighted moving average."""
+
 from __future__ import annotations
 
 from collections import deque

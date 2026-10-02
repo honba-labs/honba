@@ -1,4 +1,5 @@
 """Choppiness index (volatility family)."""
+
 from __future__ import annotations
 
 import math
@@ -7,7 +8,9 @@ from collections import deque
 from honba.strategies.indicators._base import Indicator, indicator
 
 
-@indicator("choppiness_index", "volatility", inputs=("high", "low", "close"), warmup=lambda s: s.length)
+@indicator(
+    "choppiness_index", "volatility", inputs=("high", "low", "close"), warmup=lambda s: s.length
+)
 class ChoppinessIndex(Indicator):
     """Choppiness index = 100 * log10(sum(TR, n) / (highest high - lowest low)) / log10(n).
 

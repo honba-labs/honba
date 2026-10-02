@@ -1,4 +1,5 @@
 """Rescaled-range Hurst exponent (statistical family)."""
+
 from __future__ import annotations
 
 import math

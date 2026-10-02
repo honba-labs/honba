@@ -1,4 +1,5 @@
 """Shared helpers for paired-series statistics."""
+
 from __future__ import annotations
 
 

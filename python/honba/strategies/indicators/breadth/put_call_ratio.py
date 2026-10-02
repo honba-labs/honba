@@ -1,4 +1,5 @@
 """Put/Call ratio (breadth family)."""
+
 from __future__ import annotations
 
 from honba.strategies.indicators._util import check as _check
@@ -6,7 +7,9 @@ from honba.strategies.indicators.moving_average import Sma
 from honba.strategies.indicators._base import Indicator, indicator
 
 
-@indicator("put_call_ratio", "breadth", inputs=("put_volume", "call_volume"), warmup=lambda s: s.smoothing)
+@indicator(
+    "put_call_ratio", "breadth", inputs=("put_volume", "call_volume"), warmup=lambda s: s.smoothing
+)
 class PutCallRatio(Indicator):
     """SMA(smoothing) of the per-bar put_volume / call_volume; smoothing=1 is the raw ratio.
 

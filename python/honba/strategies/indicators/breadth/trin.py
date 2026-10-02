@@ -1,10 +1,16 @@
 """Arms index / TRIN (breadth family)."""
+
 from __future__ import annotations
 
 from honba.strategies.indicators._base import Indicator, indicator
 
 
-@indicator("trin", "breadth", inputs=("advances", "declines", "adv_volume", "dec_volume"), warmup=lambda s: 1)
+@indicator(
+    "trin",
+    "breadth",
+    inputs=("advances", "declines", "adv_volume", "dec_volume"),
+    warmup=lambda s: 1,
+)
 class Trin(Indicator):
     """Arms index: (advances/declines) / (adv_volume/dec_volume).
 
@@ -15,7 +21,9 @@ class Trin(Indicator):
     def __init__(self) -> None:
         pass
 
-    def update(self, advances: float, declines: float, adv_volume: float, dec_volume: float) -> float:
+    def update(
+        self, advances: float, declines: float, adv_volume: float, dec_volume: float
+    ) -> float:
         if declines <= 0 or adv_volume <= 0 or dec_volume <= 0:
             return 1.0
         return (advances / declines) / (adv_volume / dec_volume)

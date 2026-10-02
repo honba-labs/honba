@@ -1,4 +1,5 @@
 """Rolling beta against a benchmark (statistical family)."""
+
 from __future__ import annotations
 
 import math

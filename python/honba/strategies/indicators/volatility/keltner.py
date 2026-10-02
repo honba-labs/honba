@@ -1,4 +1,5 @@
 """Keltner channels (volatility family)."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -16,8 +17,13 @@ class KeltnerValue:
     lower: float
 
 
-@indicator("keltner", "volatility", inputs=("high", "low", "close"), outputs=("upper", "middle", "lower"),
-           warmup=lambda s: max(s.length, s.atr_length + 1))
+@indicator(
+    "keltner",
+    "volatility",
+    inputs=("high", "low", "close"),
+    outputs=("upper", "middle", "lower"),
+    warmup=lambda s: max(s.length, s.atr_length + 1),
+)
 class Keltner(Indicator):
     """Keltner channels: EMA(close, length) +/- mult * Wilder ATR(atr_length) (TradingView defaults).
 

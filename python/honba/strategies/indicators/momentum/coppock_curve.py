@@ -10,7 +10,9 @@ from honba.strategies.indicators.momentum.roc import Roc
 from honba.strategies.indicators.moving_average import Wma
 
 
-@indicator("coppock_curve", "momentum", warmup=lambda s: max(s.long_roc, s.short_roc) + s.wma_length)
+@indicator(
+    "coppock_curve", "momentum", warmup=lambda s: max(s.long_roc, s.short_roc) + s.wma_length
+)
 class CoppockCurve(Indicator):
     """Coppock Curve (TradingView): WMA(ROC(long_roc) + ROC(short_roc), wma_length), ROC in percent."""
 

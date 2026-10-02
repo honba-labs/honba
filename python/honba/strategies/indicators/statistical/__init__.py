@@ -1,4 +1,5 @@
 """Statistical indicators: correlation, beta, covariance, z-score, Hurst exponent."""
+
 from honba.strategies.indicators.statistical.beta import Beta
 from honba.strategies.indicators.statistical.correlation import Correlation
 from honba.strategies.indicators.statistical.covariance import Covariance

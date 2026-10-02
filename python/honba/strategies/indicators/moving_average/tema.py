@@ -1,4 +1,5 @@
 """Triple exponential moving average."""
+
 from __future__ import annotations
 
 from honba.strategies.indicators._base import Indicator, indicator

@@ -1,4 +1,5 @@
 """Vortex indicator."""
+
 from __future__ import annotations
 
 from collections import deque
@@ -14,8 +15,13 @@ class VortexValue:
     minus: float
 
 
-@indicator("vortex", "trend", inputs=("high", "low", "close"), outputs=("plus", "minus"),
-           warmup=lambda s: s.period + 1)
+@indicator(
+    "vortex",
+    "trend",
+    inputs=("high", "low", "close"),
+    outputs=("plus", "minus"),
+    warmup=lambda s: s.period + 1,
+)
 class Vortex(Indicator):
     """Vortex: VI+ = sum|high - prev low| / sum TR, VI- = sum|low - prev high| / sum TR over ``period`` bars.
 
@@ -32,7 +38,9 @@ class Vortex(Indicator):
         if prev is None:
             return None
         ph, pl, pc = prev
-        self._w.append((abs(high - pl), abs(low - ph), max(high - low, abs(high - pc), abs(low - pc))))
+        self._w.append(
+            (abs(high - pl), abs(low - ph), max(high - low, abs(high - pc), abs(low - pc)))
+        )
         if len(self._w) < self.period:
             return None
         tr = sum(t for _, _, t in self._w)

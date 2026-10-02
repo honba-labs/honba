@@ -1,4 +1,5 @@
 """Bollinger bands (volatility family)."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

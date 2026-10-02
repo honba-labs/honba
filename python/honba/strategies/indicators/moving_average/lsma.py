@@ -1,4 +1,5 @@
 """Least-squares (linear regression) moving average."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence

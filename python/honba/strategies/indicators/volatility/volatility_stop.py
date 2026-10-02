@@ -1,4 +1,5 @@
 """Volatility stop (volatility family)."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -14,8 +15,13 @@ class VolatilityStopValue:
     direction: float
 
 
-@indicator("volatility_stop", "volatility", inputs=("high", "low", "close"), outputs=("value", "direction"),
-           warmup=lambda s: s.length)
+@indicator(
+    "volatility_stop",
+    "volatility",
+    inputs=("high", "low", "close"),
+    outputs=("value", "direction"),
+    warmup=lambda s: s.length,
+)
 class VolatilityStop(Indicator):
     """ATR trailing volatility stop (TradingView 'Volatility Stop'); direction +1 = uptrend (stop below), -1 = downtrend.
 

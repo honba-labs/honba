@@ -1,4 +1,5 @@
 """Ease of movement."""
+
 from __future__ import annotations
 
 from honba.strategies.indicators._util import check as _check
@@ -6,7 +7,12 @@ from honba.strategies.indicators._base import Indicator, indicator
 from honba.strategies.indicators.moving_average import Sma
 
 
-@indicator("ease_of_movement", "volume", inputs=("high", "low", "close", "volume"), warmup=lambda s: s.period + 1)
+@indicator(
+    "ease_of_movement",
+    "volume",
+    inputs=("high", "low", "close", "volume"),
+    warmup=lambda s: s.period + 1,
+)
 class EaseOfMovement(Indicator):
     """Ease of movement (TradingView): SMA(divisor * change(hl2) * (high-low) / volume, n); a bar with zero volume contributes 0."""
 
