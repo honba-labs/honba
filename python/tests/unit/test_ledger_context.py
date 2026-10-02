@@ -74,3 +74,26 @@ def test_positions_lists_non_flat_ordered_by_symbol_then_venue():
         ctx.apply_fill(Trade(iid, OrderSide.BUY, 1, 10.0))
     ctx.apply_fill(Trade(INFY, OrderSide.SELL, 1, 10.0))  # flat again
     assert list(ctx.positions().items()) == [(ACME_BSE, 1.0), (ACME_NSE, 1.0), (NIFTY, 1.0)]
+
+
+def _invalid_intent(quantity: float) -> OrderIntent:
+    """An intent whose invariants are broken after construction (``OrderIntent`` validates
+    on construction, so this takes a deliberate bypass: a duck-typed or unpickled value)."""
+    intent = OrderIntent.market_buy(NIFTY, 1.0)
+    object.__setattr__(intent, "quantity", quantity)
+    return intent
+
+
+def test_invalid_intent_does_not_touch_pending_state():
+    # Mirrors the Rust regression (commit 4c3a95a): a NaN quantity wiped other pending orders.
+    ctx = LedgerContext()
+    ctx.submit(OrderIntent.market_buy(NIFTY, 10.0))
+    for bad in (float("nan"), float("inf"), float("-inf"), -1.0):
+        intent = _invalid_intent(bad)
+        ctx.submit(intent)
+        assert ctx.busy(NIFTY), f"pending wiped by quantity {bad}"
+        ctx.release(intent)  # the runner releases rejected intents
+        assert ctx.busy(NIFTY), f"pending wiped by release of {bad}"
+    ctx.apply_fill(Trade(NIFTY, OrderSide.BUY, 10, 1.0))
+    assert not ctx.busy(NIFTY)
+    assert len(ctx.drain_intents()) == 5  # invalid ones are still handed to the runner to reject

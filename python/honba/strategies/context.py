@@ -12,10 +12,20 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 
 from honba.entities.instrument import Instrument, InstrumentId
-from honba.entities.order import OrderIntent, OrderSide
+from honba.entities.order import OrderIntent, OrderSide, validate_intent
 from honba.entities.trade import Trade
 
 _EPSILON = 1e-9
+
+
+def _is_valid(intent: OrderIntent) -> bool:
+    try:
+        validate_intent(
+            intent.side, intent.quantity, intent.order_type, intent.price, intent.trigger_price
+        )
+    except ValueError:
+        return False
+    return True
 
 
 class StrategyContext(ABC):
@@ -89,8 +99,12 @@ class LedgerContext(StrategyContext):
         return self._instruments.get(instrument_id)
 
     def submit(self, intent: OrderIntent) -> None:
-        key = (intent.instrument_id, intent.side)
-        self._pending[key] = self._pending.get(key, 0.0) + intent.quantity
+        # An invalid intent (only possible if built around ``OrderIntent``'s validation) is still
+        # queued so the runner can reject it, but it must not touch the pending ledger: a NaN
+        # quantity would wipe the other pending orders (same rule as the Rust ``LedgerContext``).
+        if _is_valid(intent):
+            key = (intent.instrument_id, intent.side)
+            self._pending[key] = self._pending.get(key, 0.0) + intent.quantity
         self._outbox.append(intent)
 
     # -- runner side ----------------------------------------------------------
@@ -117,7 +131,12 @@ class LedgerContext(StrategyContext):
         self._reduce_pending(fill.instrument_id, fill.side, fill.quantity)
 
     def release(self, intent: OrderIntent) -> None:
-        """An intent was rejected or its order cancelled unfilled: it no longer counts as busy."""
+        """An intent was rejected or its order cancelled unfilled: it no longer counts as busy.
+
+        An invalid intent never counted (see ``submit``), so releasing it is a no-op.
+        """
+        if not _is_valid(intent):
+            return
         self._reduce_pending(intent.instrument_id, intent.side, intent.quantity)
 
     def _reduce_pending(

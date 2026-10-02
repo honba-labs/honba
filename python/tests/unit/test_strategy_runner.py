@@ -180,3 +180,58 @@ def test_from_wire_messages_parses_market_data_strictly():
         from_wire_messages(duplicate)
     with pytest.raises(TypeError):
         from_wire_messages(json.dumps({"not": "a list"}))
+
+
+def _invalid(intent: OrderIntent, **fields) -> OrderIntent:
+    """Break an ``OrderIntent`` after construction (it validates on construction)."""
+    for name, value in fields.items():
+        object.__setattr__(intent, name, value)
+    return intent
+
+
+def test_runner_rejects_an_invalid_intent_without_submitting_it():
+    good = OrderIntent.market_buy(X, 3)
+    bad = _invalid(OrderIntent.market_buy(X, 1), quantity=float("nan"))
+    rec = Recorder({"on_bar": [good, bad]})
+    execution = FakeExecution()
+    runner = StrategyRunner(rec, execution)
+    runner.start()
+    runner.on_event(bar(10.0, 1), 7)
+    assert [o[1] for o in execution.orders] == [good]
+    assert [(r.ts_init, r.intent) for r in runner.rejections] == [(7, bad)]
+    assert "quantity must be positive" in runner.rejections[0].error
+    assert runner.ctx.busy(X)  # the valid order is still pending: the NaN did not wipe it
+    # Order ids count only submitted orders.
+    assert [o[0] for o in execution.orders] == ["rec-0"]
+
+
+def test_runner_releases_a_rejected_intent_from_the_context_by_default():
+    bad = _invalid(OrderIntent.market_buy(X, 2), quantity=-2.0)
+    runner = StrategyRunner(Recorder({"on_bar": [bad]}), FakeExecution())
+    runner.start()
+    runner.on_event(bar(10.0, 1), 1)
+    assert len(runner.rejections) == 1
+    assert not runner.ctx.busy(X)
+
+
+def test_runner_honours_a_handle_rejected_override():
+    import warnings
+
+    seen: list[OrderIntent] = []
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+
+        class Handles(Recorder):
+            name = "handles"
+
+            def handle_rejected(self, intent):
+                seen.append(intent)
+                super().handle_rejected(intent)
+
+    bad = _invalid(OrderIntent.market_sell(X, 2), quantity=0.0)
+    runner = StrategyRunner(Handles({"on_bar": [bad]}), FakeExecution())
+    runner.start()
+    runner.on_event(bar(10.0, 1), 1)
+    assert seen == [bad]
+    assert runner.rejections[0].intent is bad
+    assert not runner.ctx.busy(X)
