@@ -28,7 +28,7 @@ pub use contract_probe::{ContractProbe, Observation};
 pub use intent::{IntentError, OrderIntent};
 pub use rsi_reversal::RsiReversal;
 pub use runner::{IntentRejection, StrategyRunner, SubmittedIntent};
-pub use sma_crossover::SmaCrossover;
+pub use sma_crossover::{SmaCrossover, MAX_SMA_PERIOD};
 pub use strategy::{Strategy, StrategyAdapter};
 
 #[cfg(test)]

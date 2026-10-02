@@ -13,6 +13,7 @@ use honba_engine::{AlgoError, ExecutionEngine, Handler};
 use honba_entities::{Currency, Instrument, InstrumentKind, Trade};
 use honba_messages::{InstrumentId, Message, Order};
 use honba_sim::BarFillEngine;
+pub use honba_strategy::MAX_SMA_PERIOD;
 use honba_strategy::{
     BuyAndHold, ContractProbe, IntentError, LedgerContext, SmaCrossover, Strategy, StrategyContext,
     StrategyRunner,
@@ -207,6 +208,12 @@ pub fn run_strategy_json(
             let p: SmaParams = parse("sma_crossover params", params)?;
             if !(p.fast > 0 && p.fast < p.slow) {
                 return Err("sma_crossover: fast must be positive and less than slow".into());
+            }
+            if p.slow > MAX_SMA_PERIOD {
+                return Err(format!(
+                    "sma_crossover: periods must be at most {MAX_SMA_PERIOD}, got slow={}",
+                    p.slow
+                ));
             }
             let s = SmaCrossover::new(p.instrument_id, p.fast, p.slow, p.quantity);
             drive(s, ctx, &messages)?.1

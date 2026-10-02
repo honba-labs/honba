@@ -8,6 +8,12 @@ use crate::context::StrategyContext;
 use crate::intent::OrderIntent;
 use crate::strategy::Strategy;
 
+/// The largest SMA period [`SmaCrossover`] accepts through untrusted input
+/// (the `run_strategy` binding, configs, agents). Far above any practical
+/// lookback (the longest conventional one is 200) yet small enough that
+/// the indicator buffers stay trivial.
+pub const MAX_SMA_PERIOD: usize = 10_000;
+
 /// Emits a buy when the fast SMA crosses above the slow SMA, and a sell
 /// when it crosses back below.
 ///

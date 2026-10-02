@@ -4,6 +4,9 @@ use std::collections::VecDeque;
 
 use crate::indicator::Indicator;
 
+/// Most samples reserved up front by [`Sma::new`].
+const MAX_PREALLOC: usize = 4096;
+
 /// A simple moving average over the last `period` inputs.
 ///
 /// Uses a ring buffer and a running sum, so each update is O(1).
@@ -35,7 +38,9 @@ impl Sma {
         assert!(period > 0, "SMA period must be positive");
         Self {
             period,
-            buf: VecDeque::with_capacity(period),
+            // Capped so an absurd period cannot abort on allocation; the
+            // buffer grows on demand beyond this.
+            buf: VecDeque::with_capacity(period.min(MAX_PREALLOC)),
             sum: 0.0,
             last: None,
         }

@@ -38,3 +38,11 @@ fn window_slides_over_the_last_period_inputs() {
         [None, None, Some(2.0), Some(3.0), Some(4.0)]
     );
 }
+
+#[test]
+fn huge_period_does_not_preallocate() {
+    // Used to abort the process: VecDeque::with_capacity(2**40).
+    let mut s = Sma::new(1 << 40);
+    assert_eq!(s.update(1.0), None);
+    assert_eq!(s.period(), 1 << 40);
+}
