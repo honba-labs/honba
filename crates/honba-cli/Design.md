@@ -336,10 +336,10 @@ Behind a `BarStore` port, so the engine is an implementation detail. Recommended
 
 ### 12.4 Ports and flow
 
-- `MarketDataProvider.fetch(instrument, timeframe, range) -> list[Bar]`. Implementations: the NSE, BSE and AMFI
-  loaders in `honba.research.data_loader`, and broker adapters through `honba.adapters.base`. Providers are an ordered
-  list from config with fallback. Each provider declares its limits (for example intraday history depth), so an
-  impossible request fails fast with a clear message.
+- `MarketDataProvider.fetch(instrument, timeframe, range) -> list[Bar]`. Implementations:
+  - **Option A (Implemented):** Public daily EOD archives (`NseBhavcopyProvider` in `honba.research.data_loader.nse`) supporting modern UDiFF CM Bhavcopy zip and Sec Bhavdata full CSVs with local directory caching.
+  - **Option B (Scheduled / Recorded):** Broker APIs (Zerodha Kite, Upstox, Dhan via `honba-adapters`) for authenticated historical intraday candles (`15m`, `5m`, `1m`) and live market feed tick streaming.
+  - Providers are an ordered list from config with fallback. Each provider declares its limits (for example intraday history depth), so an impossible request fails fast with a clear message.
 - `BarStore`: `coverage()`, `read()`, `append()`.
 - Application service `DataService.ensure(plan)`:
   1. fetch each gap with bounded concurrency, retry with backoff and rate limiting;

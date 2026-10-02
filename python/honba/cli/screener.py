@@ -6,6 +6,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from honba.entities.instrument import InstrumentId
 from honba.entities.screener import (
     MetricKeySpec,
     ScreenerFilterGroup,
@@ -248,6 +249,9 @@ def scan_cmd(
     format: Annotated[
         str, typer.Option("--format", help="Output format: table, json")
     ] = "table",
+    fetch: Annotated[
+        str, typer.Option("--fetch", help="Missing-data policy: auto, never, force")
+    ] = "auto",
     filters: Annotated[
         list[str] | None, typer.Argument(help="Trailing filter words")
     ] = None,
@@ -272,15 +276,25 @@ def scan_cmd(
         typer.echo(req.model_dump_json(by_alias=True, indent=2))
         return
 
-    from honba.screener.ports import InMemoryBarStore, InMemoryMarketDataProvider
-    from honba.screener.service import DataService
+    from honba.cli.data import _DATA_SERVICE
+    from honba.screener.service import MissingDataPolicy
     from honba.screener.sources import LocalScreenerSource
 
-    # Initialize service and source
-    store = InMemoryBarStore()
-    provider = InMemoryMarketDataProvider()
-    service = DataService(store=store, providers=[provider])
-    source = LocalScreenerSource(data_service=service)
+    # Configure fetch policy on the shared DataService
+    try:
+        policy = MissingDataPolicy(fetch.lower())
+    except ValueError:
+        err_console.print(f"[red]Invalid --fetch policy:[/red] {fetch} (choose from auto, never, force)")
+        raise typer.Exit(code=1)
+
+    _DATA_SERVICE.policy = policy
+    source = LocalScreenerSource(
+        data_service=_DATA_SERVICE,
+        default_instruments=[
+            InstrumentId("RELIANCE", "NSE"),
+            InstrumentId("TCS", "NSE"),
+        ],
+    )
 
     response = source.scan(req)
 

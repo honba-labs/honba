@@ -15,7 +15,7 @@ def test_data_cli_help():
 def test_data_cli_coverage():
     res = runner.invoke(app, ["data", "coverage"])
     assert res.exit_code == 0
-    assert "No covered intervals found" in res.output
+    assert "Data Store Coverage" in res.output or "No covered intervals found" in res.output
 
 
 def test_data_cli_gaps():

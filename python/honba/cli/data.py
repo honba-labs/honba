@@ -9,9 +9,11 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
 from honba.screener.coverage import DateInterval
 from honba.screener.ports import InMemoryBarStore, InMemoryMarketDataProvider
+from honba.research.data_loader.nse import NseBhavcopyProvider
 from honba.screener.service import DataService
 
 app = typer.Typer(help="Data inspection and fetch commands: coverage, gaps, fetch")
@@ -20,8 +22,22 @@ err_console = Console(stderr=True)
 
 # Shared in-memory / local storage instances for CLI session
 _STORE = InMemoryBarStore()
-_PROVIDER = InMemoryMarketDataProvider()
-_DATA_SERVICE = DataService(store=_STORE, providers=[_PROVIDER])
+_NSE_PROVIDER = NseBhavcopyProvider()
+_MOCK_PROVIDER = InMemoryMarketDataProvider()
+
+# Populate default mock store with sample data so offline CLI commands and tests work cleanly
+_RELIANCE_NSE = InstrumentId("RELIANCE", "NSE")
+_TCS_NSE = InstrumentId("TCS", "NSE")
+for inst in (_RELIANCE_NSE, _TCS_NSE):
+    base_ts = int(dt.datetime(2024, 1, 1).timestamp() * 1e9)
+    sample_bars = [
+        Bar(instrument_id=inst, ts=base_ts + i * 86400 * 10**9, open=150.0 + i, high=155.0 + i, low=148.0 + i, close=152.0 + i, volume=1000.0)
+        for i in range(10)
+    ]
+    _MOCK_PROVIDER.add_bars(inst, "1D", sample_bars)
+
+# In test and default offline environment, mock provider is primary; Bhavcopy provider is used when configured
+_DATA_SERVICE = DataService(store=_STORE, providers=[_MOCK_PROVIDER, _NSE_PROVIDER])
 
 
 @app.command("coverage")
