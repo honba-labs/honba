@@ -25,6 +25,16 @@ python3 scripts/dependency_graph.py            # crate-hierarchy check (also a C
 
 `make build|test|lint|fmt` wrap the above (note `make lint` omits `--workspace`; CI uses it).
 
+Schema workflow (`schema/domain/domain_schema.json`, generated from `honba.entities.wire`):
+- `make schema` regenerates the JSON bundle and, in the workspace, the frontend TypeScript
+  (`FRONTEND_TS_DIR`, default `../honba-frontend/src/core/types/generated`; override with
+  `make schema FRONTEND_TS_DIR=...`). `scripts/export_schema.py` itself skips TypeScript unless
+  `--frontend-dir` or `HONBA_FRONTEND_DIR` is given.
+- `make check-schema` regenerates JSON only and fails on `git diff schema/domain`; works in a
+  single-repo checkout and runs in CI (python job, step "schema drift").
+- `make check-schema-ts` is the cross-repo TypeScript drift check. LOCAL ONLY: it writes into the
+  sibling `../honba-frontend` checkout, so CI does not run it.
+
 Python (`python/`, built with maturin; extension module `honba._honba`; Python >=3.10):
 
 ```
@@ -36,7 +46,7 @@ ruff check .                              # line-length 100
 
 Optional extras: `ai` (openai, anthropic, litellm, mcp), `rl` (torch, gymnasium). CLI entry point: `honba` → `honba.cli.main:app` (typer; subcommands in `python/honba/cli/`: backtest, data, optimize, research, strategy, ai).
 
-CI: Rust job (fmt, check, clippy `-D warnings`, test, doctest, doc), dependency-graph check, and Python job (deps, maturin develop, stubtest, pytest) are all blocking.
+CI: Rust job (fmt, check, clippy `-D warnings`, test, doctest, doc), dependency-graph check, and Python job (deps, maturin develop, stubtest, pytest, schema drift) are all blocking. A ruff lint step (`ruff check python`, `ruff format --check python`) runs with `continue-on-error` until the pre-existing findings are cleaned up.
 
 ## Rust test layout (ADR 007)
 
