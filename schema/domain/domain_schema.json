@@ -1165,11 +1165,23 @@
     },
     "MetricDefinition": {
       "additionalProperties": false,
-      "description": "Catalog definition of a metric.",
+      "description": "Catalog definition of a metric.\n\n``key`` is the wire key sent to the backend. ``ui_id`` (``uiId``) is the frontend\ncolumn id and must never be emitted on the wire. ``aliases`` are natural-language\nphrases the NL layer (``honba.screener.MetricCatalog.resolve``) maps to ``key``.",
       "properties": {
         "key": {
           "title": "Key",
           "type": "string"
+        },
+        "uiId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Uiid"
         },
         "label": {
           "title": "Label",
@@ -1260,6 +1272,13 @@
           ],
           "default": null,
           "title": "Source"
+        },
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
         }
       },
       "required": [

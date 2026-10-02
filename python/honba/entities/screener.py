@@ -113,9 +113,15 @@ class MetricRef(_Wire):
 
 
 class MetricDefinition(_Wire):
-    """Catalog definition of a metric."""
+    """Catalog definition of a metric.
+
+    ``key`` is the wire key sent to the backend. ``ui_id`` (``uiId``) is the frontend
+    column id and must never be emitted on the wire. ``aliases`` are natural-language
+    phrases the NL layer (``honba.screener.MetricCatalog.resolve``) maps to ``key``.
+    """
 
     key: Str
+    ui_id: Str | None = Field(default=None, alias="uiId")
     label: Str
     group: Str
     value_type: WireValueType = Field(alias="valueType")
@@ -128,6 +134,7 @@ class MetricDefinition(_Wire):
     filterable: Annotated[bool, Strict()] = True
     sortable: Annotated[bool, Strict()] = True
     source: Str | None = None
+    aliases: list[Str] = Field(default_factory=list)
 
 
 _ORDERING_OPS = frozenset({FilterOp.GT, FilterOp.GTE, FilterOp.LT, FilterOp.LTE})
