@@ -94,15 +94,17 @@ NIFTY_200_ALPHA_30_SYMBOLS: tuple[str, ...] = (
 
 UNIVERSES: dict[str, tuple[str, ...]] = {
     "nifty50": NIFTY_50_SYMBOLS,
-    "nifty200_alpha_30": NIFTY_200_ALPHA_30_SYMBOLS,
+    "nifty200_alpha30": NIFTY_200_ALPHA_30_SYMBOLS,
 }
 
 # optional aliases → canonical key
 _ALIASES: dict[str, str] = {
     "nifty_50": "nifty50",
-    "nifty200alpha30": "nifty200_alpha_30",
-    "alpha30": "nifty200_alpha_30",
-    "nifty200_alpha30": "nifty200_alpha_30",
+    "nifty_200_alpha_30": "nifty200_alpha30",
+    "nifty200_alpha_30": "nifty200_alpha30",
+    "nifty200alpha30": "nifty200_alpha30",
+    "nifty200_alpha30": "nifty200_alpha30",
+    "alpha30": "nifty200_alpha30",
 }
 
 
