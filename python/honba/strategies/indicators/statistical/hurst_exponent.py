@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from collections import deque
+from itertools import pairwise
 
 from honba.strategies.indicators._base import Indicator, indicator
 
@@ -28,7 +29,7 @@ class HurstExponent(Indicator):
         if len(self._w) < self.length:
             return None
         w = list(self._w)
-        d = [b - a for a, b in zip(w, w[1:])]
+        d = [b - a for a, b in pairwise(w)]
         n = len(d)
         m = sum(d) / n
         s = math.sqrt(sum((v - m) ** 2 for v in d) / n)

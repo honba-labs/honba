@@ -17,20 +17,20 @@ from honba.strategies.indicators.trend.supertrend import Supertrend, SupertrendV
 from honba.strategies.indicators.trend.vortex import Vortex, VortexValue
 
 __all__ = [
-    "Macd",
-    "MacdValue",
-    "Ichimoku",
     "Adx",
     "AdxValue",
     "Aroon",
     "AroonValue",
+    "ChandeKrollStop",
+    "ChandeKrollStopValue",
+    "Ichimoku",
+    "LinearRegression",
+    "LinearRegressionValue",
+    "Macd",
+    "MacdValue",
     "ParabolicSar",
     "Supertrend",
     "SupertrendValue",
     "Vortex",
     "VortexValue",
-    "ChandeKrollStop",
-    "ChandeKrollStopValue",
-    "LinearRegression",
-    "LinearRegressionValue",
 ]

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from honba.strategies.indicators._util import check as _check
 from honba.strategies.indicators._base import Indicator, indicator
+from honba.strategies.indicators._util import check as _check
 from honba.strategies.indicators.moving_average.averages import Ema
 
 

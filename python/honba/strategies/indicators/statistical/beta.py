@@ -40,6 +40,6 @@ class Beta(Indicator):
         if m is None:
             return None
         cov, vy = m[4], m[3]
-        if cov != cov:
+        if cov != cov:  # noqa: PLR0124  (NaN check)
             return math.nan
         return cov / vy if vy > 0 else 0.0

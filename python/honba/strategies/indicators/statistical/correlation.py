@@ -30,9 +30,9 @@ class Correlation(Indicator):
         if m is None:
             return None
         cov, vx, vy = m[4], m[2], m[3]
-        if cov != cov:
+        if cov != cov:  # noqa: PLR0124  (NaN check)
             return math.nan
         if vx <= 0 or vy <= 0:
             return 0.0
         r = cov / math.sqrt(vx * vy)
-        return 1.0 if r > 1.0 else -1.0 if r < -1.0 else r
+        return 1.0 if r > 1.0 else max(r, -1.0)

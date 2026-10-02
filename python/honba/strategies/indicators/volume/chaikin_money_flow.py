@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from collections import deque
 
-from honba.strategies.indicators._util import check as _check
 from honba.strategies.indicators._base import Indicator, indicator
+from honba.strategies.indicators._util import check as _check
+
 from .accumulation_distribution import clv_volume
 
 

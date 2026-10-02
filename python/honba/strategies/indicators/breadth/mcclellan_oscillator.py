@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from honba.strategies.indicators.moving_average import Ema
 from honba.strategies.indicators._base import Indicator, indicator
+from honba.strategies.indicators.moving_average import Ema
 
 
 @indicator("mcclellan_oscillator", "breadth", inputs=("advances", "declines"), warmup=lambda s: 1)

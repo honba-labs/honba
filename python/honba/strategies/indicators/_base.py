@@ -10,7 +10,8 @@ it returns ``None`` until warmed up. Indicators declare, as class metadata, thei
 from __future__ import annotations
 
 import inspect
-from typing import Any, Callable, ClassVar
+from collections.abc import Callable
+from typing import Any, ClassVar
 
 FAMILIES = (
     "moving_average",

@@ -5,7 +5,6 @@ from dataclasses import dataclass
 
 from honba.strategies.indicators._base import Indicator, indicator
 from honba.strategies.indicators._util import check as _check
-
 from honba.strategies.indicators.momentum.rsi import Rsi
 from honba.strategies.indicators.moving_average import Sma
 

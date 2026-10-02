@@ -13,7 +13,8 @@ bar with ``bank.update(bar)``. Changing an indicator or its parameters is a conf
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from honba.strategies.indicators import _base
 

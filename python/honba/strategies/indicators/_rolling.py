@@ -218,8 +218,7 @@ class RollingMoments:
                 self._shift, self._mean, self._m2, self._peak = x, 0.0, 0.0, 0.0
                 sh, nm, m2 = x, 0.0, 0.0
             var = m2 / self._d
-            if var < 0.0:
-                var = 0.0
+            var = max(var, 0.0)
             return (sh + nm, var, math.sqrt(var))
         return self._slow(x)
 
@@ -416,8 +415,7 @@ class RollingPairMoments:
                 ):
                     cr = self._cr + t - self._cr_t  # token bucket, topped up lazily
                     cap = self._cap
-                    if cr > cap:
-                        cr = cap
+                    cr = min(cr, cap)
                     if cr >= self._gap:
                         cr -= self._gap
                         rebuild = True
@@ -437,7 +435,7 @@ class RollingPairMoments:
             d = self._d
             vx = m2x / d
             vy = m2y / d
-            return (sx + nmx, sy + nmy, vx if vx > 0.0 else 0.0, vy if vy > 0.0 else 0.0, c / d)
+            return (sx + nmx, sy + nmy, max(0.0, vx), max(0.0, vy), c / d)
         return self._slow(x, y)
 
     def _slow(self, x: float, y: float) -> tuple[float, float, float, float, float] | None:
@@ -573,7 +571,7 @@ class RollingLinReg:
         if r is None:
             return None
         a, d = r[0], r[1]
-        if a != a:
+        if a != a:  # noqa: PLR0124  (NaN check)
             return _NAN_FIT
         return _new(LinFit, (a, d, a + d / 2.0, d * d / 4.0, 0.0))
 
@@ -639,8 +637,7 @@ class RollingLinReg:
             ):
                 cr = self._cr + t - self._cr_t  # token bucket, topped up lazily
                 cap = self._cap
-                if cr > cap:
-                    cr = cap
+                cr = min(cr, cap)
                 if cr >= self._gap:
                     cr -= self._gap
                     rebuild = True
@@ -658,7 +655,7 @@ class RollingLinReg:
             return (
                 sh + nm - slope * self._half,
                 slope,
-                sse if sse > 0.0 else 0.0,
+                max(0.0, sse),
             )
         return self._slow(y)
 

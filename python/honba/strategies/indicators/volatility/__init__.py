@@ -19,9 +19,9 @@ from honba.strategies.indicators.volatility.volatility_stop import (
 __all__ = [
     "Atr",
     "Bollinger",
-    "BollingerValue",
     "BollingerBandwidth",
     "BollingerPercentB",
+    "BollingerValue",
     "ChaikinVolatility",
     "ChoppinessIndex",
     "Donchian",
