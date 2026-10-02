@@ -194,3 +194,15 @@ def test_legacy_override_warning_is_visible_by_default_for_main_and_filterable_b
         check=True,
     )
     assert "DeprecationWarning" not in hidden.stderr
+
+
+def test_assigning_self_ctx_in_a_legacy_subclass_raises_attribute_error():
+    # ``ctx`` is a read-only property (ADR 008): a legacy attribute named ctx must be renamed.
+    class UsesCtxName(Strategy):
+        name = "uses_ctx_name"
+
+        def __init__(self) -> None:
+            self.ctx = "my own thing"
+
+    with pytest.raises(AttributeError):
+        UsesCtxName()

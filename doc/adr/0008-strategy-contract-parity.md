@@ -90,6 +90,12 @@ this ADR:
      directly. A subclass that *overrides* one of them is still honoured by the runner in this window, but its class
      creation emits a `DeprecationWarning`, because that override will stop being called in 0.3. This is the only
      warning: nothing else changes behaviour.
+   - Breaking, no warning possible: `ctx` is a read-only property, so a legacy subclass that assigns
+     `self.ctx = ...` now raises `AttributeError`. Migration: use a different attribute name (the strategy's own
+     `ctx` was never part of the contract); read the new `self.ctx` for the context.
+   - `honba.strategies.testing.replay` sets `ctx.now()` to the bar's `ts` before each bar, because domain `Bar`s
+     carry no `ts_init`; `StrategyRunner` sets it to the message's `ts_init`. A strategy reading `ctx.now()` under
+     `replay` therefore sees event time, not init time.
    - Behaviour note without a warning: a method named `on_quote` or `on_trade` on an existing subclass is now a hook
      and is called by the runner with a `QuoteTick` / `TradeTick`. No catalog strategy defines either.
 8. **Placeholders.** `context.rs` is wired in as the context module. `config.rs` is deleted: strategy configuration
@@ -114,6 +120,14 @@ this ADR:
 ## Known gaps
 - `BarFillEngine` fills at the last bar close of *any* instrument and at 0.0 before the first bar (ADR 006). The
   fixture avoids both; the Python mirror and `run_strategy` raise instead of filling at 0.0.
-- `IntentRejection` is not exposed to Python; Python intents cannot be invalid.
+- `IntentRejection` is a Python `StrategyRunner` result (`rejections`) and a `run_strategy` output, but a Python
+  `OrderIntent` validates on construction, so it can be invalid only if built around that validation
+  (`object.__setattr__`, unpickling, a duck-typed intent); `LedgerContext` keeps such intents out of its pending
+  state, as in Rust.
+- The Rust stub `python/honba/_lib/__init__.pyi` is not mapped to the module `honba._honba`, so type checkers
+  and the CI stubtest do not cover it (including `run_strategy`). Moving it would surface about 79 existing
+  stubtest errors in older pyclasses; fixing them is a separate ticket. The stub was deliberately not moved here.
+- Conformance covers bar-close fills with no costs only: `bar_close` has no cost parameter, so cost signs are
+  covered by runner-level unit tests in both languages, not by the shared fixture.
 - Venue-side rejections and cancellations (an order state machine) are E2-S6; until then `release` is only driven by
   invariant rejections in Rust and by `handle_rejected` in Python.
