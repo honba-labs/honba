@@ -7,7 +7,7 @@
 pub mod bar_fill;
 pub mod paper;
 
-pub use bar_fill::BarFillEngine;
+pub use bar_fill::{BarFillEngine, FillCosts, FillCostsError};
 pub use paper::{OrderLedger, PaperExecution};
 
 #[cfg(test)]

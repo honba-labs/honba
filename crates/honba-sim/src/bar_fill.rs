@@ -6,6 +6,66 @@ use honba_engine::{ExecutionEngine, Handler, Result};
 use honba_entities::Trade;
 use honba_messages::{Event, Order, OrderId, UnixNanos};
 
+/// Largest accepted flat cost per fill.
+pub const MAX_FLAT_COST: f64 = 1e9;
+
+/// Largest accepted proportional cost, in basis points of the fill notional
+/// (10 000 bps = 100%).
+pub const MAX_COST_BPS: f64 = 10_000.0;
+
+/// Why a [`FillCosts`] could not be built.
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+pub enum FillCostsError {
+    /// The flat cost is not a finite number in `[0, MAX_FLAT_COST]`.
+    #[error("flat fill cost must be finite and within 0..={MAX_FLAT_COST}, got {0}")]
+    InvalidFlat(f64),
+    /// The proportional cost is not a finite number in `[0, MAX_COST_BPS]`.
+    #[error("fill cost bps must be finite and within 0..={MAX_COST_BPS}, got {0}")]
+    InvalidBps(f64),
+}
+
+/// Per-fill transaction costs charged by [`BarFillEngine`] (ADR 008).
+///
+/// The cost of a fill of `quantity` at `price` is the unrounded IEEE-754
+/// value `flat + (quantity * price) * bps / 10_000`, evaluated in that order.
+/// It is an amount in the settlement currency, never negative and not signed
+/// by side: `Trade::costs` carries it, a buy debits `quantity * price +
+/// costs` and a sell credits `quantity * price - costs`. The default is no
+/// costs.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct FillCosts {
+    flat: f64,
+    bps: f64,
+}
+
+impl FillCosts {
+    /// Validates and builds the costs: `flat` in `[0, MAX_FLAT_COST]` and
+    /// `bps` in `[0, MAX_COST_BPS]`, both finite.
+    pub fn new(flat: f64, bps: f64) -> std::result::Result<Self, FillCostsError> {
+        if !(flat.is_finite() && (0.0..=MAX_FLAT_COST).contains(&flat)) {
+            return Err(FillCostsError::InvalidFlat(flat));
+        }
+        if !(bps.is_finite() && (0.0..=MAX_COST_BPS).contains(&bps)) {
+            return Err(FillCostsError::InvalidBps(bps));
+        }
+        Ok(Self { flat, bps })
+    }
+
+    /// The flat cost per fill.
+    pub fn flat(&self) -> f64 {
+        self.flat
+    }
+
+    /// The proportional cost in basis points of the fill notional.
+    pub fn bps(&self) -> f64 {
+        self.bps
+    }
+
+    fn of(&self, quantity: f64, price: f64) -> f64 {
+        self.flat + (quantity * price) * self.bps / 10_000.0
+    }
+}
+
 #[derive(Default)]
 struct Inner {
     last_price: Option<f64>,
@@ -54,12 +114,21 @@ struct Inner {
 #[derive(Clone, Default)]
 pub struct BarFillEngine {
     inner: Arc<Mutex<Inner>>,
+    costs: FillCosts,
 }
 
 impl BarFillEngine {
-    /// Creates an engine with no observed price.
+    /// Creates an engine with no observed price and no fill costs.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Creates an engine that charges `costs` on every fill.
+    pub fn with_costs(costs: FillCosts) -> Self {
+        Self {
+            costs,
+            ..Self::default()
+        }
     }
 
     /// Returns the most recent observed close, if any.
@@ -83,15 +152,19 @@ impl ExecutionEngine for BarFillEngine {
         let price = inner.last_price.unwrap_or(0.0);
         let ts = UnixNanos::from_u64(inner.next_ts.max(order.ts_event().as_u64()));
         inner.next_ts = ts.as_u64() + 1;
-        inner.fills.push(Trade::new(
-            OrderId::new(order.order_id().as_str()),
-            order.instrument_id().clone(),
-            order.side(),
-            order.quantity(),
-            price,
-            ts,
-            ts,
-        ));
+        let costs = self.costs.of(order.quantity(), price);
+        inner.fills.push(
+            Trade::new(
+                OrderId::new(order.order_id().as_str()),
+                order.instrument_id().clone(),
+                order.side(),
+                order.quantity(),
+                price,
+                ts,
+                ts,
+            )
+            .with_costs(costs),
+        );
         Ok(())
     }
 

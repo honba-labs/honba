@@ -162,3 +162,84 @@ fn identical_inputs_give_identical_fills() {
     assert_eq!(a.len(), 4);
     assert_eq!(a, run());
 }
+
+// ---- fill costs (ADR 008): cost = flat + quantity * price * bps / 10_000 ----
+
+use crate::bar_fill::{MAX_COST_BPS, MAX_FLAT_COST};
+use crate::{FillCosts, FillCostsError};
+
+fn costed(flat: f64, bps: f64) -> BarFillEngine {
+    BarFillEngine::with_costs(FillCosts::new(flat, bps).unwrap())
+}
+
+#[test]
+fn default_engine_charges_no_costs() {
+    let mut exec = BarFillEngine::new();
+    observe(&mut exec, 101.0, 1);
+    exec.submit(market("O-1", OrderSide::Buy, 3.0, 1)).unwrap();
+    assert_eq!(exec.drain_fills().unwrap()[0].costs(), 0.0);
+    assert_eq!(FillCosts::default(), FillCosts::new(0.0, 0.0).unwrap());
+}
+
+#[test]
+fn flat_and_proportional_costs_add_up_per_fill() {
+    // notional 10 * 100 = 1000; 10 bps of it is 1.0; plus the flat 20.
+    let mut exec = costed(20.0, 10.0);
+    observe(&mut exec, 100.0, 1);
+    exec.submit(market("O-1", OrderSide::Buy, 10.0, 1)).unwrap();
+    exec.submit(market("O-2", OrderSide::Sell, 10.0, 1))
+        .unwrap();
+    let fills = exec.drain_fills().unwrap();
+    // Costs are an amount, never signed by side: the ledger applies the sign.
+    assert_eq!(fills[0].costs(), 21.0);
+    assert_eq!(fills[1].costs(), 21.0);
+    assert_eq!(fills[0].price(), 100.0);
+}
+
+#[test]
+fn flat_only_and_bps_only_costs() {
+    let mut flat = costed(2.5, 0.0);
+    observe(&mut flat, 100.0, 1);
+    flat.submit(market("O-1", OrderSide::Buy, 3.0, 1)).unwrap();
+    assert_eq!(flat.drain_fills().unwrap()[0].costs(), 2.5);
+
+    let mut bps = costed(0.0, 625.0);
+    observe(&mut bps, 64.0, 1);
+    bps.submit(market("O-1", OrderSide::Sell, 1.0, 1)).unwrap();
+    assert_eq!(bps.drain_fills().unwrap()[0].costs(), 4.0);
+}
+
+#[test]
+fn fill_costs_reject_invalid_values_with_typed_errors() {
+    assert_eq!(
+        FillCosts::new(-0.01, 0.0),
+        Err(FillCostsError::InvalidFlat(-0.01))
+    );
+    assert!(matches!(
+        FillCosts::new(f64::NAN, 0.0),
+        Err(FillCostsError::InvalidFlat(_))
+    ));
+    assert!(matches!(
+        FillCosts::new(f64::INFINITY, 0.0),
+        Err(FillCostsError::InvalidFlat(_))
+    ));
+    assert!(matches!(
+        FillCosts::new(MAX_FLAT_COST + 1.0, 0.0),
+        Err(FillCostsError::InvalidFlat(_))
+    ));
+    assert_eq!(
+        FillCosts::new(0.0, -1.0),
+        Err(FillCostsError::InvalidBps(-1.0))
+    );
+    assert!(matches!(
+        FillCosts::new(0.0, f64::NAN),
+        Err(FillCostsError::InvalidBps(_))
+    ));
+    assert!(matches!(
+        FillCosts::new(0.0, MAX_COST_BPS + 1.0),
+        Err(FillCostsError::InvalidBps(_))
+    ));
+    // The caps themselves are allowed.
+    assert!(FillCosts::new(MAX_FLAT_COST, MAX_COST_BPS).is_ok());
+    assert!(FillCostsError::InvalidBps(-1.0).to_string().contains("bps"));
+}
