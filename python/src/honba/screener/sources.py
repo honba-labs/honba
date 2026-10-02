@@ -13,8 +13,8 @@ from honba.entities.screener import (
     ScreenerScanRequest,
     ScreenerScanResponse,
 )
-from honba.india.calendar import NseCalendar
-from honba.india.universes import resolve_universe
+from honba.markets.india.calendar import NseCalendar
+from honba.markets.india.universes import resolve_universe
 from honba.screener.coverage import DateInterval
 from honba.screener.evaluator import evaluate_group_on_bars, extract_metrics_from_bars
 from honba.screener.ports import ScreenerSource

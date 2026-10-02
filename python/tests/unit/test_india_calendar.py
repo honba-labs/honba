@@ -1,6 +1,6 @@
 import datetime as dt
 import pytest
-from honba.india.calendar import NseCalendar, SessionWindow
+from honba.markets.india.calendar import NseCalendar, SessionWindow
 
 
 def test_nse_calendar_weekends_and_holidays():

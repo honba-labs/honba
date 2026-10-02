@@ -17,7 +17,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from honba.entities.screener import FilterOp, MetricPeriod, Timeframe
-from honba.india.units import INDIA_CURRENCY_SYMBOLS, INDIA_MULTIPLIERS
+from honba.markets.india.units import INDIA_CURRENCY_SYMBOLS, INDIA_MULTIPLIERS
 from honba.query.quantity import SHARED_MULTIPLIERS
 from honba.screener.catalog import load_catalog
 from honba.screener.presets import LOOKBACK_BARS, PRESETS

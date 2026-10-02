@@ -58,16 +58,63 @@ NIFTY_50_SYMBOLS: tuple[str, ...] = (
     "WIPRO",
 )
 
+# Canonical Nifty 200 Alpha 30 constituent symbols (NSE primary listing)
+NIFTY_200_ALPHA_30_SYMBOLS: tuple[str, ...] = (
+    "ABCAPITAL",
+    "ADANIENSOL",
+    "ADANIGREEN",
+    "ADANIPOWER",
+    "ASHOKLEY",
+    "AUBANK",
+    "BHARATFORG",
+    "BHEL",
+    "BSE",
+    "CUMMINSIND",
+    "EICHERMOT",
+    "FEDERALBNK",
+    "FORTIS",
+    "GLENMARK",
+    "GVT&D",
+    "HINDALCO",
+    "IDEA",
+    "INDIANB",
+    "LAURUSLABS",
+    "LTF",
+    "MCX",
+    "MUTHOOTFIN",
+    "NATIONALUM",
+    "NYKAA",
+    "PAYTM",
+    "POLYCAB",
+    "POWERINDIA",
+    "SAIL",
+    "SHRIRAMFIN",
+    "VEDL",
+)
+
 UNIVERSES: dict[str, tuple[str, ...]] = {
     "nifty50": NIFTY_50_SYMBOLS,
-    "nifty_50": NIFTY_50_SYMBOLS,
+    "nifty200_alpha_30": NIFTY_200_ALPHA_30_SYMBOLS,
+}
+
+# optional aliases → canonical key
+_ALIASES: dict[str, str] = {
+    "nifty_50": "nifty50",
+    "nifty200alpha30": "nifty200_alpha_30",
+    "alpha30": "nifty200_alpha_30",
+    "nifty200_alpha30": "nifty200_alpha_30",
 }
 
 
 def resolve_universe(name: str, venue: str = "NSE") -> list[InstrumentId]:
-    """Resolve a named universe like 'nifty50' to a list of InstrumentIds."""
     norm = name.lower().replace("-", "_").replace(" ", "_")
-    symbols = UNIVERSES.get(norm)
+    key = _ALIASES.get(norm, norm)
+    symbols = UNIVERSES.get(key)
     if symbols is None:
-        raise ValueError(f"unknown universe {name!r}; available: {list(UNIVERSES)}")
+        raise ValueError(f"unknown universe {name!r}; available: {sorted(UNIVERSES)}")
+    if not symbols:
+        raise ValueError(
+            f"universe {key!r} is registered but has no constituents "
+            "(wire a UniverseSource / catalog snapshot)"
+        )
     return [InstrumentId(sym, venue) for sym in symbols]
