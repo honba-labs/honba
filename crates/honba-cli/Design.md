@@ -53,17 +53,18 @@ honba <app> <sub-command> [<sub-sub-command>] [options] [filters...]
 ### 3.2 Options of `scan`
 
 Each option maps to a field of `ScreenerScanRequest` (`honba.entities.screener`; Rust mirror in `honba-entities`).
+Field names below are the **wire** names (camelCase, as the screener models serialise them); see section 14.
 
 | Option | Request field | Notes |
 |---|---|---|
 | `--market` | `market` | e.g. `india` |
-| `--type` (repeatable) | `types` | default `EQUITY` |
+| `--type` (repeatable) | `types` | default `EQUITY`; accepts the UI names `stocks`, `etf`, `mf`, `bonds`, `index`, `ipo` and normalises them to the wire enum (14.4) |
 | `--universe` | symbol filter | resolved from `honba.india.universes`, e.g. `nifty50` |
-| `--all-listings` | `primary_only=false` | default is primary listing only |
+| `--all-listings` | `primaryOnly=false` | default is primary listing only |
 | `--timescale`, `-t` | default `timeframe` | `1d`, `1D`, `daily`, `D1` all normalise to `Timeframe.D1` |
 | `--period` | default `period` | `snapshot`, `ttm`, `fy`, `fq`, `h1`, `current` |
 | `--columns` | `columns[]` | list of `MetricKeySpec`, comma separated, accepts `key@timeframe` |
-| `--column-set` | `column_set` | named column set |
+| `--column-set` | `columnSet` | named column set |
 | `--sort 'key[@tf]:asc\|desc'` | `sort` | `ScreenerSortSpec` |
 | `--limit`, `--offset` | `range` | default `(0, 50)` |
 | `--request FILE\|-` | whole request | bypasses filter text; mutually exclusive with filters |
@@ -239,16 +240,16 @@ The CLI does only: arguments → `ScreenerScanRequest` → port → render. The 
 so humans and agents share one contract. Evaluation reuses the indicator bank in `honba.strategies.indicators`
 instead of reimplementing indicators.
 
-The metric catalog is currently empty: the `MetricDefinition` model exists but no instances do. The v1 seed covers
-price, volume, market cap, PE ratio, RSI, SMA, 52-week high and low, and sector, each with aliases, unit,
-`filterable`, `sortable`, `has_timeframe` and `has_period`.
+The metric catalog is seeded from `metric_catalog.json` (about 55 metrics with TradingView-style wire keys such as
+`market_cap_basic`, `price_52_week_low` and `RSI`, plus India extras), not invented here. Natural-language aliases,
+per-metric lookback and the `uiId` mapping are layered on top of that seed; see section 14.2.
 
 ## 8. Determinism and the research loop
 
 - `--asof` is required for historical scans and defaults to the latest bar date in the catalog, never the wall clock.
 - `--print-request` makes any command a replayable artifact; `--journal` records request, response hash and `asof`
   in `data/journals` for the LLM research loop.
-- Output order is stable: ties on the sort key break by `full_symbol`.
+- Output order is stable: ties on the sort key break by `fullSymbol`.
 
 ## 9. Testing plan
 
@@ -273,6 +274,8 @@ Rust: if the evaluator is ever moved to Rust, unit tests go in `crates/<crate>/s
 
 ## 10. Rollout
 
+0. Prerequisites from section 14.6: Rust and Python screener wire parity, catalog seed placement, and the
+   `fullSymbol` format. These are owned by the screener-model work and are not done by this design.
 1. `honba/query/` quantity parser and grammar, with tests.
 2. Metric catalog (with per-metric lookback) and presets, with tests.
 3. Coverage ledger, interval algebra and gap planner (pure), then `BarStore`/`MarketDataProvider` ports with the
@@ -311,10 +314,12 @@ fully inside the covered range must make no external call.
 Behind a `BarStore` port, so the engine is an implementation detail. Recommended default:
 
 - **Bars:** the Parquet catalog already in `honba-data`, as append-only immutable segments partitioned by
-  `timeframe/symbol/year`. Reads dedupe on `(instrument_id, timeframe, ts)`.
-- **Coverage ledger:** a small transactional table (SQLite, no new dependency) in `data/catalog/coverage.db`. One row
-  per fetched range: `instrument_id`, `timeframe`, `adjustment`, `source`, `start_session`, `end_session`
-  (half-open), `status`, `row_count`, `checksum`, `fetched_at`.
+  bar spec/symbol/year. Reads dedupe on `(venue, symbol, bar spec, ts_event)`.
+- **Coverage ledger:** a small transactional table in the same embedded SQL store as the metric facts (section 14.3;
+  DuckDB by default, which also reads the Parquet bars natively). One row per fetched range: `venue`, `symbol`, the bar
+  spec (`step`, `aggregation`, `price_type`, matching `BarType`), `adjustment`, `source`, `start_ns`, `end_ns` (UnixNanos
+  of session boundaries, half-open), `status`, `row_count`, `checksum`, `fetched_at_ns`. This replaces the earlier
+  `instrument_id`/`timeframe`/SQLite sketch.
 - `status` is `final`, `provisional` or `empty`. `empty` records a range that was fetched and has no data (before the
   listing date, suspension, holiday-only), so it is never fetched again. `provisional` marks the current session
   before the close; it is replaced, not appended, on the next request.
@@ -521,3 +526,130 @@ gateway at `honba/ai/mcp`; these are the patterns we take from it.
    dashboard URLs in replies. The journal entry (section 8) is keyed by the same id.
 9. **Transport and auth.** Stdio for local use, streamable HTTP for the frontend and remote agents, with a token passed
    at startup. Nothing binds beyond localhost by default (Jesse's server listens on `0.0.0.0`; we do not copy that).
+
+## 14. Alignment with the gaps pack (`honba-labs/tmp/gaps/`)
+
+Inputs read: `Readme.md`, `mapping.md`, `rest.md`, `persistance.sql`, `metric_catalog.json`,
+`rust_screener_gap.rs`. That pack fixes the data contract this CLI sits on. Where this document disagreed with it, the
+pack wins and the sections above were edited. Nothing in `tmp/gaps/` was modified.
+
+### 14.1 Contract decisions adopted
+
+- **Wire format:** JSON wire, pydantic `_Wire` and serde (ADR 006). No protobuf. Screener models use camelCase
+  aliases on the wire (`primaryOnly`, `columnSet`, `fullSymbol`); engine goldens stay snake_case. The CLI and the
+  filter language print and accept wire names only.
+- **Identity:** `InstrumentId {symbol, venue}`, displayed `RELIANCE.NSE`. `ScreenerRow.fullSymbol` becomes
+  `RELIANCE.NSE`; `NSE:RELIANCE` is accepted on input as an alias. Filter text and `--universe` accept both.
+- **Numbers and time:** money is `f64` plus the `Currency` enum, never decimal strings; timestamps are UnixNanos, no
+  RFC3339 on new fields. The unit parser (section 6) already converts to `f64`. `--asof DATE` is converted at the edge
+  to the UnixNanos of the IST session close, and row-level `asOf`, if added, is nanos.
+- **Storage:** lean engine `Instrument`; research facts live in `honba-data`, not in the engine crates.
+  Parquet first, ClickHouse optional later. Brokers and credentials stay in `honba-adapters`; no broker tables here.
+- **Asset types:** the scan `types[]` enum is `EQUITY, FUTURE, OPTION, FX, INDEX, MUTUAL_FUND, ETF, BOND, IPO`, which
+  needs `Etf`, `Bond`, `Ipo` added to `InstrumentKind` in Rust and Python. The UI's plural names (`stocks`, `mf`,
+  `bonds`) exist at the UI boundary only; the CLI accepts them as aliases.
+
+### 14.2 Metric catalog: seed, aliases, and the gaps in it
+
+`metric_catalog.json` is the seed. Wire key = `MetricKeySpec.key`; `uiId` = the frontend `columns.tsx` id. UI ids never
+go on the wire. The natural-language layer adds, as data beside the seed:
+
+- `aliases` (phrases such as `market cap`, `52 week low`, `p/e`) and `lookbackBars` (for gap planning, section 12.3).
+- A build-time check that aliases are unique across the whole catalog. This matters because `uiId` and wire key
+  collide in places: UI `change` is the absolute change (`change_abs`), while wire `change` is the percentage. A bare
+  `change` in filter text is therefore ambiguous and reports both candidates; `change %` and `change abs` resolve.
+  Wire keys are case-sensitive (`RSI`, `SMA200`, `Perf.1M`); aliases match case-insensitively.
+
+Problems found in the seed that block parts of this design:
+
+1. **No SECURITY metrics.** `mapping.md` lists `symbol`, `name`, `exchange`, `country`, `sector` as SECURITY metrics and
+   the catalog declares the group, but `metric_catalog.json` has no entries for them. Filters like
+   `sector in IT, Banks` and `exchange in NSE, BSE` need them. Add them.
+2. **Fixed-period indicators only.** The catalog has `SMA20` and `SMA200` but no `SMA50` or `RSI` periods. The example
+   `50 day sma crosses above 200 day sma` needs `SMA50`. Either add the common periods as catalog entries (the
+   TradingView approach) or add a parametric metric family (`SMA{n}`); this document assumes the first, and the
+   examples will use `SMA20` and `SMA200` until `SMA50` exists.
+3. **Metric-to-metric operands are not on the wire.** `ScreenerFilterPredicate.value` is `Any`, so `crosses above SMA200`
+   has no defined encoding. The wire needs an agreed shape, for example `{"key": "SMA200"}` as a metric reference,
+   with a golden vector in both languages. Until then the CLI and `ask` support constants only for the comparison
+   operators, and crossovers are listed as blocked.
+4. **`uiId` is not in the Python `MetricDefinition`.** The model is `extra="forbid"`-style (`_Wire`), and the JSON and
+   `persistance.sql` both carry `ui_id`. The model gets an optional `uiId` field, or the loader strips it.
+5. **Type drift:** the Rust sketch types `default_period` and `default_timeframe` as enums and the Python model uses
+   strings. They must match before the schema export is trusted.
+6. Hand-checked, not machine-validated: no test currently loads the JSON against `MetricDefinition`. A catalog-load
+   test is the first catalog test (section 9).
+
+### 14.3 Two evaluation modes, one request
+
+The pack models screener facts as a table, `instrument_metrics (venue, symbol, metric_key, period, timeframe,
+value_num, value_text, as_of_ns)`, keyed so each metric has one latest value. That differs from my earlier
+assumption that every filter is computed from bars. Both are real, so `ScreenerSource` has two strategies behind the
+same request:
+
+| Mode | Used when | Data | Gap handling |
+|---|---|---|---|
+| Facts scan | latest values (`--asof` omitted) | `instrument_metrics` joined to `instruments` | refresh metrics whose `as_of_ns` is older than a per-source freshness policy |
+| Bar-derived | historical `--asof`, or a metric with no stored fact | Parquet bars through the evaluator | section 12 gap fill of bars |
+
+- `source` on each metric decides how it is refreshed: `MARKET` and `CALCULATED` can be recomputed from bars;
+  `FUNDAMENTAL` and `ANALYST` come from external providers and only have freshness, not bar coverage.
+- After bars are gap-filled, the `CALCULATED` and `MARKET` facts for those instruments (52-week high and low, SMAs,
+  RSI, performance) are recomputed and upserted with a new `as_of_ns`, so the two modes never disagree.
+- Historical scans cannot use the facts table, because it keeps only the latest row per key. `--asof` therefore forces
+  bar-derived mode and fails clearly for `FUNDAMENTAL` metrics, which have no history stored.
+- `52 week low` has two meanings. In facts mode `close at 52 week low` compares stored `close` and `price_52_week_low`;
+  in bar-derived mode it is computed from 252 sessions. The preset expands to the same predicate and the mode is an
+  implementation detail, with a test asserting both modes agree on a fixture.
+- Persistence follows `persistance.sql`: `instruments`, `instrument_metrics` and `metric_definitions` in `honba-data`.
+  The SQL is dialect-neutral, so it runs on DuckDB (default embedded engine, also holding the coverage ledger) and on
+  Postgres. Bars stay Parquet.
+- Timeframe handling: CLI `--timescale` is the screener `Timeframe`; stored bars are keyed by `BarSpecification` (step,
+  aggregation, price type). A pure mapping function converts between them, and the REST chart timeframes (`1D`, `1W`,
+  `1M`) map the same way. They are not interchangeable with the screener enum.
+
+### 14.4 REST surface the CLI, MCP and frontend share
+
+From `rest.md`, kept as is:
+
+- Canonical: `GET /api/v1/metrics`, `GET /api/v1/column-sets`, `POST /api/v1/screener/scan`, plus the symbol-page
+  routes `GET /api/v1/instruments/{venue}/{symbol}[/metrics?group=&period=|/financials|/delivery|/shareholding|/peers|
+  /technicals?timeframe=]` and asset-type extras (`holdings`, `constituents`, `yields`, `ipo`).
+- Compatibility during migration: `GET /api/instruments?country=IN&assetType=stocks&limit=4000`,
+  `GET /api/instruments/{symbol}`, `GET /api/instruments/{symbol}/candles?timeframe=1D`. The wide camelCase
+  `Instrument` is a projection of `instrument_metrics` through the `uiId` map; no second wide model is invented.
+- HTTP lives in the Python control plane or a `honba-cli` gateway; scan execution lives in `honba-data` or the control
+  plane, never `honba-engine`; live quotes come through `honba-market` and adapters.
+
+Additions this design needs, in the same `/api/v1` namespace:
+
+- `POST /api/v1/screener/explain`: parse and validate filter text or a request, return the resolved request, the fetch
+  plan and warnings. This is the endpoint the frontend uses for validation in 13.7.
+- `GET /api/v1/metrics` is also the frontend's source for the knowledge pack's metric slice, so the browser LLM and the
+  backend see the same aliases and units.
+
+The CLI can later grow an `instrument` app (`honba instrument show RELIANCE.NSE --group VALUATION`) over the symbol-page
+routes. It is not part of the first cut.
+
+### 14.5 Things not to do (carried over from the pack)
+
+- Do not add protobuf beside ADR 006, expand the engine `Instrument` with `pe`, `roe` or `aum`, put broker credentials
+  in this schema, or use RFC3339 on new research endpoints.
+- Do not let the LLM or the filter language emit UI column ids. The knowledge pack lists wire keys, with `uiId` only as
+  an alias source subject to the uniqueness check in 14.2.
+
+### 14.6 Prerequisites and ownership
+
+These are in the screener-model work, not in this design, and several touch files that are currently uncommitted in this
+repo, so they are listed rather than done:
+
+1. **Rust parity:** `MetricDefinition` and `ScreenerScanRequest` in `honba-entities` (the pack's sketch), exported from
+   `lib.rs`, and both included in the `wire.py` schema export list (drift risk). Then `make schema`. Note the sketch
+   names `SortSpec` while Python names `ScreenerSortSpec`; the names must match.
+2. **`fullSymbol` format** changes to `RELIANCE.NSE`, with golden vectors updated in both languages.
+3. **Catalog placement:** one `metric_catalog.json` as source of truth where both Python and `honba-data` can read it
+   (for example under `schema/`, beside the goldens), loaded and validated in both languages by the same test.
+4. **`InstrumentKind`:** add `Etf`, `Bond`, `Ipo`.
+5. **Crossover operand encoding** (14.2, item 3) and the SECURITY and `SMA50` catalog entries (14.2, items 1 and 2).
+6. Frontend follow-ups, flagged only: `columns.tsx` reading `uiId` from the catalog, the wide `Instrument` projection,
+   and the new generated types. No other repo is touched by this design.
