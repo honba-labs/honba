@@ -1,4 +1,5 @@
 """Strategy configuration (the ``config.toml`` next to each catalog strategy)."""
+
 from __future__ import annotations
 
 import sys

@@ -1,4 +1,5 @@
 """Position sizing helpers. NSE cash equity trades in whole shares."""
+
 from __future__ import annotations
 
 import math
