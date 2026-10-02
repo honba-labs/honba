@@ -2,6 +2,7 @@
 
 import typer
 
+from honba.cli.ai import app as ai_app
 from honba.cli.data import app as data_app
 from honba.cli.indicators import app as indicators_app
 from honba.cli.schema import app as schema_app
@@ -9,6 +10,7 @@ from honba.cli.screener import app as screener_app
 
 app = typer.Typer(help="Honba - AI-native trading for Indian markets")
 
+app.add_typer(ai_app, name="ai")
 app.add_typer(data_app, name="data")
 app.add_typer(indicators_app, name="indicators")
 app.add_typer(schema_app, name="schema")

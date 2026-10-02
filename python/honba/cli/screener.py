@@ -317,3 +317,63 @@ def scan_cmd(
         table.add_row(*row_vals)
 
     console.print(table)
+
+
+@app.command("ask")
+def ask_cmd(
+    query_text: Annotated[list[str], typer.Argument(help="Free-text query to translate and run")],
+    market: Annotated[str, typer.Option("--market", help="Market identifier")] = "india",
+    timescale: Annotated[str | None, typer.Option("--timescale", "-t", help="Default timeframe")] = None,
+    sort: Annotated[str | None, typer.Option("--sort", help="Sort spec, e.g. close:desc")] = None,
+    limit: Annotated[int, typer.Option("--limit", help="Max results")] = 50,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Execute scan without interactive confirmation")] = False,
+    format: Annotated[str, typer.Option("--format", help="Output format: table, json")] = "table",
+) -> None:
+    """Translate natural language into validated filters and run the scan (Design.md Section 13)."""
+    from honba.ai.ask import QueryTranslationError, translate_query
+    from honba.ai.llm.provider import ScriptedFakeLlm
+
+    full_query = " ".join(query_text).strip()
+    if not full_query:
+        err_console.print("[red]Query cannot be empty[/red]")
+        raise typer.Exit(code=1)
+
+    # Scaffolding: default to ScriptedFakeLlm echoing the query if it contains valid syntax,
+    # or returning an error if unconfigured.
+    llm = ScriptedFakeLlm(default_response=full_query)
+    catalog = load_catalog()
+
+    try:
+        result = translate_query(full_query, llm=llm, catalog=catalog)
+    except QueryTranslationError as err:
+        err_console.print(f"[red]Query translation failed:[/red] {err}")
+        raise typer.Exit(code=1)
+
+    console.print(f"[bold cyan]Translated Filter:[/bold cyan] {result.filter_text}")
+    console.print(f"[dim]Equivalent command:[/dim] honba screener scan --market {market} {result.filter_text}")
+
+    if not yes:
+        confirm = typer.confirm("Run scan with this filter?", default=True)
+        if not confirm:
+            console.print("[yellow]Scan aborted.[/yellow]")
+            return
+
+    # Execute scan with translated filter words
+    filter_words = result.filter_text.split()
+    scan_cmd(
+        market=market,
+        types=["EQUITY"],
+        all_listings=False,
+        timescale=timescale,
+        period=None,
+        columns=None,
+        column_set=None,
+        sort=sort,
+        limit=limit,
+        offset=0,
+        print_request=False,
+        format=format,
+        fetch="auto",
+        filters=filter_words,
+    )
+
