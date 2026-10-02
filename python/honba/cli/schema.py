@@ -8,7 +8,7 @@ import typer
 
 from honba.cli._schema_export import export_json_schema, generate_typescript
 
-app = typer.Typer(help="Export canonical schemas and generate client contracts")
+app = typer.Typer(help="Export canonical schemas and generate client contracts", no_args_is_help=True)
 
 
 @app.command("export")
@@ -22,6 +22,7 @@ def export_command(
     generate_ts: bool = typer.Option(
         True,
         "--ts/--no-ts",
+        "-t/-T",
         help="Also compile generated TypeScript definitions for honba-frontend",
     ),
     ts_out_dir: str = typer.Option(

@@ -19,7 +19,7 @@ def _fail(msg: str) -> None:
 @app.command("list")
 def list_cmd(
     family: str = typer.Option(None, "--family", "-f", help=f"One of: {', '.join(FAMILIES)}"),
-    as_json: bool = typer.Option(False, "--json", help="Machine-readable output."),
+    as_json: bool = typer.Option(False, "--json", "-j", help="Machine-readable output."),
 ) -> None:
     """List indicators, grouped by family."""
     try:
@@ -42,7 +42,7 @@ def list_cmd(
 @app.command()
 def show(
     kind: str = typer.Argument(..., help="Indicator kind, e.g. rsi"),
-    as_json: bool = typer.Option(False, "--json", help="Machine-readable output."),
+    as_json: bool = typer.Option(False, "--json", "-j", help="Machine-readable output."),
 ) -> None:
     """Show an indicator's family, inputs, outputs and parameters (with defaults)."""
     try:

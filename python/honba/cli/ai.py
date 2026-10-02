@@ -11,8 +11,8 @@ from rich.console import Console
 
 from honba.ai.knowledge import build_knowledge_pack
 
-app = typer.Typer(help="AI and knowledge pack commands")
-knowledge_app = typer.Typer(help="Manage knowledge pack artifacts")
+app = typer.Typer(help="AI and knowledge pack commands", no_args_is_help=True)
+knowledge_app = typer.Typer(help="Manage knowledge pack artifacts", no_args_is_help=True)
 app.add_typer(knowledge_app, name="knowledge")
 
 console = Console()
@@ -21,7 +21,7 @@ err_console = Console(stderr=True)
 
 @knowledge_app.command("export")
 def export_knowledge(
-    out: Annotated[Path | None, typer.Option("--out", help="Target JSON file path")] = None,
+    out: Annotated[Path | None, typer.Option("--out", "-o", help="Target JSON file path")] = None,
 ) -> None:
     """Export the current generated knowledge pack as JSON."""
     pack = build_knowledge_pack()

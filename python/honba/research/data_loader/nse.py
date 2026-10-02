@@ -65,7 +65,10 @@ def parse_bhavcopy_csv(csv_content: str, venue: str = "NSE") -> dict[str, Bar]:
     date_col = field_map.get("TRADDT") or field_map.get("DATE1") or field_map.get("TIMESTAMP")
 
     if not all([sym_col, open_col, high_col, low_col, close_col, qty_col]):
-        logger.warning("Unrecognized bhavcopy header format: %s", reader.fieldnames)
+        # Suppress logging if the content was an XML or binary payload
+        first_hdr = str(reader.fieldnames[0]) if reader.fieldnames else ""
+        if not first_hdr.startswith(("PK", "<", "<?", "{")):
+            logger.debug("Unrecognized bhavcopy header format: %s", reader.fieldnames)
         return {}
 
     bars: dict[str, Bar] = {}
@@ -146,15 +149,29 @@ class NseBhavcopyProvider:
         return "nse_bhavcopy"
 
     def _get_urls_for_date(self, d: dt.date) -> list[str]:
-        """Generate candidate download URLs for a given trading session."""
+        """Generate candidate download URLs for a given trading session.
+
+        Supports:
+        1. Modern UDiFF CM Bhavcopy zip (2024+)
+        2. Classic historical CM Bhavcopy zip from archives.nseindia.com (< 2024)
+        3. Sec Bhavdata full CSV from archives / nsearchives
+        """
         ymd = d.strftime("%Y%m%d")
         dmy = d.strftime("%d%m%Y")
+        year = d.strftime("%Y")
+        mon = d.strftime("%b").upper()
+        cm_dmy = d.strftime("%d%b%Y").upper()
 
-        # 1. Modern UDiFF CM Bhavcopy zip
-        url_udiff = f"https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_{ymd}_F_0000.csv.zip"
-        # 2. Full Bhavcopy csv
-        url_full = f"https://nsearchives.nseindia.com/products/content/sec_bhavdata_full_{dmy}.csv"
-        return [url_udiff, url_full]
+        return [
+            # 1. Modern UDiFF CM Bhavcopy zip
+            f"https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_{ymd}_F_0000.csv.zip",
+            # 2. Historical CM Bhavcopy zip (compressed, fast, works across historical archives)
+            f"https://archives.nseindia.com/content/historical/EQUITIES/{year}/{mon}/cm{cm_dmy}bhav.csv.zip",
+            f"https://nsearchives.nseindia.com/content/historical/EQUITIES/{year}/{mon}/cm{cm_dmy}bhav.csv.zip",
+            # 3. Direct Sec Bhavdata full CSV
+            f"https://nsearchives.nseindia.com/products/content/sec_bhavdata_full_{dmy}.csv",
+            f"https://archives.nseindia.com/products/content/sec_bhavdata_full_{dmy}.csv",
+        ]
 
     def download_session_bhavcopy(self, session_date: dt.date) -> dict[str, Bar]:
         """Download and parse Bhavcopy for one session date (with local file caching)."""
@@ -172,26 +189,41 @@ class NseBhavcopyProvider:
 
                     content = resp.content
                     csv_text = ""
-                    if url.endswith(".zip"):
-                        with zipfile.ZipFile(io.BytesIO(content)) as z:
-                            for name in z.namelist():
-                                if name.endswith(".csv"):
-                                    csv_text = z.read(name).decode("utf-8", errors="ignore")
-                                    break
+
+                    # Check for zip magic bytes 'PK\x03\x04' regardless of URL extension
+                    is_zip = url.endswith(".zip") or content.startswith(b"PK\x03\x04")
+
+                    if is_zip:
+                        try:
+                            with zipfile.ZipFile(io.BytesIO(content)) as z:
+                                for name in z.namelist():
+                                    if name.lower().endswith(".csv"):
+                                        csv_text = z.read(name).decode("utf-8", errors="ignore")
+                                        break
+                        except zipfile.BadZipFile:
+                            continue
                     else:
-                        csv_text = content.decode("utf-8", errors="ignore")
+                        # Ensure it's not a binary or HTML/XML error page before parsing
+                        if not content.startswith((b"<!DOCTYPE", b"<html", b"<?xml")):
+                            csv_text = content.decode("utf-8", errors="ignore")
 
                     if csv_text:
-                        if cache_file:
-                            cache_file.write_text(csv_text, encoding="utf-8")
-                        return parse_bhavcopy_csv(csv_text)
+                        parsed = parse_bhavcopy_csv(csv_text)
+                        if parsed:
+                            if cache_file:
+                                cache_file.write_text(csv_text, encoding="utf-8")
+                            return parsed
             except Exception as exc:
                 logger.debug("Failed to fetch %s: %s", url, exc)
 
         return {}
 
     def fetch(
-        self, instrument: InstrumentId, timeframe: str, interval: DateInterval
+        self,
+        instrument: InstrumentId,
+        timeframe: str,
+        interval: DateInterval,
+        progress_callback: Any = None,
     ) -> list[Bar]:
         """Fetch daily bars for instrument in [interval.start, interval.end)."""
         if timeframe.upper() not in ("1D", "D", "DAILY"):
@@ -202,16 +234,26 @@ class NseBhavcopyProvider:
         cur = interval.start
         bars: list[Bar] = []
 
-        while cur < interval.end:
-            if self.calendar.is_trading_day(cur):
-                session_bars = self.download_session_bhavcopy(cur)
-                if instrument.symbol in session_bars:
-                    b = session_bars[instrument.symbol]
-                    try:
-                        validate_bar(b)
-                        bars.append(b)
-                    except ValueError:
-                        pass
-            cur += dt.timedelta(days=1)
+        # Collect trading days first to support accurate progress reporting
+        trading_days: list[dt.date] = []
+        scan_date = interval.start
+        while scan_date < interval.end:
+            if self.calendar.is_trading_day(scan_date):
+                trading_days.append(scan_date)
+            scan_date += dt.timedelta(days=1)
+
+        total_sessions = len(trading_days)
+        for idx, session_date in enumerate(trading_days, start=1):
+            if progress_callback:
+                progress_callback(session_date, idx, total_sessions)
+
+            session_bars = self.download_session_bhavcopy(session_date)
+            if instrument.symbol in session_bars:
+                b = session_bars[instrument.symbol]
+                try:
+                    validate_bar(b)
+                    bars.append(b)
+                except ValueError:
+                    pass
 
         return sorted(bars, key=lambda x: x.ts)

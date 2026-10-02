@@ -8,7 +8,7 @@ from honba.cli.indicators import app as indicators_app
 from honba.cli.schema import app as schema_app
 from honba.cli.screener import app as screener_app
 
-app = typer.Typer(help="Honba - AI-native trading for Indian markets")
+app = typer.Typer(help="Honba - AI-native trading for Indian markets", no_args_is_help=True)
 
 app.add_typer(ai_app, name="ai")
 app.add_typer(data_app, name="data")

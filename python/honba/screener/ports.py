@@ -73,7 +73,11 @@ class MarketDataProvider(Protocol):
         ...
 
     def fetch(
-        self, instrument: InstrumentId, timeframe: str, interval: DateInterval
+        self,
+        instrument: InstrumentId,
+        timeframe: str,
+        interval: DateInterval,
+        progress_callback: Any = None,
     ) -> list[Bar]:
         """Fetch bars for the instrument and timeframe in [interval.start, interval.end)."""
         ...
@@ -136,7 +140,11 @@ class InMemoryMarketDataProvider:
             self._bars[key] = bar
 
     def fetch(
-        self, instrument: InstrumentId, timeframe: str, interval: DateInterval
+        self,
+        instrument: InstrumentId,
+        timeframe: str,
+        interval: DateInterval,
+        progress_callback: Any = None,
     ) -> list[Bar]:
         start_ns = int(dt.datetime.combine(interval.start, dt.time.min).timestamp() * 1e9)
         end_ns = int(dt.datetime.combine(interval.end, dt.time.min).timestamp() * 1e9)

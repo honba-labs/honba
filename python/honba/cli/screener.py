@@ -18,9 +18,9 @@ from honba.query.parser import FilterParseError, parse_filters
 from honba.screener.catalog import MetricCatalog, MetricResolutionError, load_catalog
 from honba.screener.presets import list_presets, resolve_preset_key
 
-app = typer.Typer(help="Screener commands: scan, explain, metrics, presets")
-metrics_app = typer.Typer(help="Browse the metric catalog")
-presets_app = typer.Typer(help="Browse named criteria presets")
+app = typer.Typer(help="Screener commands: scan, explain, metrics, presets", no_args_is_help=True)
+metrics_app = typer.Typer(help="Browse the metric catalog", no_args_is_help=True)
+presets_app = typer.Typer(help="Browse named criteria presets", no_args_is_help=True)
 
 app.add_typer(metrics_app, name="metrics")
 app.add_typer(presets_app, name="presets")
@@ -185,22 +185,22 @@ from typing import Annotated
 
 @app.command("explain")
 def explain_cmd(
-    market: Annotated[str, typer.Option("--market", help="Market identifier")] = "india",
-    types: Annotated[list[str] | None, typer.Option("--type", help="Asset type(s)")] = None,
+    market: Annotated[str, typer.Option("--market", "-m", help="Market identifier")] = "india",
+    types: Annotated[list[str] | None, typer.Option("--type", "-T", help="Asset type(s)")] = None,
     all_listings: Annotated[
-        bool, typer.Option("--all-listings", help="Include non-primary listings")
+        bool, typer.Option("--all-listings", "-a", help="Include non-primary listings")
     ] = False,
     timescale: Annotated[
         str | None, typer.Option("--timescale", "-t", help="Default timeframe")
     ] = None,
-    period: Annotated[str | None, typer.Option("--period", help="Default period")] = None,
+    period: Annotated[str | None, typer.Option("--period", "-p", help="Default period")] = None,
     columns: Annotated[
-        str | None, typer.Option("--columns", help="Comma-separated metric keys")
+        str | None, typer.Option("--columns", "-c", help="Comma-separated metric keys")
     ] = None,
-    column_set: Annotated[str | None, typer.Option("--column-set", help="Named column set")] = None,
-    sort: Annotated[str | None, typer.Option("--sort", help="Sort spec, e.g. close:desc")] = None,
-    limit: Annotated[int, typer.Option("--limit", help="Max results")] = 50,
-    offset: Annotated[int, typer.Option("--offset", help="Offset")] = 0,
+    column_set: Annotated[str | None, typer.Option("--column-set", "-C", help="Named column set")] = None,
+    sort: Annotated[str | None, typer.Option("--sort", "-s", help="Sort spec, e.g. close:desc")] = None,
+    limit: Annotated[int, typer.Option("--limit", "-l", help="Max results")] = 50,
+    offset: Annotated[int, typer.Option("--offset", "-o", help="Offset")] = 0,
     filters: Annotated[
         list[str] | None, typer.Argument(help="Trailing filter words")
     ] = None,
@@ -227,30 +227,30 @@ def explain_cmd(
 
 @app.command("scan")
 def scan_cmd(
-    market: Annotated[str, typer.Option("--market", help="Market identifier")] = "india",
-    types: Annotated[list[str] | None, typer.Option("--type", help="Asset type(s)")] = None,
+    market: Annotated[str, typer.Option("--market", "-m", help="Market identifier")] = "india",
+    types: Annotated[list[str] | None, typer.Option("--type", "-T", help="Asset type(s)")] = None,
     all_listings: Annotated[
-        bool, typer.Option("--all-listings", help="Include non-primary listings")
+        bool, typer.Option("--all-listings", "-a", help="Include non-primary listings")
     ] = False,
     timescale: Annotated[
         str | None, typer.Option("--timescale", "-t", help="Default timeframe")
     ] = None,
-    period: Annotated[str | None, typer.Option("--period", help="Default period")] = None,
+    period: Annotated[str | None, typer.Option("--period", "-p", help="Default period")] = None,
     columns: Annotated[
-        str | None, typer.Option("--columns", help="Comma-separated metric keys")
+        str | None, typer.Option("--columns", "-c", help="Comma-separated metric keys")
     ] = None,
-    column_set: Annotated[str | None, typer.Option("--column-set", help="Named column set")] = None,
-    sort: Annotated[str | None, typer.Option("--sort", help="Sort spec, e.g. close:desc")] = None,
-    limit: Annotated[int, typer.Option("--limit", help="Max results")] = 50,
-    offset: Annotated[int, typer.Option("--offset", help="Offset")] = 0,
+    column_set: Annotated[str | None, typer.Option("--column-set", "-C", help="Named column set")] = None,
+    sort: Annotated[str | None, typer.Option("--sort", "-s", help="Sort spec, e.g. close:desc")] = None,
+    limit: Annotated[int, typer.Option("--limit", "-l", help="Max results")] = 50,
+    offset: Annotated[int, typer.Option("--offset", "-o", help="Offset")] = 0,
     print_request: Annotated[
-        bool, typer.Option("--print-request", help="Emit resolved request JSON and exit")
+        bool, typer.Option("--print-request", "-P", help="Emit resolved request JSON and exit")
     ] = False,
     format: Annotated[
-        str, typer.Option("--format", help="Output format: table, json")
+        str, typer.Option("--format", "-f", help="Output format: table, json")
     ] = "table",
     fetch: Annotated[
-        str, typer.Option("--fetch", help="Missing-data policy: auto, never, force")
+        str, typer.Option("--fetch", "-F", help="Missing-data policy: auto, never, force")
     ] = "auto",
     filters: Annotated[
         list[str] | None, typer.Argument(help="Trailing filter words")
@@ -322,12 +322,12 @@ def scan_cmd(
 @app.command("ask")
 def ask_cmd(
     query_text: Annotated[list[str], typer.Argument(help="Free-text query to translate and run")],
-    market: Annotated[str, typer.Option("--market", help="Market identifier")] = "india",
+    market: Annotated[str, typer.Option("--market", "-m", help="Market identifier")] = "india",
     timescale: Annotated[str | None, typer.Option("--timescale", "-t", help="Default timeframe")] = None,
-    sort: Annotated[str | None, typer.Option("--sort", help="Sort spec, e.g. close:desc")] = None,
-    limit: Annotated[int, typer.Option("--limit", help="Max results")] = 50,
+    sort: Annotated[str | None, typer.Option("--sort", "-s", help="Sort spec, e.g. close:desc")] = None,
+    limit: Annotated[int, typer.Option("--limit", "-l", help="Max results")] = 50,
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Execute scan without interactive confirmation")] = False,
-    format: Annotated[str, typer.Option("--format", help="Output format: table, json")] = "table",
+    format: Annotated[str, typer.Option("--format", "-f", help="Output format: table, json")] = "table",
 ) -> None:
     """Translate natural language into validated filters and run the scan (Design.md Section 13)."""
     from honba.ai.ask import QueryTranslationError, translate_query

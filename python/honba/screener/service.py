@@ -98,7 +98,7 @@ class DataService:
             gaps_by_instrument=gaps_map,
         )
 
-    def ensure(self, plan: GapFetchPlan) -> DataEnsureResult:
+    def ensure(self, plan: GapFetchPlan, progress_callback: Any = None) -> DataEnsureResult:
         """Fetch all missing gaps in the plan, validate bars, persist to store, and return read view."""
         if self.policy == MissingDataPolicy.NEVER and plan.total_gaps > 0:
             msg = f"Missing data for {plan.total_gaps} gaps with --fetch never"
@@ -117,7 +117,7 @@ class DataService:
 
                 for provider in self.providers:
                     try:
-                        bars = provider.fetch(inst, plan.timeframe, gap)
+                        bars = provider.fetch(inst, plan.timeframe, gap, progress_callback=progress_callback)
                         source_used = provider.name
                         # Validate
                         for b in bars:
