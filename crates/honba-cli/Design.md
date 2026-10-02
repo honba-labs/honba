@@ -274,18 +274,15 @@ Rust: if the evaluator is ever moved to Rust, unit tests go in `crates/<crate>/s
 
 ## 10. Rollout
 
-0. Prerequisites from section 14.6: Rust and Python screener wire parity, catalog seed placement, and the
-   `fullSymbol` format. These are owned by the screener-model work and are not done by this design.
-1. `honba/query/` quantity parser and grammar, with tests.
-2. Metric catalog (with per-metric lookback) and presets, with tests.
-3. Coverage ledger, interval algebra and gap planner (pure), then `BarStore`/`MarketDataProvider` ports with the
-   in-memory and local implementations and the contract tests (section 12).
-4. Evaluator and the `ScreenerSource`, wired through `DataService.ensure`.
-5. `honba screener` commands (`scan`, `explain`, `metrics`, `presets`) and `honba data coverage|gaps|fetch`.
-6. Knowledge pack generation and drift check, `LlmPort`, the `ask` pipeline with a scripted fake LLM (section 13).
-7. Local-model and remote `LlmPort` implementations, eval harness, `save`/`run`, journal integration, MCP tools.
-8. Follow-ups in sibling repos, flagged but not done here: `honba-docs` (CLI reference and filter language),
-   `honba-frontend` (shares the request model and the same `scan` endpoint).
+- [x] **0. Prerequisites from section 14.6**: Rust and Python screener wire parity, catalog seed placement, and the `fullSymbol` format. (Completed in commits `8848b1b`, `2c35c27`, `039f9c1`, `74f7c5a`).
+- [x] **1. `honba/query/` quantity parser and grammar, with tests**: (Completed in commit `0dd9ce4` - `honba.query.quantity`, `honba.query.parser`, and unit tests).
+- [x] **2. Metric catalog (with per-metric lookback) and presets, with tests**: (Completed in commits `039f9c1` and `0dd9ce4` - `honba.screener.catalog`, `honba.screener.presets`, unit tests).
+- [x] **3. Coverage ledger, interval algebra and gap planner (pure), then `BarStore`/`MarketDataProvider` ports with the in-memory and local implementations and the contract tests (section 12)**: (Completed - `honba.screener.coverage`, `honba.screener.ports`, `honba.india.calendar`, contract tests).
+- [x] **4. Evaluator and the `ScreenerSource`, wired through `DataService.ensure`**: (Completed - `honba.screener.evaluator`, `honba.screener.sources`, `DataService`).
+- [x] **5. `honba screener` commands (`scan`, `explain`, `metrics`, `presets`) and `honba data coverage|gaps|fetch`**: (Completed - CLI scanning with formatting, explain, catalog browsing, data coverage, gaps, and fetch).
+- [ ] **6. Knowledge pack generation and drift check, `LlmPort`, the `ask` pipeline with a scripted fake LLM (section 13)**.
+- [ ] **7. Local-model and remote `LlmPort` implementations, eval harness, `save`/`run`, journal integration, MCP tools**.
+- [ ] **8. Follow-ups in sibling repos, flagged but not done here**: `honba-docs` (CLI reference and filter language), `honba-frontend` (shares the request model and the same `scan` endpoint).
 
 ## 11. Open points
 

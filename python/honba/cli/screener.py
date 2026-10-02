@@ -245,6 +245,9 @@ def scan_cmd(
     print_request: Annotated[
         bool, typer.Option("--print-request", help="Emit resolved request JSON and exit")
     ] = False,
+    format: Annotated[
+        str, typer.Option("--format", help="Output format: table, json")
+    ] = "table",
     filters: Annotated[
         list[str] | None, typer.Argument(help="Trailing filter words")
     ] = None,
@@ -269,5 +272,34 @@ def scan_cmd(
         typer.echo(req.model_dump_json(by_alias=True, indent=2))
         return
 
-    # Execution against ScreenerSource will follow in Step 4
-    console.print(f"[yellow]Scan execution for {market} will execute via ScreenerSource[/yellow]")
+    from honba.screener.ports import InMemoryBarStore, InMemoryMarketDataProvider
+    from honba.screener.service import DataService
+    from honba.screener.sources import LocalScreenerSource
+
+    # Initialize service and source
+    store = InMemoryBarStore()
+    provider = InMemoryMarketDataProvider()
+    service = DataService(store=store, providers=[provider])
+    source = LocalScreenerSource(data_service=service)
+
+    response = source.scan(req)
+
+    if format == "json":
+        typer.echo(response.model_dump_json(by_alias=True, indent=2))
+        return
+
+    # Render table
+    table = Table(title=f"Screener Results ({response.total} matched)")
+    table.add_column("Symbol", style="cyan", no_wrap=True)
+    table.add_column("Name", style="white")
+    for col in response.columns:
+        table.add_column(col, justify="right", style="green")
+
+    for row in response.rows:
+        row_vals = [row.full_symbol, row.name]
+        for col in response.columns:
+            val = row.values.get(col)
+            row_vals.append("-" if val is None else str(val))
+        table.add_row(*row_vals)
+
+    console.print(table)

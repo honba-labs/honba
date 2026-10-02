@@ -100,3 +100,16 @@ def test_screener_invalid_filter_exits_with_code_1():
     )
     assert result.exit_code == 1
     assert "^" in result.output or "multiplier" in result.output or "unit" in result.output
+
+
+def test_screener_scan_table_and_json():
+    res_table = runner.invoke(app, ["screener", "scan", "--market", "india", "close", "above", "100"])
+    assert res_table.exit_code == 0
+    assert "Screener Results" in res_table.output
+
+    res_json = runner.invoke(app, ["screener", "scan", "--market", "india", "--format", "json", "close", "above", "100"])
+    assert res_json.exit_code == 0
+    doc = json.loads(res_json.output)
+    assert "total" in doc
+    assert "rows" in doc
+
