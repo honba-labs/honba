@@ -166,15 +166,17 @@ impl<S: Strategy, E: ExecutionEngine> Handler for StrategyRunner<S, E> {
                 continue;
             }
             let id = self.next_order_id();
-            self.submitted.push(SubmittedIntent {
-                ts_init,
-                intent: intent.clone(),
-                order_id: id.clone(),
-            });
             let order = intent
-                .into_order(id, ts_init)
+                .clone()
+                .into_order(id.clone(), ts_init)
                 .map_err(|e| AlgoError::Component(e.to_string()))?;
             self.execution.submit(order)?;
+            // Recorded only once the execution port accepted it (Python parity).
+            self.submitted.push(SubmittedIntent {
+                ts_init,
+                intent,
+                order_id: id,
+            });
         }
 
         // 4. Drain fills, book them, and feed them back to the strategy.

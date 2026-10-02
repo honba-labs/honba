@@ -217,3 +217,34 @@ fn a_strategy_works_with_any_context_implementation() {
     assert_eq!(ctx.drain_intents().len(), 1);
     assert_eq!(*log.lock().unwrap(), vec![("on_bar", 3)]);
 }
+
+/// An execution port whose `submit` always fails.
+struct FailingExecution;
+
+impl ExecutionEngine for FailingExecution {
+    fn submit(&mut self, _order: Order) -> Result<()> {
+        Err(honba_engine::AlgoError::Component("venue down".into()))
+    }
+    fn cancel(&mut self, _order_id: &str) -> Result<()> {
+        Ok(())
+    }
+    fn drain_fills(&mut self) -> Result<Vec<Trade>> {
+        Ok(Vec::new())
+    }
+}
+
+#[test]
+fn intent_is_recorded_only_after_a_successful_submit() {
+    let (strategy, _log) = Recorder::new(vec![(
+        "on_bar",
+        OrderIntent::market_buy(any_instrument(), 1.0),
+    )]);
+    let mut runner = StrategyRunner::new(strategy, FailingExecution);
+    let bar = VecFeed::bar("NIFTY50", 100.0, 1);
+    let result = runner.on_event(bar.event(), bar.ts_init());
+    assert!(result.is_err(), "the execution error propagates");
+    assert!(
+        runner.submitted().is_empty(),
+        "a failed submit must not be recorded (Python parity)"
+    );
+}
