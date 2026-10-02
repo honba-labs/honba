@@ -99,7 +99,7 @@ honba screener scan --market india --timescale 1d --sort market_cap:desc --limit
   market cap between 5000 Cr and 2 Tn and rsi below 30 and close near 52 week low
 
 honba screener scan --market india sector in IT, Banks and pe ratio under 25 \
-  and volume at least 5 Lk and 50 day sma crosses above 200 day sma
+  and volume at least 5 Lk and delivery pct at least 50
 
 honba screener scan --timescale 1w close at 52 week low or rsi on 1d above 70
 
