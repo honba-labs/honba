@@ -456,3 +456,25 @@ flagged but not made here.
   fill, and the scan; the `LlmPort` contract test across implementations; the eval harness over recorded responses.
 - Real-model runs are marked `slow` and run in a separate CI step. Model accuracy (exact match and
   execution-equivalence rates on the golden set) is reported by `honba ai eval screener`, not asserted in unit tests.
+
+### 13.9 External-agent integration (skill pack)
+
+Reference: HydraTrade's `agent/` folder (`HydraLabs-RF/HydraTrade`). It takes the opposite route from 13.4: the LLM is an
+external coding assistant (Cursor, Claude Code) that drives a thin CLI, and the app's knowledge is a markdown skill file.
+This was read from the repo's README and plugin spec; the code itself was not inspected. We adopt its good parts
+alongside the in-process path, so one knowledge pack serves both:
+
+- **Skill files generated from the pack.** `honba ai skills install --target claude|cursor|both` writes
+  `.claude/skills/honba-screener/SKILL.md` and the Cursor equivalent. The content comes from the knowledge pack
+  (grammar, catalog, units, examples), not hand-written prose, and the drift check covers it.
+- **The CLI is the tool surface.** `--format json`, `--print-request`, `explain` and the exit codes in 3.3 are what let
+  an external agent drive Honba reliably. Commands that produce reports return their file paths.
+- **Thin commands.** No screening or trading logic in the skill or CLI layer; they call the library, as in section 7.
+- **Safety split.** The screener and data commands are read-only and safe for model invocation. Any future live or
+  order command is excluded from model invocation (`disable-model-invocation`) and requires an explicit `--yes`.
+- **Public and private layers.** The public skill ships the grammar and catalog. A git-ignored private overlay
+  (`~/.config/honba/skills/`) holds the user's own universes, naming conventions and risk notes.
+
+What we add beyond a prose skill: generated content, parser validation of whatever the model produces, and
+grammar-constrained decoding on the local path.
+
