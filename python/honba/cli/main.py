@@ -1,4 +1,5 @@
 """Honba CLI."""
+
 import typer
 
 from honba.cli.indicators import app as indicators_app

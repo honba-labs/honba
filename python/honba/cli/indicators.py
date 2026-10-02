@@ -1,4 +1,5 @@
 """``honba indicators``: discover indicators and their parameters."""
+
 from __future__ import annotations
 
 import json
