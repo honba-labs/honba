@@ -1,5 +1,8 @@
 """Compatibility shim for pre-ADR-008 ``Strategy`` subclasses (one minor version)."""
 
+import os
+import subprocess
+import sys
 import warnings
 
 import pytest
@@ -149,3 +152,45 @@ def test_overriding_a_legacy_runner_entry_point_warns_but_is_still_honoured():
     result = StrategyRunner(s, BarCloseFills()).run([(bar(5.0, 1), 1), (bar(6.0, 2), 2)])
     assert s.seen == len(result.fills) == 1
     assert s.position(X) == 1.0
+
+
+def test_legacy_override_warning_is_attributed_to_the_defining_module():
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+
+        class Old(LegacyNoSuper):
+            name = "old_attributed"
+
+            def handle_fill(self, fill: Trade) -> None:
+                super().handle_fill(fill)
+
+    (w,) = caught
+    assert issubclass(w.category, DeprecationWarning)
+    assert w.filename == __file__  # not "<frozen abc>"
+
+
+def test_legacy_override_warning_is_visible_by_default_for_main_and_filterable_by_module(tmp_path):
+    script = tmp_path / "legacy_strategy.py"
+    script.write_text(
+        "from honba.strategies.base import Strategy\n"
+        "class Old(Strategy):\n"
+        "    name = 'old'\n"
+        "    def handle_fill(self, fill): pass\n"
+    )
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONWARNINGS"}
+    # Default filters: DeprecationWarning is shown only when attributed to __main__.
+    shown = subprocess.run(
+        [sys.executable, str(script)], env=env, capture_output=True, text=True, check=True
+    )
+    assert "DeprecationWarning" in shown.stderr
+    assert "handle_fill" in shown.stderr
+    assert str(script) in shown.stderr
+    # Attribution to the defining module makes it filterable by that module.
+    hidden = subprocess.run(
+        [sys.executable, "-W", "ignore::DeprecationWarning:__main__", str(script)],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "DeprecationWarning" not in hidden.stderr

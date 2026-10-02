@@ -45,7 +45,7 @@ class Strategy(ABC):
                 "are still called in 0.1/0.2 but not from 0.3, when the runner talks to the "
                 "StrategyContext directly; move the logic to on_fill (ADR 008)",
                 DeprecationWarning,
-                stacklevel=2,
+                stacklevel=3,  # past ABCMeta.__new__: the class statement of the subclass
             )
 
     def __new__(cls, *args: Any, **kwargs: Any) -> Self:
