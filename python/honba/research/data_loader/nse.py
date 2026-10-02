@@ -137,12 +137,22 @@ class NseBhavcopyProvider:
         cache_dir: str | Path | None = None,
         timeout: float = 15.0,
         calendar: NseCalendar | None = None,
+        max_workers: int = 12,
     ) -> None:
         self.cache_dir = Path(cache_dir) if cache_dir else None
         if self.cache_dir:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.timeout = timeout
         self.calendar = calendar or NseCalendar()
+        self.max_workers = max_workers
+        self._client: httpx.Client | None = None
+
+    def _get_client(self) -> httpx.Client:
+        if self._client is None or self._client.is_closed:
+            # Persistent connection pool with keep-alive
+            limits = httpx.Limits(max_keepalive_connections=self.max_workers * 2, max_connections=self.max_workers * 4)
+            self._client = httpx.Client(headers=DEFAULT_HEADERS, timeout=self.timeout, limits=limits, follow_redirects=True)
+        return self._client
 
     @property
     def name(self) -> str:
@@ -173,46 +183,46 @@ class NseBhavcopyProvider:
             f"https://archives.nseindia.com/products/content/sec_bhavdata_full_{dmy}.csv",
         ]
 
-    def download_session_bhavcopy(self, session_date: dt.date) -> dict[str, Bar]:
+    def download_session_bhavcopy(self, session_date: dt.date, client: httpx.Client | None = None) -> dict[str, Bar]:
         """Download and parse Bhavcopy for one session date (with local file caching)."""
         cache_file = self.cache_dir / f"bhavcopy_{session_date.strftime('%Y%m%d')}.csv" if self.cache_dir else None
         if cache_file and cache_file.exists():
             return parse_bhavcopy_csv(cache_file.read_text(encoding="utf-8"))
 
+        http_client = client or self._get_client()
         urls = self._get_urls_for_date(session_date)
         for url in urls:
             try:
-                with httpx.Client(headers=DEFAULT_HEADERS, timeout=self.timeout, follow_redirects=True) as client:
-                    resp = client.get(url)
-                    if resp.status_code != 200:
+                resp = http_client.get(url)
+                if resp.status_code != 200:
+                    continue
+
+                content = resp.content
+                csv_text = ""
+
+                # Check for zip magic bytes 'PK\x03\x04' regardless of URL extension
+                is_zip = url.endswith(".zip") or content.startswith(b"PK\x03\x04")
+
+                if is_zip:
+                    try:
+                        with zipfile.ZipFile(io.BytesIO(content)) as z:
+                            for name in z.namelist():
+                                if name.lower().endswith(".csv"):
+                                    csv_text = z.read(name).decode("utf-8", errors="ignore")
+                                    break
+                    except zipfile.BadZipFile:
                         continue
+                else:
+                    # Ensure it's not a binary or HTML/XML error page before parsing
+                    if not content.startswith((b"<!DOCTYPE", b"<html", b"<?xml")):
+                        csv_text = content.decode("utf-8", errors="ignore")
 
-                    content = resp.content
-                    csv_text = ""
-
-                    # Check for zip magic bytes 'PK\x03\x04' regardless of URL extension
-                    is_zip = url.endswith(".zip") or content.startswith(b"PK\x03\x04")
-
-                    if is_zip:
-                        try:
-                            with zipfile.ZipFile(io.BytesIO(content)) as z:
-                                for name in z.namelist():
-                                    if name.lower().endswith(".csv"):
-                                        csv_text = z.read(name).decode("utf-8", errors="ignore")
-                                        break
-                        except zipfile.BadZipFile:
-                            continue
-                    else:
-                        # Ensure it's not a binary or HTML/XML error page before parsing
-                        if not content.startswith((b"<!DOCTYPE", b"<html", b"<?xml")):
-                            csv_text = content.decode("utf-8", errors="ignore")
-
-                    if csv_text:
-                        parsed = parse_bhavcopy_csv(csv_text)
-                        if parsed:
-                            if cache_file:
-                                cache_file.write_text(csv_text, encoding="utf-8")
-                            return parsed
+                if csv_text:
+                    parsed = parse_bhavcopy_csv(csv_text)
+                    if parsed:
+                        if cache_file:
+                            cache_file.write_text(csv_text, encoding="utf-8")
+                        return parsed
             except Exception as exc:
                 logger.debug("Failed to fetch %s: %s", url, exc)
 
@@ -225,16 +235,12 @@ class NseBhavcopyProvider:
         interval: DateInterval,
         progress_callback: Any = None,
     ) -> list[Bar]:
-        """Fetch daily bars for instrument in [interval.start, interval.end)."""
+        """Fetch daily bars for instrument in [interval.start, interval.end) concurrently."""
         if timeframe.upper() not in ("1D", "D", "DAILY"):
             # Bhavcopy is EOD daily only
             return []
 
         # Find trading sessions in the requested interval
-        cur = interval.start
-        bars: list[Bar] = []
-
-        # Collect trading days first to support accurate progress reporting
         trading_days: list[dt.date] = []
         scan_date = interval.start
         while scan_date < interval.end:
@@ -243,17 +249,37 @@ class NseBhavcopyProvider:
             scan_date += dt.timedelta(days=1)
 
         total_sessions = len(trading_days)
-        for idx, session_date in enumerate(trading_days, start=1):
-            if progress_callback:
-                progress_callback(session_date, idx, total_sessions)
+        if total_sessions == 0:
+            return []
 
-            session_bars = self.download_session_bhavcopy(session_date)
+        bars: list[Bar] = []
+        completed_count = 0
+        client = self._get_client()
+
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        def _fetch_one_session(d: dt.date) -> tuple[dt.date, Bar | None]:
+            session_bars = self.download_session_bhavcopy(d, client=client)
+            bar: Bar | None = None
             if instrument.symbol in session_bars:
-                b = session_bars[instrument.symbol]
+                candidate = session_bars[instrument.symbol]
                 try:
-                    validate_bar(b)
-                    bars.append(b)
+                    validate_bar(candidate)
+                    bar = candidate
                 except ValueError:
                     pass
+            return d, bar
+
+        # Use thread pool to fetch sessions concurrently
+        workers = min(self.max_workers, total_sessions)
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            future_to_date = {executor.submit(_fetch_one_session, d): d for d in trading_days}
+            for future in as_completed(future_to_date):
+                completed_count += 1
+                sess_date, bar = future.result()
+                if bar is not None:
+                    bars.append(bar)
+                if progress_callback:
+                    progress_callback(sess_date, completed_count, total_sessions)
 
         return sorted(bars, key=lambda x: x.ts)
