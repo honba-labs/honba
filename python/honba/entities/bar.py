@@ -1,4 +1,5 @@
 """OHLCV bar (mirrors honba_messages::Bar)."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
