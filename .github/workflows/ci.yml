@@ -93,6 +93,6 @@ jobs:
 
       - name: lint (ruff)
         run: |
-          pip install ruff
+          # ruff is pinned in python/requirements-dev.txt (installed above)
           ruff check python
           ruff format --check python
