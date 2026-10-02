@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 import typer
 
-from honba.scripts.export_schema import export_json_schema, generate_typescript
+from honba.cli._schema_export import export_json_schema, generate_typescript
 
 app = typer.Typer(help="Export canonical schemas and generate client contracts")
 
