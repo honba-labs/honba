@@ -235,3 +235,20 @@ def test_runner_honours_a_handle_rejected_override():
     assert seen == [bad]
     assert runner.rejections[0].intent is bad
     assert not runner.ctx.busy(X)
+
+
+def test_fill_costs_reach_the_context_cash_through_the_runner():
+    # The fixture's bar_close model charges no costs; this covers the cost signs end to end.
+    s = Recorder(
+        {"on_bar": [OrderIntent.market_buy(X, 2)], "on_quote": [OrderIntent.market_sell(X, 2)]}
+    )
+    ex = FakeExecution()
+    runner = StrategyRunner(s, ex)
+    runner.start()
+    ex.pending_fills = [Trade(X, OrderSide.BUY, 2, 10.0, 5, "rec-0", costs=1.5)]
+    runner.on_event(bar(10.0, 5), ts_init=5)
+    assert runner.ctx.cash() == -(2 * 10.0 + 1.5)  # a buy debits cost on top of the notional
+    ex.pending_fills = [Trade(X, OrderSide.SELL, 2, 11.0, 6, "rec-1", costs=2.0)]
+    runner.on_event(QuoteTick(X, 6, 10.9, 11.1, 1.0, 1.0), ts_init=6)
+    assert runner.ctx.position(X) == 0.0
+    assert runner.ctx.cash() == -21.5 + (2 * 11.0 - 2.0)  # a sell credits notional minus cost

@@ -125,7 +125,7 @@ fn fixture_header() {
     assert_eq!(doc["schema_version"], u64::from(SCHEMA_VERSION));
     assert_eq!(doc["type"], "StrategyConformance");
     assert_eq!(doc["fill_model"], "bar_close");
-    assert_eq!(doc["scenarios"].as_array().unwrap().len(), 4);
+    assert_eq!(doc["scenarios"].as_array().unwrap().len(), 5);
 }
 
 #[test]

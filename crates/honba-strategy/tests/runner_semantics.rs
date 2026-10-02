@@ -248,3 +248,46 @@ fn intent_is_recorded_only_after_a_successful_submit() {
         "a failed submit must not be recorded (Python parity)"
     );
 }
+
+#[test]
+fn fill_costs_reach_the_context_cash_through_the_runner() {
+    // The fixture's bar_close model charges no costs; this covers the cost signs end to end.
+    let (s, _) = Recorder::new(vec![
+        ("on_bar", OrderIntent::market_buy(x(), 2.0)),
+        ("on_quote", OrderIntent::market_sell(x(), 2.0)),
+    ]);
+    let ex = FakeExecution::default();
+    let mut runner = StrategyRunner::new(s, ex.clone());
+    runner.on_start().unwrap();
+    let fill = |side, price, ts: u64, id: &str, costs| {
+        Trade::new(
+            id.into(),
+            x(),
+            side,
+            2.0,
+            price,
+            UnixNanos::from_u64(ts),
+            UnixNanos::from_u64(ts),
+        )
+        .with_costs(costs)
+    };
+    ex.fills
+        .lock()
+        .unwrap()
+        .push(fill(OrderSide::Buy, 10.0, 5, "rec-0", 1.5));
+    send(&mut runner, bar_event(10.0, 5), 5);
+    // A buy debits the cost on top of the notional.
+    assert_eq!(runner.context().cash(), -(2.0 * 10.0 + 1.5));
+    ex.fills
+        .lock()
+        .unwrap()
+        .push(fill(OrderSide::Sell, 11.0, 6, "rec-1", 2.0));
+    send(
+        &mut runner,
+        VecFeed::quote("X", 10.9, 11.1, 6).event().clone(),
+        6,
+    );
+    assert_eq!(runner.context().position(&x()), 0.0);
+    // A sell credits the notional minus the cost.
+    assert_eq!(runner.context().cash(), -21.5 + (2.0 * 11.0 - 2.0));
+}

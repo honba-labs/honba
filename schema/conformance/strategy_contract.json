@@ -1344,6 +1344,246 @@
         "positions": [],
         "cash": -10.0
       }
+    },
+    {
+      "name": "contract_probe_fill_time_and_ts_init",
+      "description": "Two events share ts_init 100, so the second order (the on_fill protective stop) fills at max(order ts 100, previous fill ts 100 + 1) = 101; the trade tick with ts_event 200 != ts_init 210 submits a stop buy that is stamped ts_init 210 (and the clock reads 210), not 200. Bar events carry ts_event 95 != ts_init 100 likewise.",
+      "strategy": "contract_probe",
+      "params": {
+        "instrument_id": {
+          "symbol": "ACME",
+          "venue": "NSE"
+        }
+      },
+      "initial_cash": 1000.0,
+      "instruments": [],
+      "events": [
+        {
+          "schema_version": 1,
+          "event": {
+            "type": "bar",
+            "bar_type": {
+              "instrument_id": {
+                "symbol": "ACME",
+                "venue": "NSE"
+              },
+              "spec": {
+                "step": 1,
+                "aggregation": "minute",
+                "price_type": "last"
+              }
+            },
+            "open": 50.0,
+            "high": 50.0,
+            "low": 50.0,
+            "close": 50.0,
+            "volume": 100.0,
+            "ts_event": 95,
+            "ts_init": 100
+          },
+          "ts_init": 100
+        },
+        {
+          "schema_version": 1,
+          "event": {
+            "type": "trade",
+            "instrument_id": {
+              "symbol": "ACME",
+              "venue": "NSE"
+            },
+            "price": 51.0,
+            "size": 1.0,
+            "aggressor_side": "no_aggressor",
+            "trade_id": "T-1",
+            "ts_event": 90,
+            "ts_init": 100
+          },
+          "ts_init": 100
+        },
+        {
+          "schema_version": 1,
+          "event": {
+            "type": "trade",
+            "instrument_id": {
+              "symbol": "ACME",
+              "venue": "NSE"
+            },
+            "price": 52.0,
+            "size": 1.0,
+            "aggressor_side": "no_aggressor",
+            "trade_id": "T-2",
+            "ts_event": 200,
+            "ts_init": 210
+          },
+          "ts_init": 210
+        }
+      ],
+      "expected": {
+        "intents": [
+          {
+            "ts_init": 100,
+            "intent": {
+              "instrument_id": {
+                "symbol": "ACME",
+                "venue": "NSE"
+              },
+              "side": "buy",
+              "quantity": 1.0,
+              "order_type": "market",
+              "price": null,
+              "trigger_price": null,
+              "time_in_force": "day"
+            }
+          },
+          {
+            "ts_init": 100,
+            "intent": {
+              "instrument_id": {
+                "symbol": "ACME",
+                "venue": "NSE"
+              },
+              "side": "sell",
+              "quantity": 1.0,
+              "order_type": "stop_market",
+              "price": null,
+              "trigger_price": 49.9,
+              "time_in_force": "day"
+            }
+          },
+          {
+            "ts_init": 210,
+            "intent": {
+              "instrument_id": {
+                "symbol": "ACME",
+                "venue": "NSE"
+              },
+              "side": "buy",
+              "quantity": 1.0,
+              "order_type": "stop_market",
+              "price": null,
+              "trigger_price": 52.01,
+              "time_in_force": "day"
+            }
+          }
+        ],
+        "fills": [
+          {
+            "order_id": "contract_probe-0",
+            "instrument_id": {
+              "symbol": "ACME",
+              "venue": "NSE"
+            },
+            "side": "buy",
+            "quantity": 1.0,
+            "price": 50.0,
+            "costs": 0.0,
+            "ts_event": 100,
+            "ts_init": 100
+          },
+          {
+            "order_id": "contract_probe-1",
+            "instrument_id": {
+              "symbol": "ACME",
+              "venue": "NSE"
+            },
+            "side": "sell",
+            "quantity": 1.0,
+            "price": 50.0,
+            "costs": 0.0,
+            "ts_event": 101,
+            "ts_init": 101
+          },
+          {
+            "order_id": "contract_probe-2",
+            "instrument_id": {
+              "symbol": "ACME",
+              "venue": "NSE"
+            },
+            "side": "buy",
+            "quantity": 1.0,
+            "price": 50.0,
+            "costs": 0.0,
+            "ts_event": 210,
+            "ts_init": 210
+          }
+        ],
+        "observations": [
+          {
+            "hook": "on_start",
+            "now": 0,
+            "position": 0.0,
+            "cash": 1000.0,
+            "busy": false,
+            "open_positions": 0
+          },
+          {
+            "hook": "on_bar",
+            "now": 100,
+            "position": 0.0,
+            "cash": 1000.0,
+            "busy": true,
+            "open_positions": 0
+          },
+          {
+            "hook": "on_fill",
+            "now": 100,
+            "position": 1.0,
+            "cash": 950.0,
+            "busy": false,
+            "open_positions": 1
+          },
+          {
+            "hook": "on_trade",
+            "now": 100,
+            "position": 1.0,
+            "cash": 950.0,
+            "busy": true,
+            "open_positions": 1
+          },
+          {
+            "hook": "on_fill",
+            "now": 100,
+            "position": 0.0,
+            "cash": 1000.0,
+            "busy": false,
+            "open_positions": 0
+          },
+          {
+            "hook": "on_trade",
+            "now": 210,
+            "position": 0.0,
+            "cash": 1000.0,
+            "busy": false,
+            "open_positions": 0
+          },
+          {
+            "hook": "on_fill",
+            "now": 210,
+            "position": 1.0,
+            "cash": 950.0,
+            "busy": false,
+            "open_positions": 1
+          },
+          {
+            "hook": "on_stop",
+            "now": 210,
+            "position": 1.0,
+            "cash": 950.0,
+            "busy": false,
+            "open_positions": 1
+          }
+        ],
+        "positions": [
+          {
+            "instrument_id": {
+              "symbol": "ACME",
+              "venue": "NSE"
+            },
+            "quantity": 1.0
+          }
+        ],
+        "cash": 950.0
+      }
     }
   ]
 }
