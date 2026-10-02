@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
+import math
 from enum import Enum
 from typing import Annotated, Any, Literal
 
 from pydantic import (
-    BaseModel,
-    BeforeValidator,
-    ConfigDict,
     Field,
+    SerializerFunctionWrapHandler,
     Strict,
+    model_serializer,
+    model_validator,
 )
 
-from honba.entities.wire import _canonical, _Wire, Str
+from honba.entities._wire_base import Str, _canonical, _Wire
 
 
 class ValueType(Enum):
@@ -86,6 +87,31 @@ class MetricKeySpec(_Wire):
     timeframe: WireTimeframe | None = None
 
 
+def _omit_absent_dimensions(data: Any) -> Any:
+    """Drop ``period`` / ``timeframe`` when unset, as Rust's ``skip_serializing_if`` does."""
+    if isinstance(data, dict):
+        for name in ("period", "timeframe"):
+            if name in data and data[name] is None:
+                del data[name]
+    return data
+
+
+class MetricRef(_Wire):
+    """A metric used as the right-hand operand of a predicate.
+
+    Makes metric-to-metric comparisons expressible on the wire, e.g.
+    ``SMA50 crosses_above {"key": "SMA200"}``. ``key`` is the wire key, never a UI id.
+    """
+
+    key: Str
+    period: WireMetricPeriod | None = None
+    timeframe: WireTimeframe | None = None
+
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler: SerializerFunctionWrapHandler) -> Any:
+        return _omit_absent_dimensions(handler(self))
+
+
 class MetricDefinition(_Wire):
     """Catalog definition of a metric."""
 
@@ -104,14 +130,79 @@ class MetricDefinition(_Wire):
     source: Str | None = None
 
 
+_ORDERING_OPS = frozenset({FilterOp.GT, FilterOp.GTE, FilterOp.LT, FilterOp.LTE})
+_CROSSING_OPS = frozenset({FilterOp.CROSSES_ABOVE, FilterOp.CROSSES_BELOW})
+_SET_OPS = frozenset({FilterOp.IN, FilterOp.NOT_IN})
+
+
+def _is_finite_number(value: Any) -> bool:
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return True
+    return isinstance(value, float) and math.isfinite(value)
+
+
+def _metric_ref(value: Any, op: FilterOp) -> MetricRef:
+    if isinstance(value, MetricRef):
+        return value
+    if isinstance(value, dict):
+        return MetricRef.model_validate(value)
+    raise ValueError(f"{op.value}: value must be a finite number or a MetricRef object")
+
+
+def _check_value(op: FilterOp, value: Any) -> Any:
+    """Enforce the per-operator value contract (mirrors Rust ``check_predicate_value``).
+
+    - ``crosses_above`` / ``crosses_below``: a finite number or a ``MetricRef``.
+    - ``gt`` / ``gte`` / ``lt`` / ``lte``: a finite number, a string, or a ``MetricRef``.
+    - ``between``: a list of exactly two finite numbers.
+    - ``in`` / ``not_in``: a list.
+    - other operators: unconstrained.
+    """
+    if op in _CROSSING_OPS:
+        return value if _is_finite_number(value) else _metric_ref(value, op)
+    if op in _ORDERING_OPS:
+        if _is_finite_number(value) or isinstance(value, str):
+            return value
+        return _metric_ref(value, op)
+    if op is FilterOp.BETWEEN:
+        if not (isinstance(value, list) and len(value) == 2 and all(map(_is_finite_number, value))):
+            raise ValueError("between: value must be a list of two finite numbers")
+        return value
+    if op in _SET_OPS:
+        if not isinstance(value, list):
+            raise ValueError(f"{op.value}: value must be a list")
+        return value
+    return value
+
+
 class ScreenerFilterPredicate(_Wire):
-    """Filter predicate for screening instruments."""
+    """Filter predicate for screening instruments.
+
+    ``value`` must fit ``op``: ``crosses_above`` / ``crosses_below`` take a finite number
+    or a ``MetricRef``; ``gt`` / ``gte`` / ``lt`` / ``lte`` a finite number, a string or a
+    ``MetricRef``; ``between`` a list of two finite numbers; ``in`` / ``not_in`` a list;
+    other operators any value. A ``MetricRef`` operand is parsed into a ``MetricRef``.
+    """
 
     key: Str
     op: WireFilterOp
     value: Any
     period: WireMetricPeriod | None = None
     timeframe: WireTimeframe | None = None
+
+    @model_validator(mode="after")
+    def _value_matches_op(self) -> ScreenerFilterPredicate:
+        checked = _check_value(self.op, self.value)
+        if checked is not self.value:
+            # Frozen model: replace the raw dict with the parsed MetricRef.
+            object.__setattr__(self, "value", checked)
+        return self
+
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler: SerializerFunctionWrapHandler) -> Any:
+        return _omit_absent_dimensions(handler(self))
 
 
 class ScreenerFilterGroup(_Wire):

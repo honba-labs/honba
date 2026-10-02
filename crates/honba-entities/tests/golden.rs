@@ -1,4 +1,5 @@
-//! Golden-vector contract tests for `Trade` and `Position` (ADR 006).
+//! Golden-vector contract tests for `Trade`, `Position` and
+//! `ScreenerFilterPredicate` (ADR 006).
 //!
 //! Reads the shared vectors in `schema/golden/`; the Python tests read the
 //! same files.
@@ -6,7 +7,10 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use honba_entities::{Currency, Position, PositionSide, Trade};
+use honba_entities::{
+    Currency, FilterOp, MetricPeriod, MetricRef, Position, PositionSide, ScreenerFilterPredicate,
+    Timeframe, Trade,
+};
 use honba_messages::{InstrumentId, OrderId, OrderSide, UnixNanos, Venue, SCHEMA_VERSION};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -138,4 +142,101 @@ fn position_golden() {
         "Position",
         vec![("flat", flat), ("short_with_realized_pnl", short)],
     );
+}
+
+fn pred(
+    key: &str,
+    op: FilterOp,
+    value: Value,
+    period: Option<MetricPeriod>,
+    timeframe: Option<Timeframe>,
+) -> ScreenerFilterPredicate {
+    ScreenerFilterPredicate {
+        key: key.to_owned(),
+        op,
+        value,
+        period,
+        timeframe,
+    }
+}
+
+#[test]
+fn screener_predicate_golden() {
+    use serde_json::json;
+    let sma200 = serde_json::to_value(MetricRef::new("SMA200")).unwrap();
+    let pe = serde_json::to_value(MetricRef {
+        key: "price_earnings_ttm".into(),
+        period: Some(MetricPeriod::Ttm),
+        timeframe: Some(Timeframe::W1),
+    })
+    .unwrap();
+    let d1 = Some(Timeframe::D1);
+    check(
+        "screener_predicate.json",
+        "ScreenerFilterPredicate",
+        vec![
+            (
+                "crosses_above_metric_ref",
+                pred("SMA50", FilterOp::CrossesAbove, sma200, None, d1.clone()),
+            ),
+            (
+                "crosses_below_number",
+                pred("RSI", FilterOp::CrossesBelow, json!(30), None, d1),
+            ),
+            (
+                "gt_metric_ref_with_dimensions",
+                pred("close", FilterOp::Gt, pe, None, None),
+            ),
+            (
+                "gte_number",
+                pred(
+                    "market_cap_basic",
+                    FilterOp::Gte,
+                    json!(10_000_000_000u64),
+                    None,
+                    None,
+                ),
+            ),
+            (
+                "lt_string_scalar",
+                pred(
+                    "maturity_date",
+                    FilterOp::Lt,
+                    json!("2030-01-01"),
+                    None,
+                    None,
+                ),
+            ),
+            (
+                "between_two_numbers",
+                pred(
+                    "price_earnings_ttm",
+                    FilterOp::Between,
+                    json!([10, 20.5]),
+                    Some(MetricPeriod::Ttm),
+                    None,
+                ),
+            ),
+            (
+                "in_list",
+                pred("exchange", FilterOp::In, json!(["NSE", "BSE"]), None, None),
+            ),
+            (
+                "not_in_empty_list",
+                pred("sector", FilterOp::NotIn, json!([]), None, None),
+            ),
+            (
+                "eq_null",
+                pred("credit_rating", FilterOp::Eq, Value::Null, None, None),
+            ),
+        ],
+    );
+}
+
+#[test]
+fn metric_ref_operand_is_recoverable_from_golden_predicate() {
+    let cases = load_cases("screener_predicate.json", "ScreenerFilterPredicate");
+    let p: ScreenerFilterPredicate =
+        serde_json::from_value(cases["crosses_above_metric_ref"].clone()).unwrap();
+    assert_eq!(p.metric_ref(), Some(MetricRef::new("SMA200")));
 }

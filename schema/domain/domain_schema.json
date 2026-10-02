@@ -31,6 +31,9 @@
     "metric_key_spec": {
       "$ref": "#/$defs/MetricKeySpec"
     },
+    "metric_ref": {
+      "$ref": "#/$defs/MetricRef"
+    },
     "metric_definition": {
       "$ref": "#/$defs/MetricDefinition"
     },
@@ -971,6 +974,25 @@
       "title": "Message",
       "type": "object"
     },
+    "FilterOp": {
+      "enum": [
+        "eq",
+        "neq",
+        "gt",
+        "gte",
+        "lt",
+        "lte",
+        "between",
+        "in",
+        "not_in",
+        "like",
+        "has",
+        "crosses_above",
+        "crosses_below"
+      ],
+      "title": "FilterOp",
+      "type": "string"
+    },
     "MetricPeriod": {
       "enum": [
         "SNAPSHOT",
@@ -998,6 +1020,51 @@
       ],
       "title": "Timeframe",
       "type": "string"
+    },
+    "ScreenerFilterPredicate": {
+      "additionalProperties": false,
+      "description": "Filter predicate for screening instruments.\n\n``value`` must fit ``op``: ``crosses_above`` / ``crosses_below`` take a finite number\nor a ``MetricRef``; ``gt`` / ``gte`` / ``lt`` / ``lte`` a finite number, a string or a\n``MetricRef``; ``between`` a list of two finite numbers; ``in`` / ``not_in`` a list;\nother operators any value. A ``MetricRef`` operand is parsed into a ``MetricRef``.",
+      "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "op": {
+          "$ref": "#/$defs/FilterOp"
+        },
+        "value": {
+          "title": "Value"
+        },
+        "period": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MetricPeriod"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "timeframe": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Timeframe"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "key",
+        "op",
+        "value"
+      ],
+      "title": "ScreenerFilterPredicate",
+      "type": "object"
     },
     "MetricKeySpec": {
       "additionalProperties": false,
@@ -1034,6 +1101,43 @@
         "key"
       ],
       "title": "MetricKeySpec",
+      "type": "object"
+    },
+    "MetricRef": {
+      "additionalProperties": false,
+      "description": "A metric used as the right-hand operand of a predicate.\n\nMakes metric-to-metric comparisons expressible on the wire, e.g.\n``SMA50 crosses_above {\"key\": \"SMA200\"}``. ``key`` is the wire key, never a UI id.",
+      "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "period": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MetricPeriod"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "timeframe": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Timeframe"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "title": "MetricRef",
       "type": "object"
     },
     "UnitType": {
@@ -1165,70 +1269,6 @@
         "valueType"
       ],
       "title": "MetricDefinition",
-      "type": "object"
-    },
-    "FilterOp": {
-      "enum": [
-        "eq",
-        "neq",
-        "gt",
-        "gte",
-        "lt",
-        "lte",
-        "between",
-        "in",
-        "not_in",
-        "like",
-        "has",
-        "crosses_above",
-        "crosses_below"
-      ],
-      "title": "FilterOp",
-      "type": "string"
-    },
-    "ScreenerFilterPredicate": {
-      "additionalProperties": false,
-      "description": "Filter predicate for screening instruments.",
-      "properties": {
-        "key": {
-          "title": "Key",
-          "type": "string"
-        },
-        "op": {
-          "$ref": "#/$defs/FilterOp"
-        },
-        "value": {
-          "title": "Value"
-        },
-        "period": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/MetricPeriod"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
-        "timeframe": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Timeframe"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        }
-      },
-      "required": [
-        "key",
-        "op",
-        "value"
-      ],
-      "title": "ScreenerFilterPredicate",
       "type": "object"
     },
     "ScreenerFilterGroup": {

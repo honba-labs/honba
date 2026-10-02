@@ -15,9 +15,9 @@ import json
 import subprocess
 from pathlib import Path
 
-from honba.entities import screener
-from honba.entities import wire
 from pydantic import TypeAdapter
+
+from honba.entities import screener, wire
 
 
 def export_json_schema(output_dir: Path) -> Path:
@@ -39,6 +39,7 @@ def export_json_schema(output_dir: Path) -> Path:
             "bar": {"$ref": "#/$defs/Bar"},
             "instrument_id": {"$ref": "#/$defs/InstrumentId"},
             "metric_key_spec": {"$ref": "#/$defs/MetricKeySpec"},
+            "metric_ref": {"$ref": "#/$defs/MetricRef"},
             "metric_definition": {"$ref": "#/$defs/MetricDefinition"},
             "screener_filter_predicate": {"$ref": "#/$defs/ScreenerFilterPredicate"},
             "screener_filter_group": {"$ref": "#/$defs/ScreenerFilterGroup"},
@@ -53,6 +54,7 @@ def export_json_schema(output_dir: Path) -> Path:
     all_adapters = dict(wire._ADAPTERS)
     screener_adapters = {
         "MetricKeySpec": TypeAdapter(screener.MetricKeySpec),
+        "MetricRef": TypeAdapter(screener.MetricRef),
         "MetricDefinition": TypeAdapter(screener.MetricDefinition),
         "ScreenerFilterPredicate": TypeAdapter(screener.ScreenerFilterPredicate),
         "ScreenerFilterGroup": TypeAdapter(screener.ScreenerFilterGroup),

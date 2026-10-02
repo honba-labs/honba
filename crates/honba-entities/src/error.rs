@@ -29,4 +29,8 @@ pub enum EntitiesError {
         /// The right operand's currency.
         right: String,
     },
+
+    /// A screener predicate's value does not fit its operator.
+    #[error("invalid screener predicate: {0}")]
+    InvalidPredicate(String),
 }

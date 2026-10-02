@@ -3,6 +3,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::error::{EntitiesError, Result};
+
 /// Type of metric value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -157,14 +159,45 @@ pub enum FilterOp {
     CrossesBelow,
 }
 
+/// A metric used as the right-hand operand of a predicate.
+///
+/// Makes metric-to-metric comparisons expressible on the wire, e.g.
+/// `SMA50 crosses_above {"key": "SMA200"}`. `key` is the wire key, never a UI id.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MetricRef {
+    /// Wire key of the referenced metric (e.g. `SMA200`).
+    pub key: String,
+    /// Optional period dimension.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub period: Option<MetricPeriod>,
+    /// Optional timeframe dimension.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeframe: Option<Timeframe>,
+}
+
+impl MetricRef {
+    /// A reference to `key` with no period or timeframe.
+    pub fn new(key: impl Into<String>) -> Self {
+        Self {
+            key: key.into(),
+            period: None,
+            timeframe: None,
+        }
+    }
+}
+
 /// Individual filter predicate applied to a metric key.
+///
+/// Deserialization enforces the value contract of [`check_predicate_value`].
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "RawFilterPredicate")]
 pub struct ScreenerFilterPredicate {
     /// Target metric key to filter by.
     pub key: String,
     /// Comparison operator.
     pub op: FilterOp,
-    /// Target value or array of values.
+    /// Target value, array of values, or a [`MetricRef`] object.
     pub value: serde_json::Value,
     /// Optional period dimension.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -172,6 +205,121 @@ pub struct ScreenerFilterPredicate {
     /// Optional timeframe dimension.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeframe: Option<Timeframe>,
+}
+
+/// Unchecked wire form of [`ScreenerFilterPredicate`].
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawFilterPredicate {
+    key: String,
+    op: FilterOp,
+    value: serde_json::Value,
+    #[serde(default)]
+    period: Option<MetricPeriod>,
+    #[serde(default)]
+    timeframe: Option<Timeframe>,
+}
+
+impl TryFrom<RawFilterPredicate> for ScreenerFilterPredicate {
+    type Error = EntitiesError;
+
+    fn try_from(raw: RawFilterPredicate) -> Result<Self> {
+        check_predicate_value(raw.op, &raw.value)?;
+        Ok(Self {
+            key: raw.key,
+            op: raw.op,
+            value: raw.value,
+            period: raw.period,
+            timeframe: raw.timeframe,
+        })
+    }
+}
+
+impl ScreenerFilterPredicate {
+    /// A predicate with no period or timeframe, checked by [`check_predicate_value`].
+    pub fn new(key: impl Into<String>, op: FilterOp, value: serde_json::Value) -> Result<Self> {
+        check_predicate_value(op, &value)?;
+        Ok(Self {
+            key: key.into(),
+            op,
+            value,
+            period: None,
+            timeframe: None,
+        })
+    }
+
+    /// The metric operand, when `value` is a [`MetricRef`] for a comparison operator.
+    pub fn metric_ref(&self) -> Option<MetricRef> {
+        match self.op {
+            FilterOp::Gt
+            | FilterOp::Gte
+            | FilterOp::Lt
+            | FilterOp::Lte
+            | FilterOp::CrossesAbove
+            | FilterOp::CrossesBelow
+                if self.value.is_object() =>
+            {
+                serde_json::from_value(self.value.clone()).ok()
+            }
+            _ => None,
+        }
+    }
+}
+
+fn invalid(msg: String) -> EntitiesError {
+    EntitiesError::InvalidPredicate(msg)
+}
+
+fn as_metric_ref(op: FilterOp, value: &serde_json::Value) -> Result<()> {
+    if value.is_object() {
+        serde_json::from_value::<MetricRef>(value.clone())
+            .map(|_| ())
+            .map_err(|e| invalid(format!("{op:?}: invalid MetricRef: {e}")))
+    } else {
+        Err(invalid(format!(
+            "{op:?}: value must be a finite number or a MetricRef object"
+        )))
+    }
+}
+
+/// Checks that `value` fits `op` (mirrors Python `honba.entities.screener._check_value`).
+///
+/// - `crosses_above` / `crosses_below`: a finite number or a [`MetricRef`] object.
+/// - `gt` / `gte` / `lt` / `lte`: a finite number, a string, or a [`MetricRef`] object.
+/// - `between`: an array of exactly two finite numbers.
+/// - `in` / `not_in`: an array.
+/// - other operators: unconstrained.
+pub fn check_predicate_value(op: FilterOp, value: &serde_json::Value) -> Result<()> {
+    match op {
+        FilterOp::CrossesAbove | FilterOp::CrossesBelow => {
+            if value.is_number() {
+                Ok(())
+            } else {
+                as_metric_ref(op, value)
+            }
+        }
+        FilterOp::Gt | FilterOp::Gte | FilterOp::Lt | FilterOp::Lte => {
+            if value.is_number() || value.is_string() {
+                Ok(())
+            } else {
+                as_metric_ref(op, value)
+            }
+        }
+        FilterOp::Between => match value.as_array() {
+            Some(bounds) if bounds.len() == 2 && bounds.iter().all(|b| b.is_number()) => Ok(()),
+            _ => Err(invalid(
+                "Between: value must be an array of two finite numbers".into(),
+            )),
+        },
+        FilterOp::In | FilterOp::NotIn => {
+            if value.is_array() {
+                Ok(())
+            } else {
+                Err(invalid(format!("{op:?}: value must be an array")))
+            }
+        }
+        FilterOp::Eq | FilterOp::Neq | FilterOp::Like | FilterOp::Has => Ok(()),
+    }
 }
 
 /// Logical grouping of filter predicates (AND / OR).

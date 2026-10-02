@@ -15,7 +15,7 @@ use serde::Serialize;
 
 use std::collections::BTreeMap;
 
-use honba_entities::{Currency, Position, PositionSide, Trade};
+use honba_entities::{Currency, Position, PositionSide, ScreenerFilterPredicate, Trade};
 use honba_messages::{
     AggressorSide, Bar, BarAggregation, Event, InstrumentId, Message, Order, OrderSide,
     OrderStatus, OrderType, PriceType, TimeInForce, SCHEMA_VERSION,
@@ -23,7 +23,7 @@ use honba_messages::{
 use honba_strategy::OrderIntent;
 
 /// Wire-contract type names accepted by [`canonical_json`].
-pub const KINDS: [&str; 8] = [
+pub const KINDS: [&str; 9] = [
     "InstrumentId",
     "Bar",
     "Order",
@@ -32,6 +32,7 @@ pub const KINDS: [&str; 8] = [
     "Position",
     "Event",
     "Message",
+    "ScreenerFilterPredicate",
 ];
 
 /// Wire enum names accepted by [`canonical`] and listed by [`enum_values`].
@@ -90,6 +91,7 @@ pub fn canonical(kind: &str, payload: &str) -> Result<String, String> {
         "Position" => reserialize::<Position>(payload),
         "Event" => reserialize::<Event>(payload),
         "Message" => reserialize::<Message>(payload),
+        "ScreenerFilterPredicate" => reserialize::<ScreenerFilterPredicate>(payload),
         "OrderSide" => reserialize::<OrderSide>(payload),
         "OrderType" => reserialize::<OrderType>(payload),
         "OrderStatus" => reserialize::<OrderStatus>(payload),

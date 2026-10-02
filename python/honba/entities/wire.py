@@ -16,9 +16,6 @@ from enum import Enum
 from typing import Annotated, Any, Final, Literal
 
 from pydantic import (
-    BaseModel,
-    BeforeValidator,
-    ConfigDict,
     Field,
     Strict,
     TypeAdapter,
@@ -27,7 +24,9 @@ from pydantic import (
 
 from honba.entities import instrument as _instrument
 from honba.entities import order as _order
+from honba.entities._wire_base import Str, _canonical, _Wire
 from honba.entities.order import OrderSide, OrderStatus, OrderType, TimeInForce
+from honba.entities.screener import ScreenerFilterPredicate
 from honba.entities.tick import AggressorSide
 
 SCHEMA_VERSION: Final[int] = 1
@@ -39,23 +38,10 @@ UnixNanos = Annotated[int, Strict(), Field(ge=0, le=_U64_MAX)]
 """Nanoseconds since the Unix epoch, as a JSON integer (u64)."""
 Float = Annotated[float, Strict()]
 """A finite f64 (ints are accepted and widened, strings are not)."""
-Str = Annotated[str, Strict()]
 PositiveFloat = Annotated[float, Strict(), Field(gt=0)]
 """A finite f64 that must be > 0."""
 NonNegativeFloat = Annotated[float, Strict(), Field(ge=0)]
 """A finite f64 that must be >= 0."""
-
-
-def _canonical(enum: type[Enum]) -> BeforeValidator:
-    """Accept only the canonical wire value, not aliases resolved by ``_missing_``."""
-    values = {member.value for member in enum}
-
-    def check(value: Any) -> Any:
-        if isinstance(value, str) and value not in values:
-            raise ValueError(f"{value!r} is not a valid {enum.__name__}")
-        return value
-
-    return BeforeValidator(check)
 
 
 class Currency(Enum):
@@ -90,10 +76,6 @@ class PriceType(Enum):
 WireOrderSide = Annotated[OrderSide, _canonical(OrderSide)]
 WireOrderType = Annotated[OrderType, _canonical(OrderType)]
 WireTimeInForce = Annotated[TimeInForce, _canonical(TimeInForce)]
-
-
-class _Wire(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 
 
 class InstrumentId(_Wire):
@@ -346,6 +328,7 @@ MODELS: Final[dict[str, Any]] = {
     "Position": Position,
     "Event": Event,
     "Message": Message,
+    "ScreenerFilterPredicate": ScreenerFilterPredicate,
 }
 """Wire-contract type name (as in the golden files and ``canonical_json``) to model."""
 
