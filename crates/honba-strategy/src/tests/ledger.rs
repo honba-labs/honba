@@ -111,3 +111,23 @@ fn positions_lists_non_flat_ordered_by_symbol_then_venue() {
         vec![(acme_bse, 1.0), (acme_nse, 1.0), (nifty, 1.0)]
     );
 }
+
+#[test]
+fn invalid_intent_does_not_touch_pending_state() {
+    let mut ctx = LedgerContext::new();
+    let nifty = id("NIFTY50", "NSE");
+    ctx.submit(OrderIntent::market_buy(nifty.clone(), 10.0));
+    for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0] {
+        let intent = OrderIntent::market_buy(nifty.clone(), bad);
+        ctx.submit(intent.clone());
+        assert!(ctx.busy(&nifty), "pending wiped by quantity {bad}");
+        // The runner releases rejected intents; that must not corrupt it either.
+        ctx.release(&intent);
+        assert!(ctx.busy(&nifty), "pending wiped by release of {bad}");
+    }
+    // The valid 10 is still exactly what is pending: a 10-lot fill clears it.
+    ctx.apply_fill(&fill(&nifty, OrderSide::Buy, 10.0, 1.0, 0.0));
+    assert!(!ctx.busy(&nifty));
+    // Invalid intents are still handed to the runner to be rejected.
+    assert_eq!(ctx.drain_intents().len(), 5);
+}

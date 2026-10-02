@@ -127,7 +127,13 @@ impl LedgerContext {
 
     /// An intent was rejected or its order cancelled unfilled: it no longer
     /// counts towards [`StrategyContext::busy`].
+    ///
+    /// An intent that fails [`OrderIntent::validate`] never counted (see
+    /// `submit`), so releasing it is a no-op.
     pub fn release(&mut self, intent: &OrderIntent) {
+        if intent.validate().is_err() {
+            return;
+        }
         self.reduce_pending(&intent.instrument_id, intent.side, intent.quantity);
     }
 
@@ -180,14 +186,18 @@ impl StrategyContext for LedgerContext {
     }
 
     fn submit(&mut self, intent: OrderIntent) {
-        let p = self
-            .pending
-            .entry(intent.instrument_id.clone())
-            .or_default();
-        if intent.side == OrderSide::Buy {
-            p.buy += intent.quantity;
-        } else {
-            p.sell += intent.quantity;
+        // An invalid intent is still queued so the runner can reject it, but
+        // it must not touch the pending ledger (a NaN would corrupt it).
+        if intent.validate().is_ok() {
+            let p = self
+                .pending
+                .entry(intent.instrument_id.clone())
+                .or_default();
+            if intent.side == OrderSide::Buy {
+                p.buy += intent.quantity;
+            } else {
+                p.sell += intent.quantity;
+            }
         }
         self.outbox.push(intent);
     }
