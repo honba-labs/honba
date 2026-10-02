@@ -1,6 +1,6 @@
 """Type stubs for honba._honba native PyO3 extension module."""
 
-from typing import Final, List, Optional, Tuple
+from typing import Final
 
 SCHEMA_VERSION: Final[int]
 
@@ -32,8 +32,6 @@ class InstrumentId:
     symbol: str
     venue: str
     def __init__(self, symbol: str, venue: str = "NSE") -> None: ...
-    def __repr__(self) -> str: ...
-    def __str__(self) -> str: ...
 
 class QuoteTick:
     symbol: str
@@ -55,7 +53,6 @@ class QuoteTick:
     ) -> None: ...
     @property
     def mid_price(self) -> float: ...
-    def __repr__(self) -> str: ...
 
 class Bar:
     symbol: str
@@ -77,7 +74,6 @@ class Bar:
         volume: float = 0.0,
         venue: str = "NSE",
     ) -> None: ...
-    def __repr__(self) -> str: ...
 
 class Fill:
     symbol: str
@@ -93,7 +89,6 @@ class Fill:
         qty: float,
         side: str,
     ) -> None: ...
-    def __repr__(self) -> str: ...
 
 class OrderIntent:
     symbol: str
@@ -101,8 +96,8 @@ class OrderIntent:
     side: str
     quantity: float
     order_type: str
-    price: Optional[float]
-    trigger_price: Optional[float]
+    price: float | None
+    trigger_price: float | None
     time_in_force: str
     def __init__(
         self,
@@ -110,10 +105,10 @@ class OrderIntent:
         side: str,
         quantity: float,
         order_type: str = "market",
-        price: Optional[float] = None,
+        price: float | None = None,
         time_in_force: str = "day",
         venue: str = "NSE",
-        trigger_price: Optional[float] = None,
+        trigger_price: float | None = None,
     ) -> None: ...
     @staticmethod
     def market_buy(symbol: str, quantity: float, venue: str = "NSE") -> OrderIntent: ...
@@ -143,14 +138,13 @@ class OrderIntent:
     def stop_limit_sell(
         symbol: str, quantity: float, trigger_price: float, limit_price: float, venue: str = "NSE"
     ) -> OrderIntent: ...
-    def __repr__(self) -> str: ...
 
 class RustSmaCrossover:
     def __init__(self, fast: int = 3, slow: int = 8, qty: float = 1.0) -> None: ...
-    def on_bar(self, bar: Bar) -> Optional[Tuple[str, float]]: ...
-    def on_close(self, close: float) -> Optional[Tuple[str, float]]: ...
+    def on_bar(self, bar: Bar) -> tuple[str, float] | None: ...
+    def on_close(self, close: float) -> tuple[str, float] | None: ...
     @property
     def position(self) -> float: ...
     @property
     def intent_count(self) -> int: ...
-    def intents(self) -> List[Tuple[str, float]]: ...
+    def intents(self) -> list[tuple[str, float]]: ...
