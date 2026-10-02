@@ -1,4 +1,5 @@
 """Instrument identity and metadata (mirrors honba_messages::InstrumentId, honba_entities::Instrument)."""
+
 from __future__ import annotations
 
 import math
