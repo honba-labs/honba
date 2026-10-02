@@ -12,7 +12,7 @@
 use honba_engine::{AlgoError, ExecutionEngine, Handler};
 use honba_entities::{Currency, Instrument, InstrumentKind, Trade};
 use honba_messages::{InstrumentId, Message, Order};
-use honba_sim::BarFillEngine;
+use honba_sim::{BarFillEngine, FillCosts};
 pub use honba_strategy::MAX_SMA_PERIOD;
 use honba_strategy::{
     BuyAndHold, ContractProbe, IntentError, LedgerContext, SmaCrossover, Strategy, StrategyContext,
@@ -126,9 +126,10 @@ fn drive<S: Strategy>(
     strategy: S,
     ctx: LedgerContext,
     messages: &[Message],
+    costs: FillCosts,
 ) -> Result<(S, Value), String> {
     let err = |e: AlgoError| e.to_string();
-    let mut execution = BarFillEngine::new();
+    let mut execution = BarFillEngine::with_costs(costs);
     let mut runner = StrategyRunner::with_context(strategy, PricedBarFill(execution.clone()), ctx);
     runner.on_start().map_err(err)?;
     for msg in messages {
@@ -185,6 +186,31 @@ pub fn run_strategy_json(
     instruments: &str,
     initial_cash: f64,
 ) -> Result<String, String> {
+    run_strategy_costed_json(
+        strategy,
+        params,
+        events,
+        instruments,
+        initial_cash,
+        0.0,
+        0.0,
+    )
+}
+
+/// [`run_strategy_json`] with fill costs (ADR 008): every fill carries
+/// `flat_cost + quantity * price * cost_bps / 10_000`. `flat_cost` must be
+/// finite within `0..=1e9` and `cost_bps` finite within `0..=10_000`;
+/// otherwise a descriptive error is returned (no panic).
+pub fn run_strategy_costed_json(
+    strategy: &str,
+    params: &str,
+    events: &str,
+    instruments: &str,
+    initial_cash: f64,
+    flat_cost: f64,
+    cost_bps: f64,
+) -> Result<String, String> {
+    let costs = FillCosts::new(flat_cost, cost_bps).map_err(|e| e.to_string())?;
     let messages: Vec<Message> = parse("events", events)?;
     let raw_instruments: Vec<Value> = parse("instruments", instruments)?;
     let mut ctx = LedgerContext::with_cash(initial_cash);
@@ -195,14 +221,21 @@ pub fn run_strategy_json(
     let outcome = match strategy {
         "contract_probe" => {
             let p: ProbeParams = parse("contract_probe params", params)?;
-            let (probe, mut outcome) = drive(ContractProbe::new(p.instrument_id), ctx, &messages)?;
+            let (probe, mut outcome) =
+                drive(ContractProbe::new(p.instrument_id), ctx, &messages, costs)?;
             outcome["observations"] =
                 serde_json::to_value(probe.observations()).map_err(|e| e.to_string())?;
             outcome
         }
         "buy_and_hold" => {
             let p: BuyAndHoldParams = parse("buy_and_hold params", params)?;
-            drive(BuyAndHold::new(p.instrument_id, p.quantity), ctx, &messages)?.1
+            drive(
+                BuyAndHold::new(p.instrument_id, p.quantity),
+                ctx,
+                &messages,
+                costs,
+            )?
+            .1
         }
         "sma_crossover" => {
             let p: SmaParams = parse("sma_crossover params", params)?;
@@ -216,7 +249,7 @@ pub fn run_strategy_json(
                 ));
             }
             let s = SmaCrossover::new(p.instrument_id, p.fast, p.slow, p.quantity);
-            drive(s, ctx, &messages)?.1
+            drive(s, ctx, &messages, costs)?.1
         }
         other => {
             return Err(format!(
@@ -231,18 +264,31 @@ pub fn run_strategy_json(
 ///
 /// Returns JSON with `intents`, `rejections` (intents the runner refused, each
 /// with a typed `error`), `fills`, `observations`, `positions` and `cash`. Raises `ValueError` for an unknown strategy, invalid JSON or a
-/// failed run.
+/// failed run or invalid costs. `flat_cost` and `cost_bps` set the per-fill
+/// costs (default none); see ADR 008.
 #[pyfunction]
-#[pyo3(signature = (strategy, params, events, instruments="[]", initial_cash=0.0))]
+#[pyo3(signature = (
+    strategy, params, events, instruments="[]", initial_cash=0.0, flat_cost=0.0, cost_bps=0.0
+))]
 pub fn run_strategy(
     strategy: &str,
     params: &str,
     events: &str,
     instruments: &str,
     initial_cash: f64,
+    flat_cost: f64,
+    cost_bps: f64,
 ) -> PyResult<String> {
-    run_strategy_json(strategy, params, events, instruments, initial_cash)
-        .map_err(PyValueError::new_err)
+    run_strategy_costed_json(
+        strategy,
+        params,
+        events,
+        instruments,
+        initial_cash,
+        flat_cost,
+        cost_bps,
+    )
+    .map_err(PyValueError::new_err)
 }
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {

@@ -85,7 +85,9 @@ def run_python(scenario: dict[str, Any]) -> dict[str, Any]:
         cash=scenario["initial_cash"],
         instruments=[build_instrument(i) for i in scenario["instruments"]],
     )
-    runner = StrategyRunner(strategy, BarCloseFills(), ctx=ctx)
+    costs = scenario.get("fill_costs", {})
+    execution = BarCloseFills(flat_cost=costs.get("flat", 0.0), cost_bps=costs.get("bps", 0.0))
+    runner = StrategyRunner(strategy, execution, ctx=ctx)
     result = runner.run(from_wire_messages(json.dumps(scenario["events"])))
     return outcome(result, strategy)
 
@@ -97,6 +99,13 @@ def test_fixture_header():
     names = [s["name"] for s in SCENARIOS]
     assert len(names) == len(set(names))
     assert {s["strategy"] for s in SCENARIOS} == {"contract_probe", "buy_and_hold", "sma_crossover"}
+
+
+def test_fixture_covers_non_zero_costs():
+    costed = [s for s in SCENARIOS if s.get("fill_costs")]
+    assert costed, "no scenario exercises fill costs"
+    for s in costed:
+        assert any(f["costs"] > 0 for f in s["expected"]["fills"]), s["name"]
 
 
 def test_fixture_payloads_are_valid_wire_values():
@@ -120,12 +129,15 @@ def test_python_run_matches_the_fixture(scenario):
 def run_rust(scenario: dict[str, Any]) -> dict[str, Any]:
     from honba import _honba
 
+    costs = scenario.get("fill_costs", {})
     out = _honba.run_strategy(
         scenario["strategy"],
         json.dumps(scenario["params"]),
         json.dumps(scenario["events"]),
         json.dumps(scenario["instruments"]),
         scenario["initial_cash"],
+        flat_cost=costs.get("flat", 0.0),
+        cost_bps=costs.get("bps", 0.0),
     )
     return json.loads(out)
 
@@ -148,3 +160,19 @@ def test_run_strategy_rejects_unknown_strategies_and_bad_json():
     with pytest.raises(ValueError):
         _honba.run_strategy("buy_and_hold", params, "not json")
     assert json.loads(_honba.run_strategy("buy_and_hold", params, "[]"))["fills"] == []
+
+
+def test_run_strategy_costs_default_to_none_and_invalid_costs_raise_value_error():
+    from honba import _honba
+
+    params = json.dumps({"instrument_id": {"symbol": "X", "venue": "NSE"}, "quantity": 1.0})
+    for kwargs in (
+        {"flat_cost": -1.0},
+        {"flat_cost": float("nan")},
+        {"flat_cost": 1e12},
+        {"cost_bps": -1.0},
+        {"cost_bps": float("inf")},
+        {"cost_bps": 10_001.0},
+    ):
+        with pytest.raises(ValueError, match="fill cost"):
+            _honba.run_strategy("buy_and_hold", params, "[]", **kwargs)

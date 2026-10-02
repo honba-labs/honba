@@ -12,6 +12,8 @@ def run_strategy(
     events: str,
     instruments: str = "[]",
     initial_cash: float = 0.0,
+    flat_cost: float = 0.0,
+    cost_bps: float = 0.0,
 ) -> str:
     """Run a Rust reference strategy over JSON wire messages (ADR 008).
 
@@ -21,7 +23,9 @@ def run_strategy(
     ``intents``, ``rejections`` (intents refused for breaking an invariant, each
     ``{"ts_init", "intent", "error": {"kind", "message"}}``), ``fills``,
     ``observations``, ``positions`` and ``cash``.
-    Raises ``ValueError`` for an unknown strategy or invalid JSON.
+    ``flat_cost`` (``0..=1e9``) and ``cost_bps`` (``0..=10_000``) set the per-fill costs:
+    ``Trade.costs = flat_cost + quantity * price * cost_bps / 10_000`` (default none).
+    Raises ``ValueError`` for an unknown strategy, invalid JSON or invalid costs.
     """
 
 class InstrumentId:

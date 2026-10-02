@@ -73,7 +73,7 @@ this ADR:
    scripted stream of wire `Message`s, plus the expected intents (with the `ts_init` they were submitted at), fills
    (wire `Trade`), per-hook observations of the context, final positions and cash. The execution model is fixed by
    the fixture (`"fill_model": "bar_close"`: every order fills in full at the close of the most recent bar, fill time
-   `max(order ts, previous fill ts + 1)`, no costs), which is what `honba_sim::BarFillEngine` and the Python mirror
+   `max(order ts, previous fill ts + 1)`, costs per decision 10), which is what `honba_sim::BarFillEngine` and the Python mirror
    `honba.strategies.testing.BarCloseFills` do. The strategies under test exist in both languages:
    `contract_probe` (exercises every hook, every context capability and all four order types), `buy_and_hold` and
    `sma_crossover`. The suite runs in three places: Rust (`honba-strategy/tests/conformance.rs`), Python
@@ -106,6 +106,27 @@ this ADR:
    entry point for research and agents. Like the Python mirror it refuses (`ValueError`) an order submitted before
    any bar instead of filling it at 0.0.
 
+10. **Fill costs.** The `bar_close` model has an optional, backward-compatible cost parameter, `flat` and `bps`, both
+    defaulting to 0 (no costs, every earlier scenario and caller unchanged). The cost of a fill is
+
+    `costs = flat + (quantity * price) * bps / 10_000`
+
+    evaluated left to right in IEEE-754 `f64`, with no rounding (`quantity * price` first, then `* bps`, then
+    `/ 10_000`, then `flat +`). `price` is the fill price (the last bar close). `costs` is an amount in the settlement
+    currency: never negative and never signed by side. It is stored in `Trade.costs`; the ledger applies the sign
+    (decision 2): a buy debits `quantity * price + costs`, a sell credits `quantity * price - costs`. Validation:
+    `flat` is finite within `[0, 1e9]` and `bps` finite within `[0, 10_000]` (100% of the notional), otherwise a typed
+    error (Rust `FillCostsError::{InvalidFlat, InvalidBps}`, Python `FillCostsError(ValueError)`, and a `ValueError`
+    from `run_strategy`); nothing panics across the FFI.
+    - Rust: `honba_sim::FillCosts::new(flat, bps)` and `BarFillEngine::with_costs`; `run_strategy` takes
+      `flat_cost` and `cost_bps` keyword arguments (stub `python/honba/_lib/__init__.pyi`), and the Rust API gains
+      `run_strategy_costed_json` beside the unchanged `run_strategy_json`.
+    - Python: `BarCloseFills(flat_cost=0.0, cost_bps=0.0)`.
+    - Fixture: a scenario may carry `"fill_costs": {"flat": ..., "bps": ...}`; absent means no costs. The scenario
+      `contract_probe_fill_costs` (flat 0.5, 625 bps; prices 64, 64, 32) pins the semantics with values derived by
+      hand: costs 4.5, 4.5, 2.5; cash -68.5, -9.0, -43.5. 625 bps is chosen so every product is exact in binary
+      floating point.
+
 ## Consequences
 - Breaking (Rust): every `Strategy` hook takes `ctx: &mut dyn StrategyContext`; market-data hooks lose `ts_init`;
   `drain_intents` is removed (submit with `ctx.submit`). `StrategyAdapter` owns a `LedgerContext`. In-repo
@@ -127,7 +148,5 @@ this ADR:
 - The Rust stub `python/honba/_lib/__init__.pyi` is not mapped to the module `honba._honba`, so type checkers
   and the CI stubtest do not cover it (including `run_strategy`). Moving it would surface about 79 existing
   stubtest errors in older pyclasses; fixing them is a separate ticket. The stub was deliberately not moved here.
-- Conformance covers bar-close fills with no costs only: `bar_close` has no cost parameter, so cost signs are
-  covered by runner-level unit tests in both languages, not by the shared fixture.
 - Venue-side rejections and cancellations (an order state machine) are E2-S6; until then `release` is only driven by
   invariant rejections in Rust and by `handle_rejected` in Python.

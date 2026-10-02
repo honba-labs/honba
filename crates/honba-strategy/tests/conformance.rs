@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use honba_engine::Handler;
 use honba_entities::{Currency, Instrument, InstrumentKind};
 use honba_messages::{InstrumentId, Message, SCHEMA_VERSION};
-use honba_sim::BarFillEngine;
+use honba_sim::{BarFillEngine, FillCosts};
 use honba_strategy::{
     BuyAndHold, ContractProbe, LedgerContext, SmaCrossover, Strategy, StrategyContext,
     StrategyRunner,
@@ -57,10 +57,18 @@ fn context(scenario: &Value) -> LedgerContext {
     ctx
 }
 
+/// The scenario's optional `fill_costs` (`{"flat", "bps"}`); none when absent.
+fn fill_costs(scenario: &Value) -> FillCosts {
+    match scenario.get("fill_costs") {
+        None => FillCosts::default(),
+        Some(c) => FillCosts::new(c["flat"].as_f64().unwrap(), c["bps"].as_f64().unwrap()).unwrap(),
+    }
+}
+
 /// Runs `strategy` over the scenario's messages and returns the outcome in
 /// the fixture's JSON shape (observations are added by the caller).
 fn run<S: Strategy>(strategy: S, scenario: &Value) -> (S, Value) {
-    let mut execution = BarFillEngine::new();
+    let mut execution = BarFillEngine::with_costs(fill_costs(scenario));
     let mut runner = StrategyRunner::with_context(strategy, execution.clone(), context(scenario));
     runner.on_start().unwrap();
     for m in scenario["events"].as_array().unwrap() {
@@ -125,7 +133,7 @@ fn fixture_header() {
     assert_eq!(doc["schema_version"], u64::from(SCHEMA_VERSION));
     assert_eq!(doc["type"], "StrategyConformance");
     assert_eq!(doc["fill_model"], "bar_close");
-    assert_eq!(doc["scenarios"].as_array().unwrap().len(), 5);
+    assert_eq!(doc["scenarios"].as_array().unwrap().len(), 6);
 }
 
 #[test]

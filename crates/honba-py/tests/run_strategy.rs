@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-use honba::pyclasses::run::run_strategy_json;
+use honba::pyclasses::run::{run_strategy_costed_json, run_strategy_json};
 use serde_json::Value;
 
 #[test]
@@ -14,12 +14,15 @@ fn run_strategy_matches_every_conformance_scenario() {
     let doc: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
     for s in doc["scenarios"].as_array().unwrap() {
         let name = s["name"].as_str().unwrap();
-        let out = run_strategy_json(
+        let costs = &s["fill_costs"];
+        let out = run_strategy_costed_json(
             s["strategy"].as_str().unwrap(),
             &s["params"].to_string(),
             &s["events"].to_string(),
             &s["instruments"].to_string(),
             s["initial_cash"].as_f64().unwrap(),
+            costs["flat"].as_f64().unwrap_or(0.0),
+            costs["bps"].as_f64().unwrap_or(0.0),
         )
         .unwrap_or_else(|e| panic!("{name}: {e}"));
         let mut got: Value = serde_json::from_str(&out).unwrap();
@@ -61,4 +64,34 @@ fn run_strategy_has_an_empty_rejections_array_for_valid_runs() {
     let got = run_buy_and_hold("10.0");
     assert_eq!(got["rejections"], serde_json::json!([]));
     assert_eq!(got["intents"].as_array().unwrap().len(), 1);
+}
+
+#[test]
+fn run_strategy_costed_charges_costs_and_the_plain_entry_point_charges_none() {
+    let params = BUY_AND_HOLD.replace("QTY", "10.0");
+    // 10 * 2950 = 29500; 100 bps of it is 295.0; plus a flat 5.
+    let out =
+        run_strategy_costed_json("buy_and_hold", &params, BAR, "[]", 0.0, 5.0, 100.0).unwrap();
+    let got: Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(got["fills"][0]["costs"], 300.0);
+    assert_eq!(got["cash"], -29800.0);
+    assert_eq!(run_buy_and_hold("10.0")["fills"][0]["costs"], 0.0);
+}
+
+#[test]
+fn run_strategy_costed_rejects_invalid_costs_with_an_error_not_a_panic() {
+    let params = BUY_AND_HOLD.replace("QTY", "1.0");
+    for (flat, bps) in [
+        (-1.0, 0.0),
+        (f64::NAN, 0.0),
+        (f64::INFINITY, 0.0),
+        (1e12, 0.0),
+        (0.0, -1.0),
+        (0.0, f64::NAN),
+        (0.0, 10_001.0),
+    ] {
+        let err = run_strategy_costed_json("buy_and_hold", &params, BAR, "[]", 0.0, flat, bps)
+            .unwrap_err();
+        assert!(err.contains("fill cost"), "{err}");
+    }
 }

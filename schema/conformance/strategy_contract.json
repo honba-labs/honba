@@ -1584,6 +1584,258 @@
         ],
         "cash": 950.0
       }
+    },
+    {
+      "name": "contract_probe_fill_costs",
+      "description": "Non-zero fill costs (flat 0.5 + 625 bps of the notional): every fill carries cost = 0.5 + q*p*625/10000, a buy debits q*p + cost, a sell credits q*p - cost. Expected values derived by hand from ADR 008.",
+      "strategy": "contract_probe",
+      "params": {
+        "instrument_id": {
+          "symbol": "ACME",
+          "venue": "NSE"
+        }
+      },
+      "initial_cash": 0.0,
+      "instruments": [],
+      "events": [
+        {
+          "schema_version": 1,
+          "event": {
+            "type": "bar",
+            "bar_type": {
+              "instrument_id": {
+                "symbol": "ACME",
+                "venue": "NSE"
+              },
+              "spec": {
+                "step": 1,
+                "aggregation": "minute",
+                "price_type": "last"
+              }
+            },
+            "open": 64.0,
+            "high": 64.0,
+            "low": 64.0,
+            "close": 64.0,
+            "volume": 1000.0,
+            "ts_event": 100,
+            "ts_init": 100
+          },
+          "ts_init": 100
+        },
+        {
+          "schema_version": 1,
+          "event": {
+            "type": "trade",
+            "instrument_id": {
+              "symbol": "ACME",
+              "venue": "NSE"
+            },
+            "price": 50.5,
+            "size": 1.0,
+            "aggressor_side": "no_aggressor",
+            "trade_id": "T-7",
+            "ts_event": 200,
+            "ts_init": 200
+          },
+          "ts_init": 200
+        },
+        {
+          "schema_version": 1,
+          "event": {
+            "type": "bar",
+            "bar_type": {
+              "instrument_id": {
+                "symbol": "ACME",
+                "venue": "NSE"
+              },
+              "spec": {
+                "step": 1,
+                "aggregation": "minute",
+                "price_type": "last"
+              }
+            },
+            "open": 32.0,
+            "high": 32.0,
+            "low": 32.0,
+            "close": 32.0,
+            "volume": 1000.0,
+            "ts_event": 300,
+            "ts_init": 300
+          },
+          "ts_init": 300
+        }
+      ],
+      "expected": {
+        "intents": [
+          {
+            "ts_init": 100,
+            "intent": {
+              "instrument_id": {
+                "symbol": "ACME",
+                "venue": "NSE"
+              },
+              "side": "buy",
+              "quantity": 1.0,
+              "order_type": "market",
+              "price": null,
+              "trigger_price": null,
+              "time_in_force": "day"
+            }
+          },
+          {
+            "ts_init": 200,
+            "intent": {
+              "instrument_id": {
+                "symbol": "ACME",
+                "venue": "NSE"
+              },
+              "side": "sell",
+              "quantity": 1.0,
+              "order_type": "stop_market",
+              "price": null,
+              "trigger_price": 63.9,
+              "time_in_force": "day"
+            }
+          },
+          {
+            "ts_init": 300,
+            "intent": {
+              "instrument_id": {
+                "symbol": "ACME",
+                "venue": "NSE"
+              },
+              "side": "buy",
+              "quantity": 1.0,
+              "order_type": "market",
+              "price": null,
+              "trigger_price": null,
+              "time_in_force": "day"
+            }
+          }
+        ],
+        "fills": [
+          {
+            "order_id": "contract_probe-0",
+            "instrument_id": {
+              "symbol": "ACME",
+              "venue": "NSE"
+            },
+            "side": "buy",
+            "quantity": 1.0,
+            "price": 64.0,
+            "costs": 4.5,
+            "ts_event": 100,
+            "ts_init": 100
+          },
+          {
+            "order_id": "contract_probe-1",
+            "instrument_id": {
+              "symbol": "ACME",
+              "venue": "NSE"
+            },
+            "side": "sell",
+            "quantity": 1.0,
+            "price": 64.0,
+            "costs": 4.5,
+            "ts_event": 200,
+            "ts_init": 200
+          },
+          {
+            "order_id": "contract_probe-2",
+            "instrument_id": {
+              "symbol": "ACME",
+              "venue": "NSE"
+            },
+            "side": "buy",
+            "quantity": 1.0,
+            "price": 32.0,
+            "costs": 2.5,
+            "ts_event": 300,
+            "ts_init": 300
+          }
+        ],
+        "observations": [
+          {
+            "hook": "on_start",
+            "now": 0,
+            "position": 0.0,
+            "cash": 0.0,
+            "busy": false,
+            "open_positions": 0
+          },
+          {
+            "hook": "on_bar",
+            "now": 100,
+            "position": 0.0,
+            "cash": 0.0,
+            "busy": true,
+            "open_positions": 0
+          },
+          {
+            "hook": "on_fill",
+            "now": 100,
+            "position": 1.0,
+            "cash": -68.5,
+            "busy": false,
+            "open_positions": 1
+          },
+          {
+            "hook": "on_trade",
+            "now": 200,
+            "position": 1.0,
+            "cash": -68.5,
+            "busy": true,
+            "open_positions": 1
+          },
+          {
+            "hook": "on_fill",
+            "now": 200,
+            "position": 0.0,
+            "cash": -9.0,
+            "busy": false,
+            "open_positions": 0
+          },
+          {
+            "hook": "on_bar",
+            "now": 300,
+            "position": 0.0,
+            "cash": -9.0,
+            "busy": false,
+            "open_positions": 0
+          },
+          {
+            "hook": "on_fill",
+            "now": 300,
+            "position": 1.0,
+            "cash": -43.5,
+            "busy": false,
+            "open_positions": 1
+          },
+          {
+            "hook": "on_stop",
+            "now": 300,
+            "position": 1.0,
+            "cash": -43.5,
+            "busy": false,
+            "open_positions": 1
+          }
+        ],
+        "positions": [
+          {
+            "instrument_id": {
+              "symbol": "ACME",
+              "venue": "NSE"
+            },
+            "quantity": 1.0
+          }
+        ],
+        "cash": -43.5
+      },
+      "fill_costs": {
+        "flat": 0.5,
+        "bps": 625.0
+      }
     }
   ]
 }
