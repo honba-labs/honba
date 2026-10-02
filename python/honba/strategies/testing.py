@@ -8,6 +8,7 @@ that produced them (or ``fill_delay`` bars later at the open), with no costs.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
@@ -19,6 +20,22 @@ from honba.entities.tick import QuoteTick, TradeTick
 from honba.entities.trade import Trade
 from honba.strategies.base import Strategy
 from honba.strategies.context import LedgerContext
+
+MAX_FLAT_COST = 1e9
+"""Largest accepted flat cost per fill (mirrors ``honba_sim::MAX_FLAT_COST``)."""
+
+MAX_COST_BPS = 10_000.0
+"""Largest accepted proportional cost in bps of the fill notional (100%)."""
+
+
+class FillCostsError(ValueError):
+    """Invalid ``BarCloseFills`` cost parameter (not finite, negative or above its cap)."""
+
+
+def _checked(name: str, value: float, cap: float) -> float:
+    if not (math.isfinite(value) and 0.0 <= value <= cap):
+        raise FillCostsError(f"{name} must be finite and within 0..={cap}, got {value}")
+    return float(value)
 
 
 @dataclass
@@ -62,13 +79,20 @@ def _fill(
 class BarCloseFills:
     """Simulated execution: every order fills in full at the latest bar close.
 
-    Fill time is ``max(order ts, previous fill ts + 1)``; no costs. This is the
+    Fill time is ``max(order ts, previous fill ts + 1)``. This is the
     ``"bar_close"`` fill model of the conformance fixture and mirrors Rust's
     ``BarFillEngine``, except that an order before any bar raises instead of
     filling at 0.0 (a known gap of the Rust engine, ADR 006).
+
+    Costs (ADR 008) default to none. With ``flat_cost`` (``0..=MAX_FLAT_COST``)
+    and ``cost_bps`` (``0..=MAX_COST_BPS``) every fill carries
+    ``Trade.costs = flat_cost + (quantity * price) * cost_bps / 10_000``,
+    unrounded and not signed by side. Invalid values raise ``FillCostsError``.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, flat_cost: float = 0.0, cost_bps: float = 0.0) -> None:
+        self._flat_cost = _checked("flat_cost", flat_cost, MAX_FLAT_COST)
+        self._cost_bps = _checked("cost_bps", cost_bps, MAX_COST_BPS)
         self._last_price: float | None = None
         self._next_ts = 0
         self._fills: list[Trade] = []
@@ -90,6 +114,8 @@ class BarCloseFills:
                 self._last_price,
                 fill_ts,
                 order_id,
+                costs=self._flat_cost
+                + (intent.quantity * self._last_price) * self._cost_bps / 10_000.0,
             )
         )
 

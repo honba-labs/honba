@@ -10,7 +10,7 @@ from honba.entities.trade import Trade
 from honba.strategies.base import Strategy
 from honba.strategies.context import LedgerContext
 from honba.strategies.runner import StrategyRunner
-from honba.strategies.testing import BarCloseFills
+from honba.strategies.testing import MAX_COST_BPS, MAX_FLAT_COST, BarCloseFills, FillCostsError
 
 X = InstrumentId("X", "NSE")
 
@@ -137,6 +137,79 @@ def test_bar_close_fills_refuses_an_order_before_any_bar():
     # Rust BarFillEngine fills at 0.0 here (known gap, ADR 006); the mirror refuses.
     with pytest.raises(RuntimeError):
         BarCloseFills().submit("a-0", OrderIntent.market_buy(X, 1), 1)
+
+
+def test_bar_close_fills_default_charges_no_costs():
+    ex = BarCloseFills()
+    ex.on_event(bar(101.0, 1), ts_init=1)
+    ex.submit("a-0", OrderIntent.market_buy(X, 3), 1)
+    assert ex.drain_fills()[0].costs == 0.0
+
+
+def test_bar_close_fills_costs_are_flat_plus_bps_of_the_notional():
+    # notional 10 * 100 = 1000; 10 bps of it is 1.0; plus the flat 20.
+    ex = BarCloseFills(flat_cost=20.0, cost_bps=10.0)
+    ex.on_event(bar(100.0, 1), ts_init=1)
+    ex.submit("a-0", OrderIntent.market_buy(X, 10), 1)
+    ex.submit("a-1", OrderIntent.market_sell(X, 10), 1)
+    buy, sell = ex.drain_fills()
+    assert (buy.costs, sell.costs) == (21.0, 21.0)  # an amount, not signed by side
+    assert buy.price == 100.0
+
+
+def test_bar_close_fills_flat_only_and_bps_only():
+    flat = BarCloseFills(flat_cost=2.5)
+    flat.on_event(bar(100.0, 1), ts_init=1)
+    flat.submit("a-0", OrderIntent.market_buy(X, 3), 1)
+    assert flat.drain_fills()[0].costs == 2.5
+    bps = BarCloseFills(cost_bps=625.0)
+    bps.on_event(bar(64.0, 1), ts_init=1)
+    bps.submit("a-0", OrderIntent.market_sell(X, 1), 1)
+    assert bps.drain_fills()[0].costs == 4.0
+
+
+def test_costs_reach_the_context_cash_through_the_simulator():
+    class BuySell(Strategy):
+        name = "bs"
+
+        def on_bar(self, bar):
+            if not self.ctx.busy(X):
+                side = self.ctx.position(X)
+                self.ctx.submit(
+                    OrderIntent.market_sell(X, 1) if side else OrderIntent.market_buy(X, 1)
+                )
+
+    ex = BarCloseFills(flat_cost=0.5, cost_bps=625.0)
+    runner = StrategyRunner(BuySell(), ex)
+    ex.on_event(bar(64.0, 1), ts_init=1)
+    runner.on_event(bar(64.0, 1), ts_init=1)  # buy: debit 64 + (0.5 + 4.0)
+    assert runner.ctx.cash() == -68.5
+    ex.on_event(bar(64.0, 2), ts_init=2)
+    runner.on_event(bar(64.0, 2), ts_init=2)  # sell: credit 64 - 4.5
+    assert runner.ctx.cash() == -9.0
+
+
+@pytest.mark.parametrize(
+    ("flat", "bps"),
+    [
+        (-0.01, 0.0),
+        (float("nan"), 0.0),
+        (float("inf"), 0.0),
+        (MAX_FLAT_COST + 1, 0.0),
+        (0.0, -1.0),
+        (0.0, float("nan")),
+        (0.0, float("inf")),
+        (0.0, MAX_COST_BPS + 1),
+    ],
+)
+def test_bar_close_fills_rejects_invalid_costs_with_a_typed_error(flat, bps):
+    with pytest.raises(FillCostsError):
+        BarCloseFills(flat_cost=flat, cost_bps=bps)
+    assert issubclass(FillCostsError, ValueError)
+
+
+def test_bar_close_fills_accepts_the_cost_caps():
+    BarCloseFills(flat_cost=MAX_FLAT_COST, cost_bps=MAX_COST_BPS)
 
 
 def test_run_feeds_the_simulator_before_the_strategy():
