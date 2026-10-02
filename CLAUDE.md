@@ -46,7 +46,7 @@ ruff check .                              # line-length 100
 
 Optional extras: `ai` (openai, anthropic, litellm, mcp), `rl` (torch, gymnasium). CLI entry point: `honba` → `honba.cli.main:app` (typer; subcommands in `python/honba/cli/`: backtest, data, optimize, research, strategy, ai).
 
-CI: Rust job (fmt, check, clippy `-D warnings`, test, doctest, doc), dependency-graph check, and Python job (deps, maturin develop, stubtest, pytest, schema drift) are all blocking. A ruff lint step (`ruff check python`, `ruff format --check python`) runs with `continue-on-error` until the pre-existing findings are cleaned up.
+CI: Rust job (fmt, check, clippy `-D warnings`, test, doctest, doc), dependency-graph check, and Python job (deps, maturin develop, stubtest, pytest, schema drift, ruff lint: `ruff check python` and `ruff format --check python`) are all blocking.
 
 ## Rust test layout (ADR 007)
 

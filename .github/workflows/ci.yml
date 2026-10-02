@@ -91,10 +91,7 @@ jobs:
         run: |
           make check-schema
 
-      # Not blocking yet: the python tree has pre-existing ruff findings (see CLAUDE.md).
-      # Make blocking once `ruff check python` and `ruff format --check python` are clean.
       - name: lint (ruff)
-        continue-on-error: true
         run: |
           pip install ruff
           ruff check python
