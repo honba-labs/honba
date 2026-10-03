@@ -21,6 +21,7 @@ Logged event types mirror ``honba-messages::Event`` wire types exactly so that
 from __future__ import annotations
 
 import logging
+import honba.log as _honba_log  # noqa: F401 — triggers auto-init from HONBA_LOG_EVENTS
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any, Protocol

@@ -204,3 +204,12 @@ def setup_event_logging(
 
     target_logger.addHandler(handler)
     return handler
+
+
+# ---------------------------------------------------------------------------
+# Auto-initialization: if HONBA_LOG_EVENTS is set in the environment when
+# this module is first imported, configure logging immediately.
+# Scripts and examples don't need to call setup_event_logging() explicitly.
+# ---------------------------------------------------------------------------
+if os.environ.get("HONBA_LOG_EVENTS", "").strip():
+    setup_event_logging()
