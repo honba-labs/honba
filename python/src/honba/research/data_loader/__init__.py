@@ -6,4 +6,5 @@ from honba.data.loaders import (
     bse as bse,
     cache as cache,
     nse as nse,
+    yfinance as yfinance,
 )

@@ -15,6 +15,7 @@ from honba.screener.coverage import DateInterval
 from honba.screener.ports import InMemoryBarStore, InMemoryMarketDataProvider
 from honba.screener.store import ParquetBarStore
 from honba.research.data_loader.nse import NseBhavcopyProvider
+from honba.data.loaders.yfinance import YFinanceProvider
 from honba.screener.service import DataService
 
 app = typer.Typer(help="Data inspection and fetch commands: coverage, gaps, fetch", no_args_is_help=True)
@@ -25,10 +26,11 @@ err_console = Console(stderr=True)
 # Persistent Parquet and ledger store located in project root honba/data or ./data
 _STORE = ParquetBarStore()
 _NSE_PROVIDER = NseBhavcopyProvider(cache_dir=_STORE.data_dir / "cache" / "bhavcopy")
+_YFINANCE_PROVIDER = YFinanceProvider()
 _MOCK_PROVIDER = InMemoryMarketDataProvider()
 
-# Bhavcopy provider is primary for real market data; mock provider is fallback
-_DATA_SERVICE = DataService(store=_STORE, providers=[_NSE_PROVIDER, _MOCK_PROVIDER])
+# Default service: NSE bhavcopy first, yfinance fallback for daily / primary for intraday
+_DATA_SERVICE = DataService(store=_STORE, providers=[_NSE_PROVIDER, _YFINANCE_PROVIDER, _MOCK_PROVIDER])
 
 
 @app.command("coverage")
@@ -109,6 +111,7 @@ def fetch_cmd(
     timeframe: Annotated[str, typer.Option("--timeframe", "-t", help="Timeframe [default: 1D]")] = "1D",
     start: Annotated[str, typer.Option("--start", "-s", help="Start date YYYY-MM-DD", show_default="2024-01-01")] = "2024-01-01",
     end: Annotated[str | None, typer.Option("--end", "-d", help="End date YYYY-MM-DD", show_default="today")] = None,
+    provider: Annotated[str, typer.Option("--provider", "-p", help="Provider: auto, yfinance, nse [default: auto]")] = "auto",
 ) -> None:
     """Fetch missing data and fill gaps without running a scan."""
     inst = InstrumentId(symbol, exchange)
@@ -116,7 +119,18 @@ def fetch_cmd(
     end_date = dt.date.fromisoformat(end) if end else dt.date.today() + dt.timedelta(days=1)
     req_interval = DateInterval(start_date, end_date)
 
-    plan = _DATA_SERVICE.plan([inst], timeframe, req_interval)
+    p_clean = provider.lower().strip()
+    if p_clean == "yfinance":
+        svc = DataService(store=_STORE, providers=[_YFINANCE_PROVIDER])
+    elif p_clean == "nse":
+        svc = DataService(store=_STORE, providers=[_NSE_PROVIDER])
+    elif timeframe.upper() not in ("1D", "D", "DAILY"):
+        # Intraday default to yfinance
+        svc = DataService(store=_STORE, providers=[_YFINANCE_PROVIDER])
+    else:
+        svc = _DATA_SERVICE
+
+    plan = svc.plan([inst], timeframe, req_interval)
     gaps = plan.gaps_by_instrument.get(inst, [])
 
     from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
@@ -145,7 +159,7 @@ def fetch_cmd(
                 description=f"Fetching {symbol}.{exchange} ({session_date.strftime('%Y-%m-%d')})",
             )
 
-        res = _DATA_SERVICE.ensure(plan, progress_callback=on_progress)
+        res = svc.ensure(plan, progress_callback=on_progress)
 
     if res.success:
         total_bars = sum(len(b) for b in res.bars.values())

@@ -118,6 +118,8 @@ class DataService:
                 for provider in self.providers:
                     try:
                         bars = provider.fetch(inst, plan.timeframe, gap, progress_callback=progress_callback)
+                        if not bars:
+                            continue
                         source_used = provider.name
                         # Validate
                         for b in bars:
