@@ -9,10 +9,18 @@ Per event ``(event, ts_init)`` (ADR 008, decision 5):
 4. fills drained from the port are booked in the context, then passed to ``on_fill``.
 
 Intents submitted in ``on_stop`` are never executed.
+
+Logged event types mirror ``honba-messages::Event`` wire types exactly so that
+``honba.log.EventFilter`` can filter them by wire name:
+
+* ``order``          – intent submitted to the execution port
+* ``order_rejected`` – intent failed validation (WARNING level, always admitted)
+* ``order_filled``   – fill received from the execution port
 """
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -76,6 +84,9 @@ class StrategyRunner:
         self.execution = execution
         self.ctx = ctx if ctx is not None else LedgerContext()
         strategy.bind(self.ctx)
+        # Logger name: honba.runner.<strategy-name>
+        # Filter with: EventFilter(["order_filled", "order_rejected", ...])
+        self.logger = logging.getLogger(f"honba.runner.{strategy.name}")
         self._seq = 0
         self.intents: list[SubmittedIntent] = []
         self.fills: list[Trade] = []
@@ -131,15 +142,43 @@ class StrategyRunner:
                 )
             except ValueError as error:
                 self.rejections.append(IntentRejection(ts_init, intent, str(error)))
+                # Wire type: order_rejected — WARNING always passes EventFilter
+                self.logger.warning(
+                    "order_rejected: order_id=pending symbol=%s side=%s reason=%s",
+                    intent.instrument_id.symbol,
+                    intent.side.name,
+                    error,
+                    extra={
+                        "event_type": "order_rejected",
+                        "symbol": intent.instrument_id.symbol,
+                        "reason": str(error),
+                    },
+                )
                 if _overrides(self.strategy, "handle_rejected"):
                     self.strategy.handle_rejected(intent)
                 else:
                     self.ctx.release(intent)
                 continue
+
             order_id = f"{self.strategy.name}-{self._seq}"
             self._seq += 1
             self.execution.submit(order_id, intent, ts_init)
             self.intents.append(SubmittedIntent(ts_init, intent, order_id))
+            # Wire type: order (DEBUG — not emitted unless level <= DEBUG)
+            self.logger.debug(
+                "order: order_id=%s symbol=%s side=%s qty=%s",
+                order_id,
+                intent.instrument_id.symbol,
+                intent.side.name,
+                intent.quantity,
+                extra={
+                    "event_type": "order",
+                    "order_id": order_id,
+                    "symbol": intent.instrument_id.symbol,
+                    "side": intent.side.name,
+                    "qty": intent.quantity,
+                },
+            )
 
     def _book_fills(self) -> None:
         for fill in self.execution.drain_fills():
@@ -149,3 +188,22 @@ class StrategyRunner:
                 self.ctx.apply_fill(fill)
                 self.strategy.on_fill(fill)
             self.fills.append(fill)
+            # Wire type: order_filled (INFO)
+            self.logger.info(
+                "order_filled: order_id=%s symbol=%s side=%s last_qty=%s last_px=%.4f cost=%.4f",
+                fill.order_id or "?",
+                fill.instrument_id.symbol,
+                fill.side.name,
+                fill.quantity,
+                fill.price,
+                fill.costs,
+                extra={
+                    "event_type": "order_filled",
+                    "order_id": fill.order_id,
+                    "symbol": fill.instrument_id.symbol,
+                    "side": fill.side.name,
+                    "last_qty": fill.quantity,
+                    "last_px": fill.price,
+                    "cost": fill.costs,
+                },
+            )

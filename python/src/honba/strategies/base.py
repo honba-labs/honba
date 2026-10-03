@@ -8,6 +8,7 @@ execution directly, so the same strategy runs in backtest, paper and live.
 
 from __future__ import annotations
 
+import logging
 import warnings
 from abc import ABC
 from typing import TYPE_CHECKING, Any, ClassVar
@@ -53,6 +54,7 @@ class Strategy(ABC):
             raise TypeError(f"{cls.__name__} must define a class attribute `name`")
         self = super().__new__(cls)
         self._ctx = LedgerContext()
+        self.logger = logging.getLogger(f"honba.strategy.{cls.name}")
         return self
 
     # -- context ---------------------------------------------------------------
@@ -95,10 +97,31 @@ class Strategy(ABC):
         """
         return self.ctx.busy(instrument_id)
 
-    def buy(self, instrument_id: InstrumentId, quantity: float) -> None:
+    def log_event(self, event_type: str, message: str = "", **data: Any) -> None:
+        """Emit a structured event log for this strategy.
+
+        Parameters
+        ----------
+        event_type : str
+            Event name/identifier (e.g. 'EVENT_BUY', 'EVENT_MEMBERSHIP_ADD').
+        message : str, optional
+            Optional human-readable description.
+        **data : Any
+            Key-value pairs to log as event attributes.
+        """
+        parts = [event_type]
+        if message:
+            parts.append(message)
+        if data:
+            parts.append(" ".join(f"{k}={v}" for k, v in data.items()))
+        self.logger.info(" ".join(parts), extra={"event_type": event_type, "event_data": data})
+
+    def buy(self, instrument_id: InstrumentId, quantity: float, **data: Any) -> None:
+        self.log_event("EVENT_BUY", symbol=instrument_id.symbol, qty=quantity, **data)
         self.submit(OrderIntent.market_buy(instrument_id, quantity))
 
-    def sell(self, instrument_id: InstrumentId, quantity: float) -> None:
+    def sell(self, instrument_id: InstrumentId, quantity: float, **data: Any) -> None:
+        self.log_event("EVENT_SELL", symbol=instrument_id.symbol, qty=quantity, **data)
         self.submit(OrderIntent.market_sell(instrument_id, quantity))
 
     def submit(self, intent: OrderIntent) -> None:

@@ -57,6 +57,9 @@ from honba.strategies import (
     indicators,
 )
 
+# Logging & Events
+from honba.log import EventFilter, setup_event_logging
+
 # Wire contracts (ADR 006)
 from honba.wire import (
     ENUMS,
@@ -88,6 +91,7 @@ __all__ = [
     "DataService",
     "DateInterval",
     "ENUMS",
+    "EventFilter",
     "GapFetchPlan",
     "InMemoryBarStore",
     "InMemoryMarketDataProvider",
@@ -131,4 +135,5 @@ __all__ = [
     "__version__",
     "indicators",
     "load_catalog",
+    "setup_event_logging",
 ]
