@@ -190,8 +190,16 @@ class StrategyRunner:
                 self.strategy.on_fill(fill)
             self.fills.append(fill)
             # Wire type: order_filled (INFO)
+            # ts_event is the simulated bar date (Unix ns), formatted as YYYY-MM-DD for readability
+            ts_ns = fill.ts or 0
+            if ts_ns > 0:
+                from datetime import datetime, timezone
+                bar_date = datetime.fromtimestamp(ts_ns / 1e9, tz=timezone.utc).strftime("%Y-%m-%d")
+            else:
+                bar_date = "?"
             self.logger.info(
-                "order_filled: order_id=%s symbol=%s side=%s last_qty=%s last_px=%.4f cost=%.4f",
+                "order_filled: ts_event=%s order_id=%s symbol=%s side=%s last_qty=%s last_px=%.4f cost=%.4f",
+                bar_date,
                 fill.order_id or "?",
                 fill.instrument_id.symbol,
                 fill.side.name,
@@ -200,6 +208,7 @@ class StrategyRunner:
                 fill.costs,
                 extra={
                     "event_type": "order_filled",
+                    "ts_event": bar_date,
                     "order_id": fill.order_id,
                     "symbol": fill.instrument_id.symbol,
                     "side": fill.side.name,
