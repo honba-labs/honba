@@ -140,6 +140,7 @@ class BacktestConfig:
     end: str | date | datetime = ""
     timeframe: str = "1d"
     cash: float = 1_000_000.0
+    currency: str = "INR"
     # Named cost pack ("india.equity") or a CostModel instance. Resolved in Session.
     costs: str | CostModel = "india.equity"
     fill: FillModel = "bar_close"
@@ -186,7 +187,7 @@ class BacktestResult:
     # Optional narrative / debug
     notes: list[str] = field(default_factory=list)
 
-    def print_report(self, format: str = "table") -> None:
+    def print_report(self, format: str = "tui") -> None:
         """Print a human- or machine-readable report.
 
         format:
@@ -376,6 +377,7 @@ class Honba:
         end: str | date | datetime,
         timeframe: str = "1d",
         cash: float = 1_000_000.0,
+        currency: str = "INR",
         costs: str | CostModel = "india.equity",
         fill: FillModel = "bar_close",
         data: DataProvider | None = None,
@@ -397,7 +399,7 @@ class Honba:
         timeframe:
           Bar size string understood by the provider ("1d", "5m", ...).
         cash:
-          Starting portfolio cash in account currency (INR for India packs).
+          Starting portfolio cash in account currency.
         costs:
           Named pack ("india.equity") or a CostModel instance.
         fill:
@@ -413,6 +415,7 @@ class Honba:
             end=end,
             timeframe=timeframe,
             cash=cash,
+            currency=currency,
             costs=costs,
             fill=fill,
             data=data,

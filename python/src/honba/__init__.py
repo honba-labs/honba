@@ -66,6 +66,17 @@ from honba.strategies import (
 # Logging & Events
 from honba.log import EventFilter, KNOWN_EVENTS, register_event, setup_event_logging
 
+# Formatting utilities
+from honba.utils.format import (
+    format_currency,
+    format_inr,
+    format_usd,
+    format_eur,
+    format_date_indian,
+    format_date_us,
+    format_date_iso,
+)
+
 # Wire contracts (ADR 006)
 from honba.wire import (
     ENUMS,
@@ -146,4 +157,11 @@ __all__ = [
     "load_catalog",
     "register_event",
     "setup_event_logging",
+    "format_currency",
+    "format_inr",
+    "format_usd",
+    "format_eur",
+    "format_date_indian",
+    "format_date_us",
+    "format_date_iso",
 ]
