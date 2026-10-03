@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+### Adapter contract (E1-S1, ADR 0010)
+
+- `honba.adapters` package: `Adapter` (facade, capabilities, lifecycle), `MarketDataAdapter`
+  and `ExecutionAdapter` (async Protocols, runtime-checkable), canonical value types
+  (`OrderReport`, `Funds`, `Holding`, `MarginReport`, `MarketDepth`, `SessionInfo`,
+  `Product`, `RunMode`, `StreamMode`, `Subscription`, `StreamEvent`/`StreamCallback`).
+- `AdapterCapabilities` descriptor: venues, products, order types, time-in-force, price types,
+  stream modes, capability features (`place_order` … `instrument_master`). `require_*`
+  helpers raise `CapabilityError` when a declared capability is missing.
+- `AdapterRegistry` (mirrors `honba_market::MarketRegistry`): explicit register/unregister,
+  `create(name, **config)`, sorted `available()`, one-shot lazy entry-point discovery under
+  group `"honba.adapters"`.
+- Shared contract suite `verify_adapter_contract`: connects, refuses before connect, probes
+  every unsupported method for `CapabilityError`, every supported method for its canonical
+  type, places a probe order, retrieves it by id, idempotency under repeated
+  `client_order_id`, cancels a resting order, and verifies fills reach the trade and
+  position books. Pytest-free, deterministic, no network.
+- `FakeAdapter`: in-memory reference implementation (reduced capabilities on purpose) that
+  certifies the suite; not a paper adapter (E3-S7).
+- Boundary rule: `find_boundary_violations(root, *, forbidden, adapter_roots)` asserts no
+  broker SDK or adapter package is imported outside an adapter package.
+- Cross-repo: `honba-adapters/shared` ships the contract wrapper, fixture reader and the
+  boundary test; broker packages register via the entry point when they have code.
+
 ### Strategy contract (E0-S3, ADR 008)
 
 - Python `Strategy` is an ABC with `on_start`, `on_bar`, `on_quote`, `on_trade`, `on_fill` and
