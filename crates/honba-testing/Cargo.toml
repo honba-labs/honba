@@ -11,4 +11,7 @@ description = "Test fixtures, feeds, and helpers for Honba"
 honba-messages.workspace = true
 honba-entities.workspace = true
 honba-engine.workspace = true
+honba-ports.workspace = true
 honba-sim.workspace = true
+async-trait.workspace = true
+tokio = { workspace = true, features = ["rt", "macros"] }

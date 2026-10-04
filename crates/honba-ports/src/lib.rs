@@ -1,49 +1,66 @@
-use async_trait::async_trait;
-use honba_entities::Instrument;
-use honba_messages::InstrumentId;
-use honba_messages::{Bar, Order, OrderId, QuoteTick, TradeTick};
-use std::time::Duration;
+#![deny(missing_docs)]
+#![deny(rustdoc::broken_intra_doc_links)]
+#![deny(unsafe_code)]
 
-#[async_trait]
-pub trait Clock: Send + Sync {
-    async fn now_ns(&self) -> i64;
-    async fn sleep(&self, d: Duration) -> anyhow::Result<()>;
-}
+//! Async trait ports: the seam between the synchronous kernel and the asynchronous edges.
+//!
+//! The Honba event loop is synchronous and single-threaded. `honba-engine` owns the queue, the
+//! clock and the audit trail, and every surface — backtest, paper, live — drives that same kernel
+//! the same way. I/O is the exception, so it lives at the edges, behind the six traits in this
+//! crate, and nowhere else.
+//!
+//! # Ports
+//!
+//! | Port | Answers |
+//! |---|---|
+//! | [`Clock`] | what time is it, and wait |
+//! | [`MarketDataFeed`] | the next market-data message |
+//! | [`ExecutionGateway`] | route an order, cancel, modify, next fill |
+//! | [`InstrumentMaster`] | what is this instrument, and what else is there |
+//! | [`Sink`] | append to the audit trail |
+//! | [`SecretStore`] | the credential stored under this key |
+//!
+//! This crate defines traits and one error taxonomy. It contains no I/O: nothing here opens a
+//! socket, reads a file, spawns a task or reads the wall clock. Implementations live at the edges
+//! (broker adapters, `honba-data`, `honba-async`); the fakes that make the ports testable live in
+//! `honba-testing`, together with the shared contract suite every implementation must pass.
+//!
+//! # Thread-safety rule
+//!
+//! A port that owns mutable state — the methods take `&mut self` — is `Send` and not `Sync`: one
+//! owner, one writer, driven by one task. A port that only reads its state — the methods take
+//! `&self` — is `Send + Sync`, so it can be shared behind an `Arc`. All six are object-safe, so a
+//! registry can hold them as trait objects.
+//!
+//! # Errors
+//!
+//! Every method returns [`PortResult`]. Failures are typed values, not strings, and
+//! [`PortError::is_retryable`] is the only question the edge needs to ask to decide between
+//! backing off and giving up.
+//!
+//! # Rules the edges must keep
+//!
+//! 1. [`Clock`] is the only time source outside the kernel; domain code never calls
+//!    `UnixNanos::now()`.
+//! 2. Ordering is the kernel's job. Feeds may deliver out of order or in bursts.
+//! 3. The audit stream is always complete: [`Sink`] is append-only and flushable on demand.
+//! 4. `Ok(None)` means idle or exhausted, never a broken stream. A broken stream is an error.
 
-#[async_trait]
-pub trait MarketDataFeed: Send + Sync {
-    async fn subscribe(&mut self, symbols: &[InstrumentId]) -> anyhow::Result<()>;
-    async fn unsubscribe(&mut self, symbols: &[InstrumentId]) -> anyhow::Result<()>;
-    async fn next_bar(&mut self) -> anyhow::Result<Option<Bar>>;
-    async fn next_quote(&mut self) -> anyhow::Result<Option<QuoteTick>>;
-    async fn next_trade(&mut self) -> anyhow::Result<Option<TradeTick>>;
-}
+pub mod clock;
+pub mod error;
+pub mod execution;
+pub mod feed;
+pub mod master;
+pub mod secret;
+pub mod sink;
 
-#[async_trait]
-pub trait ExecutionGateway: Send + Sync {
-    async fn submit_order(&mut self, order: Order) -> anyhow::Result<OrderId>;
-    async fn cancel_order(&mut self, id: OrderId) -> anyhow::Result<()>;
-    async fn modify_order(
-        &mut self,
-        id: OrderId,
-        new_qty: f64,
-        new_price: Option<f64>,
-    ) -> anyhow::Result<()>;
-    async fn next_fill(&mut self) -> anyhow::Result<Option<honba_entities::Trade>>;
-}
+pub use clock::Clock;
+pub use error::{PortError, PortResult};
+pub use execution::ExecutionGateway;
+pub use feed::MarketDataFeed;
+pub use master::InstrumentMaster;
+pub use secret::SecretStore;
+pub use sink::Sink;
 
-#[async_trait]
-pub trait InstrumentMaster: Send + Sync {
-    async fn get_instrument(&self, id: &InstrumentId) -> anyhow::Result<Option<Instrument>>;
-    async fn list_instruments(&self) -> anyhow::Result<Vec<Instrument>>;
-}
-
-#[async_trait]
-pub trait Sink: Send + Sync {
-    async fn write(&mut self, msg: honba_messages::Message) -> anyhow::Result<()>;
-}
-
-#[async_trait]
-pub trait SecretStore: Send + Sync {
-    async fn get_secret(&self, key: &str) -> anyhow::Result<Option<String>>;
-}
+#[cfg(test)]
+mod tests;
