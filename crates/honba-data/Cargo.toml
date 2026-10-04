@@ -10,6 +10,7 @@ description = "Market data catalog, Parquet import/export, and report loaders fo
 [dependencies]
 honba-messages = { workspace = true }
 honba-entities = { workspace = true }
+honba-engine = { workspace = true }
 honba-analytics = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

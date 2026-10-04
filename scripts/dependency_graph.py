@@ -25,7 +25,7 @@ ALLOWED_PROD = {
     "honba-strategy": {"honba-engine", "honba-indicators", "honba-messages", "honba-entities"},
     "honba-testing": {"honba-engine", "honba-messages", "honba-entities", "honba-ports", "honba-sim"},
     "honba-analytics": {"honba-messages", "honba-entities"},
-    "honba-data": {"honba-messages", "honba-entities", "honba-analytics"},
+    "honba-data": {"honba-messages", "honba-entities", "honba-engine", "honba-analytics"},
     "honba-sweep": {"honba-messages", "honba-entities", "honba-engine", "honba-strategy", "honba-sim", "honba-data"},
     "honba-codegen": {"honba-messages", "honba-entities", "honba-strategy"},
     "honba-py": {"honba-messages", "honba-entities", "honba-engine", "honba-strategy", "honba-sim"},
