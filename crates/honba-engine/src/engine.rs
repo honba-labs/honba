@@ -34,6 +34,8 @@ pub struct Engine {
     trading_state: TradingState,
     audit: AuditLog,
     pending_fills: Vec<Trade>,
+    started: bool,
+    finished: bool,
 }
 
 impl Default for Engine {
@@ -54,6 +56,8 @@ impl Engine {
             trading_state: TradingState::Active,
             audit: AuditLog::new(),
             pending_fills: Vec::new(),
+            started: false,
+            finished: false,
         }
     }
 
@@ -106,6 +110,106 @@ impl Engine {
     /// Used by tests and by the async shell; does not advance the clock.
     pub fn inject(&mut self, msg: Message) {
         self.queue.push(msg);
+    }
+
+    /// Number of messages waiting in the queue.
+    pub fn pending(&self) -> usize {
+        self.queue.len()
+    }
+
+    /// Runs `on_start` for every handler. Idempotent: a second call is a no-op.
+    ///
+    /// [`Engine::run`] calls this for you. A driver that injects messages
+    /// incrementally — the async shell, or anything else that owns its own
+    /// loop — calls it instead of `run`, then dispatches with
+    /// [`Engine::pump`] and closes the lifecycle with [`Engine::finish`].
+    ///
+    /// Each handler's `on_start` runs at most once: the lifecycle is marked
+    /// started before the handlers are called, so a handler that fails
+    /// half-way through the fan-out is not started a second time by a retry.
+    pub fn start(&mut self) -> Result<()> {
+        if self.started {
+            return Ok(());
+        }
+        self.started = true;
+        for h in &mut self.handlers {
+            h.on_start()?;
+        }
+        Ok(())
+    }
+
+    /// Dispatches one queued message, if any. Returns false when the queue is empty.
+    ///
+    /// This is the one place a queued message becomes a handler call: the
+    /// clock is advanced to the message's `ts_event`, the dispatch is audited,
+    /// and each handler in registration order is asked for an
+    /// [`EngineOutput`] whose commands are applied before the next handler
+    /// runs. After every handler the execution sink is drained and each fill
+    /// is turned back into a queued [`Event::OrderFilled`], so a caller that
+    /// pumps until `false` closes the command/ack loop in one queue.
+    ///
+    /// Errors are returned verbatim: an event earlier than one already
+    /// dispatched yields [`AlgoError::ClockRegression`](crate::AlgoError::ClockRegression).
+    pub fn pump(&mut self) -> Result<bool> {
+        let Some(msg) = self.queue.pop() else {
+            return Ok(false);
+        };
+        let ts_event = msg.event().ts_event();
+        self.clock.advance_to(ts_event)?;
+        self.audit.record(AuditKind::EventDispatched {
+            ts_event: ts_event.as_u64(),
+        });
+        for i in 0..self.handlers.len() {
+            let output = self.handlers[i].on_event(msg.event(), msg.ts_init())?;
+            self.apply_output(output)?;
+            self.acknowledge_fills()?;
+        }
+        Ok(true)
+    }
+
+    /// Drains the queue via [`Engine::pump`], then runs `on_stop` for every handler. Idempotent.
+    ///
+    /// [`Engine::run`] calls this for you. A driver that injected messages
+    /// incrementally calls it instead: draining before stopping is what makes
+    /// the audit trail complete, because a message that was accepted into the
+    /// queue is dispatched before any handler is told the run is over.
+    ///
+    /// Each handler's `on_stop` runs at most once, on the same terms as
+    /// [`Engine::start`]: a handler that fails half-way through the fan-out is
+    /// not stopped a second time by a retry. The queue is drained either way.
+    pub fn finish(&mut self) -> Result<()> {
+        while self.pump()? {}
+        if self.finished {
+            return Ok(());
+        }
+        self.finished = true;
+        for h in &mut self.handlers {
+            h.on_stop()?;
+        }
+        Ok(())
+    }
+
+    /// Sets the trading state, honouring [`TradingState::can_transition_to`], and records
+    /// [`AuditKind::StateChanged`] when it actually changes. Returns the previous state.
+    ///
+    /// A transition to the state the engine is already in is not a change and
+    /// records nothing; a transition [`TradingState::can_transition_to`]
+    /// refuses leaves the state alone and records nothing. Both are still
+    /// reported through the returned previous state.
+    ///
+    /// This is the only implementation of the state transition: a handler's
+    /// [`EngineOutput::StateChange`] and the async shell's operator command
+    /// both go through it, so they cannot drift apart.
+    pub fn set_trading_state(&mut self, next: TradingState) -> TradingState {
+        let previous = self.trading_state;
+        if previous != next && previous.can_transition_to(next) {
+            self.trading_state = next;
+            self.audit.record(AuditKind::StateChanged {
+                from: previous,
+                to: next,
+            });
+        }
+        previous
     }
 
     /// Drains fills produced since the last call, in production order.
@@ -202,12 +306,7 @@ impl Engine {
                 }
             }
             EngineOutput::StateChange(next) => {
-                if self.trading_state.can_transition_to(next) {
-                    let from = self.trading_state;
-                    self.trading_state = next;
-                    self.audit
-                        .record(AuditKind::StateChanged { from, to: next });
-                }
+                self.set_trading_state(next);
             }
         }
         Ok(())
@@ -216,10 +315,10 @@ impl Engine {
     /// Runs the engine to completion against the given feed.
     ///
     /// Each iteration pulls up to `batch_size` events from the feed into the
-    /// queue, then pops the earliest and dispatches it: the clock advances to
-    /// the message's `ts_event`, the dispatch is audited, and each handler in
-    /// registration order is asked for an [`EngineOutput`] whose commands are
-    /// applied before the next handler runs.
+    /// queue, then dispatches the earliest one through [`Engine::pump`]: the
+    /// clock advances to the message's `ts_event`, the dispatch is audited, and
+    /// each handler in registration order is asked for an [`EngineOutput`]
+    /// whose commands are applied before the next handler runs.
     ///
     /// After every handler the engine drains the execution sink and turns each
     /// fill into an [`Event::OrderFilled`] message stamped with the kernel
@@ -231,10 +330,13 @@ impl Engine {
     /// If the feed produces events earlier than ones already dispatched, the
     /// clock returns [`AlgoError::ClockRegression`](crate::AlgoError::ClockRegression)
     /// and the run aborts.
+    ///
+    /// This is [`Engine::start`], the pull/dispatch loop, then
+    /// [`Engine::finish`], and nothing else: the three phases are the same
+    /// public steps a driver that owns its own loop takes, so a run driven by
+    /// `run` and a run driven by `start`/`pump`/`finish` dispatch identically.
     pub fn run(&mut self, feed: &mut dyn DataFeed) -> Result<()> {
-        for h in &mut self.handlers {
-            h.on_start()?;
-        }
+        self.start()?;
 
         loop {
             for _ in 0..self.batch_size {
@@ -244,28 +346,12 @@ impl Engine {
                 }
             }
 
-            match self.queue.pop() {
-                Some(msg) => {
-                    let ts_event = msg.event().ts_event();
-                    self.clock.advance_to(ts_event)?;
-                    self.audit.record(AuditKind::EventDispatched {
-                        ts_event: ts_event.as_u64(),
-                    });
-                    for i in 0..self.handlers.len() {
-                        let output = self.handlers[i].on_event(msg.event(), msg.ts_init())?;
-                        self.apply_output(output)?;
-                        self.acknowledge_fills()?;
-                    }
-                }
-                None => break,
+            if !self.pump()? {
+                break;
             }
         }
 
-        for h in &mut self.handlers {
-            h.on_stop()?;
-        }
-
-        Ok(())
+        self.finish()
     }
 }
 

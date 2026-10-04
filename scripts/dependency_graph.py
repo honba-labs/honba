@@ -19,7 +19,7 @@ ALLOWED_PROD = {
     "honba-ports": {"honba-messages", "honba-entities", "honba-market"},
     "honba-market": {"honba-entities", "honba-messages"},
     "honba-engine": {"honba-messages", "honba-entities"},
-    "honba-async": {"honba-messages", "honba-entities", "honba-engine", "honba-ports"},
+    "honba-async": {"honba-messages", "honba-engine", "honba-ports"},
     "honba-indicators": {"honba-messages", "honba-entities"},
     "honba-sim": {"honba-messages", "honba-entities", "honba-engine"},
     "honba-strategy": {"honba-engine", "honba-indicators", "honba-messages", "honba-entities"},
@@ -52,6 +52,7 @@ ALLOWED_DEV = {
     "honba-codegen": set(),
     "honba-py": set(),
     "honba-cli": set(),
+    "honba-async": {"honba-testing", "honba-sim"},
 }
 
 # Core crates that must NEVER enable market-specific packs (like the `india` feature of honba-market)

@@ -8,7 +8,8 @@ use honba_messages::{Event, Message, Order, QuoteTick, UnixNanos};
 use super::any_instrument;
 
 use crate::{
-    AlgoError, DataFeed, Engine, EngineOutput, ExecutionEngine, Handler, Result, TradingState,
+    AlgoError, AuditKind, AuditRecord, DataFeed, Engine, EngineOutput, ExecutionEngine, Handler,
+    Result, TradingState,
 };
 
 fn ts(n: u64) -> UnixNanos {
@@ -130,6 +131,200 @@ fn drain_fills_is_empty_before_anything_runs() {
     engine.set_execution(Box::new(StubSink::default()));
     engine.run(&mut EmptyFeed).unwrap();
     assert!(engine.drain_fills().unwrap().is_empty());
+}
+
+#[derive(Clone, Default)]
+struct Lifecycle {
+    starts: Arc<Mutex<usize>>,
+    stops: Arc<Mutex<usize>>,
+    seen: Arc<Mutex<Vec<u64>>>,
+}
+
+impl Lifecycle {
+    fn starts(&self) -> usize {
+        *self.starts.lock().unwrap()
+    }
+
+    fn stops(&self) -> usize {
+        *self.stops.lock().unwrap()
+    }
+
+    fn seen(&self) -> Vec<u64> {
+        self.seen.lock().unwrap().clone()
+    }
+}
+
+impl Handler for Lifecycle {
+    fn on_start(&mut self) -> Result<()> {
+        *self.starts.lock().unwrap() += 1;
+        Ok(())
+    }
+
+    fn on_event(&mut self, event: &Event, _ts_init: UnixNanos) -> Result<EngineOutput> {
+        self.seen.lock().unwrap().push(event.ts_event().as_u64());
+        Ok(EngineOutput::None)
+    }
+
+    fn on_stop(&mut self) -> Result<()> {
+        *self.stops.lock().unwrap() += 1;
+        Ok(())
+    }
+}
+
+#[test]
+fn start_runs_on_start_once_and_a_second_call_is_a_no_op() {
+    let mut engine = Engine::new();
+    let lifecycle = Lifecycle::default();
+    engine.add_handler(lifecycle.clone());
+
+    engine.start().unwrap();
+    engine.start().unwrap();
+    engine.start().unwrap();
+
+    assert_eq!(lifecycle.starts(), 1);
+    assert_eq!(lifecycle.stops(), 0);
+}
+
+#[test]
+fn finish_drains_the_queue_in_time_order_then_runs_on_stop_once() {
+    let mut engine = Engine::new();
+    let lifecycle = Lifecycle::default();
+    engine.add_handler(lifecycle.clone());
+    engine.inject(quote(3, 3));
+    engine.inject(quote(1, 1));
+
+    engine.finish().unwrap();
+    engine.finish().unwrap();
+
+    assert_eq!(lifecycle.seen(), vec![1, 3]);
+    assert_eq!(lifecycle.stops(), 1);
+    assert_eq!(lifecycle.starts(), 0);
+}
+
+#[test]
+fn pump_dispatches_one_message_per_call_and_reports_an_empty_queue() {
+    let mut engine = Engine::new();
+    let lifecycle = Lifecycle::default();
+    engine.add_handler(lifecycle.clone());
+    engine.inject(quote(3, 3));
+    engine.inject(quote(1, 1));
+
+    assert!(engine.pump().unwrap());
+    assert_eq!(lifecycle.seen(), vec![1]);
+    assert!(engine.pump().unwrap());
+    assert_eq!(lifecycle.seen(), vec![1, 3]);
+    assert_eq!(engine.now(), ts(3));
+
+    assert!(!engine.pump().unwrap());
+    assert_eq!(lifecycle.seen(), vec![1, 3]);
+    assert_eq!(engine.now(), ts(3));
+}
+
+#[test]
+fn pending_counts_the_messages_waiting_in_the_queue() {
+    let mut engine = Engine::new();
+    assert_eq!(engine.pending(), 0);
+
+    engine.inject(quote(1, 1));
+    assert_eq!(engine.pending(), 1);
+
+    engine.inject(quote(2, 2));
+    assert_eq!(engine.pending(), 2);
+
+    engine.start().unwrap();
+    engine.pump().unwrap();
+    assert_eq!(engine.pending(), 1);
+
+    engine.finish().unwrap();
+    assert_eq!(engine.pending(), 0);
+}
+
+#[test]
+fn set_trading_state_returns_the_previous_state_and_audits_the_change() {
+    let mut engine = Engine::new();
+
+    assert_eq!(
+        engine.set_trading_state(TradingState::Halted),
+        TradingState::Active
+    );
+    assert_eq!(engine.trading_state(), TradingState::Halted);
+    assert_eq!(
+        engine.audit(),
+        &[AuditRecord {
+            seq: 0,
+            kind: AuditKind::StateChanged {
+                from: TradingState::Active,
+                to: TradingState::Halted,
+            },
+        }]
+    );
+
+    assert_eq!(
+        engine.set_trading_state(TradingState::Reducing),
+        TradingState::Halted
+    );
+    assert_eq!(engine.trading_state(), TradingState::Reducing);
+    assert_eq!(
+        engine.audit(),
+        &[
+            AuditRecord {
+                seq: 0,
+                kind: AuditKind::StateChanged {
+                    from: TradingState::Active,
+                    to: TradingState::Halted,
+                },
+            },
+            AuditRecord {
+                seq: 1,
+                kind: AuditKind::StateChanged {
+                    from: TradingState::Halted,
+                    to: TradingState::Reducing,
+                },
+            },
+        ]
+    );
+}
+
+#[test]
+fn set_trading_state_to_the_state_it_is_already_in_records_nothing() {
+    let mut engine = Engine::new();
+
+    assert_eq!(
+        engine.set_trading_state(TradingState::Active),
+        TradingState::Active
+    );
+
+    assert_eq!(engine.trading_state(), TradingState::Active);
+    assert!(engine.audit().is_empty());
+}
+
+#[test]
+fn set_trading_state_applies_exactly_the_transitions_the_state_machine_permits() {
+    const STATES: [TradingState; 3] = [
+        TradingState::Active,
+        TradingState::Reducing,
+        TradingState::Halted,
+    ];
+
+    let mut engine = Engine::new();
+    for from in STATES {
+        for to in STATES {
+            engine.set_trading_state(from);
+            let audited = engine.audit().len();
+
+            assert_eq!(engine.set_trading_state(to), from);
+
+            if from.can_transition_to(to) {
+                assert_eq!(engine.trading_state(), to, "{from:?} -> {to:?} was refused");
+            }
+            let changed = from.can_transition_to(to) && from != to;
+            assert_eq!(
+                engine.audit().len(),
+                audited + usize::from(changed),
+                "{from:?} -> {to:?} audited the wrong number of records"
+            );
+        }
+    }
 }
 
 #[test]
