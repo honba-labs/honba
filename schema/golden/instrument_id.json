@@ -1,26 +1,26 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "type": "InstrumentId",
   "cases": [
     {
       "name": "nse_equity",
       "value": {
         "symbol": "RELIANCE",
-        "venue": "NSE"
+        "exchange": "NSE"
       }
     },
     {
       "name": "bse_index",
       "value": {
         "symbol": "SENSEX",
-        "venue": "BSE"
+        "exchange": "BSE"
       }
     }
   ],
   "invalid_text": [
     {
       "name": "duplicate_symbol",
-      "text": "{\"symbol\":\"RELIANCE\",\"venue\":\"NSE\",\"symbol\":\"TCS\"}"
+      "text": "{\"symbol\":\"RELIANCE\",\"exchange\":\"NSE\",\"symbol\":\"TCS\"}"
     }
   ]
 }

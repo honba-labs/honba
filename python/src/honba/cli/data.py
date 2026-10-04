@@ -36,7 +36,7 @@ _DATA_SERVICE = DataService(store=_STORE, providers=[_NSE_PROVIDER, _YFINANCE_PR
 @app.command("coverage")
 def coverage_cmd(
     symbol: Annotated[str | None, typer.Argument(help="Optional symbol, e.g. RELIANCE")] = None,
-    exchange: Annotated[str, typer.Option("--exchange", "-e", "--venue", help="Market exchange / venue [default: NSE]")] = "NSE",
+    exchange: Annotated[str, typer.Option("--exchange", "-e", "--exchange", help="Market exchange / exchange [default: NSE]")] = "NSE",
     timeframe: Annotated[str, typer.Option("--timeframe", "-t", help="Timeframe [default: 1D]")] = "1D",
 ) -> None:
     """Show covered ranges in the data store."""
@@ -59,7 +59,7 @@ def coverage_cmd(
         for r in records:
             found = True
             table.add_row(
-                r.venue,
+                r.exchange,
                 r.symbol,
                 r.timeframe,
                 f"{r.interval.start}..{r.interval.end}",
@@ -76,7 +76,7 @@ def coverage_cmd(
 @app.command("gaps")
 def gaps_cmd(
     symbol: Annotated[str, typer.Argument(help="Instrument symbol, e.g. RELIANCE")],
-    exchange: Annotated[str, typer.Option("--exchange", "-e", "--venue", help="Market exchange / venue [default: NSE]")] = "NSE",
+    exchange: Annotated[str, typer.Option("--exchange", "-e", "--exchange", help="Market exchange / exchange [default: NSE]")] = "NSE",
     timeframe: Annotated[str, typer.Option("--timeframe", "-t", help="Timeframe [default: 1D]")] = "1D",
     start: Annotated[str, typer.Option("--start", "-s", help="Start date YYYY-MM-DD", show_default="2024-01-01")] = "2024-01-01",
     end: Annotated[str | None, typer.Option("--end", "-d", help="End date YYYY-MM-DD", show_default="today")] = None,
@@ -107,7 +107,7 @@ def gaps_cmd(
 @app.command("fetch")
 def fetch_cmd(
     symbol: Annotated[str, typer.Argument(help="Instrument symbol, e.g. RELIANCE")],
-    exchange: Annotated[str, typer.Option("--exchange", "-e", "--venue", help="Market exchange / venue [default: NSE]")] = "NSE",
+    exchange: Annotated[str, typer.Option("--exchange", "-e", "--exchange", help="Market exchange / exchange [default: NSE]")] = "NSE",
     timeframe: Annotated[str, typer.Option("--timeframe", "-t", help="Timeframe [default: 1D]")] = "1D",
     start: Annotated[str, typer.Option("--start", "-s", help="Start date YYYY-MM-DD", show_default="2024-01-01")] = "2024-01-01",
     end: Annotated[str | None, typer.Option("--end", "-d", help="End date YYYY-MM-DD", show_default="today")] = None,

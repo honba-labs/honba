@@ -126,7 +126,7 @@ class FakeAdapter(Adapter):
     def capabilities(self) -> AdapterCapabilities:
         return AdapterCapabilities(
             name=self.name,
-            venues=frozenset({"NSE"}),
+            exchanges=frozenset({"NSE"}),
             products=frozenset({Product.DELIVERY, Product.INTRADAY}),
             order_types=frozenset({OrderType.MARKET, OrderType.LIMIT}),
             stream_modes=frozenset({StreamMode.LTP, StreamMode.QUOTE}),

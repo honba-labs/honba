@@ -1,11 +1,11 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "type": "Message",
   "cases": [
     {
       "name": "order_filled",
       "value": {
-        "schema_version": 1,
+        "schema_version": 2,
         "event": {
           "type": "order_filled",
           "order_id": "O-1",
@@ -19,12 +19,12 @@
     {
       "name": "quote",
       "value": {
-        "schema_version": 1,
+        "schema_version": 2,
         "event": {
           "type": "quote",
           "instrument_id": {
             "symbol": "NIFTY50",
-            "venue": "NSE"
+            "exchange": "NSE"
           },
           "bid_price": 22000.0,
           "ask_price": 22001.0,
@@ -41,7 +41,7 @@
     {
       "name": "future_schema_version",
       "value": {
-        "schema_version": 2,
+        "schema_version": 3,
         "event": {
           "type": "order_cancelled",
           "order_id": "O-3",
@@ -65,7 +65,7 @@
   "invalid_text": [
     {
       "name": "duplicate_key_in_nested_event",
-      "text": "{\"schema_version\":1,\"event\":{\"type\":\"order_cancelled\",\"order_id\":\"O-1\",\"order_id\":\"O-2\",\"ts_event\":1},\"ts_init\":1}"
+      "text": "{\"schema_version\":2,\"event\":{\"type\":\"order_cancelled\",\"order_id\":\"O-1\",\"order_id\":\"O-2\",\"ts_event\":1},\"ts_init\":1}"
     }
   ]
 }

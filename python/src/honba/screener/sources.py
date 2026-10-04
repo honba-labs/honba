@@ -69,7 +69,7 @@ class LocalScreenerSource:
         if self.default_instruments is not None:
             instruments = list(self.default_instruments)
         elif request.market.lower() == "india":
-            instruments = resolve_universe("nifty50", venue="NSE")
+            instruments = resolve_universe("nifty50", exchange="NSE")
         else:
             instruments = []
 
@@ -113,7 +113,7 @@ class LocalScreenerSource:
 
             matching_rows.append(
                 ScreenerRow(
-                    full_symbol=f"{inst.symbol}.{inst.venue}",
+                    full_symbol=f"{inst.symbol}.{inst.exchange}",
                     instrument_id=str(inst),
                     name=inst.symbol,
                     values=values,

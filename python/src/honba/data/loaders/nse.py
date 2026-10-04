@@ -33,7 +33,7 @@ DEFAULT_HEADERS = {
 }
 
 
-def parse_bhavcopy_csv(csv_content: str, venue: str = "NSE") -> dict[str, Bar]:
+def parse_bhavcopy_csv(csv_content: str, exchange: str = "NSE") -> dict[str, Bar]:
     """Parse NSE Bhavcopy CSV text and return map of symbol -> Bar."""
     f = io.StringIO(csv_content)
     reader = csv.DictReader(f)
@@ -103,7 +103,7 @@ def parse_bhavcopy_csv(csv_content: str, venue: str = "NSE") -> dict[str, Bar]:
         bar_date = _parse_date(raw_date_str) or dt.date.today()
 
         ts = int(dt.datetime.combine(bar_date, dt.time(9, 15)).timestamp() * 1e9)
-        inst_id = InstrumentId(symbol=raw_sym, venue=venue)
+        inst_id = InstrumentId(symbol=raw_sym, exchange=exchange)
 
         b = Bar(
             instrument_id=inst_id,

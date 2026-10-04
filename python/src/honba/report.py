@@ -135,7 +135,7 @@ def _print_table(
 
     heading = title or "Honba backtest report"
     symbol = _cfg_get(config, "symbol", "?")
-    venue = _cfg_get(config, "venue", "?")
+    exchange = _cfg_get(config, "exchange", "?")
     start = _cfg_get(config, "start", "?")
     end = _cfg_get(config, "end", "?")
     timeframe = _cfg_get(config, "timeframe", "?")
@@ -148,7 +148,7 @@ def _print_table(
         heading=heading,
         strategy=strategy,
         symbol=symbol,
-        venue=venue,
+        exchange=exchange,
         start=start,
         end=end,
         timeframe=timeframe,
@@ -173,7 +173,7 @@ def _print_table(
     print(f"  {heading}", file=out)
     print(line, file=out)
     row("Strategy", strategy)
-    row("Instrument", f"{symbol}.{venue}")
+    row("Instrument", f"{symbol}.{exchange}")
     row("Period", f"{start} → {end}")
     row("Timeframe", timeframe)
     if cash is not None:
@@ -224,7 +224,7 @@ def _try_rich_table(
     heading: str,
     strategy: str,
     symbol: str,
-    venue: str,
+    exchange: str,
     start: Any,
     end: Any,
     timeframe: str,
@@ -250,7 +250,7 @@ def _try_rich_table(
     meta.add_column("k", style="dim")
     meta.add_column("v")
     meta.add_row("Strategy", strategy)
-    meta.add_row("Instrument", f"{symbol}.{venue}")
+    meta.add_row("Instrument", f"{symbol}.{exchange}")
     meta.add_row("Period", f"{start} → {end}")
     meta.add_row("Timeframe", str(timeframe))
     if cash is not None:
@@ -343,7 +343,7 @@ def _print_tui(
 
     heading = title or "Honba Backtest Report"
     symbol = _cfg_get(config, "symbol", "?")
-    venue = _cfg_get(config, "venue", "?")
+    exchange = _cfg_get(config, "exchange", "?")
     start = _cfg_get(config, "start", "?")
     end = _cfg_get(config, "end", "?")
     timeframe = _cfg_get(config, "timeframe", "?")
@@ -353,7 +353,7 @@ def _print_tui(
     # Header
     header_text = Text()
     header_text.append(f"{heading}\n", style="bold magenta")
-    header_text.append(f"Strategy: {strategy}  |  Instrument: {symbol}.{venue}  |  Period: {start} → {end}\n", style="dim")
+    header_text.append(f"Strategy: {strategy}  |  Instrument: {symbol}.{exchange}  |  Period: {start} → {end}\n", style="dim")
     header_text.append(f"Timeframe: {timeframe}", style="dim")
     if cash is not None:
         header_text.append(f"  |  Initial Cash: {_fmt_money(cash, currency=currency)}", style="dim")
@@ -413,7 +413,7 @@ def _print_tui(
             price = getattr(t, 'price', 0)
             costs = getattr(t, 'costs', 0)
             inst = getattr(t, 'instrument_id', None)
-            sym = f"{inst.symbol}.{inst.venue}" if inst else "?"
+            sym = f"{inst.symbol}.{inst.exchange}" if inst else "?"
 
             trades_table.add_row(
                 time_str,
@@ -507,7 +507,7 @@ def _trade_to_dict(t: Any) -> dict[str, Any]:
             if hasattr(v, "value"):
                 d[k] = v.value
             elif hasattr(v, "symbol"):
-                d[k] = f"{v.symbol}.{v.venue}" if hasattr(v, "venue") else str(v)
+                d[k] = f"{v.symbol}.{v.exchange}" if hasattr(v, "exchange") else str(v)
             else:
                 d[k] = v
     return d

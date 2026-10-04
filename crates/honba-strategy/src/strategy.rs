@@ -145,20 +145,35 @@ impl<S: Strategy> StrategyAdapter<S> {
 
 impl<S: Strategy> Handler for StrategyAdapter<S> {
     fn on_start(&mut self) -> Result<()> {
-        self.inner.on_start(&mut self.ctx)
+        self.inner.on_start(&mut self.ctx)?;
+        Ok(())
     }
 
-    fn on_event(&mut self, event: &Event, ts_init: UnixNanos) -> Result<()> {
+    fn on_event(
+        &mut self,
+        event: &Event,
+        ts_init: UnixNanos,
+    ) -> Result<honba_engine::EngineOutput> {
         self.ctx.set_now(ts_init);
         match event {
-            Event::Bar(b) => self.inner.on_bar(&mut self.ctx, b),
-            Event::Quote(q) => self.inner.on_quote(&mut self.ctx, q),
-            Event::Trade(t) => self.inner.on_trade(&mut self.ctx, t),
-            _ => Ok(()),
+            Event::Bar(b) => {
+                self.inner.on_bar(&mut self.ctx, b)?;
+                Ok(honba_engine::EngineOutput::None)
+            }
+            Event::Quote(q) => {
+                self.inner.on_quote(&mut self.ctx, q)?;
+                Ok(honba_engine::EngineOutput::None)
+            }
+            Event::Trade(t) => {
+                self.inner.on_trade(&mut self.ctx, t)?;
+                Ok(honba_engine::EngineOutput::None)
+            }
+            _ => Ok(honba_engine::EngineOutput::None),
         }
     }
 
     fn on_stop(&mut self) -> Result<()> {
-        self.inner.on_stop(&mut self.ctx)
+        self.inner.on_stop(&mut self.ctx)?;
+        Ok(())
     }
 }

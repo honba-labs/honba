@@ -172,7 +172,7 @@ def default_catalog_path() -> Path:
     override = os.environ.get(CATALOG_ENV_VAR)
     if override:
         return Path(override)
-    return Path(__file__).resolve().parents[3] / "schema" / "catalog" / "metric_catalog.json"
+    return Path(__file__).resolve().parents[4] / "schema" / "catalog" / "metric_catalog.json"
 
 
 def load_catalog(path: str | os.PathLike[str] | None = None) -> MetricCatalog:

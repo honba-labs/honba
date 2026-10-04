@@ -34,9 +34,9 @@ fn run_strategy_matches_every_conformance_scenario() {
     }
 }
 
-const BAR: &str = r#"[{"schema_version": 1, "event": {"type": "bar", "bar_type": {"instrument_id": {"symbol": "RELIANCE", "venue": "NSE"}, "spec": {"step": 1, "aggregation": "minute", "price_type": "last"}}, "open": 2945.0, "high": 2955.0, "low": 2940.0, "close": 2950.0, "volume": 1000.0, "ts_event": 1000, "ts_init": 1000}, "ts_init": 1000}]"#;
+const BAR: &str = r#"[{"schema_version": 2, "event": {"type": "bar", "bar_type": {"instrument_id": {"symbol": "RELIANCE", "exchange": "NSE"}, "spec": {"step": 1, "aggregation": "minute", "price_type": "last"}}, "open": 2945.0, "high": 2955.0, "low": 2940.0, "close": 2950.0, "volume": 1000.0, "ts_event": 1000, "ts_init": 1000}, "ts_init": 1000}]"#;
 const BUY_AND_HOLD: &str =
-    r#"{"instrument_id": {"symbol": "RELIANCE", "venue": "NSE"}, "quantity": QTY}"#;
+    r#"{"instrument_id": {"symbol": "RELIANCE", "exchange": "NSE"}, "quantity": QTY}"#;
 
 fn run_buy_and_hold(quantity: &str) -> Value {
     let params = BUY_AND_HOLD.replace("QTY", quantity);

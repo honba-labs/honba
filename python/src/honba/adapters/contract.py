@@ -176,7 +176,7 @@ def _probe_from(
     return _Probe(
         instrument_id=first.instrument_id,
         product=min(caps.products, key=lambda p: p.value),
-        unknown_instrument=InstrumentId("HONBA-CONTRACT-UNKNOWN", first.instrument_id.venue),
+        unknown_instrument=InstrumentId("HONBA-CONTRACT-UNKNOWN", first.instrument_id.exchange),
         unknown_order="honba-contract-unknown-order",
         unknown_subscription="honba-contract-unknown-subscription",
         client_order_id="honba-contract-probe",

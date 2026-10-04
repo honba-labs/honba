@@ -10,13 +10,13 @@ use std::sync::{Arc, Mutex};
 use honba_engine::{DataFeed, Engine, ExecutionEngine, Handler, Result};
 use honba_entities::Trade;
 use honba_messages::{
-    Bar, BarAggregation, BarSpecification, BarType, Event, InstrumentId, Message, Order, OrderId,
-    OrderSide, OrderType, PriceType, TimeInForce, UnixNanos, Venue,
+    Bar, BarAggregation, BarSpecification, BarType, Event, Exchange, InstrumentId, Message, Order,
+    OrderId, OrderSide, OrderType, PriceType, TimeInForce, UnixNanos,
 };
 use honba_sim::{BarFillEngine, PaperExecution};
 
 fn instrument() -> InstrumentId {
-    InstrumentId::new("X", Venue::new("TEST"))
+    InstrumentId::new("X", Exchange::new("TEST"))
 }
 
 fn bar(close: f64, ts: u64) -> Message {
@@ -78,9 +78,13 @@ impl<E: ExecutionEngine> Threshold<E> {
 }
 
 impl<E: ExecutionEngine> Handler for Threshold<E> {
-    fn on_event(&mut self, event: &Event, _ts_init: UnixNanos) -> Result<()> {
+    fn on_event(
+        &mut self,
+        event: &Event,
+        _ts_init: UnixNanos,
+    ) -> Result<honba_engine::EngineOutput> {
         let Event::Bar(b) = event else {
-            return Ok(());
+            return Ok(honba_engine::EngineOutput::None);
         };
         (self.on_bar)(&mut self.exec, b);
         if !self.long && b.close() > self.level {
@@ -90,7 +94,7 @@ impl<E: ExecutionEngine> Handler for Threshold<E> {
             self.long = false;
             self.submit(OrderSide::Sell, b.ts_event())?;
         }
-        Ok(())
+        Ok(honba_engine::EngineOutput::None)
     }
 }
 
@@ -161,11 +165,15 @@ fn paper_execution_fills_strategy_orders_at_the_bar_price() {
         out: Arc<Mutex<Vec<Trade>>>,
     }
     impl Handler for Collect<PaperExecution> {
-        fn on_event(&mut self, event: &Event, ts_init: UnixNanos) -> Result<()> {
+        fn on_event(
+            &mut self,
+            event: &Event,
+            ts_init: UnixNanos,
+        ) -> Result<honba_engine::EngineOutput> {
             self.inner.on_event(event, ts_init)?;
             let new = self.inner.exec.drain_fills()?;
             self.out.lock().unwrap().extend(new);
-            Ok(())
+            Ok(honba_engine::EngineOutput::None)
         }
     }
 

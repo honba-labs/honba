@@ -1,7 +1,7 @@
 //! Unit tests for `crate::round_trip`.
 
 use honba_entities::{PositionSide, Trade};
-use honba_messages::{InstrumentId, OrderId, OrderSide, UnixNanos, Venue};
+use honba_messages::{Exchange, InstrumentId, OrderId, OrderSide, UnixNanos};
 
 use super::{any_instrument, assert_close, long_trip};
 use crate::{AnalyticsError, RoundTrip};
@@ -83,7 +83,7 @@ fn from_fills_rejects_different_instruments() {
     let entry = fill(OrderSide::Buy, 1.0, 100.0, 1);
     let exit = Trade::new(
         OrderId::new("O-2"),
-        InstrumentId::new("Y", Venue::new("NSE")),
+        InstrumentId::new("Y", Exchange::new("NSE")),
         OrderSide::Sell,
         1.0,
         101.0,

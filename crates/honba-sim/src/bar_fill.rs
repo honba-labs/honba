@@ -87,12 +87,12 @@ struct Inner {
 /// use honba_messages::{
 ///     Bar, BarAggregation, BarSpecification, BarType, Event, InstrumentId,
 ///     Order, OrderId, OrderSide, OrderType, PriceType, TimeInForce,
-///     UnixNanos, Venue,
+///     UnixNanos, Exchange,
 /// };
 ///
 /// let mut exec = BarFillEngine::new();
 /// let bt = BarType::new(
-///     InstrumentId::new("X", Venue::new("TEST")),
+///     InstrumentId::new("X", Exchange::new("TEST")),
 ///     BarSpecification::new(1, BarAggregation::Minute, PriceType::Last),
 /// );
 /// let t = UnixNanos::from_u64(2);
@@ -102,7 +102,7 @@ struct Inner {
 /// // Last price observed from bar close is 101. Submit and drain.
 /// let order = Order::new(
 ///     OrderId::new("O-1"),
-///     InstrumentId::new("X", Venue::new("TEST")),
+///     InstrumentId::new("X", Exchange::new("TEST")),
 ///     OrderSide::Buy, OrderType::Market, 5.0, None, TimeInForce::Day,
 ///     UnixNanos::from_u64(2), UnixNanos::from_u64(2),
 /// );
@@ -138,11 +138,15 @@ impl BarFillEngine {
 }
 
 impl Handler for BarFillEngine {
-    fn on_event(&mut self, event: &Event, _ts_init: UnixNanos) -> Result<()> {
+    fn on_event(
+        &mut self,
+        event: &Event,
+        _ts_init: UnixNanos,
+    ) -> Result<honba_engine::EngineOutput> {
         if let Event::Bar(b) = event {
             self.inner.lock().unwrap().last_price = Some(b.close());
         }
-        Ok(())
+        Ok(honba_engine::EngineOutput::None)
     }
 }
 

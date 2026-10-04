@@ -2,7 +2,7 @@
 
 use honba_engine::{Engine, ExecutionEngine};
 use honba_messages::{
-    InstrumentId, Order, OrderId, OrderSide, OrderType, TimeInForce, UnixNanos, Venue,
+    Exchange, InstrumentId, Order, OrderId, OrderSide, OrderType, TimeInForce, UnixNanos,
 };
 use honba_sim::PaperExecution;
 use honba_testing::{assert_close, assert_close_slice, Recorder, VecFeed};
@@ -10,7 +10,7 @@ use honba_testing::{assert_close, assert_close_slice, Recorder, VecFeed};
 fn order(id: &str, side: OrderSide, qty: f64) -> Order {
     Order::new(
         OrderId::new(id),
-        InstrumentId::new("X", Venue::new("TEST")),
+        InstrumentId::new("X", Exchange::new("TEST")),
         side,
         OrderType::Market,
         qty,

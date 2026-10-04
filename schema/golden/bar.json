@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "type": "Bar",
   "cases": [
     {
@@ -8,7 +8,7 @@
         "bar_type": {
           "instrument_id": {
             "symbol": "BANKNIFTY",
-            "venue": "NSE"
+            "exchange": "NSE"
           },
           "spec": {
             "step": 5,
@@ -31,7 +31,7 @@
         "bar_type": {
           "instrument_id": {
             "symbol": "RELIANCE",
-            "venue": "NSE"
+            "exchange": "NSE"
           },
           "spec": {
             "step": 1,
@@ -56,7 +56,7 @@
         "bar_type": {
           "instrument_id": {
             "symbol": "BANKNIFTY",
-            "venue": "NSE"
+            "exchange": "NSE"
           },
           "spec": {
             "step": 5,
@@ -79,7 +79,7 @@
         "bar_type": {
           "instrument_id": {
             "symbol": "BANKNIFTY",
-            "venue": "NSE"
+            "exchange": "NSE"
           },
           "spec": {
             "step": 5,
@@ -102,7 +102,7 @@
         "bar_type": {
           "instrument_id": {
             "symbol": "BANKNIFTY",
-            "venue": "NSE"
+            "exchange": "NSE"
           },
           "spec": {
             "step": 5,
@@ -125,7 +125,7 @@
         "bar_type": {
           "instrument_id": {
             "symbol": "BANKNIFTY",
-            "venue": "NSE"
+            "exchange": "NSE"
           },
           "spec": {
             "step": 5,
@@ -148,7 +148,7 @@
         "bar_type": {
           "instrument_id": {
             "symbol": "BANKNIFTY",
-            "venue": "NSE"
+            "exchange": "NSE"
           },
           "spec": {
             "step": 0,
@@ -171,7 +171,7 @@
         "bar_type": {
           "instrument_id": {
             "symbol": "BANKNIFTY",
-            "venue": "NSE"
+            "exchange": "NSE"
           },
           "spec": {
             "step": 5,

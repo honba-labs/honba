@@ -4,9 +4,9 @@ use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
 use honba_messages::{
-    Bar, BarAggregation, BarSpecification, BarType, InstrumentId as RustInstrumentId,
-    OrderSide as RustOrderSide, OrderType as RustOrderType, PriceType, QuoteTick as RustQuoteTick,
-    TimeInForce as RustTimeInForce, UnixNanos, Venue as RustVenue,
+    Bar, BarAggregation, BarSpecification, BarType, Exchange as RustExchange,
+    InstrumentId as RustInstrumentId, OrderSide as RustOrderSide, OrderType as RustOrderType,
+    PriceType, QuoteTick as RustQuoteTick, TimeInForce as RustTimeInForce, UnixNanos,
 };
 use honba_strategy::OrderIntent as RustOrderIntent;
 
@@ -17,22 +17,22 @@ pub struct RInstrumentId {
     #[pyo3(get)]
     pub symbol: String,
     #[pyo3(get)]
-    pub venue: String,
+    pub exchange: String,
 }
 
 #[pymethods]
 impl RInstrumentId {
     #[new]
-    #[pyo3(signature = (symbol, venue="NSE"))]
-    pub fn new(symbol: String, venue: &str) -> Self {
+    #[pyo3(signature = (symbol, exchange="NSE"))]
+    pub fn new(symbol: String, exchange: &str) -> Self {
         Self {
             symbol,
-            venue: venue.to_string(),
+            exchange: exchange.to_string(),
         }
     }
 
     fn __repr__(&self) -> String {
-        format!("{}.{}", self.symbol, self.venue)
+        format!("{}.{}", self.symbol, self.exchange)
     }
 
     fn __str__(&self) -> String {
@@ -42,13 +42,13 @@ impl RInstrumentId {
 
 impl RInstrumentId {
     pub fn to_rust(&self) -> RustInstrumentId {
-        RustInstrumentId::new(&self.symbol, RustVenue::new(&self.venue))
+        RustInstrumentId::new(&self.symbol, RustExchange::new(&self.exchange))
     }
 
     pub fn from_rust(id: &RustInstrumentId) -> Self {
         Self {
             symbol: id.symbol().to_string(),
-            venue: id.venue().as_str().to_string(),
+            exchange: id.exchange().as_str().to_string(),
         }
     }
 }
@@ -60,7 +60,7 @@ pub struct RQuoteTick {
     #[pyo3(get)]
     pub symbol: String,
     #[pyo3(get)]
-    pub venue: String,
+    pub exchange: String,
     #[pyo3(get)]
     pub bid_price: f64,
     #[pyo3(get)]
@@ -76,7 +76,7 @@ pub struct RQuoteTick {
 #[pymethods]
 impl RQuoteTick {
     #[new]
-    #[pyo3(signature = (symbol, bid_price, ask_price, bid_size=1.0, ask_size=1.0, ts=0, venue="NSE"))]
+    #[pyo3(signature = (symbol, bid_price, ask_price, bid_size=1.0, ask_size=1.0, ts=0, exchange="NSE"))]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         symbol: String,
@@ -85,11 +85,11 @@ impl RQuoteTick {
         bid_size: f64,
         ask_size: f64,
         ts: u64,
-        venue: &str,
+        exchange: &str,
     ) -> Self {
         Self {
             symbol,
-            venue: venue.to_string(),
+            exchange: exchange.to_string(),
             bid_price,
             ask_price,
             bid_size,
@@ -106,14 +106,14 @@ impl RQuoteTick {
     fn __repr__(&self) -> String {
         format!(
             "<QuoteTick {}.{} bid={:.2} ask={:.2} ts={}>",
-            self.symbol, self.venue, self.bid_price, self.ask_price, self.ts
+            self.symbol, self.exchange, self.bid_price, self.ask_price, self.ts
         )
     }
 }
 
 impl RQuoteTick {
     pub fn to_rust(&self) -> RustQuoteTick {
-        let inst = RustInstrumentId::new(&self.symbol, RustVenue::new(&self.venue));
+        let inst = RustInstrumentId::new(&self.symbol, RustExchange::new(&self.exchange));
         let t = UnixNanos::from_u64(self.ts);
         RustQuoteTick::new(
             inst,
@@ -134,7 +134,7 @@ pub struct RBar {
     #[pyo3(get, set)]
     pub symbol: String,
     #[pyo3(get, set)]
-    pub venue: String,
+    pub exchange: String,
     #[pyo3(get, set)]
     pub ts: u64,
     #[pyo3(get, set)]
@@ -152,7 +152,7 @@ pub struct RBar {
 #[pymethods]
 impl RBar {
     #[new]
-    #[pyo3(signature = (symbol, ts, open, high, low, close, volume=0.0, venue="NSE"))]
+    #[pyo3(signature = (symbol, ts, open, high, low, close, volume=0.0, exchange="NSE"))]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         symbol: String,
@@ -162,11 +162,11 @@ impl RBar {
         low: f64,
         close: f64,
         volume: f64,
-        venue: &str,
+        exchange: &str,
     ) -> Self {
         Self {
             symbol,
-            venue: venue.to_string(),
+            exchange: exchange.to_string(),
             ts,
             open,
             high,
@@ -184,7 +184,7 @@ impl RBar {
 impl RBar {
     /// Convert to the native Rust `Bar`. Spec defaults to 1-minute Last.
     pub fn to_rust(&self) -> Bar {
-        let instrument = RustInstrumentId::new(&self.symbol, RustVenue::new(&self.venue));
+        let instrument = RustInstrumentId::new(&self.symbol, RustExchange::new(&self.exchange));
         let spec = BarSpecification::new(1, BarAggregation::Minute, PriceType::Last);
         let bar_type = BarType::new(instrument, spec);
         let t = UnixNanos::from_u64(self.ts);
@@ -249,7 +249,7 @@ pub struct ROrderIntent {
     #[pyo3(get)]
     pub symbol: String,
     #[pyo3(get)]
-    pub venue: String,
+    pub exchange: String,
     #[pyo3(get)]
     pub side: String,
     #[pyo3(get)]
@@ -268,7 +268,7 @@ pub struct ROrderIntent {
 #[allow(clippy::useless_conversion)]
 impl ROrderIntent {
     #[new]
-    #[pyo3(signature = (symbol, side, quantity, order_type="market", price=None, time_in_force="day", venue="NSE", trigger_price=None))]
+    #[pyo3(signature = (symbol, side, quantity, order_type="market", price=None, time_in_force="day", exchange="NSE", trigger_price=None))]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         symbol: String,
@@ -277,7 +277,7 @@ impl ROrderIntent {
         order_type: &str,
         price: Option<f64>,
         time_in_force: &str,
-        venue: &str,
+        exchange: &str,
         trigger_price: Option<f64>,
     ) -> PyResult<Self> {
         let norm_type = match order_type.to_lowercase().as_str() {
@@ -286,7 +286,7 @@ impl ROrderIntent {
         };
         let intent = Self {
             symbol,
-            venue: venue.to_string(),
+            exchange: exchange.to_string(),
             side: side.to_lowercase(),
             quantity,
             order_type: norm_type,
@@ -303,20 +303,24 @@ impl ROrderIntent {
     }
 
     #[staticmethod]
-    #[pyo3(signature = (symbol, quantity, venue="NSE"))]
-    pub fn market_buy(symbol: String, quantity: f64, venue: &str) -> PyResult<Self> {
-        Self::new(symbol, "buy", quantity, "market", None, "day", venue, None)
+    #[pyo3(signature = (symbol, quantity, exchange="NSE"))]
+    pub fn market_buy(symbol: String, quantity: f64, exchange: &str) -> PyResult<Self> {
+        Self::new(
+            symbol, "buy", quantity, "market", None, "day", exchange, None,
+        )
     }
 
     #[staticmethod]
-    #[pyo3(signature = (symbol, quantity, venue="NSE"))]
-    pub fn market_sell(symbol: String, quantity: f64, venue: &str) -> PyResult<Self> {
-        Self::new(symbol, "sell", quantity, "market", None, "day", venue, None)
+    #[pyo3(signature = (symbol, quantity, exchange="NSE"))]
+    pub fn market_sell(symbol: String, quantity: f64, exchange: &str) -> PyResult<Self> {
+        Self::new(
+            symbol, "sell", quantity, "market", None, "day", exchange, None,
+        )
     }
 
     #[staticmethod]
-    #[pyo3(signature = (symbol, quantity, price, venue="NSE"))]
-    pub fn limit_buy(symbol: String, quantity: f64, price: f64, venue: &str) -> PyResult<Self> {
+    #[pyo3(signature = (symbol, quantity, price, exchange="NSE"))]
+    pub fn limit_buy(symbol: String, quantity: f64, price: f64, exchange: &str) -> PyResult<Self> {
         Self::new(
             symbol,
             "buy",
@@ -324,14 +328,14 @@ impl ROrderIntent {
             "limit",
             Some(price),
             "day",
-            venue,
+            exchange,
             None,
         )
     }
 
     #[staticmethod]
-    #[pyo3(signature = (symbol, quantity, price, venue="NSE"))]
-    pub fn limit_sell(symbol: String, quantity: f64, price: f64, venue: &str) -> PyResult<Self> {
+    #[pyo3(signature = (symbol, quantity, price, exchange="NSE"))]
+    pub fn limit_sell(symbol: String, quantity: f64, price: f64, exchange: &str) -> PyResult<Self> {
         Self::new(
             symbol,
             "sell",
@@ -339,18 +343,18 @@ impl ROrderIntent {
             "limit",
             Some(price),
             "day",
-            venue,
+            exchange,
             None,
         )
     }
 
     #[staticmethod]
-    #[pyo3(signature = (symbol, quantity, trigger_price, venue="NSE"))]
+    #[pyo3(signature = (symbol, quantity, trigger_price, exchange="NSE"))]
     pub fn stop_buy(
         symbol: String,
         quantity: f64,
         trigger_price: f64,
-        venue: &str,
+        exchange: &str,
     ) -> PyResult<Self> {
         let t = Some(trigger_price);
         Self::new(
@@ -360,18 +364,18 @@ impl ROrderIntent {
             "stop_market",
             None,
             "day",
-            venue,
+            exchange,
             t,
         )
     }
 
     #[staticmethod]
-    #[pyo3(signature = (symbol, quantity, trigger_price, venue="NSE"))]
+    #[pyo3(signature = (symbol, quantity, trigger_price, exchange="NSE"))]
     pub fn stop_sell(
         symbol: String,
         quantity: f64,
         trigger_price: f64,
-        venue: &str,
+        exchange: &str,
     ) -> PyResult<Self> {
         let t = Some(trigger_price);
         Self::new(
@@ -381,35 +385,44 @@ impl ROrderIntent {
             "stop_market",
             None,
             "day",
-            venue,
+            exchange,
             t,
         )
     }
 
     #[staticmethod]
-    #[pyo3(signature = (symbol, quantity, trigger_price, limit_price, venue="NSE"))]
+    #[pyo3(signature = (symbol, quantity, trigger_price, limit_price, exchange="NSE"))]
     pub fn stop_limit_buy(
         symbol: String,
         quantity: f64,
         trigger_price: f64,
         limit_price: f64,
-        venue: &str,
+        exchange: &str,
     ) -> PyResult<Self> {
         let (p, t) = (Some(limit_price), Some(trigger_price));
-        Self::new(symbol, "buy", quantity, "stop_limit", p, "day", venue, t)
+        Self::new(symbol, "buy", quantity, "stop_limit", p, "day", exchange, t)
     }
 
     #[staticmethod]
-    #[pyo3(signature = (symbol, quantity, trigger_price, limit_price, venue="NSE"))]
+    #[pyo3(signature = (symbol, quantity, trigger_price, limit_price, exchange="NSE"))]
     pub fn stop_limit_sell(
         symbol: String,
         quantity: f64,
         trigger_price: f64,
         limit_price: f64,
-        venue: &str,
+        exchange: &str,
     ) -> PyResult<Self> {
         let (p, t) = (Some(limit_price), Some(trigger_price));
-        Self::new(symbol, "sell", quantity, "stop_limit", p, "day", venue, t)
+        Self::new(
+            symbol,
+            "sell",
+            quantity,
+            "stop_limit",
+            p,
+            "day",
+            exchange,
+            t,
+        )
     }
 
     fn __repr__(&self) -> String {
@@ -422,7 +435,7 @@ impl ROrderIntent {
 
 impl ROrderIntent {
     pub fn to_rust(&self) -> Result<RustOrderIntent, String> {
-        let inst = RustInstrumentId::new(&self.symbol, RustVenue::new(&self.venue));
+        let inst = RustInstrumentId::new(&self.symbol, RustExchange::new(&self.exchange));
         let side = match self.side.as_str() {
             "buy" => RustOrderSide::Buy,
             "sell" => RustOrderSide::Sell,

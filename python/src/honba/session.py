@@ -93,7 +93,7 @@ class DataProvider(Protocol):
         ...
 
     def instrument(self, instrument_id: InstrumentId) -> Instrument:
-        """Resolve symbol/venue to full instrument metadata (tick size, lot, etc.)."""
+        """Resolve symbol/exchange to full instrument metadata (tick size, lot, etc.)."""
         ...
 
 
@@ -135,7 +135,7 @@ class BacktestConfig:
     """
 
     symbol: str
-    venue: str = "NSE"
+    exchange: str = "NSE"
     start: str | date | datetime = ""  # required in practice; validated in __post_init__
     end: str | date | datetime = ""
     timeframe: str = "1d"
@@ -157,7 +157,7 @@ class BacktestConfig:
 
     @property
     def instrument_id(self) -> InstrumentId:
-        return InstrumentId(self.symbol, self.venue)
+        return InstrumentId(self.symbol, self.exchange)
 
 
 # =============================================================================
@@ -208,7 +208,7 @@ class BacktestResult:
         # Minimal fallback
         m = self.metrics
         print(f"Strategy : {self.strategy_name}")
-        print(f"Symbol   : {self.config.symbol}.{self.config.venue}")
+        print(f"Symbol   : {self.config.symbol}.{self.config.exchange}")
         print(f"Period   : {self.config.start} → {self.config.end}")
         print(f"Fills    : {len(self.fills)}")
         print(f"Final equity : {m.get('final_equity', float('nan')):.2f}")
@@ -372,7 +372,7 @@ class Honba:
         strategy: Strategy | type[Strategy] | str | Path,
         *,
         symbol: str,
-        venue: str = "NSE",
+        exchange: str = "NSE",
         start: str | date | datetime,
         end: str | date | datetime,
         timeframe: str = "1d",
@@ -392,7 +392,7 @@ class Honba:
           * Strategy instance
           * Strategy subclass (instantiated with no args)
           * path to a .py file containing one Strategy subclass
-        symbol / venue:
+        symbol / exchange:
           Primary instrument for this run (multi-leg later can take a list).
         start / end:
           Inclusive/exclusive bounds interpreted by the DataProvider.
@@ -410,7 +410,7 @@ class Honba:
         """
         config = BacktestConfig(
             symbol=symbol,
-            venue=venue,
+            exchange=exchange,
             start=start,
             end=end,
             timeframe=timeframe,

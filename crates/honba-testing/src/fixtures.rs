@@ -11,24 +11,24 @@
 //! ```
 
 use honba_messages::{
-    Bar, BarAggregation, BarSpecification, BarType, InstrumentId, PriceType, UnixNanos, Venue,
+    Bar, BarAggregation, BarSpecification, BarType, Exchange, InstrumentId, PriceType, UnixNanos,
 };
 
-/// Venue used by every fixture (and by [`crate::VecFeed`]'s builders).
-pub const TEST_VENUE: &str = "TEST";
+/// Exchange used by every fixture (and by [`crate::VecFeed`]'s builders).
+pub const TEST_EXCHANGE: &str = "TEST";
 
-/// Instrument `symbol` on the [`TEST_VENUE`].
+/// Instrument `symbol` on the [`TEST_EXCHANGE`].
 pub fn instrument(symbol: &str) -> InstrumentId {
-    InstrumentId::new(symbol, Venue::new(TEST_VENUE))
+    InstrumentId::new(symbol, Exchange::new(TEST_EXCHANGE))
 }
 
-/// A placeholder instrument (`X` on the [`TEST_VENUE`]) for tests where the
+/// A placeholder instrument (`X` on the [`TEST_EXCHANGE`]) for tests where the
 /// instrument does not matter.
 pub fn any_instrument() -> InstrumentId {
     instrument("X")
 }
 
-/// One-minute, last-price bar type for `symbol` on the [`TEST_VENUE`].
+/// One-minute, last-price bar type for `symbol` on the [`TEST_EXCHANGE`].
 pub fn minute_bar_type(symbol: &str) -> BarType {
     BarType::new(
         instrument(symbol),

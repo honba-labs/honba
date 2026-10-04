@@ -55,7 +55,6 @@ pub struct Codegen {
     schemas: BTreeMap<String, Value>,
 }
 
-
 impl Codegen {
     /// Create a new codegen context and register all wire types.
     pub fn new() -> Self {
@@ -353,7 +352,11 @@ impl Codegen {
 
 fn json_type_to_ts(value: &Value) -> String {
     if let Some(ref_str) = value.get("$ref").and_then(|v| v.as_str()) {
-        return ref_str.split('/').next_back().unwrap_or(ref_str).to_string();
+        return ref_str
+            .split('/')
+            .next_back()
+            .unwrap_or(ref_str)
+            .to_string();
     }
     match value.get("type").and_then(|v| v.as_str()) {
         Some("string") => {
@@ -442,7 +445,11 @@ fn json_schema_to_typescript(name: &str, schema: &Value) -> String {
 
 fn json_type_to_py(value: &Value) -> String {
     if let Some(ref_str) = value.get("$ref").and_then(|v| v.as_str()) {
-        return ref_str.split('/').next_back().unwrap_or(ref_str).to_string();
+        return ref_str
+            .split('/')
+            .next_back()
+            .unwrap_or(ref_str)
+            .to_string();
     }
     match value.get("type").and_then(|v| v.as_str()) {
         Some("string") => "str".to_string(),

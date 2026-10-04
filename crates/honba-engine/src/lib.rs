@@ -6,7 +6,7 @@
 //!
 //! The kernel is deliberately small: a monotonic [`Clock`], a time-ordered
 //! [`EventQueue`], a [`Handler`] trait, and an [`Engine`] that drives them.
-//! Data sources and execution venues are injected via the [`DataFeed`] and
+//! Data sources and execution exchanges are injected via the [`DataFeed`] and
 //! [`ExecutionEngine`] traits, so the same kernel runs backtests, paper
 //! trading, and live sessions without code changes.
 
@@ -23,7 +23,7 @@ pub use data::DataFeed;
 pub use engine::Engine;
 pub use error::{AlgoError, Result};
 pub use execution::ExecutionEngine;
-pub use handler::{Handler, NoopHandler};
+pub use handler::{EngineOutput, Handler, NoopHandler, TradingState};
 pub use queue::EventQueue;
 
 #[cfg(test)]

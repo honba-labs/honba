@@ -16,11 +16,11 @@ use crate::indicator::Indicator;
 ///
 /// ```
 /// use honba_indicators::{Atr, Indicator};
-/// use honba_messages::{Bar, BarAggregation, BarSpecification, BarType, InstrumentId, PriceType, UnixNanos, Venue};
+/// use honba_messages::{Bar, BarAggregation, BarSpecification, BarType, InstrumentId, PriceType, UnixNanos, Exchange};
 ///
 /// fn bar(h: f64, l: f64, c: f64) -> Bar {
 ///     let bt = BarType::new(
-///         InstrumentId::new("X", Venue::new("NSE")),
+///         InstrumentId::new("X", Exchange::new("NSE")),
 ///         BarSpecification::new(1, BarAggregation::Day, PriceType::Last),
 ///     );
 ///     Bar::new(bt, c, h, l, c, 1.0, UnixNanos::from_u64(1), UnixNanos::from_u64(1))

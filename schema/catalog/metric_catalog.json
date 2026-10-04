@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "notes": "Metric catalog: source of truth for screener metric definitions. `key` is the wire key sent to the backend; `uiId` is the frontend column id and is never sent on the wire; `aliases` are natural-language phrases resolved by honba.screener.MetricCatalog. Security identity is InstrumentId; `name` is the display ticker and `exchange` maps to the venue. Each entry validates as honba.entities.screener.MetricDefinition.",
+  "notes": "Metric catalog: source of truth for screener metric definitions. `key` is the wire key sent to the backend; `uiId` is the frontend column id and is never sent on the wire; `aliases` are natural-language phrases resolved by honba.screener.MetricCatalog. Security identity is InstrumentId; `name` is the display ticker and `exchange` is the trading exchange code. Each entry validates as honba.entities.screener.MetricDefinition.",
   "groups": [
     "SECURITY",
     "OVERVIEW",
@@ -56,7 +56,7 @@
       "valueType": "ENUM",
       "source": "FUNDAMENTAL",
       "aliases": [
-        "venue",
+        "exchange",
         "listing exchange",
         "stock exchange"
       ]

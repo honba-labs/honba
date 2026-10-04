@@ -30,12 +30,12 @@ def run_strategy(
 
 class InstrumentId:
     symbol: str
-    venue: str
-    def __init__(self, symbol: str, venue: str = "NSE") -> None: ...
+    exchange: str
+    def __init__(self, symbol: str, exchange: str = "NSE") -> None: ...
 
 class QuoteTick:
     symbol: str
-    venue: str
+    exchange: str
     bid_price: float
     ask_price: float
     bid_size: float
@@ -49,14 +49,14 @@ class QuoteTick:
         bid_size: float = 1.0,
         ask_size: float = 1.0,
         ts: int = 0,
-        venue: str = "NSE",
+        exchange: str = "NSE",
     ) -> None: ...
     @property
     def mid_price(self) -> float: ...
 
 class Bar:
     symbol: str
-    venue: str
+    exchange: str
     ts: int
     open: float
     high: float
@@ -72,7 +72,7 @@ class Bar:
         low: float,
         close: float,
         volume: float = 0.0,
-        venue: str = "NSE",
+        exchange: str = "NSE",
     ) -> None: ...
 
 class Fill:
@@ -92,7 +92,7 @@ class Fill:
 
 class OrderIntent:
     symbol: str
-    venue: str
+    exchange: str
     side: str
     quantity: float
     order_type: str
@@ -107,36 +107,36 @@ class OrderIntent:
         order_type: str = "market",
         price: float | None = None,
         time_in_force: str = "day",
-        venue: str = "NSE",
+        exchange: str = "NSE",
         trigger_price: float | None = None,
     ) -> None: ...
     @staticmethod
-    def market_buy(symbol: str, quantity: float, venue: str = "NSE") -> OrderIntent: ...
+    def market_buy(symbol: str, quantity: float, exchange: str = "NSE") -> OrderIntent: ...
     @staticmethod
-    def market_sell(symbol: str, quantity: float, venue: str = "NSE") -> OrderIntent: ...
+    def market_sell(symbol: str, quantity: float, exchange: str = "NSE") -> OrderIntent: ...
     @staticmethod
     def limit_buy(
-        symbol: str, quantity: float, price: float, venue: str = "NSE"
+        symbol: str, quantity: float, price: float, exchange: str = "NSE"
     ) -> OrderIntent: ...
     @staticmethod
     def limit_sell(
-        symbol: str, quantity: float, price: float, venue: str = "NSE"
+        symbol: str, quantity: float, price: float, exchange: str = "NSE"
     ) -> OrderIntent: ...
     @staticmethod
     def stop_buy(
-        symbol: str, quantity: float, trigger_price: float, venue: str = "NSE"
+        symbol: str, quantity: float, trigger_price: float, exchange: str = "NSE"
     ) -> OrderIntent: ...
     @staticmethod
     def stop_sell(
-        symbol: str, quantity: float, trigger_price: float, venue: str = "NSE"
+        symbol: str, quantity: float, trigger_price: float, exchange: str = "NSE"
     ) -> OrderIntent: ...
     @staticmethod
     def stop_limit_buy(
-        symbol: str, quantity: float, trigger_price: float, limit_price: float, venue: str = "NSE"
+        symbol: str, quantity: float, trigger_price: float, limit_price: float, exchange: str = "NSE"
     ) -> OrderIntent: ...
     @staticmethod
     def stop_limit_sell(
-        symbol: str, quantity: float, trigger_price: float, limit_price: float, venue: str = "NSE"
+        symbol: str, quantity: float, trigger_price: float, limit_price: float, exchange: str = "NSE"
     ) -> OrderIntent: ...
 
 class RustSmaCrossover:

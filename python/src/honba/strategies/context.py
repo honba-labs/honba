@@ -41,7 +41,7 @@ class StrategyContext(ABC):
 
     @abstractmethod
     def positions(self) -> dict[InstrumentId, float]:
-        """Every non-flat position, ordered by instrument id (symbol, then venue)."""
+        """Every non-flat position, ordered by instrument id (symbol, then exchange)."""
 
     @abstractmethod
     def cash(self) -> float:
@@ -87,7 +87,7 @@ class LedgerContext(StrategyContext):
 
     def positions(self) -> dict[InstrumentId, float]:
         held = (item for item in self._positions.items() if item[1] != 0.0)
-        return dict(sorted(held, key=lambda item: (item[0].symbol, item[0].venue)))
+        return dict(sorted(held, key=lambda item: (item[0].symbol, item[0].exchange)))
 
     def cash(self) -> float:
         return self._cash

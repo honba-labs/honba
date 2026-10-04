@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "type": "Trade",
   "cases": [
     {
@@ -8,7 +8,7 @@
         "order_id": "O-1",
         "instrument_id": {
           "symbol": "NIFTY50",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "side": "buy",
         "quantity": 75.0,
@@ -24,7 +24,7 @@
         "order_id": "O-2",
         "instrument_id": {
           "symbol": "RELIANCE",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "side": "sell",
         "quantity": 10.0,
@@ -42,7 +42,7 @@
         "order_id": "O-1",
         "instrument_id": {
           "symbol": "NIFTY50",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "side": "buy",
         "quantity": -1.0,
@@ -58,7 +58,7 @@
         "order_id": "O-1",
         "instrument_id": {
           "symbol": "NIFTY50",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "side": "buy",
         "quantity": 75.0,
@@ -74,7 +74,7 @@
         "order_id": "O-1",
         "instrument_id": {
           "symbol": "NIFTY50",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "side": "no_order_side",
         "quantity": 75.0,
@@ -90,7 +90,7 @@
         "order_id": "O-1",
         "instrument_id": {
           "symbol": "NIFTY50",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "side": "buy",
         "quantity": 75.0,
@@ -103,7 +103,7 @@
   "invalid_text": [
     {
       "name": "duplicate_price",
-      "text": "{\"order_id\":\"O-1\",\"instrument_id\":{\"symbol\":\"NIFTY50\",\"venue\":\"NSE\"},\"side\":\"buy\",\"quantity\":75.0,\"price\":22000.0,\"price\":22001.0,\"costs\":0.0,\"ts_event\":1,\"ts_init\":1}"
+      "text": "{\"order_id\":\"O-1\",\"instrument_id\":{\"symbol\":\"NIFTY50\",\"exchange\":\"NSE\"},\"side\":\"buy\",\"quantity\":75.0,\"price\":22000.0,\"price\":22001.0,\"costs\":0.0,\"ts_event\":1,\"ts_init\":1}"
     }
   ]
 }

@@ -5,7 +5,7 @@
 
 use honba::pyclasses::run::{run_strategy_json, MAX_SMA_PERIOD};
 
-const INSTRUMENT: &str = r#"{"symbol": "RELIANCE", "venue": "NSE"}"#;
+const INSTRUMENT: &str = r#"{"symbol": "RELIANCE", "exchange": "NSE"}"#;
 
 fn run_sma(fast: &str, slow: &str, quantity: &str) -> Result<String, String> {
     let params = format!(

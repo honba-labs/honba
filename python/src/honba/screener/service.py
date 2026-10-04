@@ -132,7 +132,7 @@ class DataService:
 
                 if fetched:
                     record = CoverageRecord(
-                        venue=inst.venue,
+                        exchange=inst.exchange,
                         symbol=inst.symbol,
                         timeframe=plan.timeframe,
                         interval=gap,

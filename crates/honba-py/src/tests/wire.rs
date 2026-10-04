@@ -19,7 +19,7 @@ fn enum_values_list_every_variant_as_its_wire_string() {
 
 #[test]
 fn canonical_roundtrips_and_rejects() {
-    let id = r#"{"symbol":"X","venue":"NSE"}"#;
+    let id = r#"{"symbol":"X","exchange":"NSE"}"#;
     assert_eq!(canonical("InstrumentId", id).unwrap(), id);
     assert!(canonical("Nope", "{}")
         .unwrap_err()

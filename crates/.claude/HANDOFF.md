@@ -1,0 +1,1 @@
+E0-S2 + review fixes committed in honba (7a44813..2628daa, unpushed). Pending: mark E0-S2 done in ROADMAP (needs OK); auditing test layout (src/tests/ unit, crate/tests/ integration) across crates.

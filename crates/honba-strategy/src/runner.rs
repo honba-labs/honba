@@ -144,10 +144,15 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
 
 impl<S: Strategy, E: ExecutionEngine> Handler for StrategyRunner<S, E> {
     fn on_start(&mut self) -> Result<()> {
-        self.adapter.on_start()
+        self.adapter.on_start()?;
+        Ok(())
     }
 
-    fn on_event(&mut self, event: &Event, ts_init: UnixNanos) -> Result<()> {
+    fn on_event(
+        &mut self,
+        event: &Event,
+        ts_init: UnixNanos,
+    ) -> Result<honba_engine::EngineOutput> {
         // 1. Set the clock and dispatch to the strategy.
         self.adapter.on_event(event, ts_init)?;
 
@@ -188,7 +193,7 @@ impl<S: Strategy, E: ExecutionEngine> Handler for StrategyRunner<S, E> {
         }
         self.fills.extend(new_fills);
 
-        Ok(())
+        Ok(honba_engine::EngineOutput::None)
     }
 
     fn on_stop(&mut self) -> Result<()> {

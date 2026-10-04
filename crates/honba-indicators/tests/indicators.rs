@@ -2,12 +2,12 @@
 
 use honba_indicators::{Atr, BollingerBands, BollingerValue, Ema, Indicator, Macd, Rsi, Sma};
 use honba_messages::{
-    Bar, BarAggregation, BarSpecification, BarType, InstrumentId, PriceType, UnixNanos, Venue,
+    Bar, BarAggregation, BarSpecification, BarType, Exchange, InstrumentId, PriceType, UnixNanos,
 };
 
 fn bar(h: f64, l: f64, c: f64) -> Bar {
     let bt = BarType::new(
-        InstrumentId::new("X", Venue::new("NSE")),
+        InstrumentId::new("X", Exchange::new("NSE")),
         BarSpecification::new(1, BarAggregation::Day, PriceType::Last),
     );
     Bar::new(

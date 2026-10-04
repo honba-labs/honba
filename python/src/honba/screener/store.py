@@ -79,14 +79,14 @@ class ParquetBarStore:
         tmp_file.replace(self.ledger_file)
 
     def coverage(self, instrument: InstrumentId, timeframe: str) -> list[CoverageRecord]:
-        key = f"{instrument.venue}:{instrument.symbol}:{timeframe.upper()}"
+        key = f"{instrument.exchange}:{instrument.symbol}:{timeframe.upper()}"
         ledger = self._load_ledger()
         raw_records = ledger.get(key, [])
         records: list[CoverageRecord] = []
         for r in raw_records:
             records.append(
                 CoverageRecord(
-                    venue=r["venue"],
+                    exchange=r["exchange"],
                     symbol=r["symbol"],
                     timeframe=r["timeframe"],
                     interval=DateInterval(
@@ -106,7 +106,7 @@ class ParquetBarStore:
         return (
             self.catalog_dir
             / timeframe.upper()
-            / instrument.venue.upper()
+            / instrument.exchange.upper()
             / instrument.symbol.upper()
             / f"{year}.parquet"
         )
@@ -154,7 +154,7 @@ class ParquetBarStore:
 
     def append(self, record: CoverageRecord, bars: Sequence[Bar]) -> None:
         """Append bars into partitioned parquet files and update coverage ledger."""
-        inst = InstrumentId(record.symbol, record.venue)
+        inst = InstrumentId(record.symbol, record.exchange)
         tf = record.timeframe.upper()
 
         # Group bars by year
@@ -214,12 +214,12 @@ class ParquetBarStore:
             tmp_path.replace(fpath)
 
         # Update ledger and merge contiguous/overlapping intervals
-        key = f"{inst.venue}:{inst.symbol}:{tf}"
+        key = f"{inst.exchange}:{inst.symbol}:{tf}"
         ledger = self._load_ledger()
         records_list = ledger.setdefault(key, [])
         records_list.append(
             {
-                "venue": record.venue,
+                "exchange": record.exchange,
                 "symbol": record.symbol,
                 "timeframe": tf,
                 "start": record.interval.start.isoformat(),
@@ -238,7 +238,7 @@ class ParquetBarStore:
         self._save_ledger(ledger)
 
     def _merge_ledger_entries(self, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Merge adjacent and overlapping ledger entries having the same status and venue/symbol/tf."""
+        """Merge adjacent and overlapping ledger entries having the same status and exchange/symbol/tf."""
         if not entries:
             return []
 

@@ -65,10 +65,10 @@ _WIRE_EVENT_DESCRIPTIONS: dict[str, str] = {
     "quote":            "Top-of-book quote tick (market data)",
     "trade":            "Market trade print / last-sale tick (market data)",
     "order":            "Intent submitted to execution port (DEBUG)",
-    "order_accepted":   "Venue acknowledged the order",
+    "order_accepted":   "Exchange acknowledged the order",
     "order_filled":     "Fill received from execution port (qty, px, cost)",
-    "order_rejected":   "Intent failed validation or was rejected by venue (WARNING)",
-    "order_cancelled":  "Order cancelled by venue or strategy",
+    "order_rejected":   "Intent failed validation or was rejected by exchange (WARNING)",
+    "order_cancelled":  "Order cancelled by exchange or strategy",
 }
 
 # ---------------------------------------------------------------------------

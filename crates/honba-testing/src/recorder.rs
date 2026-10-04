@@ -79,9 +79,13 @@ impl Handler for Recorder {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &Event, _ts_init: UnixNanos) -> Result<()> {
+    fn on_event(
+        &mut self,
+        event: &Event,
+        _ts_init: UnixNanos,
+    ) -> Result<honba_engine::EngineOutput> {
         self.events.lock().unwrap().push(event.clone());
-        Ok(())
+        Ok(honba_engine::EngineOutput::None)
     }
 
     fn on_stop(&mut self) -> Result<()> {

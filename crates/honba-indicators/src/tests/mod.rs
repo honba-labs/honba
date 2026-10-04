@@ -8,14 +8,14 @@ mod rsi;
 mod sma;
 
 use honba_messages::{
-    Bar, BarAggregation, BarSpecification, BarType, InstrumentId, PriceType, UnixNanos, Venue,
+    Bar, BarAggregation, BarSpecification, BarType, Exchange, InstrumentId, PriceType, UnixNanos,
 };
 
 use crate::Indicator;
 
 /// A placeholder instrument for tests where the instrument does not matter.
 fn any_instrument() -> InstrumentId {
-    InstrumentId::new("X", Venue::new("NSE"))
+    InstrumentId::new("X", Exchange::new("NSE"))
 }
 
 /// A bar with the given high, low and close (open = close, volume 1).

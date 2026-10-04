@@ -6,7 +6,7 @@ use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use parquet::arrow::ArrowWriter;
 
-use honba_messages::{BarAggregation, BarSpecification, InstrumentId, PriceType, Venue};
+use honba_messages::{BarAggregation, BarSpecification, Exchange, InstrumentId, PriceType};
 
 use crate::import::parquet_source::{bar_schema, ParquetBarSource, ParquetError};
 
@@ -60,7 +60,7 @@ fn test_parquet_bar_source_read_valid_bars() {
     writer.write(&batch).expect("write batch");
     writer.close().expect("close writer");
 
-    let inst = InstrumentId::new("TCS", Venue::new("NSE"));
+    let inst = InstrumentId::new("TCS", Exchange::new("NSE"));
     let source = ParquetBarSource::new(temp.path(), inst.clone());
     let bars = source.bars().expect("read bars");
 
@@ -101,7 +101,7 @@ fn test_parquet_bar_source_with_custom_spec() {
     writer.write(&batch).expect("write batch");
     writer.close().expect("close writer");
 
-    let inst = InstrumentId::new("INFY", Venue::new("NSE"));
+    let inst = InstrumentId::new("INFY", Exchange::new("NSE"));
     let spec = BarSpecification::new(5, BarAggregation::Minute, PriceType::Bid);
     let source = ParquetBarSource::with_spec(temp.path(), inst, spec);
     let bars = source.bars().expect("read bars");
@@ -141,7 +141,7 @@ fn test_parquet_bar_source_missing_column() {
     writer.write(&batch).expect("write batch");
     writer.close().expect("close writer");
 
-    let inst = InstrumentId::new("RELIANCE", Venue::new("NSE"));
+    let inst = InstrumentId::new("RELIANCE", Exchange::new("NSE"));
     let source = ParquetBarSource::new(temp.path(), inst);
     let err = source.bars().expect_err("should fail with missing column");
 
@@ -182,7 +182,7 @@ fn test_parquet_bar_source_wrong_data_type() {
     writer.write(&batch).expect("write batch");
     writer.close().expect("close writer");
 
-    let inst = InstrumentId::new("SBIN", Venue::new("NSE"));
+    let inst = InstrumentId::new("SBIN", Exchange::new("NSE"));
     let source = ParquetBarSource::new(temp.path(), inst);
     let err = source.bars().expect_err("should fail with wrong type");
 
@@ -198,7 +198,7 @@ fn test_parquet_bar_source_wrong_data_type() {
 
 #[test]
 fn test_parquet_bar_source_non_existent_file() {
-    let inst = InstrumentId::new("UNKNOWN", Venue::new("NSE"));
+    let inst = InstrumentId::new("UNKNOWN", Exchange::new("NSE"));
     let source = ParquetBarSource::new("/tmp/non_existent_parquet_file_12345.parquet", inst);
     let err = source.bars().expect_err("should fail on missing file");
 

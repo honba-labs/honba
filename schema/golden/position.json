@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "type": "Position",
   "cases": [
     {
@@ -7,7 +7,7 @@
       "value": {
         "instrument_id": {
           "symbol": "NIFTY50",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "currency": "INR",
         "side": "long",
@@ -21,7 +21,7 @@
       "value": {
         "instrument_id": {
           "symbol": "RELIANCE",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "currency": "INR",
         "side": "short",
@@ -37,7 +37,7 @@
       "value": {
         "instrument_id": {
           "symbol": "RELIANCE",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "currency": "INR",
         "side": "short",
@@ -51,7 +51,7 @@
       "value": {
         "instrument_id": {
           "symbol": "RELIANCE",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "currency": "INR",
         "side": "short",
@@ -65,7 +65,7 @@
       "value": {
         "instrument_id": {
           "symbol": "RELIANCE",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "currency": "inr",
         "side": "short",

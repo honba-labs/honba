@@ -4,13 +4,13 @@ mod bar_fill;
 mod paper;
 
 use honba_messages::{
-    Bar, BarAggregation, BarSpecification, BarType, Event, InstrumentId, Order, OrderId, OrderSide,
-    OrderType, PriceType, TimeInForce, UnixNanos, Venue,
+    Bar, BarAggregation, BarSpecification, BarType, Event, Exchange, InstrumentId, Order, OrderId,
+    OrderSide, OrderType, PriceType, TimeInForce, UnixNanos,
 };
 
 /// A placeholder instrument for tests where the instrument does not matter.
 fn any_instrument() -> InstrumentId {
-    InstrumentId::new("X", Venue::new("TEST"))
+    InstrumentId::new("X", Exchange::new("TEST"))
 }
 
 /// A one-minute bar event for [`any_instrument`] closing at `close`, at `ts`.

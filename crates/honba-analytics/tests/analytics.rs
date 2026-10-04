@@ -2,10 +2,10 @@
 
 use honba_analytics::{AnalyticsError, EquityStats, PerformanceReport, RoundTrip, TradeStats};
 use honba_entities::{PositionSide, Trade};
-use honba_messages::{InstrumentId, UnixNanos, Venue};
+use honba_messages::{Exchange, InstrumentId, UnixNanos};
 
 fn id() -> InstrumentId {
-    InstrumentId::new("X", Venue::new("NSE"))
+    InstrumentId::new("X", Exchange::new("NSE"))
 }
 
 fn ts(n: u64) -> UnixNanos {

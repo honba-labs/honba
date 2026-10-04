@@ -3,7 +3,7 @@
 use std::sync::{Arc, Mutex};
 
 use honba_engine::{AlgoError, DataFeed, Engine, Handler, Result};
-use honba_messages::{Event, InstrumentId, Message, QuoteTick, UnixNanos, Venue};
+use honba_messages::{Event, Exchange, InstrumentId, Message, QuoteTick, UnixNanos};
 
 fn ts(n: u64) -> UnixNanos {
     UnixNanos::from_u64(n)
@@ -12,7 +12,7 @@ fn ts(n: u64) -> UnixNanos {
 fn quote(t: u64) -> Message {
     Message::new(
         Event::Quote(QuoteTick::new(
-            InstrumentId::new("X", Venue::new("NSE")),
+            InstrumentId::new("X", Exchange::new("NSE")),
             1.0,
             2.0,
             1.0,
@@ -44,7 +44,7 @@ impl DataFeed for VecFeed {
 
 #[derive(Clone, Default)]
 struct Recorder {
-    events: Arc<Mutex<Vec<u64>>>,
+    events: Arc<Mutex<Vec<Event>>>,
     started: Arc<Mutex<bool>>,
     stopped: Arc<Mutex<bool>>,
 }
@@ -55,9 +55,14 @@ impl Handler for Recorder {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &Event, _ts_init: UnixNanos) -> Result<()> {
-        self.events.lock().unwrap().push(event.ts_event().as_u64());
-        Ok(())
+    fn on_event(
+        &mut self,
+        event: &Event,
+        _ts_init: UnixNanos,
+    ) -> Result<honba_engine::EngineOutput> {
+        let mut evs = self.events.lock().unwrap();
+        evs.push(event.clone());
+        Ok(honba_engine::EngineOutput::None)
     }
 
     fn on_stop(&mut self) -> Result<()> {
@@ -79,7 +84,15 @@ fn engine_processes_events_in_order() {
     engine.add_handler(rec);
     engine.run(&mut feed).unwrap();
 
-    assert_eq!(*events.lock().unwrap(), vec![1, 2, 3]);
+    assert_eq!(
+        *events
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|e| e.ts_event().as_u64())
+            .collect::<Vec<_>>(),
+        vec![1, 2, 3]
+    );
     assert!(*started.lock().unwrap());
     assert!(*stopped.lock().unwrap());
     assert_eq!(engine.now(), ts(3));
@@ -114,12 +127,16 @@ fn engine_detects_clock_regression() {
     struct MaxTs(Arc<Mutex<u64>>);
 
     impl Handler for MaxTs {
-        fn on_event(&mut self, event: &Event, _init: UnixNanos) -> Result<()> {
+        fn on_event(
+            &mut self,
+            event: &Event,
+            _init: UnixNanos,
+        ) -> Result<honba_engine::EngineOutput> {
             let t = event.ts_event().as_u64();
             let mut m = self.0.lock().unwrap();
             assert!(t >= *m, "event ts went backwards: {t} < {m}");
             *m = t;
-            Ok(())
+            Ok(honba_engine::EngineOutput::None)
         }
     }
 
@@ -149,8 +166,22 @@ fn multiple_handlers_all_receive_events() {
     engine.add_handler(b);
     engine.run(&mut feed).unwrap();
 
-    assert_eq!(*ea.lock().unwrap(), vec![1, 2]);
-    assert_eq!(*eb.lock().unwrap(), vec![1, 2]);
+    assert_eq!(
+        *ea.lock()
+            .unwrap()
+            .iter()
+            .map(|e| e.ts_event().as_u64())
+            .collect::<Vec<_>>(),
+        vec![1, 2]
+    );
+    assert_eq!(
+        *eb.lock()
+            .unwrap()
+            .iter()
+            .map(|e| e.ts_event().as_u64())
+            .collect::<Vec<_>>(),
+        vec![1, 2]
+    );
 }
 
 #[test]

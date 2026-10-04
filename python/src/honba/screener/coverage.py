@@ -39,7 +39,7 @@ class DateInterval:
 class CoverageRecord:
     """A record in the coverage ledger."""
 
-    venue: str
+    exchange: str
     symbol: str
     timeframe: str
     interval: DateInterval

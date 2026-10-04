@@ -14,6 +14,9 @@ members = [
     "crates/honba-cli",
     "crates/honba-market",
     "crates/honba-codegen",
+    "crates/honba-ports",
+    "crates/honba-async",
+    "crates/honba-sweep",
 ]
 
 [workspace.package]
@@ -36,13 +39,17 @@ honba-analytics = { path = "crates/honba-analytics" }
 honba-data = { path = "crates/honba-data" }
 honba-market = { path = "crates/honba-market" }
 honba-codegen = { path = "crates/honba-codegen" }
+honba-ports = { path = "crates/honba-ports" }
+honba-async = { path = "crates/honba-async" }
+honba-sweep = { path = "crates/honba-sweep" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 thiserror = "1"
 chrono = { version = ">=0.4.20, <0.4.40", features = ["serde"] }
 arrow = "53"
 parquet = { version = "53", features = ["arrow"] }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["full", "rt-multi-thread"] }
+async-trait = "0.1"
 tracing = "0.1"
 csv = "1"
 clap = { version = "4", features = ["derive"] }

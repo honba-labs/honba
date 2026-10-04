@@ -87,19 +87,19 @@ class InMemoryBarStore:
     """In-memory implementation of BarStore for testing and offline evaluation."""
 
     def __init__(self) -> None:
-        # Key: (venue, symbol, timeframe)
+        # Key: (exchange, symbol, timeframe)
         self._coverage: dict[tuple[str, str, str], list[CoverageRecord]] = {}
-        # Key: (venue, symbol, timeframe, ts_event)
+        # Key: (exchange, symbol, timeframe, ts_event)
         self._bars: dict[tuple[str, str, str, int], Bar] = {}
 
     def coverage(self, instrument: InstrumentId, timeframe: str) -> list[CoverageRecord]:
-        key = (instrument.venue, instrument.symbol, timeframe)
+        key = (instrument.exchange, instrument.symbol, timeframe)
         return list(self._coverage.get(key, []))
 
     def read(
         self, instrument: InstrumentId, timeframe: str, interval: DateInterval
     ) -> list[Bar]:
-        key_prefix = (instrument.venue, instrument.symbol, timeframe)
+        key_prefix = (instrument.exchange, instrument.symbol, timeframe)
         # Convert date interval to nanoseconds range [start_ns, end_ns)
         start_ns = int(dt.datetime.combine(interval.start, dt.time.min).timestamp() * 1e9)
         end_ns = int(dt.datetime.combine(interval.end, dt.time.min).timestamp() * 1e9)
@@ -114,10 +114,10 @@ class InMemoryBarStore:
     def append(self, record: CoverageRecord, bars: Sequence[Bar]) -> None:
         for bar in bars:
             validate_bar(bar)
-            key = (record.venue, record.symbol, record.timeframe, bar.ts)
+            key = (record.exchange, record.symbol, record.timeframe, bar.ts)
             self._bars[key] = bar
 
-        key_prefix = (record.venue, record.symbol, record.timeframe)
+        key_prefix = (record.exchange, record.symbol, record.timeframe)
         records = self._coverage.setdefault(key_prefix, [])
         records.append(record)
 
@@ -127,7 +127,7 @@ class InMemoryMarketDataProvider:
 
     def __init__(self, name: str = "mock_provider") -> None:
         self._name = name
-        # Key: (venue, symbol, timeframe, ts_event)
+        # Key: (exchange, symbol, timeframe, ts_event)
         self._bars: dict[tuple[str, str, str, int], Bar] = {}
 
     @property
@@ -136,7 +136,7 @@ class InMemoryMarketDataProvider:
 
     def add_bars(self, instrument: InstrumentId, timeframe: str, bars: Sequence[Bar]) -> None:
         for bar in bars:
-            key = (instrument.venue, instrument.symbol, timeframe, bar.ts)
+            key = (instrument.exchange, instrument.symbol, timeframe, bar.ts)
             self._bars[key] = bar
 
     def fetch(
@@ -152,6 +152,6 @@ class InMemoryMarketDataProvider:
         matched = [
             bar
             for (v, s, tf, ts), bar in self._bars.items()
-            if v == instrument.venue and s == instrument.symbol and tf == timeframe and start_ns <= ts < end_ns
+            if v == instrument.exchange and s == instrument.symbol and tf == timeframe and start_ns <= ts < end_ns
         ]
         return sorted(matched, key=lambda b: b.ts)

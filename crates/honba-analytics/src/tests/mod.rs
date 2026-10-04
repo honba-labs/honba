@@ -7,13 +7,13 @@ mod round_trip;
 mod trade_stats;
 
 use honba_entities::PositionSide;
-use honba_messages::{InstrumentId, UnixNanos, Venue};
+use honba_messages::{Exchange, InstrumentId, UnixNanos};
 
 use crate::RoundTrip;
 
 /// A placeholder instrument for tests where the instrument does not matter.
 fn any_instrument() -> InstrumentId {
-    InstrumentId::new("X", Venue::new("NSE"))
+    InstrumentId::new("X", Exchange::new("NSE"))
 }
 
 /// A long round trip of `qty` from `entry` to `exit` with `fees`, held 1..2.

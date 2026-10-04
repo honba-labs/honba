@@ -1,0 +1,17 @@
+[package]
+name = "honba-sweep"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+honba-messages.workspace = true
+honba-entities.workspace = true
+honba-engine.workspace = true
+honba-strategy.workspace = true
+honba-sim.workspace = true
+honba-data.workspace = true
+tokio.workspace = true
+anyhow.workspace = true

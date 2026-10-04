@@ -108,7 +108,7 @@ IST_TZ = dt.timezone(dt.timedelta(hours=5, minutes=30), name="IST")
 
 def to_yfinance_symbol(
     instrument: InstrumentId | str,
-    venue: str = "NSE",
+    exchange: str = "NSE",
     custom_map: dict[str, str] | None = None,
 ) -> str:
     """Translate an InstrumentId or symbol string to a yfinance ticker.
@@ -121,10 +121,10 @@ def to_yfinance_symbol(
     """
     if isinstance(instrument, str):
         sym = instrument.strip()
-        v = venue.upper()
+        v = exchange.upper()
     else:
         sym = instrument.symbol.strip()
-        v = instrument.venue.upper()
+        v = instrument.exchange.upper()
 
     if custom_map and sym in custom_map:
         return custom_map[sym]
@@ -149,7 +149,7 @@ def to_yfinance_symbol(
 
 def from_yfinance_symbol(
     yf_symbol: str,
-    default_venue: str = "NSE",
+    default_exchange: str = "NSE",
 ) -> InstrumentId:
     """Translate a yfinance ticker back to an InstrumentId."""
     ticker = yf_symbol.strip()
@@ -161,7 +161,7 @@ def from_yfinance_symbol(
     elif ticker.endswith(".BO"):
         return InstrumentId(ticker[:-3], "BSE")
 
-    return InstrumentId(ticker, default_venue)
+    return InstrumentId(ticker, default_exchange)
 
 
 def normalize_timeframe(timeframe: str) -> str:
@@ -187,7 +187,7 @@ def dataframe_to_bars(
 
     yf_interval = normalize_timeframe(timeframe)
     is_daily_or_longer = yf_interval in ("1d", "1wk", "1mo")
-    is_india = instrument.venue.upper() in ("NSE", "BSE")
+    is_india = instrument.exchange.upper() in ("NSE", "BSE")
 
     # Required column check
     required_cols = {"Open", "High", "Low", "Close", "Volume"}
@@ -423,13 +423,13 @@ class YFinanceProvider:
         timeframe: str = "1D",
         start: dt.date | str | None = None,
         end: dt.date | str | None = None,
-        venue: str = "NSE",
+        exchange: str = "NSE",
     ) -> pd.DataFrame:
         """Convenience method returning a raw pandas DataFrame for research or exploration."""
         if isinstance(symbol_or_instrument, InstrumentId):
             inst = symbol_or_instrument
         else:
-            inst = InstrumentId(symbol_or_instrument, venue)
+            inst = InstrumentId(symbol_or_instrument, exchange)
 
         start_date = dt.date.fromisoformat(start) if isinstance(start, str) else (start or dt.date(2020, 1, 1))
         end_date = dt.date.fromisoformat(end) if isinstance(end, str) else (end or dt.date.today() + dt.timedelta(days=1))

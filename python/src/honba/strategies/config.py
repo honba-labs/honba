@@ -19,14 +19,14 @@ else:  # pragma: no cover
 class StrategyConfig(BaseModel):
     name: str = Field(min_length=1)
     symbol: str = Field(min_length=1)
-    venue: str = "NSE"
+    exchange: str = "NSE"
     params: dict[str, Any] = Field(default_factory=dict)
     # name -> {"kind": ..., **params}; built with honba.strategies.indicators.IndicatorBank
     indicators: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
     @property
     def instrument_id(self) -> InstrumentId:
-        return InstrumentId(self.symbol, self.venue)
+        return InstrumentId(self.symbol, self.exchange)
 
     @classmethod
     def from_toml(cls, path: str | Path) -> StrategyConfig:

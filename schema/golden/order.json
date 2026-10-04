@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "type": "Order",
   "cases": [
     {
@@ -8,7 +8,7 @@
         "order_id": "O-1",
         "instrument_id": {
           "symbol": "NIFTY50",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "side": "buy",
         "order_type": "market",
@@ -27,7 +27,7 @@
         "order_id": "O-2",
         "instrument_id": {
           "symbol": "NIFTY50",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "side": "sell",
         "order_type": "limit",
@@ -46,7 +46,7 @@
         "order_id": "O-3",
         "instrument_id": {
           "symbol": "NIFTY50",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "side": "buy",
         "order_type": "stop_market",
@@ -65,7 +65,7 @@
         "order_id": "O-4",
         "instrument_id": {
           "symbol": "NIFTY50",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "side": "sell",
         "order_type": "stop_limit",
@@ -84,7 +84,7 @@
         "order_id": "O-5",
         "instrument_id": {
           "symbol": "NIFTY50",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "side": "no_order_side",
         "order_type": "limit",
@@ -105,7 +105,7 @@
         "order_id": "O-1",
         "instrument_id": {
           "symbol": "NIFTY50",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "side": "buy",
         "order_type": "market",
@@ -124,7 +124,7 @@
         "order_id": "O-1",
         "instrument_id": {
           "symbol": "NIFTY50",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "side": "buy",
         "order_type": "market",
@@ -143,7 +143,7 @@
         "order_id": "O-1",
         "instrument_id": {
           "symbol": "NIFTY50",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "side": "buy",
         "order_type": "market",

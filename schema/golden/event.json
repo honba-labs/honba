@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "type": "Event",
   "cases": [
     {
@@ -8,7 +8,7 @@
         "type": "quote",
         "instrument_id": {
           "symbol": "NIFTY50",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "bid_price": 22000.0,
         "ask_price": 22001.0,
@@ -24,7 +24,7 @@
         "type": "trade",
         "instrument_id": {
           "symbol": "RELIANCE",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "price": 2950.5,
         "size": 100.0,
@@ -41,7 +41,7 @@
         "bar_type": {
           "instrument_id": {
             "symbol": "BANKNIFTY",
-            "venue": "NSE"
+            "exchange": "NSE"
           },
           "spec": {
             "step": 5,
@@ -65,7 +65,7 @@
         "order_id": "O-4",
         "instrument_id": {
           "symbol": "NIFTY50",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "side": "buy",
         "order_type": "stop_limit",
@@ -129,7 +129,7 @@
         "type": "order_accepted",
         "order_id": "O-1",
         "ts_event": 1,
-        "venue_order_id": "X"
+        "exchange_order_id": "X"
       }
     },
     {
@@ -146,7 +146,7 @@
         "type": "quote",
         "instrument_id": {
           "symbol": "NIFTY50",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "bid_price": 22000.0,
         "ask_price": 21999.0,
@@ -162,7 +162,7 @@
         "type": "quote",
         "instrument_id": {
           "symbol": "NIFTY50",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "bid_price": 22000.0,
         "ask_price": 22001.0,
@@ -178,7 +178,7 @@
         "type": "trade",
         "instrument_id": {
           "symbol": "RELIANCE",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "price": 2950.5,
         "size": -100.0,
@@ -195,7 +195,7 @@
         "bar_type": {
           "instrument_id": {
             "symbol": "BANKNIFTY",
-            "venue": "NSE"
+            "exchange": "NSE"
           },
           "spec": {
             "step": 5,
@@ -219,7 +219,7 @@
         "order_id": "O-4",
         "instrument_id": {
           "symbol": "NIFTY50",
-          "venue": "NSE"
+          "exchange": "NSE"
         },
         "side": "buy",
         "order_type": "stop_limit",

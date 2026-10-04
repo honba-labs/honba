@@ -18,13 +18,13 @@ use honba_messages::{Order, OrderId, OrderSide, OrderStatus, UnixNanos};
 /// use honba_sim::PaperExecution;
 /// use honba_messages::{
 ///     InstrumentId, Order, OrderId, OrderSide, OrderType, TimeInForce,
-///     UnixNanos, Venue,
+///     UnixNanos, Exchange,
 /// };
 ///
 /// let mut engine = PaperExecution::new(100.0);
 /// let order = Order::new(
 ///     OrderId::new("O-1"),
-///     InstrumentId::new("X", Venue::new("TEST")),
+///     InstrumentId::new("X", Exchange::new("TEST")),
 ///     OrderSide::Buy,
 ///     OrderType::Market,
 ///     10.0, None, TimeInForce::Day,

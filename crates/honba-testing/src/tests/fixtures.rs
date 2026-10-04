@@ -1,14 +1,14 @@
 //! Unit tests for `crate::fixtures`.
 
-use honba_messages::{BarAggregation, PriceType, UnixNanos, Venue};
+use honba_messages::{BarAggregation, Exchange, PriceType, UnixNanos};
 
-use crate::fixtures::{any_instrument, flat_bar, instrument, minute_bar_type, TEST_VENUE};
+use crate::fixtures::{any_instrument, flat_bar, instrument, minute_bar_type, TEST_EXCHANGE};
 
 #[test]
-fn instrument_uses_the_test_venue() {
+fn instrument_uses_the_test_exchange() {
     let id = instrument("NIFTY50");
     assert_eq!(id.symbol(), "NIFTY50");
-    assert_eq!(id.venue(), &Venue::new(TEST_VENUE));
+    assert_eq!(id.exchange(), &Exchange::new(TEST_EXCHANGE));
 }
 
 #[test]

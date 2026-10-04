@@ -108,7 +108,7 @@ _ALIASES: dict[str, str] = {
 }
 
 
-def resolve_universe(name: str, venue: str = "NSE") -> list[InstrumentId]:
+def resolve_universe(name: str, exchange: str = "NSE") -> list[InstrumentId]:
     norm = name.lower().replace("-", "_").replace(" ", "_")
     key = _ALIASES.get(norm, norm)
     symbols = UNIVERSES.get(key)
@@ -119,4 +119,4 @@ def resolve_universe(name: str, venue: str = "NSE") -> list[InstrumentId]:
             f"universe {key!r} is registered but has no constituents "
             "(wire a UniverseSource / catalog snapshot)"
         )
-    return [InstrumentId(sym, venue) for sym in symbols]
+    return [InstrumentId(sym, exchange) for sym in symbols]

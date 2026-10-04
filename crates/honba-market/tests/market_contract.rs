@@ -2,7 +2,7 @@
 
 use chrono::NaiveDate;
 use honba_entities::{Currency, Instrument, InstrumentKind, PositionSide};
-use honba_messages::{InstrumentId, OrderSide, Venue};
+use honba_messages::{Exchange, InstrumentId, OrderSide};
 
 use honba_market::costs::MarketSegment;
 use honba_market::null::NullMarketProfile;
@@ -40,7 +40,7 @@ fn verify_market_profile_contract(profile: &dyn MarketProfile) {
 
     // 4. Instrument Rules contracts
     let inst = Instrument::new(
-        InstrumentId::new("TEST", Venue::new("TEST_EX")),
+        InstrumentId::new("TEST", Exchange::new("TEST_EX")),
         InstrumentKind::Equity,
         profile.currency(),
         1.0,

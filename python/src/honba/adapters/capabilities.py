@@ -114,14 +114,14 @@ def _require_non_empty_set(name: str, values: frozenset[object]) -> None:
 
 @dataclass(frozen=True, slots=True)
 class AdapterCapabilities:
-    """What an adapter supports: venues, products, order vocabulary, prices and feed modes.
+    """What an adapter supports: exchanges, products, order vocabulary, prices and feed modes.
 
     Every dimension is a non-empty set. The descriptor is pure data, frozen, and cheap to
     build once at adapter construction.
     """
 
     name: str = "fake"
-    venues: frozenset[str] = field(default_factory=lambda: frozenset({"NSE"}))
+    exchanges: frozenset[str] = field(default_factory=lambda: frozenset({"NSE"}))
     products: frozenset[Product] = _ALL_PRODUCTS
     order_types: frozenset[OrderType] = _ALL_ORDER_TYPES
     time_in_force: frozenset[TimeInForce] = _ALL_TIME_IN_FORCE
@@ -135,7 +135,7 @@ class AdapterCapabilities:
                 f"name must be a lower-case slug ([a-z0-9] then [a-z0-9._-]), got {self.name!r}"
             )
         for dimension in (
-            "venues",
+            "exchanges",
             "products",
             "order_types",
             "time_in_force",
