@@ -2,8 +2,15 @@
 
 use std::sync::{Arc, Mutex};
 
-use honba_engine::{AlgoError, DataFeed, Engine, Handler, Result};
-use honba_messages::{Event, Exchange, InstrumentId, Message, QuoteTick, UnixNanos};
+use honba_engine::{
+    AlgoError, AuditKind, DataFeed, Engine, EngineOutput, ExecutionEngine, Handler, Result,
+    TradingState,
+};
+use honba_entities::Trade;
+use honba_messages::{
+    Bar, BarAggregation, BarSpecification, BarType, Event, Exchange, InstrumentId, Message, Order,
+    OrderId, OrderSide, OrderType, PriceType, QuoteTick, TimeInForce, UnixNanos,
+};
 
 fn ts(n: u64) -> UnixNanos {
     UnixNanos::from_u64(n)
@@ -195,4 +202,365 @@ fn batch_size_one_requires_ordered_feed() {
 
     let err = engine.run(&mut feed).unwrap_err();
     assert!(matches!(err, AlgoError::ClockRegression { .. }));
+}
+
+fn instrument() -> InstrumentId {
+    InstrumentId::new("X", Exchange::new("NSE"))
+}
+
+fn bar_msg(close: f64, t: u64) -> Message {
+    let bar_type = BarType::new(
+        instrument(),
+        BarSpecification::new(1, BarAggregation::Minute, PriceType::Last),
+    );
+    let bar = Bar::new(bar_type, close, close, close, close, 10.0, ts(t), ts(t));
+    Message::new(Event::Bar(bar), ts(t))
+}
+
+fn market_order(id: &str, side: OrderSide, quantity: f64, t: u64) -> Order {
+    Order::new(
+        OrderId::new(id),
+        instrument(),
+        side,
+        OrderType::Market,
+        quantity,
+        None,
+        TimeInForce::Day,
+        ts(t),
+        ts(t),
+    )
+}
+
+#[derive(Clone)]
+struct SpySink {
+    submitted: Arc<Mutex<Vec<Order>>>,
+    cancelled: Arc<Mutex<Vec<String>>>,
+    fills: Arc<Mutex<Vec<Trade>>>,
+    fill_price: f64,
+}
+
+impl Default for SpySink {
+    fn default() -> Self {
+        Self {
+            submitted: Arc::new(Mutex::new(Vec::new())),
+            cancelled: Arc::new(Mutex::new(Vec::new())),
+            fills: Arc::new(Mutex::new(Vec::new())),
+            fill_price: 101.0,
+        }
+    }
+}
+
+impl ExecutionEngine for SpySink {
+    fn submit(&mut self, order: Order) -> Result<()> {
+        let fill = Trade::new(
+            order.order_id().clone(),
+            order.instrument_id().clone(),
+            order.side(),
+            order.quantity(),
+            self.fill_price,
+            order.ts_event(),
+            order.ts_init(),
+        );
+        self.submitted.lock().unwrap().push(order);
+        self.fills.lock().unwrap().push(fill);
+        Ok(())
+    }
+
+    fn cancel(&mut self, order_id: &str) -> Result<()> {
+        self.cancelled.lock().unwrap().push(order_id.to_string());
+        Ok(())
+    }
+
+    fn drain_fills(&mut self) -> Result<Vec<Trade>> {
+        Ok(std::mem::take(&mut self.fills.lock().unwrap()))
+    }
+}
+
+struct Scripted {
+    steps: Vec<(u64, EngineOutput)>,
+    seen: Arc<Mutex<Vec<Event>>>,
+}
+
+impl Handler for Scripted {
+    fn on_event(&mut self, event: &Event, _ts_init: UnixNanos) -> Result<EngineOutput> {
+        self.seen.lock().unwrap().push(event.clone());
+        let t = event.ts_event().as_u64();
+        match self.steps.iter().position(|(at, _)| *at == t) {
+            Some(i) => Ok(self.steps.remove(i).1.clone()),
+            None => Ok(EngineOutput::None),
+        }
+    }
+}
+
+#[test]
+fn handler_output_routes_orders_to_the_execution_sink() {
+    let mut feed = VecFeed::new(vec![
+        bar_msg(101.0, 1),
+        bar_msg(102.0, 2),
+        bar_msg(103.0, 3),
+    ]);
+    let sink = SpySink::default();
+
+    let mut engine = Engine::new();
+    engine.set_execution(Box::new(sink.clone()));
+    engine.add_handler(Scripted {
+        steps: vec![(
+            1,
+            EngineOutput::Orders(vec![market_order("O-1", OrderSide::Buy, 5.0, 1)]),
+        )],
+        seen: Arc::new(Mutex::new(Vec::new())),
+    });
+    engine.run(&mut feed).unwrap();
+
+    let submitted = sink.submitted.lock().unwrap().clone();
+    assert_eq!(submitted.len(), 1);
+    assert_eq!(submitted[0].order_id().as_str(), "O-1");
+    assert_eq!(submitted[0].quantity(), 5.0);
+    assert_eq!(submitted[0].side(), OrderSide::Buy);
+
+    let audit = engine.audit();
+    assert_eq!(
+        audit[0],
+        honba_engine::AuditRecord {
+            seq: 0,
+            kind: AuditKind::EventDispatched { ts_event: 1 },
+        }
+    );
+    assert_eq!(
+        audit[1],
+        honba_engine::AuditRecord {
+            seq: 1,
+            kind: AuditKind::OrderSubmitted {
+                order_id: "O-1".to_string(),
+                instrument: "X.NSE".to_string(),
+                side: "buy".to_string(),
+            },
+        }
+    );
+    assert_eq!(
+        audit[2],
+        honba_engine::AuditRecord {
+            seq: 2,
+            kind: AuditKind::FillProduced {
+                order_id: "O-1".to_string(),
+                quantity: 5.0,
+                price: 101.0,
+                ts_event: 1,
+            },
+        }
+    );
+    assert_eq!(
+        audit
+            .iter()
+            .filter(|r| matches!(r.kind, AuditKind::OrderSubmitted { .. }))
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn fills_re_enter_the_queue_as_order_filled_events() {
+    use honba_sim::BarFillEngine;
+
+    let mut feed = VecFeed::new(vec![bar_msg(101.0, 1), bar_msg(102.0, 2)]);
+    let execution = BarFillEngine::new();
+
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let mut engine = Engine::new();
+    engine.set_execution(Box::new(execution.clone()));
+    engine.add_handler(execution.clone());
+    engine.add_handler(Scripted {
+        steps: vec![(
+            1,
+            EngineOutput::Orders(vec![market_order("O-1", OrderSide::Buy, 5.0, 1)]),
+        )],
+        seen: seen.clone(),
+    });
+    engine.run(&mut feed).unwrap();
+
+    let seen = seen.lock().unwrap().clone();
+    let bar_index = seen
+        .iter()
+        .position(|e| matches!(e, Event::Bar(b) if b.close() == 101.0))
+        .unwrap();
+    let fill_index = seen
+        .iter()
+        .position(|e| {
+            matches!(e, Event::OrderFilled { order_id, last_qty, last_px, .. }
+                if order_id.as_str() == "O-1" && *last_qty == 5.0 && *last_px == 101.0)
+        })
+        .unwrap();
+    assert!(fill_index > bar_index, "the ack must follow its command");
+
+    assert!(engine.audit().iter().any(|r| matches!(
+        &r.kind,
+        AuditKind::FillProduced { order_id, quantity, price, ts_event }
+            if order_id == "O-1" && *quantity == 5.0 && *price == 101.0 && *ts_event == 1
+    )));
+
+    let fills = engine.drain_fills().unwrap();
+    assert_eq!(fills.len(), 1);
+    assert_eq!(fills[0].order_id().as_str(), "O-1");
+    assert_eq!(fills[0].price(), 101.0);
+    assert!(engine.drain_fills().unwrap().is_empty());
+}
+
+#[test]
+fn cancels_and_state_changes_are_applied_and_audited() {
+    let mut feed = VecFeed::new(vec![
+        bar_msg(101.0, 1),
+        bar_msg(102.0, 2),
+        bar_msg(103.0, 3),
+    ]);
+    let sink = SpySink::default();
+
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let mut engine = Engine::new();
+    engine.set_execution(Box::new(sink.clone()));
+    engine.add_handler(Scripted {
+        steps: vec![
+            (1, EngineOutput::Cancels(vec![OrderId::new("O-9")])),
+            (2, EngineOutput::StateChange(TradingState::Halted)),
+            (
+                3,
+                EngineOutput::Orders(vec![market_order("O-1", OrderSide::Buy, 5.0, 3)]),
+            ),
+        ],
+        seen: seen.clone(),
+    });
+    engine.run(&mut feed).unwrap();
+
+    assert_eq!(*sink.cancelled.lock().unwrap(), vec!["O-9".to_string()]);
+    assert!(sink.submitted.lock().unwrap().is_empty());
+    assert_eq!(engine.trading_state(), TradingState::Halted);
+    assert_eq!(
+        seen.lock().unwrap().len(),
+        3,
+        "the run must continue after the rejection"
+    );
+    assert_eq!(engine.now(), ts(3));
+
+    let kinds: Vec<AuditKind> = engine.audit().iter().map(|r| r.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        vec![
+            AuditKind::EventDispatched { ts_event: 1 },
+            AuditKind::OrderCancelled {
+                order_id: "O-9".to_string(),
+            },
+            AuditKind::EventDispatched { ts_event: 2 },
+            AuditKind::StateChanged {
+                from: TradingState::Active,
+                to: TradingState::Halted,
+            },
+            AuditKind::EventDispatched { ts_event: 3 },
+            AuditKind::OrderRejected {
+                order_id: "O-1".to_string(),
+                reason: "trading halted".to_string(),
+            },
+        ]
+    );
+}
+
+#[test]
+fn orders_without_an_execution_sink_are_rejected_not_fatal() {
+    let mut feed = VecFeed::new(vec![bar_msg(101.0, 1), bar_msg(102.0, 2)]);
+    let seen = Arc::new(Mutex::new(Vec::new()));
+
+    let mut engine = Engine::new();
+    engine.add_handler(Scripted {
+        steps: vec![
+            (
+                1,
+                EngineOutput::Orders(vec![market_order("O-1", OrderSide::Buy, 5.0, 1)]),
+            ),
+            (
+                2,
+                EngineOutput::Orders(vec![market_order("O-2", OrderSide::Sell, 2.0, 2)]),
+            ),
+        ],
+        seen: seen.clone(),
+    });
+    engine.run(&mut feed).unwrap();
+
+    assert_eq!(engine.now(), ts(2));
+    assert_eq!(seen.lock().unwrap().len(), 2);
+    let kinds: Vec<AuditKind> = engine.audit().iter().map(|r| r.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        vec![
+            AuditKind::EventDispatched { ts_event: 1 },
+            AuditKind::OrderRejected {
+                order_id: "O-1".to_string(),
+                reason: "no execution attached".to_string(),
+            },
+            AuditKind::EventDispatched { ts_event: 2 },
+            AuditKind::OrderRejected {
+                order_id: "O-2".to_string(),
+                reason: "no execution attached".to_string(),
+            },
+        ]
+    );
+}
+
+#[test]
+fn two_runs_with_the_same_feed_produce_identical_audit_records() {
+    fn one_run() -> Vec<honba_engine::AuditRecord> {
+        let mut feed = VecFeed::new(vec![
+            bar_msg(101.0, 1),
+            bar_msg(102.0, 2),
+            bar_msg(103.0, 3),
+        ]);
+        let sink = SpySink::default();
+        let mut engine = Engine::new();
+        engine.set_execution(Box::new(sink.clone()));
+        engine.add_handler(Scripted {
+            steps: vec![
+                (
+                    1,
+                    EngineOutput::Orders(vec![market_order("O-1", OrderSide::Buy, 5.0, 1)]),
+                ),
+                (2, EngineOutput::Cancels(vec![OrderId::new("O-9")])),
+                (3, EngineOutput::StateChange(TradingState::Halted)),
+            ],
+            seen: Arc::new(Mutex::new(Vec::new())),
+        });
+        engine.run(&mut feed).unwrap();
+        engine.audit().to_vec()
+    }
+
+    let first = one_run();
+    let second = one_run();
+    assert_eq!(first, second);
+    assert_eq!(
+        first.iter().map(|r| r.seq).collect::<Vec<_>>(),
+        (0..8).collect::<Vec<_>>()
+    );
+    assert_eq!(
+        first.iter().map(|r| &r.kind).collect::<Vec<_>>(),
+        vec![
+            &AuditKind::EventDispatched { ts_event: 1 },
+            &AuditKind::OrderSubmitted {
+                order_id: "O-1".to_string(),
+                instrument: "X.NSE".to_string(),
+                side: "buy".to_string(),
+            },
+            &AuditKind::FillProduced {
+                order_id: "O-1".to_string(),
+                quantity: 5.0,
+                price: 101.0,
+                ts_event: 1,
+            },
+            &AuditKind::EventDispatched { ts_event: 1 },
+            &AuditKind::EventDispatched { ts_event: 2 },
+            &AuditKind::OrderCancelled {
+                order_id: "O-9".to_string(),
+            },
+            &AuditKind::EventDispatched { ts_event: 3 },
+            &AuditKind::StateChanged {
+                from: TradingState::Active,
+                to: TradingState::Halted,
+            },
+        ]
+    );
 }

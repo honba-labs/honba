@@ -42,7 +42,7 @@ ALLOWED_DEV = {
     "honba-entities": set(),
     "honba-market": set(),
     "honba-ports": {"honba-testing"},
-    "honba-engine": set(),
+    "honba-engine": {"honba-sim"},
     "honba-indicators": set(),
     "honba-sim": set(),
     "honba-strategy": {"honba-analytics", "honba-data", "honba-sim", "honba-testing"},

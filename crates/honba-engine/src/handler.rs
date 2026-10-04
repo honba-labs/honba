@@ -3,6 +3,7 @@
 use honba_messages::{Event, UnixNanos};
 
 use crate::error::Result;
+use crate::state::TradingState;
 
 /// Anything that reacts to events.
 ///
@@ -32,26 +33,27 @@ impl Handler for NoopHandler {
     }
 }
 
-/// Output from a handler indicating what actions the engine should take.
+/// What a handler asks the engine to do about the event it just saw.
+///
+/// This is the whole handler-to-engine contract: a handler decides, the
+/// engine applies. It never applies a command itself and it never talks to an
+/// exchange — the engine routes [`EngineOutput::Orders`] and
+/// [`EngineOutput::Cancels`] to the attached
+/// [`ExecutionEngine`](crate::ExecutionEngine), moves its
+/// [`TradingState`] on [`EngineOutput::StateChange`], and records what it did
+/// in its [`AuditLog`](crate::AuditLog).
+///
+/// Returning [`EngineOutput::None`] is the common case: most events are
+/// observed and ignored. A handler is asked for an output on every event, so
+/// it must not mutate shared state behind the engine's back.
 #[derive(Debug, Clone, PartialEq)]
 pub enum EngineOutput {
     /// No action to take.
     None,
-    /// Submit new orders.
+    /// Submit new orders, in the order given.
     Orders(Vec<honba_messages::Order>),
-    /// Cancel orders.
+    /// Cancel orders by id, in the order given.
     Cancels(Vec<honba_messages::OrderId>),
-    /// Change trading state.
+    /// Move the engine to another [`TradingState`].
     StateChange(TradingState),
-}
-
-/// Trading state for the engine.
-#[derive(Debug, Clone, PartialEq)]
-pub enum TradingState {
-    /// Normal trading.
-    Active,
-    /// Reducing positions.
-    Reducing,
-    /// Trading halted.
-    Halted,
 }

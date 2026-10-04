@@ -1,7 +1,10 @@
 //! Unit tests for this crate, one file per area.
 
+mod audit;
 mod clock;
+mod engine;
 mod queue;
+mod state;
 
 use honba_messages::{Exchange, InstrumentId};
 

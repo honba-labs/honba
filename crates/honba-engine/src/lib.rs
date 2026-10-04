@@ -9,7 +9,14 @@
 //! Data sources and execution exchanges are injected via the [`DataFeed`] and
 //! [`ExecutionEngine`] traits, so the same kernel runs backtests, paper
 //! trading, and live sessions without code changes.
+//!
+//! A handler answers every event with an [`EngineOutput`] — orders to submit,
+//! orders to cancel, or a new [`TradingState`] — and the engine is what
+//! applies it: it routes the commands to the attached [`ExecutionEngine`],
+//! turns fills back into [`Event::OrderFilled`](honba_messages::Event::OrderFilled)
+//! messages, and appends what it did to an [`AuditLog`].
 
+pub mod audit;
 pub mod clock;
 pub mod data;
 pub mod engine;
@@ -17,14 +24,17 @@ pub mod error;
 pub mod execution;
 pub mod handler;
 pub mod queue;
+pub mod state;
 
+pub use audit::{AuditKind, AuditLog, AuditRecord};
 pub use clock::Clock;
 pub use data::DataFeed;
 pub use engine::Engine;
 pub use error::{AlgoError, Result};
 pub use execution::ExecutionEngine;
-pub use handler::{EngineOutput, Handler, NoopHandler, TradingState};
+pub use handler::{EngineOutput, Handler, NoopHandler};
 pub use queue::EventQueue;
+pub use state::TradingState;
 
 #[cfg(test)]
 mod tests;
