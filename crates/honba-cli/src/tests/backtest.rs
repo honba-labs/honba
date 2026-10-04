@@ -1,12 +1,12 @@
 //! Unit tests for the pure helpers in `crate::backtest`.
 
 use honba_entities::Trade;
-use honba_messages::{InstrumentId, OrderId, OrderSide, UnixNanos, Venue};
+use honba_messages::{Exchange, InstrumentId, OrderId, OrderSide, UnixNanos};
 
 use crate::backtest::{equity_curve, pair_fills, BacktestConfig};
 
 fn any_instrument() -> InstrumentId {
-    InstrumentId::new("X", Venue::new("NSE"))
+    InstrumentId::new("X", Exchange::new("NSE"))
 }
 
 fn fill(side: OrderSide, price: f64, ts: u64) -> Trade {
@@ -61,7 +61,7 @@ fn equity_curve_accumulates_net_pnl_from_the_start() {
 fn config_fills_defaults_for_omitted_fields() {
     let cfg: BacktestConfig = toml::from_str("[strategy]\nname = \"sma_crossover\"\n").unwrap();
     assert_eq!(cfg.symbol, "NIFTY50");
-    assert_eq!(cfg.venue, "NSE");
+    assert_eq!(cfg.exchange, "NSE");
     assert_eq!(cfg.starting_equity, 1_000_000.0);
     assert_eq!(cfg.strategy.name, "sma_crossover");
     assert_eq!(
@@ -79,7 +79,7 @@ fn config_reads_explicit_values() {
     let cfg: BacktestConfig = toml::from_str(
         r#"
         symbol = "TCS"
-        venue = "BSE"
+        exchange = "BSE"
         starting_equity = 5000.0
         [strategy]
         name = "sma_crossover"
@@ -89,7 +89,7 @@ fn config_reads_explicit_values() {
         "#,
     )
     .unwrap();
-    assert_eq!((cfg.symbol.as_str(), cfg.venue.as_str()), ("TCS", "BSE"));
+    assert_eq!((cfg.symbol.as_str(), cfg.exchange.as_str()), ("TCS", "BSE"));
     assert_eq!(cfg.starting_equity, 5000.0);
     assert_eq!(
         (

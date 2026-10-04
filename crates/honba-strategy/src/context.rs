@@ -23,7 +23,7 @@ pub trait StrategyContext {
     /// Net signed quantity held (positive long, negative short), updated from fills.
     fn position(&self, instrument_id: &InstrumentId) -> f64;
 
-    /// Every non-flat position, ordered by instrument id (symbol, then venue).
+    /// Every non-flat position, ordered by instrument id (symbol, then exchange).
     fn positions(&self) -> Vec<(InstrumentId, f64)>;
 
     /// Initial cash plus the net cash flow of all fills (buys debit
@@ -60,9 +60,9 @@ struct Pending {
 ///
 /// ```
 /// use honba_strategy::{LedgerContext, OrderIntent, StrategyContext};
-/// use honba_messages::{InstrumentId, Venue};
+/// use honba_messages::{InstrumentId, Exchange};
 ///
-/// let id = InstrumentId::new("NIFTY50", Venue::new("NSE"));
+/// let id = InstrumentId::new("NIFTY50", Exchange::new("NSE"));
 /// let mut ctx = LedgerContext::with_cash(100_000.0);
 /// ctx.submit(OrderIntent::market_buy(id.clone(), 75.0));
 /// assert!(ctx.busy(&id));

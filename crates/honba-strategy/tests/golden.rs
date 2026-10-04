@@ -6,7 +6,7 @@
 use std::path::PathBuf;
 
 use honba_messages::SCHEMA_VERSION;
-use honba_messages::{InstrumentId, OrderId, OrderType, TimeInForce, UnixNanos, Venue};
+use honba_messages::{Exchange, InstrumentId, OrderId, OrderType, TimeInForce, UnixNanos};
 use honba_strategy::OrderIntent;
 use serde_json::Value;
 
@@ -20,7 +20,7 @@ fn golden() -> Value {
 }
 
 fn nifty() -> InstrumentId {
-    InstrumentId::new("NIFTY50", Venue::new("NSE"))
+    InstrumentId::new("NIFTY50", Exchange::new("NSE"))
 }
 
 fn expected(name: &str) -> OrderIntent {

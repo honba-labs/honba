@@ -1,12 +1,13 @@
 //! Screener and metric definitions domain model.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::error::{EntitiesError, Result};
 
 /// Type of metric value.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ValueType {
     /// Floating point or integer numeric value.
@@ -24,7 +25,7 @@ pub enum ValueType {
 }
 
 /// Unit of measurement for a metric.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum UnitType {
     /// Percentage.
@@ -40,7 +41,7 @@ pub enum UnitType {
 }
 
 /// Evaluation period dimension for fundamental or snapshot metrics.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum MetricPeriod {
     /// Latest snapshot.
@@ -59,7 +60,7 @@ pub enum MetricPeriod {
 }
 
 /// Bar or indicator timeframe dimension for technical metrics.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub enum Timeframe {
     /// 1 minute
     #[serde(rename = "1")]
@@ -95,7 +96,7 @@ pub enum Timeframe {
 }
 
 /// Specification of a requested metric with its evaluation dimensions.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct MetricKeySpec {
     /// Unique metric key (e.g. `price_earnings_ttm`, `RSI`, `close`).
     pub key: String,
@@ -108,7 +109,7 @@ pub struct MetricKeySpec {
 }
 
 /// Dynamic value of a metric in a screener row or symbol fact table.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
 pub enum MetricValue {
     /// Numeric value.
@@ -122,7 +123,7 @@ pub enum MetricValue {
 }
 
 /// Comparison operators for screener filter expressions.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum FilterOp {
     /// Equal
@@ -157,7 +158,7 @@ pub enum FilterOp {
 ///
 /// Makes metric-to-metric comparisons expressible on the wire, e.g.
 /// `SMA50 crosses_above {"key": "SMA200"}`. `key` is the wire key, never a UI id.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MetricRef {
     /// Wire key of the referenced metric (e.g. `SMA200`).
@@ -184,7 +185,7 @@ impl MetricRef {
 /// Individual filter predicate applied to a metric key.
 ///
 /// Deserialization enforces the value contract of [`check_predicate_value`].
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(try_from = "RawFilterPredicate")]
 pub struct ScreenerFilterPredicate {
     /// Target metric key to filter by.
@@ -448,4 +449,3 @@ fn default_equity_types() -> Vec<String> {
 const fn default_range() -> (usize, usize) {
     (0, 50)
 }
-

@@ -11,7 +11,7 @@ use honba_entities::{
     Currency, FilterOp, MetricPeriod, MetricRef, Position, PositionSide, ScreenerFilterPredicate,
     Timeframe, Trade,
 };
-use honba_messages::{InstrumentId, OrderId, OrderSide, UnixNanos, Venue, SCHEMA_VERSION};
+use honba_messages::{Exchange, InstrumentId, OrderId, OrderSide, UnixNanos, SCHEMA_VERSION};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::Value;
@@ -100,7 +100,7 @@ where
 }
 
 fn nse(sym: &str) -> InstrumentId {
-    InstrumentId::new(sym, Venue::new("NSE"))
+    InstrumentId::new(sym, Exchange::new("NSE"))
 }
 
 #[test]

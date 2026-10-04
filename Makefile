@@ -17,16 +17,41 @@ python:
 
 FRONTEND_TS_DIR ?= ../honba-frontend/src/core/types/generated
 
-schema:
-	PYTHONPATH=python python3 scripts/export_schema.py --frontend-dir $(FRONTEND_TS_DIR)
+# Rust is the codegen source of truth (honba-codegen). Every surface derives from it.
+# `scripts/export_schema.py` is a thin wrapper around `cargo run --bin honba`.
 
-# JSON-only drift check; works in a single-repo checkout (this is what CI runs).
+schema:
+	cargo run --bin honba -- schema export --typescript $(FRONTEND_TS_DIR)
+
 check-schema:
-	HONBA_FRONTEND_DIR= PYTHONPATH=python python3 scripts/export_schema.py
+	cargo run --bin honba -- schema export
 	git diff --exit-code schema/domain
 
-# LOCAL ONLY: cross-repo check, writes into the sibling ../honba-frontend checkout.
 check-schema-ts:
-	PYTHONPATH=python python3 scripts/export_schema.py --frontend-dir $(FRONTEND_TS_DIR)
+	cargo run --bin honba -- schema export --typescript $(FRONTEND_TS_DIR)
 	git diff --exit-code schema/domain
 	git -C ../honba-frontend diff --exit-code src/core/types/generated
+
+openapi:
+	cargo run --bin honba -- schema export --openapi schema/openapi
+
+check-openapi:
+	cargo run --bin honba -- schema export --openapi schema/openapi
+	git diff --exit-code schema/openapi
+
+pyi:
+	cargo run --bin honba -- schema export --pyi python/src/honba/_generated
+
+check-pyi:
+	cargo run --bin honba -- schema export --pyi python/src/honba/_generated
+	git diff --exit-code python/src/honba/_generated
+
+mcp:
+	cargo run --bin honba -- schema export --mcp schema/mcp
+
+check-mcp:
+	cargo run --bin honba -- schema export --mcp schema/mcp
+	git diff --exit-code schema/mcp
+
+check-codegen: check-schema check-schema-ts check-openapi check-pyi check-mcp
+	@echo "all codegen drift checks passed"

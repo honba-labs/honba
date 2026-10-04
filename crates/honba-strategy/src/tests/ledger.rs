@@ -2,12 +2,12 @@
 //! `python/tests/unit/test_ledger_context.py`.
 
 use honba_entities::{Currency, Instrument, InstrumentKind, Trade};
-use honba_messages::{InstrumentId, OrderSide, UnixNanos, Venue};
+use honba_messages::{Exchange, InstrumentId, OrderSide, UnixNanos};
 
 use crate::{LedgerContext, OrderIntent, StrategyContext};
 
-fn id(symbol: &str, venue: &str) -> InstrumentId {
-    InstrumentId::new(symbol, Venue::new(venue))
+fn id(symbol: &str, exchange: &str) -> InstrumentId {
+    InstrumentId::new(symbol, Exchange::new(exchange))
 }
 
 fn fill(instrument_id: &InstrumentId, side: OrderSide, qty: f64, px: f64, costs: f64) -> Trade {
@@ -98,7 +98,7 @@ fn fills_move_position_and_cash_including_costs() {
 }
 
 #[test]
-fn positions_lists_non_flat_ordered_by_symbol_then_venue() {
+fn positions_lists_non_flat_ordered_by_symbol_then_exchange() {
     let (nifty, infy) = (id("NIFTY50", "NSE"), id("INFY", "NSE"));
     let (acme_bse, acme_nse) = (id("ACME", "BSE"), id("ACME", "NSE"));
     let mut ctx = LedgerContext::new();

@@ -12,7 +12,7 @@ use crate::position::Position;
 ///
 /// ```
 /// use honba_entities::{Account, Currency, Money};
-/// use honba_messages::{InstrumentId, Venue};
+/// use honba_messages::{InstrumentId, Exchange};
 ///
 /// let mut acct = Account::new("MAIN", Money::new(1_000_000.0, Currency::Inr));
 /// assert_eq!(acct.cash().amount(), 1_000_000.0);

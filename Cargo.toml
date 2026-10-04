@@ -13,6 +13,7 @@ members = [
     "crates/honba-data",
     "crates/honba-cli",
     "crates/honba-market",
+    "crates/honba-codegen",
 ]
 
 [workspace.package]
@@ -34,6 +35,7 @@ honba-py = { path = "crates/honba-py" }
 honba-analytics = { path = "crates/honba-analytics" }
 honba-data = { path = "crates/honba-data" }
 honba-market = { path = "crates/honba-market" }
+honba-codegen = { path = "crates/honba-codegen" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 thiserror = "1"
@@ -46,4 +48,7 @@ csv = "1"
 clap = { version = "4", features = ["derive"] }
 toml = "0.8"
 anyhow = "1"
+schemars = { version = "0.8", features = ["derive"] }
+itertools = "0.13"
+indexmap = "2"
 

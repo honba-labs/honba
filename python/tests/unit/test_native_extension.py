@@ -19,7 +19,7 @@ def test_bar_roundtrip():
     _honba = importlib.import_module("honba._honba")
     bar = _honba.Bar("RELIANCE", 100, 10.0, 15.0, 9.0, 12.0, 500.0, "NSE")
     assert bar.symbol == "RELIANCE"
-    assert bar.venue == "NSE"
+    assert bar.exchange == "NSE"
     assert bar.open == 10.0
     assert bar.close == 12.0
     assert repr(bar) == "<Bar RELIANCE ts=100 close=12>"

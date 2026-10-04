@@ -4,10 +4,10 @@ use honba_entities::{
     Account, Currency, EntitiesError, Instrument, InstrumentKind, Money, Portfolio, Position,
     PositionSide, Trade,
 };
-use honba_messages::{InstrumentId, OrderId, OrderSide, UnixNanos, Venue};
+use honba_messages::{Exchange, InstrumentId, OrderId, OrderSide, UnixNanos};
 
 fn nse(sym: &str) -> InstrumentId {
-    InstrumentId::new(sym, Venue::new("NSE"))
+    InstrumentId::new(sym, Exchange::new("NSE"))
 }
 
 #[test]

@@ -64,7 +64,7 @@ def test_wire_intent_maps_to_and_from_domain():
     domain = OrderIntent.stop_limit_sell(NIFTY, 75.0, 21950.0, 21940.0)
     w = wire.OrderIntent.from_domain(domain)
     assert w.trigger_price == 21950.0 and w.price == 21940.0
-    assert w.instrument_id == wire.InstrumentId(symbol="NIFTY50", venue="NSE")
+    assert w.instrument_id == wire.InstrumentId(symbol="NIFTY50", exchange="NSE")
     assert w.to_domain() == domain
     assert wire.InstrumentId.from_domain(NIFTY).to_domain() == NIFTY
 

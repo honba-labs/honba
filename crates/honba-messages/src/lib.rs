@@ -14,7 +14,7 @@
 //!   in `honba-algo` and downstream crates.
 //! - **Immutable by construction.** Every type is `Copy` or cheaply cloneable,
 //!   with private fields and `new` / accessor methods.
-//! - **Timestamped.** Every event carries `ts_event` (when the venue observed
+//! - **Timestamped.** Every event carries `ts_event` (when the exchange observed
 //!   it) and `ts_init` (when Honba created the value), both as [`UnixNanos`].
 //!
 //! # Example
@@ -22,10 +22,10 @@
 //! ```
 //! use honba_messages::{
 //!     Bar, BarAggregation, BarSpecification, BarType, InstrumentId, PriceType,
-//!     UnixNanos, Venue,
+//!     UnixNanos, Exchange,
 //! };
 //!
-//! let instrument = InstrumentId::new("NIFTY50", Venue::new("NSE"));
+//! let instrument = InstrumentId::new("NIFTY50", Exchange::new("NSE"));
 //! let spec = BarSpecification::new(1, BarAggregation::Minute, PriceType::Last);
 //! let bar_type = BarType::new(instrument, spec);
 //!
@@ -73,7 +73,7 @@ pub mod orders;
 pub mod validation;
 
 pub use events::{timestamp::UnixNanos, Event, Message, SCHEMA_VERSION};
-pub use identifiers::{InstrumentId, OrderId, TradeId, Venue};
+pub use identifiers::{Exchange, InstrumentId, OrderId, TradeId};
 pub use market_data::{
     bar::{Bar, BarAggregation, BarSpecification, BarType, PriceType},
     tick::{AggressorSide, QuoteTick, Tick, TradeTick},

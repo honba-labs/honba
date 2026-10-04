@@ -8,7 +8,7 @@ use honba_analytics::{PerformanceReport, RoundTrip};
 use honba_data::{MarkdownReportWriter, ReportWriter};
 use honba_engine::{DataFeed, Handler};
 use honba_entities::Trade;
-use honba_messages::{InstrumentId, Venue};
+use honba_messages::{Exchange, InstrumentId};
 use honba_sim::BarFillEngine;
 use honba_strategy::{SmaCrossover, Strategy, StrategyRunner};
 use honba_testing::VecFeed;
@@ -17,8 +17,8 @@ use honba_testing::VecFeed;
 pub(crate) struct BacktestConfig {
     #[serde(default = "default_symbol")]
     pub(crate) symbol: String,
-    #[serde(default = "default_venue")]
-    pub(crate) venue: String,
+    #[serde(default = "default_exchange")]
+    pub(crate) exchange: String,
     pub(crate) strategy: StrategyConfig,
     #[serde(default = "default_starting_equity")]
     pub(crate) starting_equity: f64,
@@ -27,7 +27,7 @@ pub(crate) struct BacktestConfig {
 fn default_symbol() -> String {
     "NIFTY50".to_string()
 }
-fn default_venue() -> String {
+fn default_exchange() -> String {
     "NSE".to_string()
 }
 fn default_starting_equity() -> f64 {
@@ -86,7 +86,7 @@ pub fn run(config_path: &Path, output: Option<&Path>) -> anyhow::Result<()> {
         .collect();
     let mut feed = VecFeed::new(messages);
 
-    let instrument = InstrumentId::new(&cfg.symbol, Venue::new(&cfg.venue));
+    let instrument = InstrumentId::new(&cfg.symbol, Exchange::new(&cfg.exchange));
 
     let strategy = match cfg.strategy.name.as_str() {
         "sma_crossover" => {

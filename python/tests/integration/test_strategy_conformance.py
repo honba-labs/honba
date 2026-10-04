@@ -72,7 +72,7 @@ def outcome(result: RunResult, strategy) -> dict[str, Any]:
         ],
         "observations": getattr(strategy, "observations", []),
         "positions": [
-            {"instrument_id": {"symbol": i.symbol, "venue": i.venue}, "quantity": q}
+            {"instrument_id": {"symbol": i.symbol, "exchange": i.exchange}, "quantity": q}
             for i, q in result.ctx.positions().items()
         ],
         "cash": result.ctx.cash(),
@@ -154,7 +154,7 @@ def test_rust_strategy_through_the_binding_matches_python_and_the_fixture(scenar
 def test_run_strategy_rejects_unknown_strategies_and_bad_json():
     from honba import _honba
 
-    params = json.dumps({"instrument_id": {"symbol": "X", "venue": "NSE"}, "quantity": 1.0})
+    params = json.dumps({"instrument_id": {"symbol": "X", "exchange": "NSE"}, "quantity": 1.0})
     with pytest.raises(ValueError, match="unknown strategy"):
         _honba.run_strategy("nope", params, "[]")
     with pytest.raises(ValueError):
@@ -165,7 +165,7 @@ def test_run_strategy_rejects_unknown_strategies_and_bad_json():
 def test_run_strategy_costs_default_to_none_and_invalid_costs_raise_value_error():
     from honba import _honba
 
-    params = json.dumps({"instrument_id": {"symbol": "X", "venue": "NSE"}, "quantity": 1.0})
+    params = json.dumps({"instrument_id": {"symbol": "X", "exchange": "NSE"}, "quantity": 1.0})
     for kwargs in (
         {"flat_cost": -1.0},
         {"flat_cost": float("nan")},

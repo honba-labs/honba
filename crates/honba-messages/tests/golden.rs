@@ -8,9 +8,9 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use honba_messages::{
-    AggressorSide, Bar, BarAggregation, BarSpecification, BarType, Event, InstrumentId, Message,
-    Order, OrderId, OrderSide, OrderStatus, OrderType, PriceType, QuoteTick, TimeInForce, TradeId,
-    TradeTick, UnixNanos, Venue, SCHEMA_VERSION,
+    AggressorSide, Bar, BarAggregation, BarSpecification, BarType, Event, Exchange, InstrumentId,
+    Message, Order, OrderId, OrderSide, OrderStatus, OrderType, PriceType, QuoteTick, TimeInForce,
+    TradeId, TradeTick, UnixNanos, SCHEMA_VERSION,
 };
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -99,7 +99,7 @@ where
 }
 
 fn nse(sym: &str) -> InstrumentId {
-    InstrumentId::new(sym, Venue::new("NSE"))
+    InstrumentId::new(sym, Exchange::new("NSE"))
 }
 
 fn ts(n: u64) -> UnixNanos {
@@ -170,7 +170,10 @@ fn instrument_id_golden() {
         "InstrumentId",
         vec![
             ("nse_equity", nse("RELIANCE")),
-            ("bse_index", InstrumentId::new("SENSEX", Venue::new("BSE"))),
+            (
+                "bse_index",
+                InstrumentId::new("SENSEX", Exchange::new("BSE")),
+            ),
         ],
     );
 }

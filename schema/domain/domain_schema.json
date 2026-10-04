@@ -1,1123 +1,1152 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "HonbaDomainEnvelope",
-  "description": "Honba canonical wire models generated from Rust single source of truth contracts",
-  "type": "object",
-  "properties": {
-    "message": {
-      "$ref": "#/$defs/Message"
-    },
-    "event": {
-      "$ref": "#/$defs/Event"
-    },
-    "order": {
-      "$ref": "#/$defs/Order"
-    },
-    "order_intent": {
-      "$ref": "#/$defs/OrderIntent"
-    },
-    "trade": {
-      "$ref": "#/$defs/Trade"
-    },
-    "position": {
-      "$ref": "#/$defs/Position"
-    },
-    "bar": {
-      "$ref": "#/$defs/Bar"
-    },
-    "instrument_id": {
-      "$ref": "#/$defs/InstrumentId"
-    },
-    "metric_key_spec": {
-      "$ref": "#/$defs/MetricKeySpec"
-    },
-    "metric_ref": {
-      "$ref": "#/$defs/MetricRef"
-    },
-    "metric_definition": {
-      "$ref": "#/$defs/MetricDefinition"
-    },
-    "screener_filter_predicate": {
-      "$ref": "#/$defs/ScreenerFilterPredicate"
-    },
-    "screener_filter_group": {
-      "$ref": "#/$defs/ScreenerFilterGroup"
-    },
-    "screener_sort_spec": {
-      "$ref": "#/$defs/ScreenerSortSpec"
-    },
-    "screener_scan_request": {
-      "$ref": "#/$defs/ScreenerScanRequest"
-    },
-    "screener_row": {
-      "$ref": "#/$defs/ScreenerRow"
-    },
-    "screener_scan_response": {
-      "$ref": "#/$defs/ScreenerScanResponse"
-    }
-  },
   "$defs": {
-    "InstrumentId": {
-      "additionalProperties": false,
-      "properties": {
-        "symbol": {
-          "title": "Symbol",
+    "AggressorSide": {
+      "description": "Which side initiated a trade.",
+      "oneOf": [
+        {
+          "description": "The buyer was the aggressor.",
+          "enum": [
+            "buyer"
+          ],
           "type": "string"
         },
-        "venue": {
-          "title": "Venue",
+        {
+          "description": "The seller was the aggressor.",
+          "enum": [
+            "seller"
+          ],
           "type": "string"
+        },
+        {
+          "description": "The exchange did not report an aggressor.",
+          "enum": [
+            "no_aggressor"
+          ],
+          "type": "string"
+        }
+      ]
+    },
+    "Bar": {
+      "description": "An aggregated OHLCV bar.\n\n``` use honba_messages::{ Bar, BarAggregation, BarSpecification, BarType, InstrumentId, PriceType, UnixNanos, Exchange, };\n\nlet bar_type = BarType::new( InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), BarSpecification::new(1, BarAggregation::Minute, PriceType::Last), ); let bar = Bar::new( bar_type, 22_000.0, 22_050.0, 21_980.0, 22_020.0, 15_000.0, UnixNanos::from_u64(1_700_000_060_000_000_000), UnixNanos::from_u64(1_700_000_060_000_000_000), ); assert_eq!(bar.open(), 22_000.0); assert_eq!(bar.close(), 22_020.0); ```\n\nInvariants (checked by [`Bar::validate`] and on deserialization): all prices and the volume are finite, `low <= open, close <= high`, and `volume >= 0`.",
+      "properties": {
+        "bar_type": {
+          "$ref": "#/definitions/BarType"
+        },
+        "close": {
+          "format": "double",
+          "type": "number"
+        },
+        "high": {
+          "format": "double",
+          "type": "number"
+        },
+        "low": {
+          "format": "double",
+          "type": "number"
+        },
+        "open": {
+          "format": "double",
+          "type": "number"
+        },
+        "ts_event": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "ts_init": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "volume": {
+          "format": "double",
+          "type": "number"
         }
       },
       "required": [
-        "symbol",
-        "venue"
+        "bar_type",
+        "close",
+        "high",
+        "low",
+        "open",
+        "ts_event",
+        "ts_init",
+        "volume"
       ],
-      "title": "InstrumentId",
       "type": "object"
     },
     "BarAggregation": {
-      "enum": [
-        "tick",
-        "second",
-        "minute",
-        "hour",
-        "day",
-        "week",
-        "month"
-      ],
-      "title": "BarAggregation",
-      "type": "string"
+      "description": "How a bar aggregates its underlying data.",
+      "oneOf": [
+        {
+          "description": "Aggregate every N ticks.",
+          "enum": [
+            "tick"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Aggregate every N seconds.",
+          "enum": [
+            "second"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Aggregate every N minutes.",
+          "enum": [
+            "minute"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Aggregate every N hours.",
+          "enum": [
+            "hour"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Aggregate every N days.",
+          "enum": [
+            "day"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Aggregate every N weeks.",
+          "enum": [
+            "week"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Aggregate every N calendar months.",
+          "enum": [
+            "month"
+          ],
+          "type": "string"
+        }
+      ]
     },
     "BarSpecification": {
-      "additionalProperties": false,
+      "description": "Describes how a [`Bar`] aggregates its inputs.\n\n``` use honba_messages::{BarAggregation, BarSpecification, PriceType};\n\nlet spec = BarSpecification::new(1, BarAggregation::Minute, PriceType::Last); assert_eq!(spec.step(), 1); assert_eq!(spec.aggregation(), BarAggregation::Minute); ```\n\n`step` must be at least 1; deserializing a zero step fails.",
       "properties": {
-        "step": {
-          "maximum": 18446744073709551615,
-          "minimum": 1,
-          "title": "Step",
-          "type": "integer"
-        },
         "aggregation": {
-          "$ref": "#/$defs/BarAggregation"
+          "$ref": "#/definitions/BarAggregation"
         },
         "price_type": {
-          "$ref": "#/$defs/PriceType"
+          "$ref": "#/definitions/PriceType"
+        },
+        "step": {
+          "format": "uint",
+          "minimum": 0.0,
+          "type": "integer"
         }
       },
       "required": [
-        "step",
         "aggregation",
-        "price_type"
+        "price_type",
+        "step"
       ],
-      "title": "BarSpecification",
       "type": "object"
     },
     "BarType": {
       "additionalProperties": false,
+      "description": "Fully identifies a bar: which instrument, and how it aggregates.",
       "properties": {
         "instrument_id": {
-          "$ref": "#/$defs/InstrumentId"
+          "$ref": "#/definitions/InstrumentId"
         },
         "spec": {
-          "$ref": "#/$defs/BarSpecification"
+          "$ref": "#/definitions/BarSpecification"
         }
       },
       "required": [
         "instrument_id",
         "spec"
       ],
-      "title": "BarType",
-      "type": "object"
-    },
-    "PriceType": {
-      "enum": [
-        "bid",
-        "ask",
-        "mid",
-        "last"
-      ],
-      "title": "PriceType",
-      "type": "string"
-    },
-    "Bar": {
-      "additionalProperties": false,
-      "description": "OHLCV bar; ``low <= open, close <= high`` and ``volume >= 0``.",
-      "properties": {
-        "bar_type": {
-          "$ref": "#/$defs/BarType"
-        },
-        "open": {
-          "title": "Open",
-          "type": "number"
-        },
-        "high": {
-          "title": "High",
-          "type": "number"
-        },
-        "low": {
-          "title": "Low",
-          "type": "number"
-        },
-        "close": {
-          "title": "Close",
-          "type": "number"
-        },
-        "volume": {
-          "minimum": 0,
-          "title": "Volume",
-          "type": "number"
-        },
-        "ts_event": {
-          "maximum": 18446744073709551615,
-          "minimum": 0,
-          "title": "Ts Event",
-          "type": "integer"
-        },
-        "ts_init": {
-          "maximum": 18446744073709551615,
-          "minimum": 0,
-          "title": "Ts Init",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "bar_type",
-        "open",
-        "high",
-        "low",
-        "close",
-        "volume",
-        "ts_event",
-        "ts_init"
-      ],
-      "title": "Bar",
-      "type": "object"
-    },
-    "OrderSide": {
-      "enum": [
-        "buy",
-        "sell",
-        "no_order_side"
-      ],
-      "title": "OrderSide",
-      "type": "string"
-    },
-    "OrderStatus": {
-      "enum": [
-        "initialized",
-        "submitted",
-        "accepted",
-        "partially_filled",
-        "filled",
-        "cancelled",
-        "rejected",
-        "expired"
-      ],
-      "title": "OrderStatus",
-      "type": "string"
-    },
-    "OrderType": {
-      "enum": [
-        "market",
-        "limit",
-        "stop_market",
-        "stop_limit",
-        "stop_market"
-      ],
-      "title": "OrderType",
-      "type": "string"
-    },
-    "TimeInForce": {
-      "enum": [
-        "day",
-        "gtc",
-        "ioc",
-        "fok",
-        "gtd"
-      ],
-      "title": "TimeInForce",
-      "type": "string"
-    },
-    "Order": {
-      "additionalProperties": false,
-      "description": "A client order record; ``quantity > 0`` (``side`` may be ``no_order_side``).",
-      "properties": {
-        "order_id": {
-          "title": "Order Id",
-          "type": "string"
-        },
-        "instrument_id": {
-          "$ref": "#/$defs/InstrumentId"
-        },
-        "side": {
-          "$ref": "#/$defs/OrderSide"
-        },
-        "order_type": {
-          "$ref": "#/$defs/OrderType"
-        },
-        "quantity": {
-          "exclusiveMinimum": 0,
-          "title": "Quantity",
-          "type": "number"
-        },
-        "price": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Price"
-        },
-        "trigger_price": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Trigger Price"
-        },
-        "status": {
-          "$ref": "#/$defs/OrderStatus"
-        },
-        "time_in_force": {
-          "$ref": "#/$defs/TimeInForce"
-        },
-        "ts_event": {
-          "maximum": 18446744073709551615,
-          "minimum": 0,
-          "title": "Ts Event",
-          "type": "integer"
-        },
-        "ts_init": {
-          "maximum": 18446744073709551615,
-          "minimum": 0,
-          "title": "Ts Init",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "order_id",
-        "instrument_id",
-        "side",
-        "order_type",
-        "quantity",
-        "status",
-        "time_in_force",
-        "ts_event",
-        "ts_init"
-      ],
-      "title": "Order",
-      "type": "object"
-    },
-    "OrderIntent": {
-      "additionalProperties": false,
-      "properties": {
-        "instrument_id": {
-          "$ref": "#/$defs/InstrumentId"
-        },
-        "side": {
-          "$ref": "#/$defs/OrderSide"
-        },
-        "quantity": {
-          "title": "Quantity",
-          "type": "number"
-        },
-        "order_type": {
-          "$ref": "#/$defs/OrderType"
-        },
-        "price": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Price"
-        },
-        "trigger_price": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Trigger Price"
-        },
-        "time_in_force": {
-          "$ref": "#/$defs/TimeInForce"
-        }
-      },
-      "required": [
-        "instrument_id",
-        "side",
-        "quantity",
-        "order_type",
-        "time_in_force"
-      ],
-      "title": "OrderIntent",
-      "type": "object"
-    },
-    "Trade": {
-      "additionalProperties": false,
-      "description": "A fill; ``side`` is buy or sell, ``quantity > 0``, ``price > 0``.",
-      "properties": {
-        "order_id": {
-          "title": "Order Id",
-          "type": "string"
-        },
-        "instrument_id": {
-          "$ref": "#/$defs/InstrumentId"
-        },
-        "side": {
-          "$ref": "#/$defs/OrderSide"
-        },
-        "quantity": {
-          "exclusiveMinimum": 0,
-          "title": "Quantity",
-          "type": "number"
-        },
-        "price": {
-          "exclusiveMinimum": 0,
-          "title": "Price",
-          "type": "number"
-        },
-        "costs": {
-          "title": "Costs",
-          "type": "number"
-        },
-        "ts_event": {
-          "maximum": 18446744073709551615,
-          "minimum": 0,
-          "title": "Ts Event",
-          "type": "integer"
-        },
-        "ts_init": {
-          "maximum": 18446744073709551615,
-          "minimum": 0,
-          "title": "Ts Init",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "order_id",
-        "instrument_id",
-        "side",
-        "quantity",
-        "price",
-        "costs",
-        "ts_event",
-        "ts_init"
-      ],
-      "title": "Trade",
       "type": "object"
     },
     "Currency": {
-      "enum": [
-        "INR",
-        "USD",
-        "EUR",
-        "GBP"
-      ],
-      "title": "Currency",
-      "type": "string"
-    },
-    "PositionSide": {
-      "enum": [
-        "long",
-        "short"
-      ],
-      "title": "PositionSide",
-      "type": "string"
-    },
-    "Position": {
-      "additionalProperties": false,
-      "description": "A position; ``quantity`` and ``avg_price`` are ``>= 0`` (``side`` gives direction).",
-      "properties": {
-        "instrument_id": {
-          "$ref": "#/$defs/InstrumentId"
+      "description": "A currency in which instruments are denominated.\n\n``` use honba_entities::Currency;\n\nassert_eq!(Currency::Inr.code(), \"INR\"); assert_eq!(Currency::Inr.to_string(), \"INR\"); ```",
+      "oneOf": [
+        {
+          "description": "Indian rupee.",
+          "enum": [
+            "INR"
+          ],
+          "type": "string"
         },
-        "currency": {
-          "$ref": "#/$defs/Currency"
+        {
+          "description": "United States dollar.",
+          "enum": [
+            "USD"
+          ],
+          "type": "string"
         },
-        "side": {
-          "$ref": "#/$defs/PositionSide"
+        {
+          "description": "Euro.",
+          "enum": [
+            "EUR"
+          ],
+          "type": "string"
         },
-        "quantity": {
-          "minimum": 0,
-          "title": "Quantity",
-          "type": "number"
-        },
-        "avg_price": {
-          "minimum": 0,
-          "title": "Avg Price",
-          "type": "number"
-        },
-        "realized_pnl": {
-          "title": "Realized Pnl",
-          "type": "number"
+        {
+          "description": "Pound sterling.",
+          "enum": [
+            "GBP"
+          ],
+          "type": "string"
         }
-      },
-      "required": [
-        "instrument_id",
-        "currency",
-        "side",
-        "quantity",
-        "avg_price",
-        "realized_pnl"
-      ],
-      "title": "Position",
-      "type": "object"
+      ]
     },
-    "AggressorSide": {
-      "description": "Which side initiated a market trade.",
-      "enum": [
-        "buyer",
-        "seller",
-        "no_aggressor"
-      ],
-      "title": "AggressorSide",
+    "Event": {
+      "description": "Any typed event that can flow through the Honba event kernel.\n\nSerialized as an internally tagged JSON object: `{\"type\": \"order_filled\", ...}`.\n\n``` use honba_messages::Event;\n\nfn is_market_data(ev: &Event) -> bool { matches!(ev, Event::Quote(_) | Event::Trade(_) | Event::Bar(_)) } ```",
+      "oneOf": [
+        {
+          "description": "A quote (top-of-book) update.",
+          "properties": {
+            "ask_price": {
+              "format": "double",
+              "type": "number"
+            },
+            "ask_size": {
+              "format": "double",
+              "type": "number"
+            },
+            "bid_price": {
+              "format": "double",
+              "type": "number"
+            },
+            "bid_size": {
+              "format": "double",
+              "type": "number"
+            },
+            "instrument_id": {
+              "$ref": "#/definitions/InstrumentId"
+            },
+            "ts_event": {
+              "format": "uint64",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "ts_init": {
+              "format": "uint64",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "type": {
+              "enum": [
+                "quote"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "ask_price",
+            "ask_size",
+            "bid_price",
+            "bid_size",
+            "instrument_id",
+            "ts_event",
+            "ts_init",
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A trade (last-sale) update.",
+          "properties": {
+            "aggressor_side": {
+              "$ref": "#/definitions/AggressorSide"
+            },
+            "instrument_id": {
+              "$ref": "#/definitions/InstrumentId"
+            },
+            "price": {
+              "format": "double",
+              "type": "number"
+            },
+            "size": {
+              "format": "double",
+              "type": "number"
+            },
+            "trade_id": {
+              "$ref": "#/definitions/TradeId"
+            },
+            "ts_event": {
+              "format": "uint64",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "ts_init": {
+              "format": "uint64",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "type": {
+              "enum": [
+                "trade"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "aggressor_side",
+            "instrument_id",
+            "price",
+            "size",
+            "trade_id",
+            "ts_event",
+            "ts_init",
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "An aggregated bar.",
+          "properties": {
+            "bar_type": {
+              "$ref": "#/definitions/BarType"
+            },
+            "close": {
+              "format": "double",
+              "type": "number"
+            },
+            "high": {
+              "format": "double",
+              "type": "number"
+            },
+            "low": {
+              "format": "double",
+              "type": "number"
+            },
+            "open": {
+              "format": "double",
+              "type": "number"
+            },
+            "ts_event": {
+              "format": "uint64",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "ts_init": {
+              "format": "uint64",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "type": {
+              "enum": [
+                "bar"
+              ],
+              "type": "string"
+            },
+            "volume": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "bar_type",
+            "close",
+            "high",
+            "low",
+            "open",
+            "ts_event",
+            "ts_init",
+            "type",
+            "volume"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A new order that has been submitted.",
+          "properties": {
+            "instrument_id": {
+              "$ref": "#/definitions/InstrumentId"
+            },
+            "order_id": {
+              "$ref": "#/definitions/OrderId"
+            },
+            "order_type": {
+              "$ref": "#/definitions/OrderType"
+            },
+            "price": {
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "quantity": {
+              "format": "double",
+              "type": "number"
+            },
+            "side": {
+              "$ref": "#/definitions/OrderSide"
+            },
+            "status": {
+              "$ref": "#/definitions/OrderStatus"
+            },
+            "time_in_force": {
+              "$ref": "#/definitions/TimeInForce"
+            },
+            "trigger_price": {
+              "description": "Stop trigger price; `None` unless the order is a stop order.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "ts_event": {
+              "format": "uint64",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "ts_init": {
+              "format": "uint64",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "type": {
+              "enum": [
+                "order"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "instrument_id",
+            "order_id",
+            "order_type",
+            "quantity",
+            "side",
+            "status",
+            "time_in_force",
+            "ts_event",
+            "ts_init",
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The exchange accepted an order.",
+          "properties": {
+            "order_id": {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/OrderId"
+                }
+              ],
+              "description": "The client order identifier."
+            },
+            "ts_event": {
+              "description": "The exchange timestamp at which acceptance occurred.",
+              "format": "uint64",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "type": {
+              "enum": [
+                "order_accepted"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "order_id",
+            "ts_event",
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The exchange rejected an order.",
+          "properties": {
+            "order_id": {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/OrderId"
+                }
+              ],
+              "description": "The client order identifier."
+            },
+            "reason": {
+              "description": "A human-readable rejection reason.",
+              "type": "string"
+            },
+            "ts_event": {
+              "description": "The exchange timestamp at which rejection occurred.",
+              "format": "uint64",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "type": {
+              "enum": [
+                "order_rejected"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "order_id",
+            "reason",
+            "ts_event",
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "An order received a (possibly partial) fill.",
+          "properties": {
+            "last_px": {
+              "description": "The price at which this fill occurred (finite).",
+              "format": "double",
+              "type": "number"
+            },
+            "last_qty": {
+              "description": "The quantity filled in this event (finite, `> 0`).",
+              "format": "double",
+              "type": "number"
+            },
+            "order_id": {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/OrderId"
+                }
+              ],
+              "description": "The client order identifier."
+            },
+            "ts_event": {
+              "description": "The exchange timestamp at which the fill occurred.",
+              "format": "uint64",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "type": {
+              "enum": [
+                "order_filled"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "last_px",
+            "last_qty",
+            "order_id",
+            "ts_event",
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "An order was cancelled.",
+          "properties": {
+            "order_id": {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/OrderId"
+                }
+              ],
+              "description": "The client order identifier."
+            },
+            "ts_event": {
+              "description": "The exchange timestamp at which cancellation occurred.",
+              "format": "uint64",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "type": {
+              "enum": [
+                "order_cancelled"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "order_id",
+            "ts_event",
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Exchange": {
+      "description": "A trading exchange, e.g. `NSE`, `BSE`, `NASDAQ`.",
       "type": "string"
     },
-    "BarEvent": {
-      "additionalProperties": false,
+    "FilterOp": {
+      "description": "Comparison operators for screener filter expressions.",
+      "oneOf": [
+        {
+          "description": "Equal",
+          "enum": [
+            "eq"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Not equal",
+          "enum": [
+            "neq"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Greater than",
+          "enum": [
+            "gt"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Greater than or equal",
+          "enum": [
+            "gte"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Less than",
+          "enum": [
+            "lt"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Less than or equal",
+          "enum": [
+            "lte"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Between lower and upper bounds",
+          "enum": [
+            "between"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "In set",
+          "enum": [
+            "in"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Not in set",
+          "enum": [
+            "not_in"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Pattern match / substring",
+          "enum": [
+            "like"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Collection contains",
+          "enum": [
+            "has"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Crosses above threshold or second series",
+          "enum": [
+            "crosses_above"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Crosses below threshold or second series",
+          "enum": [
+            "crosses_below"
+          ],
+          "type": "string"
+        }
+      ]
+    },
+    "InstrumentId": {
+      "description": "A trading instrument, combining a symbol and its exchange.",
       "properties": {
-        "bar_type": {
-          "$ref": "#/$defs/BarType"
+        "exchange": {
+          "$ref": "#/definitions/Exchange"
         },
-        "open": {
-          "title": "Open",
-          "type": "number"
-        },
-        "high": {
-          "title": "High",
-          "type": "number"
-        },
-        "low": {
-          "title": "Low",
-          "type": "number"
-        },
-        "close": {
-          "title": "Close",
-          "type": "number"
-        },
-        "volume": {
-          "minimum": 0,
-          "title": "Volume",
-          "type": "number"
-        },
-        "ts_event": {
-          "maximum": 18446744073709551615,
-          "minimum": 0,
-          "title": "Ts Event",
-          "type": "integer"
-        },
-        "ts_init": {
-          "maximum": 18446744073709551615,
-          "minimum": 0,
-          "title": "Ts Init",
-          "type": "integer"
-        },
-        "type": {
-          "const": "bar",
-          "default": "bar",
-          "title": "Type",
+        "symbol": {
           "type": "string"
         }
       },
       "required": [
-        "bar_type",
-        "open",
-        "high",
-        "low",
-        "close",
-        "volume",
-        "ts_event",
+        "exchange",
+        "symbol"
+      ],
+      "type": "object"
+    },
+    "Message": {
+      "additionalProperties": false,
+      "description": "The envelope that carries an [`Event`] plus Honba-side metadata.\n\nThis is the versioned unit of the wire contract: its JSON form is `{\"schema_version\": 1, \"event\": {...}, \"ts_init\": n}`, and deserializing a message with any other `schema_version` fails.\n\n``` use honba_messages::{Event, Message, UnixNanos, QuoteTick, InstrumentId, Exchange};\n\nlet quote = QuoteTick::new( InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), 22_000.0, 22_001.0, 50.0, 75.0, UnixNanos::from_u64(1), UnixNanos::from_u64(1), ); let msg = Message::new(Event::Quote(quote), UnixNanos::from_u64(2)); assert!(msg.event().is_market_data()); assert_eq!(msg.schema_version(), honba_messages::SCHEMA_VERSION); ```",
+      "properties": {
+        "event": {
+          "$ref": "#/definitions/Event"
+        },
+        "schema_version": {
+          "description": "Rendered as a plain `u32` in the schema, matching the JSON wire form (the internal `SchemaVersion` unit type would otherwise emit `{}`).",
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "ts_init": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "event",
+        "schema_version",
         "ts_init"
       ],
-      "title": "BarEvent",
       "type": "object"
     },
-    "OrderAccepted": {
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "const": "order_accepted",
-          "default": "order_accepted",
-          "title": "Type",
+    "MetricPeriod": {
+      "description": "Evaluation period dimension for fundamental or snapshot metrics.",
+      "oneOf": [
+        {
+          "description": "Latest snapshot.",
+          "enum": [
+            "SNAPSHOT"
+          ],
           "type": "string"
         },
-        "order_id": {
-          "title": "Order Id",
+        {
+          "description": "Trailing twelve months.",
+          "enum": [
+            "TTM"
+          ],
           "type": "string"
         },
-        "ts_event": {
-          "maximum": 18446744073709551615,
-          "minimum": 0,
-          "title": "Ts Event",
-          "type": "integer"
+        {
+          "description": "Fiscal year.",
+          "enum": [
+            "FY"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Fiscal quarter.",
+          "enum": [
+            "FQ"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Half year.",
+          "enum": [
+            "H1"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Current point-in-time value.",
+          "enum": [
+            "CURRENT"
+          ],
+          "type": "string"
         }
-      },
-      "required": [
-        "order_id",
-        "ts_event"
-      ],
-      "title": "OrderAccepted",
-      "type": "object"
+      ]
     },
-    "OrderCancelled": {
-      "additionalProperties": false,
+    "Order": {
+      "description": "A client order.\n\n``` use honba_messages::{ InstrumentId, Order, OrderId, OrderSide, OrderStatus, OrderType, TimeInForce, UnixNanos, Exchange, };\n\nlet order = Order::new( OrderId::new(\"O-1\"), InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), OrderSide::Buy, OrderType::Limit, 75.0, Some(22_000.0), TimeInForce::Day, UnixNanos::from_u64(1), UnixNanos::from_u64(1), ); assert_eq!(order.status(), OrderStatus::Initialized); assert_eq!(order.quantity(), 75.0); ```\n\nInvariants (checked by [`Order::validate`] and on deserialization): `quantity` is finite and `> 0`; `price` and `trigger_price` are finite when present. An order is a record (it may come back from an exchange), so `side` may be `no_order_side`; intents are stricter.",
       "properties": {
-        "type": {
-          "const": "order_cancelled",
-          "default": "order_cancelled",
-          "title": "Type",
-          "type": "string"
-        },
-        "order_id": {
-          "title": "Order Id",
-          "type": "string"
-        },
-        "ts_event": {
-          "maximum": 18446744073709551615,
-          "minimum": 0,
-          "title": "Ts Event",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "order_id",
-        "ts_event"
-      ],
-      "title": "OrderCancelled",
-      "type": "object"
-    },
-    "OrderEvent": {
-      "additionalProperties": false,
-      "properties": {
-        "order_id": {
-          "title": "Order Id",
-          "type": "string"
-        },
         "instrument_id": {
-          "$ref": "#/$defs/InstrumentId"
+          "$ref": "#/definitions/InstrumentId"
         },
-        "side": {
-          "$ref": "#/$defs/OrderSide"
+        "order_id": {
+          "$ref": "#/definitions/OrderId"
         },
         "order_type": {
-          "$ref": "#/$defs/OrderType"
-        },
-        "quantity": {
-          "exclusiveMinimum": 0,
-          "title": "Quantity",
-          "type": "number"
+          "$ref": "#/definitions/OrderType"
         },
         "price": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Price"
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
-        "trigger_price": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Trigger Price"
+        "quantity": {
+          "format": "double",
+          "type": "number"
+        },
+        "side": {
+          "$ref": "#/definitions/OrderSide"
         },
         "status": {
-          "$ref": "#/$defs/OrderStatus"
+          "$ref": "#/definitions/OrderStatus"
         },
         "time_in_force": {
-          "$ref": "#/$defs/TimeInForce"
+          "$ref": "#/definitions/TimeInForce"
+        },
+        "trigger_price": {
+          "description": "Stop trigger price; `None` unless the order is a stop order.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "ts_event": {
-          "maximum": 18446744073709551615,
-          "minimum": 0,
-          "title": "Ts Event",
+          "format": "uint64",
+          "minimum": 0.0,
           "type": "integer"
         },
         "ts_init": {
-          "maximum": 18446744073709551615,
-          "minimum": 0,
-          "title": "Ts Init",
+          "format": "uint64",
+          "minimum": 0.0,
           "type": "integer"
-        },
-        "type": {
-          "const": "order",
-          "default": "order",
-          "title": "Type",
-          "type": "string"
         }
       },
       "required": [
-        "order_id",
         "instrument_id",
-        "side",
+        "order_id",
         "order_type",
         "quantity",
+        "side",
         "status",
         "time_in_force",
         "ts_event",
         "ts_init"
       ],
-      "title": "OrderEvent",
       "type": "object"
     },
-    "OrderFilled": {
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "const": "order_filled",
-          "default": "order_filled",
-          "title": "Type",
-          "type": "string"
-        },
-        "order_id": {
-          "title": "Order Id",
-          "type": "string"
-        },
-        "last_qty": {
-          "exclusiveMinimum": 0,
-          "title": "Last Qty",
-          "type": "number"
-        },
-        "last_px": {
-          "title": "Last Px",
-          "type": "number"
-        },
-        "ts_event": {
-          "maximum": 18446744073709551615,
-          "minimum": 0,
-          "title": "Ts Event",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "order_id",
-        "last_qty",
-        "last_px",
-        "ts_event"
-      ],
-      "title": "OrderFilled",
-      "type": "object"
+    "OrderId": {
+      "description": "A client-assigned order identifier.",
+      "type": "string"
     },
-    "OrderRejected": {
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "const": "order_rejected",
-          "default": "order_rejected",
-          "title": "Type",
-          "type": "string"
-        },
-        "order_id": {
-          "title": "Order Id",
-          "type": "string"
-        },
-        "reason": {
-          "title": "Reason",
-          "type": "string"
-        },
-        "ts_event": {
-          "maximum": 18446744073709551615,
-          "minimum": 0,
-          "title": "Ts Event",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "order_id",
-        "reason",
-        "ts_event"
-      ],
-      "title": "OrderRejected",
-      "type": "object"
-    },
-    "QuoteEvent": {
-      "additionalProperties": false,
+    "OrderIntent": {
+      "description": "A strategy's desire to trade, before it becomes a concrete [`Order`].\n\nStrategies emit intents; the runner converts them into orders with unique ids and timestamps. This indirection keeps strategies free of bookkeeping they shouldn't care about.\n\nPrice fields by order type (checked by [`OrderIntent::validate`], on deserialization, and by [`OrderIntent::into_order`], so an invalid intent built with a constructor or struct literal never becomes an [`Order`]):\n\n| `order_type`  | `price` (limit) | `trigger_price` (stop) | |---------------|-----------------|------------------------| | `Market`      | none            | none                   | | `Limit`       | required        | none                   | | `StopMarket`  | none            | required               | | `StopLimit`   | required        | required               |\n\n``` use honba_strategy::OrderIntent; use honba_messages::{InstrumentId, OrderSide, OrderType, Exchange};\n\nlet intent = OrderIntent::market_buy( InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), 75.0, ); assert_eq!(intent.side, OrderSide::Buy); assert_eq!(intent.order_type, OrderType::Market); ```",
       "properties": {
         "instrument_id": {
-          "$ref": "#/$defs/InstrumentId"
+          "allOf": [
+            {
+              "$ref": "#/definitions/InstrumentId"
+            }
+          ],
+          "description": "The instrument to trade."
         },
-        "bid_price": {
-          "title": "Bid Price",
-          "type": "number"
-        },
-        "ask_price": {
-          "title": "Ask Price",
-          "type": "number"
-        },
-        "bid_size": {
-          "minimum": 0,
-          "title": "Bid Size",
-          "type": "number"
-        },
-        "ask_size": {
-          "minimum": 0,
-          "title": "Ask Size",
-          "type": "number"
-        },
-        "ts_event": {
-          "maximum": 18446744073709551615,
-          "minimum": 0,
-          "title": "Ts Event",
-          "type": "integer"
-        },
-        "ts_init": {
-          "maximum": 18446744073709551615,
-          "minimum": 0,
-          "title": "Ts Init",
-          "type": "integer"
-        },
-        "type": {
-          "const": "quote",
-          "default": "quote",
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "required": [
-        "instrument_id",
-        "bid_price",
-        "ask_price",
-        "bid_size",
-        "ask_size",
-        "ts_event",
-        "ts_init"
-      ],
-      "title": "QuoteEvent",
-      "type": "object"
-    },
-    "TradeEvent": {
-      "additionalProperties": false,
-      "properties": {
-        "instrument_id": {
-          "$ref": "#/$defs/InstrumentId"
+        "order_type": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/OrderType"
+            }
+          ],
+          "description": "Execution instruction."
         },
         "price": {
-          "title": "Price",
+          "description": "Limit price, for `Limit` and `StopLimit` orders.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "quantity": {
+          "description": "Quantity to trade.",
+          "format": "double",
           "type": "number"
         },
-        "size": {
-          "minimum": 0,
-          "title": "Size",
-          "type": "number"
+        "side": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/OrderSide"
+            }
+          ],
+          "description": "Buy or sell."
         },
-        "aggressor_side": {
-          "$ref": "#/$defs/AggressorSide"
+        "time_in_force": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/TimeInForce"
+            }
+          ],
+          "description": "How long the order remains active."
         },
-        "trade_id": {
-          "title": "Trade Id",
-          "type": "string"
-        },
-        "ts_event": {
-          "maximum": 18446744073709551615,
-          "minimum": 0,
-          "title": "Ts Event",
-          "type": "integer"
-        },
-        "ts_init": {
-          "maximum": 18446744073709551615,
-          "minimum": 0,
-          "title": "Ts Init",
-          "type": "integer"
-        },
-        "type": {
-          "const": "trade",
-          "default": "trade",
-          "title": "Type",
-          "type": "string"
+        "trigger_price": {
+          "description": "Stop trigger price, for `StopMarket` and `StopLimit` orders.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         }
       },
       "required": [
         "instrument_id",
-        "price",
-        "size",
-        "aggressor_side",
-        "trade_id",
-        "ts_event",
-        "ts_init"
+        "order_type",
+        "quantity",
+        "side",
+        "time_in_force"
       ],
-      "title": "TradeEvent",
       "type": "object"
     },
-    "Event": {
-      "discriminator": {
-        "mapping": {
-          "bar": "#/$defs/BarEvent",
-          "order": "#/$defs/OrderEvent",
-          "order_accepted": "#/$defs/OrderAccepted",
-          "order_cancelled": "#/$defs/OrderCancelled",
-          "order_filled": "#/$defs/OrderFilled",
-          "order_rejected": "#/$defs/OrderRejected",
-          "quote": "#/$defs/QuoteEvent",
-          "trade": "#/$defs/TradeEvent"
-        },
-        "propertyName": "type"
-      },
+    "OrderSide": {
+      "description": "Which side of the book an order sits on.",
       "oneOf": [
         {
-          "$ref": "#/$defs/QuoteEvent"
+          "description": "Buy side.",
+          "enum": [
+            "buy"
+          ],
+          "type": "string"
         },
         {
-          "$ref": "#/$defs/TradeEvent"
+          "description": "Sell side.",
+          "enum": [
+            "sell"
+          ],
+          "type": "string"
         },
         {
-          "$ref": "#/$defs/BarEvent"
-        },
-        {
-          "$ref": "#/$defs/OrderEvent"
-        },
-        {
-          "$ref": "#/$defs/OrderAccepted"
-        },
-        {
-          "$ref": "#/$defs/OrderRejected"
-        },
-        {
-          "$ref": "#/$defs/OrderFilled"
-        },
-        {
-          "$ref": "#/$defs/OrderCancelled"
+          "description": "No side specified.",
+          "enum": [
+            "no_order_side"
+          ],
+          "type": "string"
         }
       ]
     },
-    "Message": {
-      "additionalProperties": false,
-      "description": "The versioned envelope; ``schema_version`` must equal ``SCHEMA_VERSION``.",
-      "properties": {
-        "schema_version": {
-          "title": "Schema Version",
-          "type": "integer"
-        },
-        "event": {
-          "discriminator": {
-            "mapping": {
-              "bar": "#/$defs/BarEvent",
-              "order": "#/$defs/OrderEvent",
-              "order_accepted": "#/$defs/OrderAccepted",
-              "order_cancelled": "#/$defs/OrderCancelled",
-              "order_filled": "#/$defs/OrderFilled",
-              "order_rejected": "#/$defs/OrderRejected",
-              "quote": "#/$defs/QuoteEvent",
-              "trade": "#/$defs/TradeEvent"
-            },
-            "propertyName": "type"
-          },
-          "oneOf": [
-            {
-              "$ref": "#/$defs/QuoteEvent"
-            },
-            {
-              "$ref": "#/$defs/TradeEvent"
-            },
-            {
-              "$ref": "#/$defs/BarEvent"
-            },
-            {
-              "$ref": "#/$defs/OrderEvent"
-            },
-            {
-              "$ref": "#/$defs/OrderAccepted"
-            },
-            {
-              "$ref": "#/$defs/OrderRejected"
-            },
-            {
-              "$ref": "#/$defs/OrderFilled"
-            },
-            {
-              "$ref": "#/$defs/OrderCancelled"
-            }
+    "OrderStatus": {
+      "description": "The current lifecycle state of an order.",
+      "oneOf": [
+        {
+          "description": "Created locally, not yet sent.",
+          "enum": [
+            "initialized"
           ],
-          "title": "Event"
-        },
-        "ts_init": {
-          "maximum": 18446744073709551615,
-          "minimum": 0,
-          "title": "Ts Init",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "schema_version",
-        "event",
-        "ts_init"
-      ],
-      "title": "Message",
-      "type": "object"
-    },
-    "FilterOp": {
-      "enum": [
-        "eq",
-        "neq",
-        "gt",
-        "gte",
-        "lt",
-        "lte",
-        "between",
-        "in",
-        "not_in",
-        "like",
-        "has",
-        "crosses_above",
-        "crosses_below"
-      ],
-      "title": "FilterOp",
-      "type": "string"
-    },
-    "MetricPeriod": {
-      "enum": [
-        "SNAPSHOT",
-        "TTM",
-        "FY",
-        "FQ",
-        "H1",
-        "CURRENT"
-      ],
-      "title": "MetricPeriod",
-      "type": "string"
-    },
-    "MetricRef": {
-      "additionalProperties": false,
-      "description": "A metric used as the right-hand operand of a predicate.\n\nMakes metric-to-metric comparisons expressible on the wire, e.g.\n``SMA50 crosses_above {\"key\": \"SMA200\"}``. ``key`` is the wire key, never a UI id.",
-      "properties": {
-        "key": {
-          "title": "Key",
           "type": "string"
         },
-        "period": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/MetricPeriod"
-            },
-            {
-              "type": "null"
-            }
+        {
+          "description": "Sent to the exchange, awaiting acknowledgement.",
+          "enum": [
+            "submitted"
           ],
-          "default": null
+          "type": "string"
         },
-        "timeframe": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Timeframe"
-            },
-            {
-              "type": "null"
-            }
+        {
+          "description": "Acknowledged by the exchange.",
+          "enum": [
+            "accepted"
           ],
-          "default": null
+          "type": "string"
+        },
+        {
+          "description": "Partially filled.",
+          "enum": [
+            "partially_filled"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Fully filled.",
+          "enum": [
+            "filled"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Cancelled by the client or exchange.",
+          "enum": [
+            "cancelled"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Rejected by the exchange.",
+          "enum": [
+            "rejected"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Expired according to its time-in-force.",
+          "enum": [
+            "expired"
+          ],
+          "type": "string"
+        }
+      ]
+    },
+    "OrderType": {
+      "description": "The kind of execution instruction.",
+      "oneOf": [
+        {
+          "description": "Execute at the best available price.",
+          "enum": [
+            "market"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Execute at or better than a limit price.",
+          "enum": [
+            "limit"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Become a market order when a stop price is touched.",
+          "enum": [
+            "stop_market"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Become a limit order when a stop price is touched.",
+          "enum": [
+            "stop_limit"
+          ],
+          "type": "string"
+        }
+      ]
+    },
+    "Position": {
+      "description": "A position in a single instrument.\n\nA position is *flat* when `quantity == 0`. Fills update the position via [`Position::apply_fill`]. Realized PnL accrues when a fill reduces or reverses the existing position; unrealized PnL is computed on demand against a mark price.\n\n``` use honba_entities::{Currency, Position, PositionSide}; use honba_messages::{InstrumentId, Exchange};\n\nlet id = InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")); let mut pos = Position::flat(id, Currency::Inr);\n\npos.apply_fill(PositionSide::Long, 75.0, 22_000.0); pos.apply_fill(PositionSide::Long, 25.0, 22_100.0);\n\nassert_eq!(pos.quantity(), 100.0); assert_eq!(pos.avg_price(), 22_025.0);   // (75*22000 + 25*22100) / 100 ```\n\nInvariants (checked by [`Position::validate`] and on deserialization): `quantity` and `avg_price` are finite and `>= 0` (the side carries the direction), `realized_pnl` is finite.",
+      "properties": {
+        "avg_price": {
+          "format": "double",
+          "type": "number"
+        },
+        "currency": {
+          "$ref": "#/definitions/Currency"
+        },
+        "instrument_id": {
+          "$ref": "#/definitions/InstrumentId"
+        },
+        "quantity": {
+          "format": "double",
+          "type": "number"
+        },
+        "realized_pnl": {
+          "format": "double",
+          "type": "number"
+        },
+        "side": {
+          "$ref": "#/definitions/PositionSide"
         }
       },
       "required": [
-        "key"
+        "avg_price",
+        "currency",
+        "instrument_id",
+        "quantity",
+        "realized_pnl",
+        "side"
       ],
-      "title": "MetricRef",
       "type": "object"
     },
-    "Timeframe": {
-      "enum": [
-        "1",
-        "5",
-        "15",
-        "30",
-        "60",
-        "120",
-        "240",
-        "1D",
-        "1W",
-        "1M"
-      ],
-      "title": "Timeframe",
-      "type": "string"
+    "PositionSide": {
+      "description": "The direction of a position.",
+      "oneOf": [
+        {
+          "description": "Long (net bought).",
+          "enum": [
+            "long"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Short (net sold).",
+          "enum": [
+            "short"
+          ],
+          "type": "string"
+        }
+      ]
+    },
+    "PriceType": {
+      "description": "Which price of the underlying data feeds the bar.",
+      "oneOf": [
+        {
+          "description": "Use the bid price.",
+          "enum": [
+            "bid"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Use the ask price.",
+          "enum": [
+            "ask"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Use the midpoint.",
+          "enum": [
+            "mid"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Use the last traded price.",
+          "enum": [
+            "last"
+          ],
+          "type": "string"
+        }
+      ]
     },
     "ScreenerFilterPredicate": {
-      "additionalProperties": false,
-      "description": "Filter predicate for screening instruments.\n\n``value`` must fit ``op``: ``crosses_above`` / ``crosses_below`` take a finite number\nor a ``MetricRef``; ``gt`` / ``gte`` / ``lt`` / ``lte`` a finite number, a string or a\n``MetricRef``; ``between`` a list of two finite numbers; ``in`` / ``not_in`` a list;\nother operators any value. A ``MetricRef`` operand is parsed into a ``MetricRef``.",
+      "description": "Individual filter predicate applied to a metric key.\n\nDeserialization enforces the value contract of [`check_predicate_value`].",
       "properties": {
         "key": {
-          "title": "Key",
+          "description": "Target metric key to filter by.",
           "type": "string"
         },
         "op": {
-          "$ref": "#/$defs/FilterOp"
-        },
-        "value": {
-          "anyOf": [
+          "allOf": [
             {
-              "type": "number"
-            },
-            {
-              "type": "string"
-            },
-            {
-              "type": "boolean"
-            },
-            {
-              "$ref": "#/$defs/MetricRef"
-            },
-            {
-              "items": {},
-              "type": "array"
-            },
-            {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            {
-              "type": "null"
+              "$ref": "#/definitions/FilterOp"
             }
           ],
-          "title": "Value"
+          "description": "Comparison operator."
         },
         "period": {
           "anyOf": [
             {
-              "$ref": "#/$defs/MetricPeriod"
+              "$ref": "#/definitions/MetricPeriod"
             },
             {
               "type": "null"
             }
           ],
-          "default": null
+          "description": "Optional period dimension."
         },
         "timeframe": {
           "anyOf": [
             {
-              "$ref": "#/$defs/Timeframe"
+              "$ref": "#/definitions/Timeframe"
             },
             {
               "type": "null"
             }
           ],
-          "default": null
+          "description": "Optional timeframe dimension."
+        },
+        "value": {
+          "description": "Target value, array of values, or a [`MetricRef`] object."
         }
       },
       "required": [
@@ -1125,429 +1154,206 @@
         "op",
         "value"
       ],
-      "title": "ScreenerFilterPredicate",
       "type": "object"
     },
-    "MetricKeySpec": {
-      "additionalProperties": false,
-      "description": "Specification of a metric with optional period and timeframe dimensions.",
-      "properties": {
-        "key": {
-          "title": "Key",
-          "type": "string"
-        },
-        "period": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/MetricPeriod"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
-        "timeframe": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Timeframe"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        }
-      },
-      "required": [
-        "key"
-      ],
-      "title": "MetricKeySpec",
-      "type": "object"
-    },
-    "UnitType": {
-      "enum": [
-        "PCT",
-        "PRICE",
-        "RATIO",
-        "SHARES",
-        "CURRENCY"
-      ],
-      "title": "UnitType",
-      "type": "string"
-    },
-    "ValueType": {
-      "enum": [
-        "NUMBER",
-        "STRING",
-        "ENUM",
-        "BOOL",
-        "DATE",
-        "MONEY"
-      ],
-      "title": "ValueType",
-      "type": "string"
-    },
-    "MetricDefinition": {
-      "additionalProperties": false,
-      "description": "Catalog definition of a metric.\n\n``key`` is the wire key sent to the backend. ``ui_id`` (``uiId``) is the frontend\ncolumn id and must never be emitted on the wire. ``aliases`` are natural-language\nphrases the NL layer (``honba.screener.MetricCatalog.resolve``) maps to ``key``.",
-      "properties": {
-        "key": {
-          "title": "Key",
-          "type": "string"
-        },
-        "uiId": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Uiid"
-        },
-        "label": {
-          "title": "Label",
-          "type": "string"
-        },
-        "group": {
-          "title": "Group",
-          "type": "string"
-        },
-        "valueType": {
-          "$ref": "#/$defs/ValueType"
-        },
-        "unit": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/UnitType"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
-        "description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Description"
-        },
-        "hasPeriod": {
-          "default": false,
-          "title": "Hasperiod",
-          "type": "boolean"
-        },
-        "hasTimeframe": {
-          "default": false,
-          "title": "Hastimeframe",
-          "type": "boolean"
-        },
-        "defaultPeriod": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Defaultperiod"
-        },
-        "defaultTimeframe": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Defaulttimeframe"
-        },
-        "filterable": {
-          "default": true,
-          "title": "Filterable",
-          "type": "boolean"
-        },
-        "sortable": {
-          "default": true,
-          "title": "Sortable",
-          "type": "boolean"
-        },
-        "source": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Source"
-        },
-        "aliases": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Aliases",
-          "type": "array"
-        }
-      },
-      "required": [
-        "key",
-        "label",
-        "group",
-        "valueType"
-      ],
-      "title": "MetricDefinition",
-      "type": "object"
-    },
-    "ScreenerFilterGroup": {
-      "additionalProperties": false,
-      "description": "Logical group of filter predicates.",
-      "properties": {
-        "operator": {
-          "default": "AND",
+    "TimeInForce": {
+      "description": "How long an order remains active.",
+      "oneOf": [
+        {
+          "description": "Good till cancelled.",
           "enum": [
-            "AND",
-            "OR"
+            "gtc"
           ],
-          "title": "Operator",
           "type": "string"
         },
-        "items": {
-          "items": {},
-          "title": "Items",
-          "type": "array"
-        }
-      },
-      "required": [
-        "items"
-      ],
-      "title": "ScreenerFilterGroup",
-      "type": "object"
-    },
-    "ScreenerSortSpec": {
-      "additionalProperties": false,
-      "description": "Sorting specification for screener results.",
-      "properties": {
-        "key": {
-          "title": "Key",
-          "type": "string"
-        },
-        "dir": {
-          "default": "desc",
+        {
+          "description": "Immediate or cancel.",
           "enum": [
-            "asc",
-            "desc"
+            "ioc"
           ],
-          "title": "Dir",
           "type": "string"
         },
-        "period": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/MetricPeriod"
-            },
-            {
-              "type": "null"
-            }
+        {
+          "description": "Fill or kill.",
+          "enum": [
+            "fok"
           ],
-          "default": null
+          "type": "string"
         },
-        "timeframe": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Timeframe"
-            },
-            {
-              "type": "null"
-            }
+        {
+          "description": "Valid until the end of the trading day.",
+          "enum": [
+            "day"
           ],
-          "default": null
+          "type": "string"
+        },
+        {
+          "description": "Good till a specified date.",
+          "enum": [
+            "gtd"
+          ],
+          "type": "string"
         }
-      },
-      "required": [
-        "key"
-      ],
-      "title": "ScreenerSortSpec",
-      "type": "object"
+      ]
     },
-    "ScreenerScanRequest": {
-      "additionalProperties": false,
-      "description": "Request payload for POST /api/v1/screener/scan.",
-      "properties": {
-        "market": {
-          "title": "Market",
+    "Timeframe": {
+      "description": "Bar or indicator timeframe dimension for technical metrics.",
+      "oneOf": [
+        {
+          "description": "1 minute",
+          "enum": [
+            "1"
+          ],
           "type": "string"
         },
-        "types": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Types",
-          "type": "array"
-        },
-        "primaryOnly": {
-          "default": true,
-          "title": "Primaryonly",
-          "type": "boolean"
-        },
-        "columnSet": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
+        {
+          "description": "5 minutes",
+          "enum": [
+            "5"
           ],
-          "default": null,
-          "title": "Columnset"
+          "type": "string"
         },
-        "columns": {
-          "items": {
-            "$ref": "#/$defs/MetricKeySpec"
-          },
-          "title": "Columns",
-          "type": "array"
+        {
+          "description": "15 minutes",
+          "enum": [
+            "15"
+          ],
+          "type": "string"
         },
-        "filters": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ScreenerFilterGroup"
-            },
-            {
-              "type": "null"
-            }
+        {
+          "description": "30 minutes",
+          "enum": [
+            "30"
           ],
-          "default": null
+          "type": "string"
         },
-        "sort": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ScreenerSortSpec"
-            },
-            {
-              "type": "null"
-            }
+        {
+          "description": "1 hour / 60 minutes",
+          "enum": [
+            "60"
           ],
-          "default": null
+          "type": "string"
         },
-        "range": {
-          "default": [
-            0,
-            50
+        {
+          "description": "2 hours / 120 minutes",
+          "enum": [
+            "120"
           ],
-          "maxItems": 2,
-          "minItems": 2,
-          "prefixItems": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "integer"
-            }
+          "type": "string"
+        },
+        {
+          "description": "4 hours / 240 minutes",
+          "enum": [
+            "240"
           ],
-          "title": "Range",
-          "type": "array"
+          "type": "string"
+        },
+        {
+          "description": "1 day",
+          "enum": [
+            "1D"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "1 week",
+          "enum": [
+            "1W"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "1 month",
+          "enum": [
+            "1M"
+          ],
+          "type": "string"
         }
-      },
-      "required": [
-        "market"
-      ],
-      "title": "ScreenerScanRequest",
-      "type": "object"
+      ]
     },
-    "ScreenerRow": {
-      "additionalProperties": false,
-      "description": "A row of screened instrument results.",
+    "Trade": {
+      "description": "A completed fill, recorded after the exchange confirms execution.\n\n`costs` is the total transaction cost of the fill (brokerage, taxes, exchange fees) in the settlement currency; it defaults to zero and is set with [`Trade::with_costs`].\n\n``` use honba_entities::Trade; use honba_messages::{InstrumentId, OrderId, OrderSide, UnixNanos, Exchange};\n\nlet t = Trade::new( OrderId::new(\"O-1\"), InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), OrderSide::Buy, 75.0, 22_000.0, UnixNanos::from_u64(1), UnixNanos::from_u64(2), ); assert_eq!(t.notional(), 75.0 * 22_000.0); assert_eq!(t.costs(), 0.0); ```\n\nInvariants (checked by [`Trade::validate`] and on deserialization): `side` is buy or sell, `quantity` and `price` are finite and `> 0`, `costs` is finite.",
       "properties": {
-        "fullSymbol": {
-          "title": "Fullsymbol",
-          "type": "string"
+        "costs": {
+          "format": "double",
+          "type": "number"
         },
-        "instrumentId": {
-          "title": "Instrumentid",
-          "type": "string"
+        "instrument_id": {
+          "$ref": "#/definitions/InstrumentId"
         },
-        "name": {
-          "title": "Name",
-          "type": "string"
+        "order_id": {
+          "$ref": "#/definitions/OrderId"
         },
-        "values": {
-          "additionalProperties": true,
-          "title": "Values",
-          "type": "object"
-        }
-      },
-      "required": [
-        "fullSymbol",
-        "instrumentId",
-        "name",
-        "values"
-      ],
-      "title": "ScreenerRow",
-      "type": "object"
-    },
-    "ScreenerScanResponse": {
-      "additionalProperties": false,
-      "description": "Response payload for POST /api/v1/screener/scan.",
-      "properties": {
-        "total": {
-          "title": "Total",
+        "price": {
+          "format": "double",
+          "type": "number"
+        },
+        "quantity": {
+          "format": "double",
+          "type": "number"
+        },
+        "side": {
+          "$ref": "#/definitions/OrderSide"
+        },
+        "ts_event": {
+          "format": "uint64",
+          "minimum": 0.0,
           "type": "integer"
         },
-        "range": {
-          "maxItems": 2,
-          "minItems": 2,
-          "prefixItems": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "integer"
-            }
-          ],
-          "title": "Range",
-          "type": "array"
-        },
-        "columns": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Columns",
-          "type": "array"
-        },
-        "rows": {
-          "items": {
-            "$ref": "#/$defs/ScreenerRow"
-          },
-          "title": "Rows",
-          "type": "array"
+        "ts_init": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
         }
       },
       "required": [
-        "total",
-        "range",
-        "columns",
-        "rows"
+        "costs",
+        "instrument_id",
+        "order_id",
+        "price",
+        "quantity",
+        "side",
+        "ts_event",
+        "ts_init"
       ],
-      "title": "ScreenerScanResponse",
       "type": "object"
+    },
+    "TradeId": {
+      "description": "A exchange-assigned trade identifier.",
+      "type": "string"
     }
-  }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Honba canonical wire models generated from Rust single source of truth contracts",
+  "properties": {
+    "bar": {
+      "$ref": "#/$defs/Bar"
+    },
+    "event": {
+      "$ref": "#/$defs/Event"
+    },
+    "instrument_id": {
+      "$ref": "#/$defs/InstrumentId"
+    },
+    "message": {
+      "$ref": "#/$defs/Message"
+    },
+    "order": {
+      "$ref": "#/$defs/Order"
+    },
+    "order_intent": {
+      "$ref": "#/$defs/OrderIntent"
+    },
+    "position": {
+      "$ref": "#/$defs/Position"
+    },
+    "screener_filter_predicate": {
+      "$ref": "#/$defs/ScreenerFilterPredicate"
+    },
+    "trade": {
+      "$ref": "#/$defs/Trade"
+    }
+  },
+  "title": "HonbaDomainEnvelope",
+  "type": "object"
 }

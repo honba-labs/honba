@@ -81,10 +81,10 @@ pub trait Strategy: Send + 'static {
 /// ```
 /// use honba_engine::Engine;
 /// use honba_strategy::{BuyAndHold, StrategyAdapter};
-/// use honba_messages::{InstrumentId, Venue};
+/// use honba_messages::{InstrumentId, Exchange};
 ///
 /// let strategy = BuyAndHold::new(
-///     InstrumentId::new("NIFTY50", Venue::new("NSE")),
+///     InstrumentId::new("NIFTY50", Exchange::new("NSE")),
 ///     75.0,
 /// );
 /// let adapter = StrategyAdapter::new(strategy);

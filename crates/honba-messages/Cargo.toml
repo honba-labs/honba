@@ -9,6 +9,7 @@ description = "Core message types for the Honba trading platform"
 
 [dependencies]
 serde.workspace = true
+schemars = { workspace = true }
 
 [dev-dependencies]
 serde_json.workspace = true

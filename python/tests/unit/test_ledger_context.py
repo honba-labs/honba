@@ -68,7 +68,7 @@ def test_fills_move_position_and_cash_including_costs():
     assert ctx.cash() == 698.5 + (5 * 110.0 - 2.0)
 
 
-def test_positions_lists_non_flat_ordered_by_symbol_then_venue():
+def test_positions_lists_non_flat_ordered_by_symbol_then_exchange():
     ctx = LedgerContext()
     for iid in (NIFTY, ACME_NSE, INFY, ACME_BSE):
         ctx.apply_fill(Trade(iid, OrderSide.BUY, 1, 10.0))

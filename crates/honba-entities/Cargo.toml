@@ -12,6 +12,7 @@ honba-messages.workspace = true
 thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+schemars = { workspace = true }
 
 [dev-dependencies]
 serde_json.workspace = true

@@ -248,7 +248,7 @@ class TestCapabilityHonestyIsChecked:
                 caps = super().capabilities()
                 return AdapterCapabilities(
                     name=caps.name,
-                    venues=caps.venues,
+                    exchanges=caps.exchanges,
                     products=caps.products,
                     order_types=caps.order_types,
                     features=caps.features | {Capability.DEPTH},
@@ -317,7 +317,7 @@ class TestSuiteIsRepeatable:
         caps = FakeAdapter().capabilities()
         read_only = AdapterCapabilities(
             name="reader",
-            venues=caps.venues,
+            exchanges=caps.exchanges,
             products=caps.products,
             order_types=caps.order_types,
             features=frozenset(

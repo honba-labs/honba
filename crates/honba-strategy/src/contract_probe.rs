@@ -47,9 +47,9 @@ pub struct Observation {
 ///
 /// ```
 /// use honba_strategy::{ContractProbe, Strategy};
-/// use honba_messages::{InstrumentId, Venue};
+/// use honba_messages::{InstrumentId, Exchange};
 ///
-/// let probe = ContractProbe::new(InstrumentId::new("NIFTY50", Venue::new("NSE")));
+/// let probe = ContractProbe::new(InstrumentId::new("NIFTY50", Exchange::new("NSE")));
 /// assert_eq!(probe.name(), "contract_probe");
 /// assert!(probe.observations().is_empty());
 /// ```

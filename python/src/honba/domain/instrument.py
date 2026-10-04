@@ -9,13 +9,13 @@ from enum import Enum
 
 @dataclass(frozen=True, slots=True)
 class InstrumentId:
-    """A symbol on a venue, e.g. ``InstrumentId("NIFTY50", "NSE")``."""
+    """A symbol on an exchange, e.g. ``InstrumentId("NIFTY50", "NSE")``."""
 
     symbol: str
-    venue: str = "NSE"
+    exchange: str = "NSE"
 
     def __str__(self) -> str:
-        return f"{self.symbol}.{self.venue}"
+        return f"{self.symbol}.{self.exchange}"
 
 
 class InstrumentKind(Enum):

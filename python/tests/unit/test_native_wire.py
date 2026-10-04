@@ -10,11 +10,11 @@ _honba = pytest.importorskip("honba._honba")
 
 
 def test_schema_version_is_exported():
-    assert _honba.SCHEMA_VERSION == 1
+    assert _honba.SCHEMA_VERSION == 2
 
 
 def test_canonical_json_parses_and_reserializes_with_rust():
-    payload = {"symbol": "RELIANCE", "venue": "NSE"}
+    payload = {"symbol": "RELIANCE", "exchange": "NSE"}
     out = _honba.canonical_json("InstrumentId", json.dumps(payload))
     assert json.loads(out) == payload
 

@@ -28,3 +28,4 @@ honba-data            = { path = "../honba-data" }
 honba-strategy        = { path = "../honba-strategy" }
 honba-testing         = { path = "../honba-testing" }
 honba-sim             = { path = "../honba-sim" }
+honba-codegen         = { path = "../honba-codegen" }

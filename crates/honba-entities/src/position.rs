@@ -2,6 +2,7 @@
 
 use honba_messages::validation::{finite, non_negative, serialize_finite};
 use honba_messages::{InstrumentId, InvariantError};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{EntitiesError, Result};
@@ -9,7 +10,7 @@ use crate::instrument::Currency;
 
 honba_messages::enum_with_all! {
     /// The direction of a position.
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
     #[serde(rename_all = "snake_case")]
     #[non_exhaustive]
     pub enum PositionSide {
@@ -47,9 +48,9 @@ impl PositionSide {
 ///
 /// ```
 /// use honba_entities::{Currency, Position, PositionSide};
-/// use honba_messages::{InstrumentId, Venue};
+/// use honba_messages::{InstrumentId, Exchange};
 ///
-/// let id = InstrumentId::new("NIFTY50", Venue::new("NSE"));
+/// let id = InstrumentId::new("NIFTY50", Exchange::new("NSE"));
 /// let mut pos = Position::flat(id, Currency::Inr);
 ///
 /// pos.apply_fill(PositionSide::Long, 75.0, 22_000.0);
@@ -62,7 +63,7 @@ impl PositionSide {
 /// Invariants (checked by [`Position::validate`] and on deserialization):
 /// `quantity` and `avg_price` are finite and `>= 0` (the side carries the
 /// direction), `realized_pnl` is finite.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(try_from = "PositionRepr")]
 pub struct Position {
     pub(crate) instrument_id: InstrumentId,
@@ -178,9 +179,9 @@ impl Position {
     ///
     /// ```
     /// use honba_entities::{Currency, Position, PositionSide};
-    /// use honba_messages::{InstrumentId, Venue};
+    /// use honba_messages::{InstrumentId, Exchange};
     ///
-    /// let id = InstrumentId::new("X", Venue::new("NSE"));
+    /// let id = InstrumentId::new("X", Exchange::new("NSE"));
     /// let mut pos = Position::flat(id, Currency::Inr);
     /// pos.apply_fill(PositionSide::Long, 100.0, 10.0);
     /// pos.apply_fill(PositionSide::Short, 40.0, 12.0);

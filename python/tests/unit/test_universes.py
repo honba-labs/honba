@@ -20,7 +20,7 @@ def test_resolve_universe_alpha30():
     insts = resolve_universe("nifty200_alpha_30")
     assert len(insts) == 30
     assert all(isinstance(i, InstrumentId) for i in insts)
-    assert all(i.venue == "NSE" for i in insts)
+    assert all(i.exchange == "NSE" for i in insts)
 
     # Alternate naming aliases
     assert resolve_universe("nifty200_alpha30") == insts

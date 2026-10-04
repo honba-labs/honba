@@ -86,8 +86,8 @@ def test_golden_invalid_text_rejected(kind, text):
 @pytest.mark.parametrize(
     "text",
     [
-        '{"symbol": "A", "venue": "NSE", "symbol": "B"}',
-        '{"symbol": "A", "venue": {"x": 1, "x": 2}}',
+        '{"symbol": "A", "exchange": "NSE", "symbol": "B"}',
+        '{"symbol": "A", "exchange": {"x": 1, "x": 2}}',
     ],
 )
 def test_loads_rejects_duplicate_keys_at_any_depth(text):
@@ -126,7 +126,7 @@ def test_message_wrap_sets_current_schema_version():
 
 
 def test_wire_rejects_non_finite_and_negative_timestamps():
-    nifty = {"symbol": "NIFTY50", "venue": "NSE"}
+    nifty = {"symbol": "NIFTY50", "exchange": "NSE"}
     with pytest.raises(ValidationError):
         wire.QuoteTick(
             instrument_id=nifty,

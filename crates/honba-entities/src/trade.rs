@@ -2,9 +2,10 @@
 
 use honba_messages::validation::{finite, positive, serialize_finite};
 use honba_messages::{InstrumentId, InvariantError, OrderId, OrderSide, UnixNanos};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// A completed fill, recorded after the venue confirms execution.
+/// A completed fill, recorded after the exchange confirms execution.
 ///
 /// `costs` is the total transaction cost of the fill (brokerage, taxes,
 /// exchange fees) in the settlement currency; it defaults to zero and is set
@@ -12,11 +13,11 @@ use serde::{Deserialize, Serialize};
 ///
 /// ```
 /// use honba_entities::Trade;
-/// use honba_messages::{InstrumentId, OrderId, OrderSide, UnixNanos, Venue};
+/// use honba_messages::{InstrumentId, OrderId, OrderSide, UnixNanos, Exchange};
 ///
 /// let t = Trade::new(
 ///     OrderId::new("O-1"),
-///     InstrumentId::new("NIFTY50", Venue::new("NSE")),
+///     InstrumentId::new("NIFTY50", Exchange::new("NSE")),
 ///     OrderSide::Buy,
 ///     75.0,
 ///     22_000.0,
@@ -30,7 +31,7 @@ use serde::{Deserialize, Serialize};
 /// Invariants (checked by [`Trade::validate`] and on deserialization): `side`
 /// is buy or sell, `quantity` and `price` are finite and `> 0`, `costs` is
 /// finite.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(try_from = "TradeRepr")]
 pub struct Trade {
     pub(crate) order_id: OrderId,
@@ -149,11 +150,11 @@ impl Trade {
     ///
     /// ```
     /// use honba_entities::Trade;
-    /// use honba_messages::{InstrumentId, OrderId, OrderSide, UnixNanos, Venue};
+    /// use honba_messages::{InstrumentId, OrderId, OrderSide, UnixNanos, Exchange};
     ///
     /// let t = Trade::new(
     ///     OrderId::new("O-1"),
-    ///     InstrumentId::new("NIFTY50", Venue::new("NSE")),
+    ///     InstrumentId::new("NIFTY50", Exchange::new("NSE")),
     ///     OrderSide::Buy,
     ///     75.0,
     ///     22_000.0,
@@ -174,7 +175,7 @@ impl Trade {
         self.costs
     }
 
-    /// Returns the venue timestamp.
+    /// Returns the exchange timestamp.
     pub fn ts_event(&self) -> UnixNanos {
         self.ts_event
     }

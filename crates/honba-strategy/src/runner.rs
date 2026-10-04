@@ -54,9 +54,9 @@ pub struct IntentRejection {
 /// use honba_sim::BarFillEngine;
 /// use honba_strategy::{BuyAndHold, StrategyRunner};
 /// use honba_testing::VecFeed;
-/// use honba_messages::{InstrumentId, Venue};
+/// use honba_messages::{InstrumentId, Exchange};
 ///
-/// let strategy = BuyAndHold::new(InstrumentId::new("X", Venue::new("NSE")), 10.0);
+/// let strategy = BuyAndHold::new(InstrumentId::new("X", Exchange::new("NSE")), 10.0);
 /// let execution = BarFillEngine::new();
 ///
 /// let mut engine = Engine::new();

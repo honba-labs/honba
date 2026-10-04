@@ -3,6 +3,7 @@
 use std::fmt;
 
 use honba_messages::{InstrumentId, Order, OrderId, OrderSide, OrderType, TimeInForce, UnixNanos};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// A strategy's desire to trade, before it becomes a concrete [`Order`].
@@ -24,16 +25,16 @@ use serde::{Deserialize, Serialize};
 ///
 /// ```
 /// use honba_strategy::OrderIntent;
-/// use honba_messages::{InstrumentId, OrderSide, OrderType, Venue};
+/// use honba_messages::{InstrumentId, OrderSide, OrderType, Exchange};
 ///
 /// let intent = OrderIntent::market_buy(
-///     InstrumentId::new("NIFTY50", Venue::new("NSE")),
+///     InstrumentId::new("NIFTY50", Exchange::new("NSE")),
 ///     75.0,
 /// );
 /// assert_eq!(intent.side, OrderSide::Buy);
 /// assert_eq!(intent.order_type, OrderType::Market);
 /// ```
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(try_from = "OrderIntentRepr")]
 pub struct OrderIntent {
     /// The instrument to trade.
@@ -219,10 +220,10 @@ impl OrderIntent {
     ///
     /// ```
     /// use honba_strategy::OrderIntent;
-    /// use honba_messages::{InstrumentId, OrderType, Venue};
+    /// use honba_messages::{InstrumentId, OrderType, Exchange};
     ///
     /// let i = OrderIntent::stop_limit_buy(
-    ///     InstrumentId::new("NIFTY50", Venue::new("NSE")),
+    ///     InstrumentId::new("NIFTY50", Exchange::new("NSE")),
     ///     75.0,
     ///     22_000.0,
     ///     22_010.0,
@@ -309,9 +310,9 @@ impl OrderIntent {
     ///
     /// ```
     /// use honba_strategy::{IntentError, OrderIntent};
-    /// use honba_messages::{InstrumentId, OrderId, UnixNanos, Venue};
+    /// use honba_messages::{InstrumentId, OrderId, UnixNanos, Exchange};
     ///
-    /// let id = InstrumentId::new("NIFTY50", Venue::new("NSE"));
+    /// let id = InstrumentId::new("NIFTY50", Exchange::new("NSE"));
     /// let err = OrderIntent::market_buy(id, -1.0)
     ///     .into_order(OrderId::new("O-1"), UnixNanos::from_u64(1))
     ///     .unwrap_err();

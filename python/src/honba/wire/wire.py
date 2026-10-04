@@ -29,7 +29,7 @@ from honba.domain.tick import AggressorSide
 from honba.wire.base import Str, _canonical, _Wire
 from honba.wire.screener import ScreenerFilterPredicate
 
-SCHEMA_VERSION: Final[int] = 1
+SCHEMA_VERSION: Final[int] = 2
 """Wire-contract version; must equal ``honba_messages::SCHEMA_VERSION``."""
 
 _U64_MAX = 2**64 - 1
@@ -80,14 +80,14 @@ WireTimeInForce = Annotated[TimeInForce, _canonical(TimeInForce)]
 
 class InstrumentId(_Wire):
     symbol: Str
-    venue: Str
+    exchange: Str
 
     @classmethod
     def from_domain(cls, value: _instrument.InstrumentId) -> InstrumentId:
-        return cls(symbol=value.symbol, venue=value.venue)
+        return cls(symbol=value.symbol, exchange=value.exchange)
 
     def to_domain(self) -> _instrument.InstrumentId:
-        return _instrument.InstrumentId(self.symbol, self.venue)
+        return _instrument.InstrumentId(self.symbol, self.exchange)
 
 
 class BarSpecification(_Wire):

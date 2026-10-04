@@ -77,7 +77,7 @@ def test_config_from_toml_and_validation(tmp_path):
     p = tmp_path / "config.toml"
     p.write_text('name = "sma_crossover"\nsymbol = "RELIANCE"\n\n[params]\nfast = 20\nslow = 50\n')
     cfg = StrategyConfig.from_toml(p)
-    assert cfg.venue == "NSE"
+    assert cfg.exchange == "NSE"
     assert cfg.instrument_id == InstrumentId("RELIANCE", "NSE")
     assert cfg.params == {"fast": 20, "slow": 50}
     with pytest.raises(ValueError):

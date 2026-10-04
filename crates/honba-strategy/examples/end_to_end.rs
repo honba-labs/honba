@@ -10,7 +10,7 @@ use honba_analytics::{PerformanceReport, RoundTrip};
 use honba_data::{MarkdownReportWriter, ReportWriter};
 use honba_engine::{DataFeed, Handler};
 use honba_entities::Trade;
-use honba_messages::{InstrumentId, Venue};
+use honba_messages::{Exchange, InstrumentId};
 use honba_sim::BarFillEngine;
 use honba_strategy::{SmaCrossover, Strategy, StrategyRunner};
 use honba_testing::VecFeed;
@@ -54,7 +54,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut feed = VecFeed::new(messages);
 
     // 2. Build the execution engine and strategy runner.
-    let strategy = SmaCrossover::new(InstrumentId::new("NIFTY50", Venue::new("NSE")), 3, 8, 10.0);
+    let strategy = SmaCrossover::new(
+        InstrumentId::new("NIFTY50", Exchange::new("NSE")),
+        3,
+        8,
+        10.0,
+    );
     let mut execution = BarFillEngine::new();
     let mut runner = StrategyRunner::new(strategy, execution.clone());
 

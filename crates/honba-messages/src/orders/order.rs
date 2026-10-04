@@ -1,5 +1,6 @@
 //! Orders and their enumeration types.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::events::timestamp::UnixNanos;
@@ -10,7 +11,7 @@ use crate::validation::{
 
 crate::enum_with_all! {
     /// Which side of the book an order sits on.
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
     #[serde(rename_all = "snake_case")]
     #[non_exhaustive]
     pub enum OrderSide {
@@ -25,7 +26,7 @@ crate::enum_with_all! {
 
 crate::enum_with_all! {
     /// The kind of execution instruction.
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
     #[serde(rename_all = "snake_case")]
     #[non_exhaustive]
     pub enum OrderType {
@@ -42,23 +43,23 @@ crate::enum_with_all! {
 
 crate::enum_with_all! {
     /// The current lifecycle state of an order.
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
     #[serde(rename_all = "snake_case")]
     #[non_exhaustive]
     pub enum OrderStatus {
         /// Created locally, not yet sent.
         Initialized,
-        /// Sent to the venue, awaiting acknowledgement.
+        /// Sent to the exchange, awaiting acknowledgement.
         Submitted,
-        /// Acknowledged by the venue.
+        /// Acknowledged by the exchange.
         Accepted,
         /// Partially filled.
         PartiallyFilled,
         /// Fully filled.
         Filled,
-        /// Cancelled by the client or venue.
+        /// Cancelled by the client or exchange.
         Cancelled,
-        /// Rejected by the venue.
+        /// Rejected by the exchange.
         Rejected,
         /// Expired according to its time-in-force.
         Expired,
@@ -67,7 +68,7 @@ crate::enum_with_all! {
 
 crate::enum_with_all! {
     /// How long an order remains active.
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
     #[serde(rename_all = "snake_case")]
     #[non_exhaustive]
     pub enum TimeInForce {
@@ -89,12 +90,12 @@ crate::enum_with_all! {
 /// ```
 /// use honba_messages::{
 ///     InstrumentId, Order, OrderId, OrderSide, OrderStatus, OrderType,
-///     TimeInForce, UnixNanos, Venue,
+///     TimeInForce, UnixNanos, Exchange,
 /// };
 ///
 /// let order = Order::new(
 ///     OrderId::new("O-1"),
-///     InstrumentId::new("NIFTY50", Venue::new("NSE")),
+///     InstrumentId::new("NIFTY50", Exchange::new("NSE")),
 ///     OrderSide::Buy,
 ///     OrderType::Limit,
 ///     75.0,
@@ -109,9 +110,9 @@ crate::enum_with_all! {
 ///
 /// Invariants (checked by [`Order::validate`] and on deserialization):
 /// `quantity` is finite and `> 0`; `price` and `trigger_price` are finite
-/// when present. An order is a record (it may come back from a venue), so
+/// when present. An order is a record (it may come back from an exchange), so
 /// `side` may be `no_order_side`; intents are stricter.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(try_from = "OrderRepr")]
 pub struct Order {
     pub(crate) order_id: OrderId,
@@ -258,7 +259,7 @@ impl Order {
         self.time_in_force
     }
 
-    /// Returns the venue timestamp.
+    /// Returns the exchange timestamp.
     pub fn ts_event(&self) -> UnixNanos {
         self.ts_event
     }
@@ -272,12 +273,12 @@ impl Order {
     ///
     /// ```
     /// use honba_messages::{
-    ///     InstrumentId, Order, OrderId, OrderSide, OrderType, TimeInForce, UnixNanos, Venue,
+    ///     InstrumentId, Order, OrderId, OrderSide, OrderType, TimeInForce, UnixNanos, Exchange,
     /// };
     ///
     /// let order = Order::new(
     ///     OrderId::new("O-1"),
-    ///     InstrumentId::new("NIFTY50", Venue::new("NSE")),
+    ///     InstrumentId::new("NIFTY50", Exchange::new("NSE")),
     ///     OrderSide::Sell,
     ///     OrderType::StopLimit,
     ///     75.0,

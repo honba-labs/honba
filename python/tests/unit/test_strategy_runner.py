@@ -231,7 +231,7 @@ def test_from_wire_messages_parses_market_data_strictly():
 
     from honba.strategies.testing import from_wire_messages
 
-    iid = {"symbol": "X", "venue": "NSE"}
+    iid = {"symbol": "X", "exchange": "NSE"}
     quote = {
         "type": "quote",
         "instrument_id": iid,
@@ -242,13 +242,13 @@ def test_from_wire_messages_parses_market_data_strictly():
         "ts_event": 4,
         "ts_init": 5,
     }
-    msgs = [{"schema_version": 1, "event": quote, "ts_init": 6}]
+    msgs = [{"schema_version": 2, "event": quote, "ts_init": 6}]
     assert from_wire_messages(json.dumps(msgs)) == [(QuoteTick(X, 4, 1.0, 1.5, 2.0, 3.0), 6)]
 
     accepted = {"type": "order_accepted", "order_id": "O-1", "ts_event": 1}
     with pytest.raises(ValueError, match="unsupported event type"):
-        from_wire_messages(json.dumps([{"schema_version": 1, "event": accepted, "ts_init": 1}]))
-    duplicate = '[{"schema_version": 1, "schema_version": 1, "event": {}, "ts_init": 1}]'
+        from_wire_messages(json.dumps([{"schema_version": 2, "event": accepted, "ts_init": 1}]))
+    duplicate = '[{"schema_version": 2, "schema_version": 2, "event": {}, "ts_init": 1}]'
     with pytest.raises(ValueError, match="duplicate key"):
         from_wire_messages(duplicate)
     with pytest.raises(TypeError):

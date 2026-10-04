@@ -24,10 +24,10 @@ enum Side {
 ///
 /// ```
 /// use honba_strategy::{RsiReversal, Strategy};
-/// use honba_messages::{InstrumentId, Venue};
+/// use honba_messages::{InstrumentId, Exchange};
 ///
 /// let strategy = RsiReversal::new(
-///     InstrumentId::new("NIFTY50", Venue::new("NSE")),
+///     InstrumentId::new("NIFTY50", Exchange::new("NSE")),
 ///     14, 30.0, 70.0, 75.0,
 /// );
 /// assert_eq!(strategy.name(), "rsi_reversal");

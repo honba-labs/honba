@@ -23,10 +23,10 @@ pub const MAX_SMA_PERIOD: usize = 10_000;
 ///
 /// ```
 /// use honba_strategy::{SmaCrossover, Strategy};
-/// use honba_messages::{InstrumentId, Venue};
+/// use honba_messages::{InstrumentId, Exchange};
 ///
 /// let strategy = SmaCrossover::new(
-///     InstrumentId::new("NIFTY50", Venue::new("NSE")),
+///     InstrumentId::new("NIFTY50", Exchange::new("NSE")),
 ///     5, 20, 75.0,
 /// );
 /// assert_eq!(strategy.name(), "sma_crossover");

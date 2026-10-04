@@ -45,7 +45,7 @@ def test_in_memory_bar_store_roundtrip():
     b2 = Bar(inst, int(dt.datetime(2025, 1, 7, 9, 15).timestamp() * 1e9), 102.0, 108.0, 101.0, 107.0, 1500.0)
 
     record = CoverageRecord(
-        venue="NSE",
+        exchange="NSE",
         symbol="RELIANCE",
         timeframe=timeframe,
         interval=DateInterval(dt.date(2025, 1, 6), dt.date(2025, 1, 8)),

@@ -51,7 +51,7 @@ class TestSymbolTranslation:
         assert from_yfinance_symbol("TCS.BO") == InstrumentId("TCS", "BSE")
         assert from_yfinance_symbol("^NSEI") == InstrumentId("NIFTY50", "NSE")
         assert from_yfinance_symbol("^BSESN") == InstrumentId("SENSEX", "BSE")
-        assert from_yfinance_symbol("AAPL", default_venue="NASDAQ") == InstrumentId("AAPL", "NASDAQ")
+        assert from_yfinance_symbol("AAPL", default_exchange="NASDAQ") == InstrumentId("AAPL", "NASDAQ")
 
 
 class TestTimeframeNormalization:

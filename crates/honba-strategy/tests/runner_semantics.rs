@@ -223,7 +223,7 @@ struct FailingExecution;
 
 impl ExecutionEngine for FailingExecution {
     fn submit(&mut self, _order: Order) -> Result<()> {
-        Err(honba_engine::AlgoError::Component("venue down".into()))
+        Err(honba_engine::AlgoError::Component("exchange down".into()))
     }
     fn cancel(&mut self, _order_id: &str) -> Result<()> {
         Ok(())

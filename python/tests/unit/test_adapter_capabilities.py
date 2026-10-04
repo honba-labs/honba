@@ -54,7 +54,7 @@ class TestAdapterCapabilities:
         assert TimeInForce.DAY in caps.time_in_force
         assert PriceType.LAST in caps.price_types
         assert StreamMode.QUOTE in caps.stream_modes
-        assert caps.venues == frozenset({"NSE"})
+        assert caps.exchanges == frozenset({"NSE"})
 
     def test_name_is_the_registry_key_and_must_be_a_clean_slug(self) -> None:
         caps = default_capabilities(name="dhan-2")
@@ -64,8 +64,8 @@ class TestAdapterCapabilities:
                 default_capabilities(name=bad)
 
     def test_every_dimension_must_declare_at_least_one_value(self) -> None:
-        with pytest.raises(ValueError, match="venues"):
-            default_capabilities(venues=frozenset())
+        with pytest.raises(ValueError, match="exchanges"):
+            default_capabilities(exchanges=frozenset())
         with pytest.raises(ValueError, match="products"):
             default_capabilities(products=frozenset())
         with pytest.raises(ValueError, match="order_types"):
@@ -79,13 +79,13 @@ class TestAdapterCapabilities:
 
     def test_sets_are_immutable(self) -> None:
         with pytest.raises(AttributeError):
-            default_capabilities().venues = frozenset({"BSE"})  # type: ignore[misc]
+            default_capabilities().exchanges = frozenset({"BSE"})  # type: ignore[misc]
 
-    def test_venue_entries_must_not_be_blank_or_nan_free_garbage(self) -> None:
-        with pytest.raises(ValueError, match="venues"):
-            default_capabilities(venues=frozenset({""}))
-        with pytest.raises(ValueError, match="venues"):
-            default_capabilities(venues=frozenset({"NSE", " "}))
+    def test_exchange_entries_must_not_be_blank_or_nan_free_garbage(self) -> None:
+        with pytest.raises(ValueError, match="exchanges"):
+            default_capabilities(exchanges=frozenset({""}))
+        with pytest.raises(ValueError, match="exchanges"):
+            default_capabilities(exchanges=frozenset({"NSE", " "}))
 
     def test_supports_requires_every_capability(self) -> None:
         caps = default_capabilities(features=frozenset({Capability.PLACE_ORDER}))
@@ -143,7 +143,7 @@ class TestAdapterCapabilities:
     def test_descriptor_does_not_accept_nan_floats_in_price_related_data(self) -> None:
         # Guards the descriptor itself against a float leaking in through **kwargs style calls.
         with pytest.raises((TypeError, ValueError)):
-            default_capabilities(venues=frozenset({"NSE"}), max_orders_per_second=math.nan)
+            default_capabilities(exchanges=frozenset({"NSE"}), max_orders_per_second=math.nan)
 
 
 class TestCapabilityForMethod:

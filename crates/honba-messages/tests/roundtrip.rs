@@ -1,13 +1,13 @@
 //! End-to-end construction and accessor tests.
 
 use honba_messages::{
-    AggressorSide, Bar, BarAggregation, BarSpecification, BarType, Event, InstrumentId, Message,
-    Order, OrderId, OrderSide, OrderStatus, OrderType, PriceType, QuoteTick, Tick, TimeInForce,
-    TradeId, TradeTick, UnixNanos, Venue,
+    AggressorSide, Bar, BarAggregation, BarSpecification, BarType, Event, Exchange, InstrumentId,
+    Message, Order, OrderId, OrderSide, OrderStatus, OrderType, PriceType, QuoteTick, Tick,
+    TimeInForce, TradeId, TradeTick, UnixNanos,
 };
 
 fn nse(sym: &str) -> InstrumentId {
-    InstrumentId::new(sym, Venue::new("NSE"))
+    InstrumentId::new(sym, Exchange::new("NSE"))
 }
 
 fn ts(n: u64) -> UnixNanos {
@@ -123,6 +123,6 @@ fn message_wraps_event() {
 fn display_impls() {
     let id = nse("NIFTY50");
     assert_eq!(id.to_string(), "NIFTY50.NSE");
-    assert_eq!(Venue::new("BSE").to_string(), "BSE");
+    assert_eq!(Exchange::new("BSE").to_string(), "BSE");
     assert_eq!(UnixNanos::from_u64(42).to_string(), "42");
 }

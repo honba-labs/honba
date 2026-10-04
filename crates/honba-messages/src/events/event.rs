@@ -1,5 +1,6 @@
 //! The [`Event`] enum and the [`Message`] envelope.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::events::timestamp::UnixNanos;
@@ -22,7 +23,7 @@ fn last_px<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
 /// Bump it on any breaking change to the serialized form of a message type,
 /// together with the golden vectors in `schema/golden/` and the Python
 /// constant `honba.entities.wire.SCHEMA_VERSION` (see ADR 006).
-pub const SCHEMA_VERSION: u32 = 1;
+pub const SCHEMA_VERSION: u32 = 2;
 
 /// Any typed event that can flow through the Honba event kernel.
 ///
@@ -35,7 +36,7 @@ pub const SCHEMA_VERSION: u32 = 1;
 ///     matches!(ev, Event::Quote(_) | Event::Trade(_) | Event::Bar(_))
 /// }
 /// ```
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 #[non_exhaustive]
 pub enum Event {
@@ -47,20 +48,20 @@ pub enum Event {
     Bar(Bar),
     /// A new order that has been submitted.
     Order(Order),
-    /// The venue accepted an order.
+    /// The exchange accepted an order.
     OrderAccepted {
         /// The client order identifier.
         order_id: OrderId,
-        /// The venue timestamp at which acceptance occurred.
+        /// The exchange timestamp at which acceptance occurred.
         ts_event: UnixNanos,
     },
-    /// The venue rejected an order.
+    /// The exchange rejected an order.
     OrderRejected {
         /// The client order identifier.
         order_id: OrderId,
         /// A human-readable rejection reason.
         reason: String,
-        /// The venue timestamp at which rejection occurred.
+        /// The exchange timestamp at which rejection occurred.
         ts_event: UnixNanos,
     },
     /// An order received a (possibly partial) fill.
@@ -73,20 +74,20 @@ pub enum Event {
         /// The price at which this fill occurred (finite).
         #[serde(serialize_with = "serialize_finite", deserialize_with = "last_px")]
         last_px: f64,
-        /// The venue timestamp at which the fill occurred.
+        /// The exchange timestamp at which the fill occurred.
         ts_event: UnixNanos,
     },
     /// An order was cancelled.
     OrderCancelled {
         /// The client order identifier.
         order_id: OrderId,
-        /// The venue timestamp at which cancellation occurred.
+        /// The exchange timestamp at which cancellation occurred.
         ts_event: UnixNanos,
     },
 }
 
 impl Event {
-    /// Returns the timestamp at which the venue observed this event.
+    /// Returns the timestamp at which the exchange observed this event.
     pub fn ts_event(&self) -> UnixNanos {
         match self {
             Event::Quote(q) => q.ts_event(),
@@ -113,10 +114,10 @@ impl Event {
 /// message with any other `schema_version` fails.
 ///
 /// ```
-/// use honba_messages::{Event, Message, UnixNanos, QuoteTick, InstrumentId, Venue};
+/// use honba_messages::{Event, Message, UnixNanos, QuoteTick, InstrumentId, Exchange};
 ///
 /// let quote = QuoteTick::new(
-///     InstrumentId::new("NIFTY50", Venue::new("NSE")),
+///     InstrumentId::new("NIFTY50", Exchange::new("NSE")),
 ///     22_000.0, 22_001.0, 50.0, 75.0,
 ///     UnixNanos::from_u64(1),
 ///     UnixNanos::from_u64(1),
@@ -125,9 +126,12 @@ impl Event {
 /// assert!(msg.event().is_market_data());
 /// assert_eq!(msg.schema_version(), honba_messages::SCHEMA_VERSION);
 /// ```
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Message {
+    /// Rendered as a plain `u32` in the schema, matching the JSON wire form
+    /// (the internal `SchemaVersion` unit type would otherwise emit `{}`).
+    #[schemars(with = "u32")]
     schema_version: SchemaVersion,
     event: Event,
     ts_init: UnixNanos,

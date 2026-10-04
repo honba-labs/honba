@@ -1,12 +1,13 @@
 //! Nanosecond-precision timestamps.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// A point in time expressed as nanoseconds since the Unix epoch (1970-01-01T00:00:00Z).
 ///
-/// Every event in Honba carries two of these: `ts_event` (when the venue
+/// Every event in Honba carries two of these: `ts_event` (when the exchange
 /// observed the event) and `ts_init` (when Honba created the message).
 ///
 /// ```
@@ -17,8 +18,20 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// assert_eq!(ts.as_millis(), 1_700_000_000_000);
 /// ```
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    JsonSchema,
 )]
+#[schemars(transparent)]
 pub struct UnixNanos(u64);
 
 impl UnixNanos {

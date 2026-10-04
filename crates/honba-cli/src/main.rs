@@ -1,6 +1,7 @@
 mod backtest;
 mod calendars;
 mod data;
+mod schema;
 #[cfg(test)]
 mod tests;
 
@@ -33,6 +34,24 @@ enum Commands {
         #[command(subcommand)]
         command: DataCommands,
     },
+    /// Codegen: emit domain_schema.json / TypeScript / OpenAPI / Python .pyi / MCP (Rust is source of truth)
+    Schema {
+        #[command(subcommand)]
+        command: SchemaCommands,
+    },
+    /// Emit every artifact (alias)
+    Codegen {
+        #[arg(long, default_value = "schema/domain")]
+        schema_dir: PathBuf,
+        #[arg(long)]
+        typescript: Option<PathBuf>,
+        #[arg(long)]
+        openapi: Option<PathBuf>,
+        #[arg(long)]
+        pyi: Option<PathBuf>,
+        #[arg(long)]
+        mcp: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -49,6 +68,28 @@ enum DataCommands {
     Load { source: String, symbol: String },
 }
 
+#[derive(Subcommand)]
+enum SchemaCommands {
+    /// Emit domain_schema.json, and optionally the derived artifacts
+    Export {
+        /// Domain schema output dir (default: crate/schema/domain)
+        #[arg(long)]
+        output: Option<PathBuf>,
+        /// Also render TypeScript into DIR (frontend)
+        #[arg(long)]
+        typescript: Option<PathBuf>,
+        /// Also render OpenAPI into DIR
+        #[arg(long)]
+        openapi: Option<PathBuf>,
+        /// Also render Python .pyi into DIR (wheel)
+        #[arg(long)]
+        pyi: Option<PathBuf>,
+        /// Also render MCP tool schemas into DIR
+        #[arg(long)]
+        mcp: Option<PathBuf>,
+    },
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
@@ -59,5 +100,21 @@ fn main() -> Result<()> {
         Commands::Calendars { command } => match command {
             CalendarCommands::Show { year } => calendars::show(year),
         },
+        Commands::Schema { command } => match command {
+            SchemaCommands::Export {
+                output,
+                typescript,
+                openapi,
+                pyi,
+                mcp,
+            } => schema::export(&output, &typescript, &openapi, &pyi, &mcp),
+        },
+        Commands::Codegen {
+            schema_dir,
+            typescript,
+            openapi,
+            pyi,
+            mcp,
+        } => schema::export_all(&schema_dir, &typescript, &openapi, &pyi, &mcp),
     }
 }

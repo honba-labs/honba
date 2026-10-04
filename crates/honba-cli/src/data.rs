@@ -1,10 +1,10 @@
 use anyhow::{bail, Result};
 
 use honba_data::ParquetBarSource;
-use honba_messages::{InstrumentId, Venue};
+use honba_messages::{Exchange, InstrumentId};
 
 pub fn load(source: &str, symbol: &str) -> Result<()> {
-    let instrument = InstrumentId::new(symbol, Venue::new("NSE"));
+    let instrument = InstrumentId::new(symbol, Exchange::new("NSE"));
 
     let bars = if source.ends_with(".parquet") {
         ParquetBarSource::new(source, instrument).bars()?

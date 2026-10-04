@@ -4,7 +4,7 @@ use honba_analytics::{PerformanceReport, RoundTrip};
 use honba_engine::Handler;
 use honba_engine::{DataFeed, Result};
 use honba_entities::Trade;
-use honba_messages::{InstrumentId, Venue};
+use honba_messages::{Exchange, InstrumentId};
 use honba_sim::BarFillEngine;
 use honba_strategy::{SmaCrossover, StrategyRunner};
 use honba_testing::fixtures::any_instrument;
@@ -36,7 +36,12 @@ fn full_stack_produces_a_report() -> std::result::Result<(), Box<dyn std::error:
         .collect();
     let mut feed = VecFeed::new(messages);
 
-    let strategy = SmaCrossover::new(InstrumentId::new("NIFTY50", Venue::new("NSE")), 3, 8, 10.0);
+    let strategy = SmaCrossover::new(
+        InstrumentId::new("NIFTY50", Exchange::new("NSE")),
+        3,
+        8,
+        10.0,
+    );
     let mut execution = BarFillEngine::new();
     let mut runner = StrategyRunner::new(strategy, execution.clone());
 

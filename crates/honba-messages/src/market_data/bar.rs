@@ -1,5 +1,6 @@
 //! Aggregated OHLCV bars and their specifications.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::events::timestamp::UnixNanos;
@@ -8,7 +9,7 @@ use crate::validation::{finite, non_negative, serialize_finite, InvariantError};
 
 crate::enum_with_all! {
     /// How a bar aggregates its underlying data.
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
     #[serde(rename_all = "snake_case")]
     #[non_exhaustive]
     pub enum BarAggregation {
@@ -31,7 +32,7 @@ crate::enum_with_all! {
 
 crate::enum_with_all! {
     /// Which price of the underlying data feeds the bar.
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
     #[serde(rename_all = "snake_case")]
     #[non_exhaustive]
     pub enum PriceType {
@@ -57,7 +58,7 @@ crate::enum_with_all! {
 /// ```
 ///
 /// `step` must be at least 1; deserializing a zero step fails.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(try_from = "BarSpecificationRepr")]
 pub struct BarSpecification {
     step: usize,
@@ -116,7 +117,7 @@ impl BarSpecification {
 }
 
 /// Fully identifies a bar: which instrument, and how it aggregates.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct BarType {
     instrument_id: InstrumentId,
@@ -148,11 +149,11 @@ impl BarType {
 /// ```
 /// use honba_messages::{
 ///     Bar, BarAggregation, BarSpecification, BarType, InstrumentId, PriceType,
-///     UnixNanos, Venue,
+///     UnixNanos, Exchange,
 /// };
 ///
 /// let bar_type = BarType::new(
-///     InstrumentId::new("NIFTY50", Venue::new("NSE")),
+///     InstrumentId::new("NIFTY50", Exchange::new("NSE")),
 ///     BarSpecification::new(1, BarAggregation::Minute, PriceType::Last),
 /// );
 /// let bar = Bar::new(
@@ -168,7 +169,7 @@ impl BarType {
 /// Invariants (checked by [`Bar::validate`] and on deserialization): all
 /// prices and the volume are finite, `low <= open, close <= high`, and
 /// `volume >= 0`.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(try_from = "BarRepr")]
 pub struct Bar {
     pub(crate) bar_type: BarType,
@@ -301,7 +302,7 @@ impl Bar {
         self.volume
     }
 
-    /// Returns the venue timestamp.
+    /// Returns the exchange timestamp.
     pub fn ts_event(&self) -> UnixNanos {
         self.ts_event
     }

@@ -1,5 +1,6 @@
 //! Tick types: top-of-book quotes and last-sale trades.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::events::timestamp::UnixNanos;
@@ -8,7 +9,7 @@ use crate::validation::{finite, non_negative, serialize_finite, InvariantError};
 
 crate::enum_with_all! {
     /// Which side initiated a trade.
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
     #[serde(rename_all = "snake_case")]
     #[non_exhaustive]
     pub enum AggressorSide {
@@ -16,7 +17,7 @@ crate::enum_with_all! {
         Buyer,
         /// The seller was the aggressor.
         Seller,
-        /// The venue did not report an aggressor.
+        /// The exchange did not report an aggressor.
         NoAggressor,
     }
 }
@@ -24,10 +25,10 @@ crate::enum_with_all! {
 /// A top-of-book quote update.
 ///
 /// ```
-/// use honba_messages::{InstrumentId, QuoteTick, UnixNanos, Venue};
+/// use honba_messages::{InstrumentId, QuoteTick, UnixNanos, Exchange};
 ///
 /// let tick = QuoteTick::new(
-///     InstrumentId::new("NIFTY50", Venue::new("NSE")),
+///     InstrumentId::new("NIFTY50", Exchange::new("NSE")),
 ///     22_000.0, 22_001.0, 50.0, 75.0,
 ///     UnixNanos::from_u64(1),
 ///     UnixNanos::from_u64(1),
@@ -38,7 +39,7 @@ crate::enum_with_all! {
 ///
 /// Invariants (checked by [`QuoteTick::validate`] and on deserialization):
 /// prices and sizes are finite, `bid_price <= ask_price`, sizes are `>= 0`.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(try_from = "QuoteTickRepr")]
 pub struct QuoteTick {
     pub(crate) instrument_id: InstrumentId,
@@ -159,7 +160,7 @@ impl QuoteTick {
         (self.bid_price + self.ask_price) / 2.0
     }
 
-    /// Returns the venue timestamp.
+    /// Returns the exchange timestamp.
     pub fn ts_event(&self) -> UnixNanos {
         self.ts_event
     }
@@ -173,10 +174,10 @@ impl QuoteTick {
 /// A last-sale trade update.
 ///
 /// ```
-/// use honba_messages::{AggressorSide, InstrumentId, TradeId, TradeTick, UnixNanos, Venue};
+/// use honba_messages::{AggressorSide, InstrumentId, TradeId, TradeTick, UnixNanos, Exchange};
 ///
 /// let tick = TradeTick::new(
-///     InstrumentId::new("NIFTY50", Venue::new("NSE")),
+///     InstrumentId::new("NIFTY50", Exchange::new("NSE")),
 ///     22_001.0, 25.0,
 ///     AggressorSide::Buyer,
 ///     TradeId::new("T-1"),
@@ -190,7 +191,7 @@ impl QuoteTick {
 /// Invariants (checked by [`TradeTick::validate`] and on deserialization):
 /// `price` is finite and `size` is finite and `>= 0` (index feeds report
 /// size 0).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(try_from = "TradeTickRepr")]
 pub struct TradeTick {
     pub(crate) instrument_id: InstrumentId,
@@ -291,12 +292,12 @@ impl TradeTick {
         self.aggressor_side
     }
 
-    /// Returns the venue trade id.
+    /// Returns the exchange trade id.
     pub fn trade_id(&self) -> &TradeId {
         &self.trade_id
     }
 
-    /// Returns the venue timestamp.
+    /// Returns the exchange timestamp.
     pub fn ts_event(&self) -> UnixNanos {
         self.ts_event
     }
@@ -318,7 +319,7 @@ pub enum Tick {
 }
 
 impl Tick {
-    /// Returns the venue timestamp.
+    /// Returns the exchange timestamp.
     pub fn ts_event(&self) -> UnixNanos {
         match self {
             Tick::Quote(q) => q.ts_event(),

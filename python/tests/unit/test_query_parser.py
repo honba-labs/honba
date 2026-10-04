@@ -110,7 +110,7 @@ def catalog() -> MetricCatalog:
             _m(
                 "exchange",
                 "exchange",
-                ["venue"],
+                ["exchange"],
                 group="SECURITY",
                 value_type=ValueType.ENUM,
             ),

@@ -3,15 +3,15 @@
 import sys, tomllib
 from pathlib import Path
 
-# Crate layering hierarchy (L0 to L7)
+# Crate layering hierarchy (L0 to L7) — plan.md / 0006 — Rust is schema source.
 # L0: honba-messages
 # L1: honba-entities
 # L2: honba-market
 # L3: honba-engine, honba-indicators
 # L4: honba-sim, honba-strategy
-# L5: honba-analytics, honba-data
+# L5: honba-analytics, honba-data, honba-codegen (schemars source-of-truth)
 # L6: honba-testing (fixtures / test helpers only)
-# L7: honba-py (cdylib), honba-cli (bin)
+# L7: honba-py (cdylib), honba-cli (bin; consumes codegen for `honba schema`)
 
 ALLOWED_PROD = {
     "honba-messages": set(),
@@ -24,10 +24,12 @@ ALLOWED_PROD = {
     "honba-testing": {"honba-engine", "honba-messages", "honba-entities", "honba-sim"},
     "honba-analytics": {"honba-messages", "honba-entities"},
     "honba-data": {"honba-messages", "honba-entities", "honba-analytics"},
+    "honba-codegen": {"honba-messages", "honba-entities", "honba-strategy"},
     "honba-py": {"honba-messages", "honba-entities", "honba-engine", "honba-strategy", "honba-sim"},
     "honba-cli": {
         "honba-messages", "honba-entities", "honba-market", "honba-engine",
-        "honba-analytics", "honba-data", "honba-strategy", "honba-testing", "honba-sim"
+        "honba-analytics", "honba-data", "honba-strategy", "honba-testing", "honba-sim",
+        "honba-codegen",
     },
 }
 
@@ -43,6 +45,7 @@ ALLOWED_DEV = {
     "honba-testing": set(),
     "honba-analytics": set(),
     "honba-data": set(),
+    "honba-codegen": set(),
     "honba-py": set(),
     "honba-cli": set(),
 }

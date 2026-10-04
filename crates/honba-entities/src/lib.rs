@@ -15,9 +15,9 @@
 //! use honba_entities::{
 //!     Currency, Instrument, InstrumentKind, Money, PositionSide, Position,
 //! };
-//! use honba_messages::{InstrumentId, Venue};
+//! use honba_messages::{InstrumentId, Exchange};
 //!
-//! let id = InstrumentId::new("NIFTY50", Venue::new("NSE"));
+//! let id = InstrumentId::new("NIFTY50", Exchange::new("NSE"));
 //! let instrument = Instrument::new(
 //!     id.clone(),
 //!     InstrumentKind::Index,

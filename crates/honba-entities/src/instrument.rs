@@ -3,6 +3,7 @@
 use std::fmt;
 
 use honba_messages::InstrumentId;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 honba_messages::enum_with_all! {
@@ -14,7 +15,7 @@ honba_messages::enum_with_all! {
     /// assert_eq!(Currency::Inr.code(), "INR");
     /// assert_eq!(Currency::Inr.to_string(), "INR");
     /// ```
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
     #[serde(rename_all = "UPPERCASE")]
     #[non_exhaustive]
     pub enum Currency {
@@ -161,10 +162,10 @@ pub enum InstrumentKind {
 ///
 /// ```
 /// use honba_entities::{Currency, Instrument, InstrumentKind};
-/// use honba_messages::{InstrumentId, Venue};
+/// use honba_messages::{InstrumentId, Exchange};
 ///
 /// let inst = Instrument::new(
-///     InstrumentId::new("RELIANCE", Venue::new("NSE")),
+///     InstrumentId::new("RELIANCE", Exchange::new("NSE")),
 ///     InstrumentKind::Equity,
 ///     Currency::Inr,
 ///     1.0,
