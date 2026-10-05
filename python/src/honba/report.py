@@ -31,9 +31,21 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
-from typing import Any, Iterable, Mapping, Sequence, TextIO
+from typing import Any, TextIO
+
+
+def _format_timestamp_ns(ts_ns: int) -> str:
+    """Convert nanosecond timestamp to human-readable UTC date string."""
+    if ts_ns <= 0:
+        return "?"
+    try:
+        return datetime.fromtimestamp(ts_ns / 1e9, tz=timezone.utc).strftime("%Y-%m-%d")
+    except (ValueError, OSError):
+        return "?"
+
 
 # BacktestResult is defined in session; import for type checkers only at
 # runtime we accept any object with the expected attributes (duck typing)
@@ -107,9 +119,7 @@ def result_to_dict(result: BacktestResult) -> dict[str, Any]:
         "n_rejections": len(rejections),
         "fills": [_trade_to_dict(t) for t in fills],
         "rejections": [_rejection_to_dict(r) for r in rejections],
-        "equity_curve": [
-            {"ts": int(ts), "equity": float(eq)} for ts, eq in equity_curve
-        ],
+        "equity_curve": [{"ts": int(ts), "equity": float(eq)} for ts, eq in equity_curve],
         "notes": notes,
     }
 
@@ -238,8 +248,8 @@ def _try_rich_table(
     """Render with Rich if importable; return False to fall back to plain text."""
     try:
         from rich.console import Console
-        from rich.table import Table
         from rich.panel import Panel
+        from rich.table import Table
         from rich.text import Text
     except ImportError:
         return False
@@ -279,9 +289,7 @@ def _try_rich_table(
     console.print(Panel(Text(heading, style="bold"), expand=False))
     console.print(meta)
     console.print(mtable)
-    console.print(
-        f"[dim]Fills: {len(fills)}  Rejections: {len(rejections)}[/dim]"
-    )
+    console.print(f"[dim]Fills: {len(fills)}  Rejections: {len(rejections)}[/dim]")
 
     if fills:
         ftable = Table(title="Recent fills (last 10)", show_header=True)
@@ -291,14 +299,14 @@ def _try_rich_table(
         ftable.add_column("Price", justify="right")
         for t in fills[-10:]:
             try:
-                ts = getattr(t, 'ts', 0)
-                time_str = str(ts)
-            except Exception:
+                ts = getattr(t, "ts", 0)
+                time_str = _format_timestamp_ns(ts)
+            except (ValueError, OSError):
                 time_str = "?"
-            side = getattr(t, 'side', None)
-            side_str = side.value.upper() if hasattr(side, 'value') else str(side)
-            qty = getattr(t, 'quantity', 0)
-            price = getattr(t, 'price', 0)
+            side = getattr(t, "side", None)
+            side_str = side.value.upper() if hasattr(side, "value") else str(side)
+            qty = getattr(t, "quantity", 0)
+            price = getattr(t, "price", 0)
             ftable.add_row(time_str, side_str, f"{qty:.4f}", f"{price:.2f}")
         console.print(ftable)
 
@@ -322,12 +330,9 @@ def _print_tui(
     """Render a rich TUI-style report to terminal."""
     try:
         from rich.console import Console
-        from rich.table import Table
         from rich.panel import Panel
+        from rich.table import Table
         from rich.text import Text
-        from rich.columns import Columns
-        from rich.layout import Layout
-        from rich.align import Align
     except ImportError:
         # Fall back to table
         _print_table(result, out=out, title=title)
@@ -353,7 +358,10 @@ def _print_tui(
     # Header
     header_text = Text()
     header_text.append(f"{heading}\n", style="bold magenta")
-    header_text.append(f"Strategy: {strategy}  |  Instrument: {symbol}.{exchange}  |  Period: {start} → {end}\n", style="dim")
+    header_text.append(
+        f"Strategy: {strategy}  |  Instrument: {symbol}.{exchange}  |  Period: {start} → {end}\n",
+        style="dim",
+    )
     header_text.append(f"Timeframe: {timeframe}", style="dim")
     if cash is not None:
         header_text.append(f"  |  Initial Cash: {_fmt_money(cash, currency=currency)}", style="dim")
@@ -383,7 +391,7 @@ def _print_tui(
             metric_table.add_row(label, _fmt_metric(k, metrics[k]))
 
     # Also add any other metrics
-    seen = set(k for k, _ in key_metrics)
+    seen = {k for k, _ in key_metrics}
     for k in sorted(metrics):
         if k not in seen:
             metric_table.add_row(_label(k), _fmt_metric(k, metrics[k]))
@@ -402,17 +410,17 @@ def _print_tui(
 
         for t in fills[-20:]:
             try:
-                ts = getattr(t, 'ts', 0)
-                time_str = str(ts)
-            except Exception:
+                ts = getattr(t, "ts", 0)
+                time_str = _format_timestamp_ns(ts)
+            except (ValueError, OSError):
                 time_str = "?"
-            side = getattr(t, 'side', None)
-            side_str = side.value.upper() if hasattr(side, 'value') else str(side)
+            side = getattr(t, "side", None)
+            side_str = side.value.upper() if hasattr(side, "value") else str(side)
             side_style = "green" if side_str == "BUY" else "red"
-            qty = getattr(t, 'quantity', 0)
-            price = getattr(t, 'price', 0)
-            costs = getattr(t, 'costs', 0)
-            inst = getattr(t, 'instrument_id', None)
+            qty = getattr(t, "quantity", 0)
+            price = getattr(t, "price", 0)
+            costs = getattr(t, "costs", 0)
+            inst = getattr(t, "instrument_id", None)
             sym = f"{inst.symbol}.{inst.exchange}" if inst else "?"
 
             trades_table.add_row(
@@ -453,21 +461,22 @@ def _cfg_get(obj: Any, key: str, default: Any = None) -> Any:
 def _fmt_money(v: Any, currency: str = "INR") -> str:
     try:
         from honba.utils.format import format_currency
+
         return format_currency(v, currency=currency)
-    except Exception:
+    except (ImportError, AttributeError):
         try:
             f = float(v)
             if abs(f) >= 100000:
-                return f"₹{f/100000:.2f}L"
+                return f"₹{f / 100000:.2f}L"
             return f"₹{f:.2f}"
-        except Exception:
+        except (ValueError, TypeError):
             return str(v)
 
 
 def _fmt_metric(key: str, v: Any) -> str:
     try:
         f = float(v)
-    except Exception:
+    except (ValueError, TypeError):
         return str(v)
     if key.endswith("_pct") or "return" in key or "drawdown" in key:
         return f"{f:+.2f}%"
@@ -498,7 +507,7 @@ def _trade_to_dict(t: Any) -> dict[str, Any]:
     if hasattr(t, "to_dict"):
         try:
             return t.to_dict()
-        except Exception:
+        except (AttributeError, ValueError):
             pass
     d: dict[str, Any] = {}
     for k in ("instrument_id", "side", "quantity", "price", "ts", "order_id", "costs"):
@@ -517,7 +526,7 @@ def _rejection_to_dict(r: Any) -> dict[str, Any]:
     if hasattr(r, "to_dict"):
         try:
             return r.to_dict()
-        except Exception:
+        except (AttributeError, ValueError):
             pass
     if hasattr(r, "__dict__"):
         return dict(r.__dict__)
@@ -534,7 +543,7 @@ def _format_fill_line(t: Any) -> str:
         inst = getattr(t, "instrument_id", None)
         sym = f"{inst.symbol}" if inst else ""
         return f"{ts} {side_str} {qty:.4f} {sym}@{price:.2f}"
-    except Exception:
+    except (ValueError, TypeError, AttributeError):
         return str(t)
 
 
