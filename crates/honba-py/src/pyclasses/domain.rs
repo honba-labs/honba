@@ -3,6 +3,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
+use honba_market::india::profile::IndiaMarketProfile;
 use honba_messages::{
     Bar, BarAggregation, BarSpecification, BarType, Exchange as RustExchange,
     InstrumentId as RustInstrumentId, OrderSide as RustOrderSide, OrderType as RustOrderType,
@@ -468,11 +469,23 @@ impl ROrderIntent {
     }
 }
 
+/// India (NSE/BSE) equity delivery settlement cycle in days (T+2).
+///
+/// Source of truth is the India market pack in `honba-market`
+/// (`IndiaMarketProfile::equity_settlement_days`); Python wraps this in
+/// `honba.markets.india.settlement_days_for` and can override per strategy with
+/// `StrategyConfig.settlement_days`.
+#[pyfunction]
+pub fn nse_equity_settlement_days() -> usize {
+    IndiaMarketProfile::equity_settlement_days()
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<RInstrumentId>()?;
     m.add_class::<RQuoteTick>()?;
     m.add_class::<RBar>()?;
     m.add_class::<RFill>()?;
     m.add_class::<ROrderIntent>()?;
+    m.add_function(wrap_pyfunction!(nse_equity_settlement_days, m)?)?;
     Ok(())
 }

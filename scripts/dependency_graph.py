@@ -28,7 +28,7 @@ ALLOWED_PROD = {
     "honba-data": {"honba-messages", "honba-entities", "honba-engine", "honba-analytics"},
     "honba-sweep": {"honba-messages", "honba-entities", "honba-engine", "honba-strategy", "honba-sim", "honba-data"},
     "honba-codegen": {"honba-messages", "honba-entities", "honba-strategy"},
-    "honba-py": {"honba-messages", "honba-entities", "honba-engine", "honba-strategy", "honba-sim"},
+    "honba-py": {"honba-messages", "honba-entities", "honba-market", "honba-engine", "honba-strategy", "honba-sim"},
     "honba-cli": {
         "honba-messages", "honba-entities", "honba-market", "honba-engine",
         "honba-analytics", "honba-data", "honba-strategy", "honba-testing", "honba-sim",

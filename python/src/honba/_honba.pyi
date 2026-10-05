@@ -6,6 +6,14 @@ SCHEMA_VERSION: Final[int]
 
 def canonical_json(kind: str, payload: str) -> str: ...
 def wire_enum_values() -> dict[str, list[str]]: ...
+def nse_equity_settlement_days() -> int:
+    """India (NSE/BSE) equity delivery settlement cycle in days (T+2).
+
+    Mirrors ``IndiaMarketProfile::equity_settlement_days`` in
+    ``crates/honba-market/src/india/profile.rs``; wrap it with
+    ``honba.markets.india.settlement_days_for``.
+    """
+
 def run_strategy(
     strategy: str,
     params: str,

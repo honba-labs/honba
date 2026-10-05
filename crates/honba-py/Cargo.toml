@@ -17,6 +17,7 @@ pyo3-async-runtimes = { version = "0.22", features = ["tokio-runtime"] }
 tokio.workspace = true
 honba-messages.workspace = true
 honba-entities.workspace = true
+honba-market = { workspace = true, features = ["india"] }
 honba-engine.workspace = true
 honba-strategy.workspace = true
 honba-sim.workspace = true
