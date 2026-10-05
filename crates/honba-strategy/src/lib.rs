@@ -16,7 +16,9 @@
 pub mod buy_and_hold;
 pub mod context;
 pub mod contract_probe;
+pub mod dyn_strategy;
 pub mod intent;
+pub mod manifest;
 pub mod rsi_reversal;
 pub mod runner;
 pub mod sma_crossover;
@@ -25,7 +27,11 @@ pub mod strategy;
 pub use buy_and_hold::BuyAndHold;
 pub use context::{LedgerContext, StrategyContext};
 pub use contract_probe::{ContractProbe, Observation};
+pub use dyn_strategy::DynStrategy;
 pub use intent::{IntentError, OrderIntent};
+pub use manifest::{
+    ManifestError, StrategyManifest, Subscriptions, TimeframeSpec, Universe, STRATEGY_API_VERSION,
+};
 pub use rsi_reversal::RsiReversal;
 pub use runner::{IntentRejection, StrategyRunner, SubmittedIntent};
 pub use sma_crossover::{SmaCrossover, MAX_SMA_PERIOD};

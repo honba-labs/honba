@@ -2,6 +2,7 @@ mod backtest;
 mod calendars;
 mod data;
 mod schema;
+mod verify;
 #[cfg(test)]
 mod tests;
 
@@ -51,6 +52,11 @@ enum Commands {
         pyi: Option<PathBuf>,
         #[arg(long)]
         mcp: Option<PathBuf>,
+    },
+    /// Verify a strategy manifest
+    Verify {
+        /// Path to the manifest file (JSON)
+        manifest: PathBuf,
     },
 }
 
@@ -116,5 +122,6 @@ fn main() -> Result<()> {
             pyi,
             mcp,
         } => schema::export_all(&schema_dir, &typescript, &openapi, &pyi, &mcp),
+        Commands::Verify { manifest } => verify::run(&manifest),
     }
 }
