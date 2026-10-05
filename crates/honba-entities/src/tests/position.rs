@@ -4,7 +4,7 @@ use honba_messages::InvariantError;
 
 use super::any_instrument;
 
-use crate::{Currency, Position, PositionSide};
+use crate::{Currency, Money, Position, PositionSide};
 
 fn short() -> Position {
     let mut p = Position::flat(any_instrument(), Currency::Inr);
@@ -34,12 +34,30 @@ fn validate_reports_typed_errors() {
 }
 
 #[test]
-fn non_finite_values_never_serialize_as_null() {
-    let p = Position {
-        realized_pnl: f64::NAN,
-        ..short()
-    };
-    assert!(serde_json::to_string(&p).is_err());
+fn realized_pnl_is_an_integer_on_the_wire() {
+    // ADR 0011: a Money can never be NaN, so the "non-finite costs serialize
+    // as null" failure mode is gone by construction. What remains is that the
+    // wire form carries the integer.
+    let mut p = Position::flat(any_instrument(), Currency::Inr);
+    p.apply_fill(PositionSide::Long, 100.0, 10.0);
+    p.apply_fill(PositionSide::Short, 40.0, 12.0);
+    let v = serde_json::to_value(&p).unwrap();
+    assert_eq!(v["realized_pnl"]["amount"], serde_json::json!(8000));
+    assert_eq!(p.realized_pnl(), Money::new(8_000, Currency::Inr));
+}
+
+#[test]
+fn a_legacy_float_realized_pnl_still_parses() {
+    let json = serde_json::json!({
+        "instrument_id": {"symbol": "X", "exchange": "NSE"},
+        "currency": "INR",
+        "side": "long",
+        "quantity": 60.0,
+        "avg_price": 10.0,
+        "realized_pnl": 80.0,
+    });
+    let p: Position = serde_json::from_value(json).unwrap();
+    assert_eq!(p.realized_pnl().minor(), 8_000);
 }
 
 #[test]

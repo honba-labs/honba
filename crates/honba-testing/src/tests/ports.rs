@@ -239,6 +239,7 @@ impl ExecutionGateway for EndlessGateway {
             OrderSide::Buy,
             1.0,
             100.0,
+            honba_entities::Currency::Inr,
             UnixNanos::from_u64(1),
             UnixNanos::from_u64(1),
         )))

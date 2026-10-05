@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use honba_engine::{ExecutionEngine, Result};
-use honba_entities::Trade;
+use honba_entities::{Currency, Trade};
 use honba_messages::{Order, OrderId, OrderSide, OrderStatus, UnixNanos};
 
 /// A minimal paper-trading execution engine.
@@ -40,6 +40,9 @@ pub struct PaperExecution {
     pending: Vec<Order>,
     fills: Vec<Trade>,
     next_ts: u64,
+    /// The currency fills settle in. See [`BarFillEngine`](crate::BarFillEngine)
+    /// for why the engine — not the `Order` — declares it.
+    currency: Currency,
 }
 
 impl PaperExecution {
@@ -50,7 +53,14 @@ impl PaperExecution {
             pending: Vec::new(),
             fills: Vec::new(),
             next_ts: 1,
+            currency: Currency::Inr,
         }
+    }
+
+    /// Sets the settlement currency fills carry.
+    pub fn with_currency(mut self, currency: Currency) -> Self {
+        self.currency = currency;
+        self
     }
 
     /// Changes the fill price for subsequent submissions.
@@ -82,7 +92,7 @@ impl ExecutionEngine for PaperExecution {
             OrderSide::Buy
         };
         self.fills.push(Trade::new(
-            order_id, instrument, side, qty, self.price, t, t,
+            order_id, instrument, side, qty, self.price, self.currency, t, t,
         ));
         Ok(())
     }

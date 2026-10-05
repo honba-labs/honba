@@ -13,7 +13,10 @@
         "side": "long",
         "quantity": 0.0,
         "avg_price": 0.0,
-        "realized_pnl": 0.0
+        "realized_pnl": {
+          "amount": 0,
+          "currency": "INR"
+        }
       }
     },
     {
@@ -27,7 +30,10 @@
         "side": "short",
         "quantity": 60.0,
         "avg_price": 2950.5,
-        "realized_pnl": -80.0
+        "realized_pnl": {
+          "amount": -8000,
+          "currency": "INR"
+        }
       }
     }
   ],
@@ -43,7 +49,10 @@
         "side": "short",
         "quantity": -5.0,
         "avg_price": 2950.5,
-        "realized_pnl": -80.0
+        "realized_pnl": {
+          "amount": -8000,
+          "currency": "INR"
+        }
       }
     },
     {
@@ -57,7 +66,10 @@
         "side": "short",
         "quantity": 60.0,
         "avg_price": -1.0,
-        "realized_pnl": -80.0
+        "realized_pnl": {
+          "amount": -8000,
+          "currency": "INR"
+        }
       }
     },
     {
@@ -71,7 +83,10 @@
         "side": "short",
         "quantity": 60.0,
         "avg_price": 2950.5,
-        "realized_pnl": -80.0
+        "realized_pnl": {
+          "amount": -8000,
+          "currency": "INR"
+        }
       }
     }
   ]

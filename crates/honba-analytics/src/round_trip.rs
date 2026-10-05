@@ -41,14 +41,10 @@ impl RoundTrip {
     /// Pairs an entry fill and an exit fill into a round trip.
     ///
     /// The entry fill's side determines the direction. The exit fill must be
-    /// the opposite side and reference the same instrument. Fees from both
-    /// fills are summed.
-    pub fn from_fills(
-        entry: &Trade,
-        exit: &Trade,
-        entry_fees: f64,
-        exit_fees: f64,
-    ) -> Result<Self> {
+    /// the opposite side and reference the same instrument. Fees are read off
+    /// the trades themselves — passing them separately let callers report fees
+    /// the ledger never charged.
+    pub fn from_fills(entry: &Trade, exit: &Trade) -> Result<Self> {
         if entry.instrument_id() != exit.instrument_id() {
             return Err(AnalyticsError::TradeMismatch(
                 "entry and exit reference different instruments".into(),
@@ -84,7 +80,11 @@ impl RoundTrip {
                 ))
             }
         };
-        let fees = entry_fees + exit_fees;
+        // Fees are ledger Money; gross and net stay f64 statistics, so the
+        // sum converts once, at the boundary, rounded to minor units.
+        let fees_major =
+            (entry.costs().minor() + exit.costs().minor()) as f64 / 100.0;
+        let fees = fees_major;
         let net_pnl = gross_pnl - fees;
         let entry_notional = entry_price * quantity;
         let pnl_pct = if entry_notional != 0.0 {

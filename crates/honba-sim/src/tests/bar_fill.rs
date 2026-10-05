@@ -177,7 +177,7 @@ fn default_engine_charges_no_costs() {
     let mut exec = BarFillEngine::new();
     observe(&mut exec, 101.0, 1);
     exec.submit(market("O-1", OrderSide::Buy, 3.0, 1)).unwrap();
-    assert_eq!(exec.drain_fills().unwrap()[0].costs(), 0.0);
+    assert_eq!(exec.drain_fills().unwrap()[0].costs().minor(), 0);
     assert_eq!(FillCosts::default(), FillCosts::new(0.0, 0.0).unwrap());
 }
 
@@ -191,8 +191,9 @@ fn flat_and_proportional_costs_add_up_per_fill() {
         .unwrap();
     let fills = exec.drain_fills().unwrap();
     // Costs are an amount, never signed by side: the ledger applies the sign.
-    assert_eq!(fills[0].costs(), 21.0);
-    assert_eq!(fills[1].costs(), 21.0);
+    // 20.00 flat + 10 bps of 1,000.00 = 1.00, each leg rounded once: 2100 paise.
+    assert_eq!(fills[0].costs().minor(), 2100);
+    assert_eq!(fills[1].costs().minor(), 2100);
     assert_eq!(fills[0].price(), 100.0);
 }
 
@@ -201,12 +202,13 @@ fn flat_only_and_bps_only_costs() {
     let mut flat = costed(2.5, 0.0);
     observe(&mut flat, 100.0, 1);
     flat.submit(market("O-1", OrderSide::Buy, 3.0, 1)).unwrap();
-    assert_eq!(flat.drain_fills().unwrap()[0].costs(), 2.5);
+    assert_eq!(flat.drain_fills().unwrap()[0].costs().minor(), 250);
 
     let mut bps = costed(0.0, 625.0);
     observe(&mut bps, 64.0, 1);
     bps.submit(market("O-1", OrderSide::Sell, 1.0, 1)).unwrap();
-    assert_eq!(bps.drain_fills().unwrap()[0].costs(), 4.0);
+    // 625 bps of 64.00 = 4.00: 400 paise.
+    assert_eq!(bps.drain_fills().unwrap()[0].costs().minor(), 400);
 }
 
 #[test]

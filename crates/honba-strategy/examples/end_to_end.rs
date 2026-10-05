@@ -26,7 +26,7 @@ fn pair_fills(fills: &[Trade]) -> Vec<RoundTrip> {
     let mut trips = Vec::new();
     let mut i = 0;
     while i + 1 < fills.len() {
-        if let Ok(rt) = RoundTrip::from_fills(&fills[i], &fills[i + 1], 0.0, 0.0) {
+        if let Ok(rt) = RoundTrip::from_fills(&fills[i], &fills[i + 1]) {
             trips.push(rt);
         }
         i += 2;

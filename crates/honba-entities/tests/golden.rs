@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use honba_entities::{
-    Currency, FilterOp, MetricPeriod, MetricRef, Position, PositionSide, ScreenerFilterPredicate,
+    Currency, FilterOp, Money, MetricPeriod, MetricRef, Position, PositionSide, ScreenerFilterPredicate,
     Timeframe, Trade,
 };
 use honba_messages::{Exchange, InstrumentId, OrderId, OrderSide, UnixNanos, SCHEMA_VERSION};
@@ -111,16 +111,18 @@ fn trade_golden_has_order_id_and_costs() {
         OrderSide::Buy,
         75.0,
         22_000.0,
+        Currency::Inr,
         UnixNanos::from_u64(TS),
         UnixNanos::from_u64(TS + 5),
     )
-    .with_costs(45.67);
+    .with_costs(Money::from_major_f64(45.67, Currency::Inr).unwrap());
     let sell = Trade::new(
         OrderId::new("O-2"),
         nse("RELIANCE"),
         OrderSide::Sell,
         10.0,
         2_950.05,
+        Currency::Inr,
         UnixNanos::from_u64(TS),
         UnixNanos::from_u64(TS),
     );

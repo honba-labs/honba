@@ -1,3 +1,5 @@
+#![allow(clippy::useless_conversion)]
+
 use pyo3::prelude::*;
 
 pub mod pyclasses;
@@ -27,10 +29,18 @@ mod tests;
 /// Initialize the Tokio runtime for Python async bridge.
 #[pyfunction]
 pub fn initialize_runtime() -> PyResult<()> {
-    let rt = Box::leak(Box::new(tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap()));
-    pyo3_async_runtimes::tokio::init_with_runtime(rt)
-        .map_err(|_| pyo3::exceptions::PyRuntimeError::new_err("failed to initialize tokio runtime"))?;
-    Ok(())
+    let rt = Box::leak(Box::new(
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap(),
+    ));
+    match pyo3_async_runtimes::tokio::init_with_runtime(rt) {
+        Ok(()) => Ok(()),
+        Err(()) => Err(pyo3::exceptions::PyRuntimeError::new_err(
+            "failed to initialize tokio runtime",
+        )),
+    }
 }
 
 /// Get a handle to the current runtime if initialized.

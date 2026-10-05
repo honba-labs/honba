@@ -6,6 +6,8 @@ use honba_messages::{Bar, InstrumentId, OrderSide, QuoteTick, TradeTick, UnixNan
 use serde::Serialize;
 
 use crate::context::StrategyContext;
+use honba_entities::Money;
+
 use crate::intent::OrderIntent;
 use crate::strategy::Strategy;
 
@@ -18,8 +20,8 @@ pub struct Observation {
     pub now: UnixNanos,
     /// [`StrategyContext::position`] of the probe's instrument.
     pub position: f64,
-    /// [`StrategyContext::cash`].
-    pub cash: f64,
+    /// [`StrategyContext::cash`], in minor units of the ledger currency.
+    pub cash: Money,
     /// [`StrategyContext::busy`] for the probe's instrument.
     pub busy: bool,
     /// The number of [`StrategyContext::positions`].

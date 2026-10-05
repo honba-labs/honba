@@ -3,7 +3,7 @@
 use std::sync::{Arc, Mutex};
 
 use honba_engine::{ExecutionEngine, Handler, Result};
-use honba_entities::Trade;
+use honba_entities::{Currency, Money, Trade};
 use honba_messages::{Event, Order, OrderId, UnixNanos};
 
 /// Largest accepted flat cost per fill.
@@ -26,10 +26,11 @@ pub enum FillCostsError {
 
 /// Per-fill transaction costs charged by [`BarFillEngine`] (ADR 008).
 ///
-/// The cost of a fill of `quantity` at `price` is the unrounded IEEE-754
-/// value `flat + (quantity * price) * bps / 10_000`, evaluated in that order.
-/// It is an amount in the settlement currency, never negative and not signed
-/// by side: `Trade::costs` carries it, a buy debits `quantity * price +
+/// The cost of a fill is the flat component plus the proportional component of
+/// the notional, each **rounded to minor units before summation** (ADR 0011):
+/// costs are computed per leg and each leg rounds once, so the reported total
+/// is one a broker's ledger can reproduce. The cost is never negative and not
+/// signed by side: `Trade::costs` carries it, a buy debits `quantity * price +
 /// costs` and a sell credits `quantity * price - costs`. The default is no
 /// costs.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -61,8 +62,22 @@ impl FillCosts {
         self.bps
     }
 
-    fn of(&self, quantity: f64, price: f64) -> f64 {
-        self.flat + (quantity * price) * self.bps / 10_000.0
+    fn of(&self, quantity: f64, price: f64, currency: Currency) -> Money {
+        // Round per leg, then sum (ADR 0011): the flat leg and the bps leg each
+        // settle to minor units once, so the total is a ledger-reproducible
+        // value rather than a rounded-after-summation approximation.
+        let flat = Money::from_major_f64(self.flat, currency);
+        let bps = Money::mul_qty(
+            quantity * price * self.bps / 10_000.0,
+            1.0,
+            currency,
+        );
+        match (flat, bps) {
+            (Ok(f), Ok(b)) => (f + b).unwrap_or_else(|_| Money::zero(currency)),
+            // A non-finite input cannot produce a cost; fall back to zero costs
+            // rather than a NaN on the trade.
+            _ => Money::zero(currency),
+        }
     }
 }
 
@@ -111,10 +126,24 @@ struct Inner {
 /// assert_eq!(fills.len(), 1);
 /// assert_eq!(fills[0].price(), 101.0);
 /// ```
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct BarFillEngine {
     inner: Arc<Mutex<Inner>>,
     costs: FillCosts,
+    /// The currency costs settle in. An `Order` carries no currency (it is a
+    /// market instruction, not a ledger entry), so the engine declares which
+    /// currency its fills cost in — INR for the Indian market by default.
+    currency: Currency,
+}
+
+impl Default for BarFillEngine {
+    fn default() -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(Inner::default())),
+            costs: FillCosts::default(),
+            currency: Currency::Inr,
+        }
+    }
 }
 
 impl BarFillEngine {
@@ -129,6 +158,17 @@ impl BarFillEngine {
             costs,
             ..Self::default()
         }
+    }
+
+    /// Sets the settlement currency costs are charged in.
+    pub fn with_currency(mut self, currency: Currency) -> Self {
+        self.currency = currency;
+        self
+    }
+
+    /// The settlement currency.
+    pub fn currency(&self) -> Currency {
+        self.currency
     }
 
     /// Returns the most recent observed close, if any.
@@ -156,7 +196,7 @@ impl ExecutionEngine for BarFillEngine {
         let price = inner.last_price.unwrap_or(0.0);
         let ts = UnixNanos::from_u64(inner.next_ts.max(order.ts_event().as_u64()));
         inner.next_ts = ts.as_u64() + 1;
-        let costs = self.costs.of(order.quantity(), price);
+        let costs = self.costs.of(order.quantity(), price, self.currency);
         inner.fills.push(
             Trade::new(
                 OrderId::new(order.order_id().as_str()),
@@ -164,6 +204,7 @@ impl ExecutionEngine for BarFillEngine {
                 order.side(),
                 order.quantity(),
                 price,
+                self.currency,
                 ts,
                 ts,
             )

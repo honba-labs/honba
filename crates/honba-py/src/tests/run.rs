@@ -5,6 +5,16 @@ use serde_json::{json, Value};
 
 use crate::pyclasses::run::*;
 
+fn ts_obj(nanos: u64) -> Value {
+    let iso = match nanos {
+        0 => "1970-01-01T00:00:00.000000000Z",
+        1 => "1970-01-01T00:00:00.000000001Z",
+        2 => "1970-01-01T00:00:00.000000002Z",
+        _ => "2023-11-14T22:14:20.000000000Z",
+    };
+    json!({"iso": iso, "unix_nanos": nanos.to_string()})
+}
+
 fn bar(close: f64, ts: u64) -> Value {
     json!({
         "schema_version": 2,
@@ -15,9 +25,9 @@ fn bar(close: f64, ts: u64) -> Value {
                 "spec": {"step": 1, "aggregation": "minute", "price_type": "last"}
             },
             "open": close, "high": close, "low": close, "close": close, "volume": 1.0,
-            "ts_event": ts, "ts_init": ts
+            "ts_event": ts_obj(ts), "ts_init": ts_obj(ts)
         },
-        "ts_init": ts
+        "ts_init": ts_obj(ts)
     })
 }
 
@@ -48,7 +58,7 @@ fn runs_buy_and_hold_and_reports_json() {
         &run_strategy_json("buy_and_hold", params, &events, "[]", 100.0).unwrap(),
     )
     .unwrap();
-    assert_eq!(out["intents"][0]["ts_init"], 1);
+    assert_eq!(out["intents"][0]["ts_init"]["unix_nanos"], "1");
     assert_eq!(out["intents"][0]["intent"]["side"], "buy");
     assert_eq!(out["fills"][0]["order_id"], "buy_and_hold-0");
     assert_eq!(out["fills"][0]["price"], 10.0);
@@ -56,7 +66,7 @@ fn runs_buy_and_hold_and_reports_json() {
         out["positions"],
         json!([{"instrument_id": {"symbol": "X", "exchange": "NSE"}, "quantity": 2.0}])
     );
-    assert_eq!(out["cash"], 80.0);
+    assert_eq!(out["cash"]["amount"], 8000);
     assert_eq!(out["observations"], json!([]));
 }
 
@@ -80,9 +90,9 @@ fn refuses_an_order_before_any_bar_instead_of_filling_at_zero() {
         "event": {
             "type": "quote", "instrument_id": {"symbol": "X", "exchange": "NSE"},
             "bid_price": 1.0, "ask_price": 1.5, "bid_size": 1.0, "ask_size": 1.0,
-            "ts_event": 1, "ts_init": 1
+            "ts_event": ts_obj(1), "ts_init": ts_obj(1)
         },
-        "ts_init": 1
+        "ts_init": ts_obj(1)
     });
     let params = r#"{"instrument_id": {"symbol": "X", "exchange": "NSE"}}"#;
     let events = json!([quote, bar(10.0, 2)]).to_string();

@@ -1,9 +1,11 @@
 //! Position tracking.
 
-use honba_messages::validation::{finite, non_negative, serialize_finite};
+use honba_messages::validation::{non_negative, serialize_finite};
 use honba_messages::{InstrumentId, InvariantError};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use crate::instrument::Money;
 
 use crate::error::{EntitiesError, Result};
 use crate::instrument::Currency;
@@ -57,12 +59,13 @@ impl PositionSide {
 /// pos.apply_fill(PositionSide::Long, 25.0, 22_100.0);
 ///
 /// assert_eq!(pos.quantity(), 100.0);
-/// assert_eq!(pos.avg_price(), 22_025.0);   // (75*22000 + 25*22100) / 100
+/// assert_eq!(pos.avg_price(), 22_025.0);   // (75*22000 + 25*22100) / 100, exact, exact
 /// ```
 ///
 /// Invariants (checked by [`Position::validate`] and on deserialization):
 /// `quantity` and `avg_price` are finite and `>= 0` (the side carries the
-/// direction), `realized_pnl` is finite.
+/// direction). `realized_pnl` is an integer `Money` and so cannot be
+/// non-finite; the wire form reads it the same way `Trade` reads costs.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(try_from = "PositionRepr")]
 pub struct Position {
@@ -73,8 +76,7 @@ pub struct Position {
     pub(crate) quantity: f64,
     #[serde(serialize_with = "serialize_finite")]
     pub(crate) avg_price: f64,
-    #[serde(serialize_with = "serialize_finite")]
-    pub(crate) realized_pnl: f64,
+    pub(crate) realized_pnl: Money,
 }
 
 /// The raw wire form, validated into a [`Position`].
@@ -86,20 +88,28 @@ struct PositionRepr {
     side: PositionSide,
     quantity: f64,
     avg_price: f64,
-    realized_pnl: f64,
+    realized_pnl: super::trade::MoneyRepr,
 }
 
 impl TryFrom<PositionRepr> for Position {
     type Error = InvariantError;
 
     fn try_from(r: PositionRepr) -> std::result::Result<Self, Self::Error> {
+        let realized_pnl = match r.realized_pnl {
+            super::trade::MoneyRepr::Exact(money) => money,
+            super::trade::MoneyRepr::LegacyMajor(major) => {
+                // Older producers wrote `-80.0`; round once, at the door.
+                Money::from_major_f64(major, r.currency)
+                    .map_err(|_| InvariantError::NonFinite { field: "realized_pnl" })?
+            }
+        };
         let position = Position {
             instrument_id: r.instrument_id,
             currency: r.currency,
             side: r.side,
             quantity: r.quantity,
             avg_price: r.avg_price,
-            realized_pnl: r.realized_pnl,
+            realized_pnl,
         };
         position.validate()?;
         Ok(position)
@@ -115,7 +125,7 @@ impl Position {
             side: PositionSide::Long,
             quantity: 0.0,
             avg_price: 0.0,
-            realized_pnl: 0.0,
+            realized_pnl: Money::zero(currency),
         }
     }
 
@@ -145,7 +155,10 @@ impl Position {
     }
 
     /// Returns realized profit and loss in the position's currency.
-    pub fn realized_pnl(&self) -> f64 {
+///
+/// Realized PnL is a ledger entry: it accrues per fill, in minor units, on
+    // every reduction or reversal, so it never accumulates in `f64`.
+    pub fn realized_pnl(&self) -> Money {
         self.realized_pnl
     }
 
@@ -153,7 +166,8 @@ impl Position {
     pub fn validate(&self) -> std::result::Result<(), InvariantError> {
         non_negative("quantity", self.quantity)?;
         non_negative("avg_price", self.avg_price)?;
-        finite("realized_pnl", self.realized_pnl)?;
+        // realized_pnl is an integer Money: exact by construction, so there is
+        // nothing to validate.
         Ok(())
     }
 
@@ -186,7 +200,7 @@ impl Position {
     /// pos.apply_fill(PositionSide::Long, 100.0, 10.0);
     /// pos.apply_fill(PositionSide::Short, 40.0, 12.0);
     /// assert_eq!(pos.quantity(), 60.0);
-    /// assert_eq!(pos.realized_pnl(), 80.0);   // 40 * (12 - 10)
+    /// assert_eq!(pos.realized_pnl().minor(), 8000);   // 40 * (12 - 10), in paise
     /// ```
     pub fn apply_fill(&mut self, fill_side: PositionSide, qty: f64, px: f64) {
         debug_assert!(qty > 0.0, "fill quantity must be positive");
@@ -205,9 +219,14 @@ impl Position {
             return;
         }
 
-        // Opposite side: reduce, possibly reverse.
+        // Opposite side: reduce, possibly reverse. The closed PnL is computed
+        // once per fill and rounded to minor units immediately (ADR 0011), so
+        // the ledger accumulates integers, not floats.
         let closable = self.quantity.min(qty);
-        self.realized_pnl += (px - self.avg_price) * self.side.sign() * closable;
+        let leg = Money::mul_qty(closable * self.side.sign() * (px - self.avg_price), 1.0, self.currency);
+        if let Ok(leg) = leg {
+            self.realized_pnl = (self.realized_pnl + leg).unwrap_or(self.realized_pnl);
+        }
 
         if qty < self.quantity {
             self.quantity -= qty;

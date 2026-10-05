@@ -10,7 +10,7 @@
 use std::path::PathBuf;
 
 use honba_engine::Handler;
-use honba_entities::{Currency, Instrument, InstrumentKind};
+use honba_entities::{Currency, Instrument, InstrumentKind, Money};
 use honba_messages::{InstrumentId, Message, SCHEMA_VERSION};
 use honba_sim::{BarFillEngine, FillCosts};
 use honba_strategy::{
@@ -50,7 +50,7 @@ fn instrument(v: &Value) -> Instrument {
 }
 
 fn context(scenario: &Value) -> LedgerContext {
-    let mut ctx = LedgerContext::with_cash(scenario["initial_cash"].as_f64().unwrap());
+    let mut ctx = LedgerContext::with_cash(Money::from_major_f64(scenario["initial_cash"].as_f64().unwrap(), Currency::Inr).unwrap());
     for i in scenario["instruments"].as_array().unwrap() {
         ctx.add_instrument(instrument(i));
     }

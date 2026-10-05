@@ -1,7 +1,7 @@
 //! Numerical checks for analytics primitives.
 
 use honba_analytics::{AnalyticsError, EquityStats, PerformanceReport, RoundTrip, TradeStats};
-use honba_entities::{PositionSide, Trade};
+use honba_entities::{Currency, Money, PositionSide, Trade};
 use honba_messages::{Exchange, InstrumentId, UnixNanos};
 
 fn id() -> InstrumentId {
@@ -75,19 +75,23 @@ fn round_trip_from_fills_pairs_buy_then_sell() {
         OrderSide::Buy,
         10.0,
         100.0,
+        Currency::Inr,
         ts(1),
         ts(1),
-    );
+    )
+    .with_costs(Money::from_major_f64(0.5, Currency::Inr).unwrap());
     let sell = Trade::new(
         OrderId::new("S1"),
         id(),
         OrderSide::Sell,
         10.0,
         110.0,
+        Currency::Inr,
         ts(2),
         ts(2),
-    );
-    let rt = RoundTrip::from_fills(&buy, &sell, 0.5, 0.5).unwrap();
+    )
+    .with_costs(Money::from_major_f64(0.5, Currency::Inr).unwrap());
+    let rt = RoundTrip::from_fills(&buy, &sell).unwrap();
     assert_eq!(rt.side, PositionSide::Long);
     assert!((rt.gross_pnl - 100.0).abs() < 1e-9);
     assert!((rt.fees - 1.0).abs() < 1e-9);
@@ -104,6 +108,7 @@ fn round_trip_from_fills_short_profits_on_decline() {
         OrderSide::Sell,
         10.0,
         110.0,
+        Currency::Inr,
         ts(1),
         ts(1),
     );
@@ -113,10 +118,11 @@ fn round_trip_from_fills_short_profits_on_decline() {
         OrderSide::Buy,
         10.0,
         100.0,
+        Currency::Inr,
         ts(2),
         ts(2),
     );
-    let rt = RoundTrip::from_fills(&sell, &buy, 0.0, 0.0).unwrap();
+    let rt = RoundTrip::from_fills(&sell, &buy).unwrap();
     assert_eq!(rt.side, PositionSide::Short);
     assert!((rt.gross_pnl - 100.0).abs() < 1e-9);
 }

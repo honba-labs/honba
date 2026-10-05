@@ -8,7 +8,7 @@
 
 use std::collections::BTreeMap;
 
-use honba_entities::{Instrument, Trade};
+use honba_entities::{Currency, Instrument, Money, Trade};
 use honba_messages::{InstrumentId, OrderSide, UnixNanos};
 
 use crate::intent::OrderIntent;
@@ -27,8 +27,8 @@ pub trait StrategyContext {
     fn positions(&self) -> Vec<(InstrumentId, f64)>;
 
     /// Initial cash plus the net cash flow of all fills (buys debit
-    /// `quantity * price + costs`, sells credit `quantity * price - costs`).
-    fn cash(&self) -> f64;
+    /// notional plus costs, sells credit notional minus costs), in minor units.
+    fn cash(&self) -> Money;
 
     /// `true` while an intent submitted for `instrument_id` is not fully
     /// filled or rejected.
@@ -59,37 +59,59 @@ struct Pending {
 /// Mirrors the Python `honba.strategies.context.LedgerContext`.
 ///
 /// ```
+/// use honba_entities::{Currency, Money};
 /// use honba_strategy::{LedgerContext, OrderIntent, StrategyContext};
 /// use honba_messages::{InstrumentId, Exchange};
 ///
 /// let id = InstrumentId::new("NIFTY50", Exchange::new("NSE"));
-/// let mut ctx = LedgerContext::with_cash(100_000.0);
+/// let mut ctx = LedgerContext::with_cash(Money::new(10_000_000, Currency::Inr));
 /// ctx.submit(OrderIntent::market_buy(id.clone(), 75.0));
 /// assert!(ctx.busy(&id));
 /// assert_eq!(ctx.drain_intents().len(), 1);
 /// ```
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct LedgerContext {
     now: UnixNanos,
-    cash: f64,
+    cash: Money,
+    currency: Currency,
     positions: BTreeMap<InstrumentId, f64>,
     pending: BTreeMap<InstrumentId, Pending>,
     instruments: BTreeMap<InstrumentId, Instrument>,
     outbox: Vec<OrderIntent>,
 }
 
+impl Default for LedgerContext {
+    fn default() -> Self {
+        Self {
+            now: UnixNanos::from_u64(0),
+            cash: Money::zero(Currency::Inr),
+            currency: Currency::Inr,
+            positions: Default::default(),
+            pending: Default::default(),
+            instruments: Default::default(),
+            outbox: Default::default(),
+        }
+    }
+}
+
 impl LedgerContext {
-    /// An empty ledger with zero cash.
+    /// An empty ledger with zero cash, in the given currency.
     pub fn new() -> Self {
         Self::default()
     }
 
     /// An empty ledger starting with `cash`.
-    pub fn with_cash(cash: f64) -> Self {
+    pub fn with_cash(cash: Money) -> Self {
         Self {
+            currency: cash.currency(),
             cash,
             ..Self::default()
         }
+    }
+
+    /// The currency this ledger settles in.
+    pub fn currency(&self) -> Currency {
+        self.currency
     }
 
     /// Sets the clock to the `ts_init` of the event about to be processed.
@@ -107,22 +129,32 @@ impl LedgerContext {
         std::mem::take(&mut self.outbox)
     }
 
-    /// Books a fill: position, cash (`quantity * price` and costs) and the
-    /// pending quantity of the instrument.
+    /// Books a fill: position, cash (notional plus costs) and the pending
+    /// quantity of the instrument. The notional rounds to minor units once, at
+    /// the point of booking (ADR 0011), so cash accumulates integers.
     pub fn apply_fill(&mut self, fill: &Trade) {
-        let (qty, px, costs) = (fill.quantity(), fill.price(), fill.costs());
-        let position = self
+        let entry = self
             .positions
             .entry(fill.instrument_id().clone())
             .or_insert(0.0);
+        let notional = Money::mul_qty(fill.quantity(), fill.price(), self.currency);
         if fill.side() == OrderSide::Buy {
-            *position += qty;
-            self.cash -= qty * px + costs;
+            *entry += fill.quantity();
+            let debit = notional
+                .and_then(|n| (n + fill.costs()).map_err(|_| honba_entities::MoneyError::InvalidQuantity.into()));
+            if let Ok(debit) = debit {
+                self.cash = (self.cash - debit).unwrap_or(self.cash);
+            }
         } else {
-            *position -= qty;
-            self.cash += qty * px - costs;
+            *entry -= fill.quantity();
+            let credit = notional.and_then(|n| {
+                (n - fill.costs()).map_err(|_| honba_entities::MoneyError::InvalidQuantity.into())
+            });
+            if let Ok(credit) = credit {
+                self.cash = (self.cash + credit).unwrap_or(self.cash);
+            }
         }
-        self.reduce_pending(fill.instrument_id(), fill.side(), qty);
+        self.reduce_pending(fill.instrument_id(), fill.side(), fill.quantity());
     }
 
     /// An intent was rejected or its order cancelled unfilled: it no longer
@@ -171,7 +203,7 @@ impl StrategyContext for LedgerContext {
             .collect()
     }
 
-    fn cash(&self) -> f64 {
+    fn cash(&self) -> Money {
         self.cash
     }
 

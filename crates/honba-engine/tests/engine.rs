@@ -258,6 +258,7 @@ impl ExecutionEngine for SpySink {
             order.side(),
             order.quantity(),
             self.fill_price,
+            honba_entities::Currency::Inr,
             order.ts_event(),
             order.ts_init(),
         );

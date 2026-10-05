@@ -4,7 +4,7 @@
 use std::sync::{Arc, Mutex};
 
 use honba_engine::{ExecutionEngine, Handler, Result};
-use honba_entities::Trade;
+use honba_entities::{Currency, Money, Trade};
 use honba_messages::{Bar, Event, InstrumentId, Order, OrderSide, QuoteTick, TradeTick, UnixNanos};
 use honba_strategy::{LedgerContext, OrderIntent, Strategy, StrategyContext, StrategyRunner};
 use honba_testing::fixtures::{any_instrument, instrument};
@@ -137,8 +137,8 @@ fn hooks_dispatch_by_event_type_with_the_clock_at_ts_init() {
 fn runner_uses_the_given_context() {
     let (s, _) = Recorder::new(vec![]);
     let runner =
-        StrategyRunner::with_context(s, FakeExecution::default(), LedgerContext::with_cash(5.0));
-    assert_eq!(runner.context().cash(), 5.0);
+        StrategyRunner::with_context(s, FakeExecution::default(), LedgerContext::with_cash(Money::from_major_f64(5.0, Currency::Inr).unwrap()));
+    assert_eq!(runner.context().cash().minor(), 500);
 }
 
 #[test]
@@ -187,13 +187,14 @@ fn fills_update_the_context_before_on_fill_and_on_fill_intents_wait_for_the_next
         OrderSide::Buy,
         2.0,
         10.0,
+        Currency::Inr,
         UnixNanos::from_u64(5),
         UnixNanos::from_u64(5),
     );
     ex.fills.lock().unwrap().push(fill.clone());
     send(&mut runner, bar_event(10.0, 5), 5);
     assert_eq!(runner.context().position(&x()), 2.0);
-    assert_eq!(runner.context().cash(), -20.0);
+    assert_eq!(runner.context().cash().minor(), -2000);
     assert_eq!(ex.orders.lock().unwrap().len(), 1, "protect not yet sent");
     send(&mut runner, bar_event(10.0, 6), 6);
     let orders = ex.orders.lock().unwrap();
@@ -259,17 +260,18 @@ fn fill_costs_reach_the_context_cash_through_the_runner() {
     let ex = FakeExecution::default();
     let mut runner = StrategyRunner::new(s, ex.clone());
     runner.on_start().unwrap();
-    let fill = |side, price, ts: u64, id: &str, costs| {
+    let fill = |side, price, ts: u64, id: &str, costs: f64| {
         Trade::new(
             id.into(),
             x(),
             side,
             2.0,
             price,
+            Currency::Inr,
             UnixNanos::from_u64(ts),
             UnixNanos::from_u64(ts),
         )
-        .with_costs(costs)
+        .with_costs(Money::from_major_f64(costs, Currency::Inr).unwrap())
     };
     ex.fills
         .lock()
@@ -277,7 +279,7 @@ fn fill_costs_reach_the_context_cash_through_the_runner() {
         .push(fill(OrderSide::Buy, 10.0, 5, "rec-0", 1.5));
     send(&mut runner, bar_event(10.0, 5), 5);
     // A buy debits the cost on top of the notional.
-    assert_eq!(runner.context().cash(), -(2.0 * 10.0 + 1.5));
+    assert_eq!(runner.context().cash().minor(), -2150);
     ex.fills
         .lock()
         .unwrap()
@@ -289,5 +291,5 @@ fn fill_costs_reach_the_context_cash_through_the_runner() {
     );
     assert_eq!(runner.context().position(&x()), 0.0);
     // A sell credits the notional minus the cost.
-    assert_eq!(runner.context().cash(), -21.5 + (2.0 * 11.0 - 2.0));
+    assert_eq!(runner.context().cash().minor(), -150);
 }

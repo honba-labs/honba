@@ -33,4 +33,8 @@ pub enum EntitiesError {
     /// A screener predicate's value does not fit its operator.
     #[error("invalid screener predicate: {0}")]
     InvalidPredicate(String),
+
+    /// A money value or operation was invalid (non-finite, overflow).
+    #[error("invalid money: {0}")]
+    InvalidMoney(String),
 }

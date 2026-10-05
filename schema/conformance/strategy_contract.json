@@ -48,10 +48,19 @@
             "low": 99.0,
             "close": 100.0,
             "volume": 1000.0,
-            "ts_event": 1000,
-            "ts_init": 1000
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000001000Z",
+              "unix_nanos": "1000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000001000Z",
+              "unix_nanos": "1000"
+            }
           },
-          "ts_init": 1000
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000001000Z",
+            "unix_nanos": "1000"
+          }
         },
         {
           "schema_version": 2,
@@ -65,10 +74,19 @@
             "ask_price": 101.0,
             "bid_size": 50.0,
             "ask_size": 75.0,
-            "ts_event": 2000,
-            "ts_init": 2000
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000002000Z",
+              "unix_nanos": "2000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000002000Z",
+              "unix_nanos": "2000"
+            }
           },
-          "ts_init": 2000
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000002000Z",
+            "unix_nanos": "2000"
+          }
         },
         {
           "schema_version": 2,
@@ -82,10 +100,19 @@
             "size": 10.0,
             "aggressor_side": "buyer",
             "trade_id": "T-1",
-            "ts_event": 3000,
-            "ts_init": 3000
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000003000Z",
+              "unix_nanos": "3000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000003000Z",
+              "unix_nanos": "3000"
+            }
           },
-          "ts_init": 3000
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000003000Z",
+            "unix_nanos": "3000"
+          }
         },
         {
           "schema_version": 2,
@@ -107,10 +134,19 @@
             "low": 100.0,
             "close": 102.0,
             "volume": 1000.0,
-            "ts_event": 4000,
-            "ts_init": 4005
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000004000Z",
+              "unix_nanos": "4000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000000Z",
+              "unix_nanos": "4005"
+            }
           },
-          "ts_init": 4005
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000000000Z",
+            "unix_nanos": "4005"
+          }
         },
         {
           "schema_version": 2,
@@ -124,10 +160,19 @@
             "ask_price": 102.5,
             "bid_size": 50.0,
             "ask_size": 75.0,
-            "ts_event": 5000,
-            "ts_init": 5000
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000005000Z",
+              "unix_nanos": "5000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000005000Z",
+              "unix_nanos": "5000"
+            }
           },
-          "ts_init": 5000
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000005000Z",
+            "unix_nanos": "5000"
+          }
         },
         {
           "schema_version": 2,
@@ -141,10 +186,19 @@
             "size": 5.0,
             "aggressor_side": "seller",
             "trade_id": "T-2",
-            "ts_event": 6000,
-            "ts_init": 6000
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000006000Z",
+              "unix_nanos": "6000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000006000Z",
+              "unix_nanos": "6000"
+            }
           },
-          "ts_init": 6000
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000006000Z",
+            "unix_nanos": "6000"
+          }
         },
         {
           "schema_version": 2,
@@ -158,10 +212,19 @@
             "size": 5.0,
             "aggressor_side": "buyer",
             "trade_id": "T-3",
-            "ts_event": 7000,
-            "ts_init": 7000
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000007000Z",
+              "unix_nanos": "7000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000007000Z",
+              "unix_nanos": "7000"
+            }
           },
-          "ts_init": 7000
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000007000Z",
+            "unix_nanos": "7000"
+          }
         },
         {
           "schema_version": 2,
@@ -183,10 +246,19 @@
             "low": 100.5,
             "close": 101.0,
             "volume": 1000.0,
-            "ts_event": 8000,
-            "ts_init": 8000
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000008000Z",
+              "unix_nanos": "8000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000008000Z",
+              "unix_nanos": "8000"
+            }
           },
-          "ts_init": 8000
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000008000Z",
+            "unix_nanos": "8000"
+          }
         },
         {
           "schema_version": 2,
@@ -208,10 +280,19 @@
             "low": 100.0,
             "close": 100.5,
             "volume": 1000.0,
-            "ts_event": 9000,
-            "ts_init": 9000
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000009000Z",
+              "unix_nanos": "9000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000009000Z",
+              "unix_nanos": "9000"
+            }
           },
-          "ts_init": 9000
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000009000Z",
+            "unix_nanos": "9000"
+          }
         },
         {
           "schema_version": 2,
@@ -233,16 +314,28 @@
             "low": 99.5,
             "close": 100.0,
             "volume": 1000.0,
-            "ts_event": 10000,
-            "ts_init": 10000
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000010000Z",
+              "unix_nanos": "10000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000010000Z",
+              "unix_nanos": "10000"
+            }
           },
-          "ts_init": 10000
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000010000Z",
+            "unix_nanos": "10000"
+          }
         }
       ],
       "expected": {
         "intents": [
           {
-            "ts_init": 1000,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000001000Z",
+              "unix_nanos": "1000"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "NIFTY50",
@@ -257,7 +350,10 @@
             }
           },
           {
-            "ts_init": 2000,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000002000Z",
+              "unix_nanos": "2000"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "NIFTY50",
@@ -272,7 +368,10 @@
             }
           },
           {
-            "ts_init": 3000,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000003000Z",
+              "unix_nanos": "3000"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "NIFTY50",
@@ -287,7 +386,10 @@
             }
           },
           {
-            "ts_init": 5000,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000005000Z",
+              "unix_nanos": "5000"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "NIFTY50",
@@ -302,7 +404,10 @@
             }
           },
           {
-            "ts_init": 6000,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000006000Z",
+              "unix_nanos": "6000"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "NIFTY50",
@@ -317,7 +422,10 @@
             }
           },
           {
-            "ts_init": 7000,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000007000Z",
+              "unix_nanos": "7000"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "NIFTY50",
@@ -332,7 +440,10 @@
             }
           },
           {
-            "ts_init": 8000,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000008000Z",
+              "unix_nanos": "8000"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "NIFTY50",
@@ -347,7 +458,10 @@
             }
           },
           {
-            "ts_init": 9000,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000009000Z",
+              "unix_nanos": "9000"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "NIFTY50",
@@ -362,7 +476,10 @@
             }
           },
           {
-            "ts_init": 10000,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000010000Z",
+              "unix_nanos": "10000"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "NIFTY50",
@@ -387,9 +504,18 @@
             "side": "buy",
             "quantity": 75.0,
             "price": 100.0,
-            "costs": 0.0,
-            "ts_event": 1000,
-            "ts_init": 1000
+            "costs": {
+              "amount": 0,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000001000Z",
+              "unix_nanos": "1000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000001000Z",
+              "unix_nanos": "1000"
+            }
           },
           {
             "order_id": "contract_probe-1",
@@ -400,9 +526,18 @@
             "side": "sell",
             "quantity": 75.0,
             "price": 100.0,
-            "costs": 0.0,
-            "ts_event": 2000,
-            "ts_init": 2000
+            "costs": {
+              "amount": 0,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000002000Z",
+              "unix_nanos": "2000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000002000Z",
+              "unix_nanos": "2000"
+            }
           },
           {
             "order_id": "contract_probe-2",
@@ -413,9 +548,18 @@
             "side": "buy",
             "quantity": 75.0,
             "price": 100.0,
-            "costs": 0.0,
-            "ts_event": 3000,
-            "ts_init": 3000
+            "costs": {
+              "amount": 0,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000003000Z",
+              "unix_nanos": "3000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000003000Z",
+              "unix_nanos": "3000"
+            }
           },
           {
             "order_id": "contract_probe-3",
@@ -426,9 +570,18 @@
             "side": "sell",
             "quantity": 75.0,
             "price": 102.0,
-            "costs": 0.0,
-            "ts_event": 5000,
-            "ts_init": 5000
+            "costs": {
+              "amount": 0,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000005000Z",
+              "unix_nanos": "5000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000005000Z",
+              "unix_nanos": "5000"
+            }
           },
           {
             "order_id": "contract_probe-4",
@@ -439,9 +592,18 @@
             "side": "buy",
             "quantity": 75.0,
             "price": 102.0,
-            "costs": 0.0,
-            "ts_event": 6000,
-            "ts_init": 6000
+            "costs": {
+              "amount": 0,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000006000Z",
+              "unix_nanos": "6000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000006000Z",
+              "unix_nanos": "6000"
+            }
           },
           {
             "order_id": "contract_probe-5",
@@ -452,9 +614,18 @@
             "side": "sell",
             "quantity": 75.0,
             "price": 102.0,
-            "costs": 0.0,
-            "ts_event": 7000,
-            "ts_init": 7000
+            "costs": {
+              "amount": 0,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000007000Z",
+              "unix_nanos": "7000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000007000Z",
+              "unix_nanos": "7000"
+            }
           },
           {
             "order_id": "contract_probe-6",
@@ -465,9 +636,18 @@
             "side": "buy",
             "quantity": 75.0,
             "price": 101.0,
-            "costs": 0.0,
-            "ts_event": 8000,
-            "ts_init": 8000
+            "costs": {
+              "amount": 0,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000008000Z",
+              "unix_nanos": "8000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000008000Z",
+              "unix_nanos": "8000"
+            }
           },
           {
             "order_id": "contract_probe-7",
@@ -478,9 +658,18 @@
             "side": "sell",
             "quantity": 75.0,
             "price": 100.5,
-            "costs": 0.0,
-            "ts_event": 9000,
-            "ts_init": 9000
+            "costs": {
+              "amount": 0,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000009000Z",
+              "unix_nanos": "9000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000009000Z",
+              "unix_nanos": "9000"
+            }
           },
           {
             "order_id": "contract_probe-8",
@@ -491,177 +680,312 @@
             "side": "buy",
             "quantity": 75.0,
             "price": 100.0,
-            "costs": 0.0,
-            "ts_event": 10000,
-            "ts_init": 10000
+            "costs": {
+              "amount": 0,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000010000Z",
+              "unix_nanos": "10000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000010000Z",
+              "unix_nanos": "10000"
+            }
           }
         ],
         "observations": [
           {
             "hook": "on_start",
-            "now": 0,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000000Z",
+              "unix_nanos": "0"
+            },
             "position": 0.0,
-            "cash": 1000000.0,
+            "cash": {
+              "amount": 100000000,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 0
           },
           {
             "hook": "on_bar",
-            "now": 1000,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000001000Z",
+              "unix_nanos": "1000"
+            },
             "position": 0.0,
-            "cash": 1000000.0,
+            "cash": {
+              "amount": 100000000,
+              "currency": "INR"
+            },
             "busy": true,
             "open_positions": 0
           },
           {
             "hook": "on_fill",
-            "now": 1000,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000001000Z",
+              "unix_nanos": "1000"
+            },
             "position": 75.0,
-            "cash": 992500.0,
+            "cash": {
+              "amount": 99250000,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 1
           },
           {
             "hook": "on_quote",
-            "now": 2000,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000002000Z",
+              "unix_nanos": "2000"
+            },
             "position": 75.0,
-            "cash": 992500.0,
+            "cash": {
+              "amount": 99250000,
+              "currency": "INR"
+            },
             "busy": true,
             "open_positions": 1
           },
           {
             "hook": "on_fill",
-            "now": 2000,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000002000Z",
+              "unix_nanos": "2000"
+            },
             "position": 0.0,
-            "cash": 1000000.0,
+            "cash": {
+              "amount": 100000000,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 0
           },
           {
             "hook": "on_trade",
-            "now": 3000,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000003000Z",
+              "unix_nanos": "3000"
+            },
             "position": 0.0,
-            "cash": 1000000.0,
+            "cash": {
+              "amount": 100000000,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 0
           },
           {
             "hook": "on_fill",
-            "now": 3000,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000003000Z",
+              "unix_nanos": "3000"
+            },
             "position": 75.0,
-            "cash": 992500.0,
+            "cash": {
+              "amount": 99250000,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 1
           },
           {
             "hook": "on_bar",
-            "now": 4005,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000004005Z",
+              "unix_nanos": "4005"
+            },
             "position": 75.0,
-            "cash": 992500.0,
+            "cash": {
+              "amount": 99250000,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 1
           },
           {
             "hook": "on_quote",
-            "now": 5000,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000005000Z",
+              "unix_nanos": "5000"
+            },
             "position": 75.0,
-            "cash": 992500.0,
+            "cash": {
+              "amount": 99250000,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 1
           },
           {
             "hook": "on_fill",
-            "now": 5000,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000005000Z",
+              "unix_nanos": "5000"
+            },
             "position": 0.0,
-            "cash": 1000150.0,
+            "cash": {
+              "amount": 100015000,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 0
           },
           {
             "hook": "on_trade",
-            "now": 6000,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000006000Z",
+              "unix_nanos": "6000"
+            },
             "position": 0.0,
-            "cash": 1000150.0,
+            "cash": {
+              "amount": 100015000,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 0
           },
           {
             "hook": "on_fill",
-            "now": 6000,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000006000Z",
+              "unix_nanos": "6000"
+            },
             "position": 75.0,
-            "cash": 992500.0,
+            "cash": {
+              "amount": 99250000,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 1
           },
           {
             "hook": "on_trade",
-            "now": 7000,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000007000Z",
+              "unix_nanos": "7000"
+            },
             "position": 75.0,
-            "cash": 992500.0,
+            "cash": {
+              "amount": 99250000,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 1
           },
           {
             "hook": "on_fill",
-            "now": 7000,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000007000Z",
+              "unix_nanos": "7000"
+            },
             "position": 0.0,
-            "cash": 1000150.0,
+            "cash": {
+              "amount": 100015000,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 0
           },
           {
             "hook": "on_bar",
-            "now": 8000,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000008000Z",
+              "unix_nanos": "8000"
+            },
             "position": 0.0,
-            "cash": 1000150.0,
+            "cash": {
+              "amount": 100015000,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 0
           },
           {
             "hook": "on_fill",
-            "now": 8000,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000008000Z",
+              "unix_nanos": "8000"
+            },
             "position": 75.0,
-            "cash": 992575.0,
+            "cash": {
+              "amount": 99257500,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 1
           },
           {
             "hook": "on_bar",
-            "now": 9000,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000009000Z",
+              "unix_nanos": "9000"
+            },
             "position": 75.0,
-            "cash": 992575.0,
+            "cash": {
+              "amount": 99257500,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 1
           },
           {
             "hook": "on_fill",
-            "now": 9000,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000009000Z",
+              "unix_nanos": "9000"
+            },
             "position": 0.0,
-            "cash": 1000112.5,
+            "cash": {
+              "amount": 100011250,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 0
           },
           {
             "hook": "on_bar",
-            "now": 10000,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000010000Z",
+              "unix_nanos": "10000"
+            },
             "position": 0.0,
-            "cash": 1000112.5,
+            "cash": {
+              "amount": 100011250,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 0
           },
           {
             "hook": "on_fill",
-            "now": 10000,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000010000Z",
+              "unix_nanos": "10000"
+            },
             "position": 75.0,
-            "cash": 992612.5,
+            "cash": {
+              "amount": 99261250,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 1
           },
           {
             "hook": "on_stop",
-            "now": 10000,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000010000Z",
+              "unix_nanos": "10000"
+            },
             "position": 75.0,
-            "cash": 992612.5,
+            "cash": {
+              "amount": 99261250,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 1
           }
@@ -675,7 +999,10 @@
             "quantity": 75.0
           }
         ],
-        "cash": 992612.5
+        "cash": {
+          "amount": 99261250,
+          "currency": "INR"
+        }
       }
     },
     {
@@ -711,10 +1038,19 @@
             "low": 50.0,
             "close": 50.0,
             "volume": 1000.0,
-            "ts_event": 100,
-            "ts_init": 100
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            }
           },
-          "ts_init": 100
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000000100Z",
+            "unix_nanos": "100"
+          }
         },
         {
           "schema_version": 2,
@@ -728,10 +1064,19 @@
             "size": 1.0,
             "aggressor_side": "no_aggressor",
             "trade_id": "T-7",
-            "ts_event": 200,
-            "ts_init": 200
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000000200Z",
+              "unix_nanos": "200"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000200Z",
+              "unix_nanos": "200"
+            }
           },
-          "ts_init": 200
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000000200Z",
+            "unix_nanos": "200"
+          }
         },
         {
           "schema_version": 2,
@@ -753,16 +1098,28 @@
             "low": 49.0,
             "close": 49.0,
             "volume": 1000.0,
-            "ts_event": 300,
-            "ts_init": 300
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000000300Z",
+              "unix_nanos": "300"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000300Z",
+              "unix_nanos": "300"
+            }
           },
-          "ts_init": 300
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000000300Z",
+            "unix_nanos": "300"
+          }
         }
       ],
       "expected": {
         "intents": [
           {
-            "ts_init": 100,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "ACME",
@@ -777,7 +1134,10 @@
             }
           },
           {
-            "ts_init": 200,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000200Z",
+              "unix_nanos": "200"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "ACME",
@@ -792,7 +1152,10 @@
             }
           },
           {
-            "ts_init": 300,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000300Z",
+              "unix_nanos": "300"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "ACME",
@@ -817,9 +1180,18 @@
             "side": "buy",
             "quantity": 1.0,
             "price": 50.0,
-            "costs": 0.0,
-            "ts_event": 100,
-            "ts_init": 100
+            "costs": {
+              "amount": 0,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            }
           },
           {
             "order_id": "contract_probe-1",
@@ -830,9 +1202,18 @@
             "side": "sell",
             "quantity": 1.0,
             "price": 50.0,
-            "costs": 0.0,
-            "ts_event": 200,
-            "ts_init": 200
+            "costs": {
+              "amount": 0,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000000200Z",
+              "unix_nanos": "200"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000200Z",
+              "unix_nanos": "200"
+            }
           },
           {
             "order_id": "contract_probe-2",
@@ -843,73 +1224,130 @@
             "side": "buy",
             "quantity": 1.0,
             "price": 49.0,
-            "costs": 0.0,
-            "ts_event": 300,
-            "ts_init": 300
+            "costs": {
+              "amount": 0,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000000300Z",
+              "unix_nanos": "300"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000300Z",
+              "unix_nanos": "300"
+            }
           }
         ],
         "observations": [
           {
             "hook": "on_start",
-            "now": 0,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000000Z",
+              "unix_nanos": "0"
+            },
             "position": 0.0,
-            "cash": 0.0,
+            "cash": {
+              "amount": 0,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 0
           },
           {
             "hook": "on_bar",
-            "now": 100,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            },
             "position": 0.0,
-            "cash": 0.0,
+            "cash": {
+              "amount": 0,
+              "currency": "INR"
+            },
             "busy": true,
             "open_positions": 0
           },
           {
             "hook": "on_fill",
-            "now": 100,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            },
             "position": 1.0,
-            "cash": -50.0,
+            "cash": {
+              "amount": -5000,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 1
           },
           {
             "hook": "on_trade",
-            "now": 200,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000200Z",
+              "unix_nanos": "200"
+            },
             "position": 1.0,
-            "cash": -50.0,
+            "cash": {
+              "amount": -5000,
+              "currency": "INR"
+            },
             "busy": true,
             "open_positions": 1
           },
           {
             "hook": "on_fill",
-            "now": 200,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000200Z",
+              "unix_nanos": "200"
+            },
             "position": 0.0,
-            "cash": 0.0,
+            "cash": {
+              "amount": 0,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 0
           },
           {
             "hook": "on_bar",
-            "now": 300,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000300Z",
+              "unix_nanos": "300"
+            },
             "position": 0.0,
-            "cash": 0.0,
+            "cash": {
+              "amount": 0,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 0
           },
           {
             "hook": "on_fill",
-            "now": 300,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000300Z",
+              "unix_nanos": "300"
+            },
             "position": 1.0,
-            "cash": -49.0,
+            "cash": {
+              "amount": -4900,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 1
           },
           {
             "hook": "on_stop",
-            "now": 300,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000300Z",
+              "unix_nanos": "300"
+            },
             "position": 1.0,
-            "cash": -49.0,
+            "cash": {
+              "amount": -4900,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 1
           }
@@ -923,7 +1361,10 @@
             "quantity": 1.0
           }
         ],
-        "cash": -49.0
+        "cash": {
+          "amount": -4900,
+          "currency": "INR"
+        }
       }
     },
     {
@@ -960,10 +1401,19 @@
             "low": 2940.0,
             "close": 2950.0,
             "volume": 1000.0,
-            "ts_event": 1000,
-            "ts_init": 1000
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000001000Z",
+              "unix_nanos": "1000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000001000Z",
+              "unix_nanos": "1000"
+            }
           },
-          "ts_init": 1000
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000001000Z",
+            "unix_nanos": "1000"
+          }
         },
         {
           "schema_version": 2,
@@ -985,10 +1435,19 @@
             "low": 2950.0,
             "close": 2960.0,
             "volume": 1000.0,
-            "ts_event": 2000,
-            "ts_init": 2000
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000002000Z",
+              "unix_nanos": "2000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000002000Z",
+              "unix_nanos": "2000"
+            }
           },
-          "ts_init": 2000
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000002000Z",
+            "unix_nanos": "2000"
+          }
         },
         {
           "schema_version": 2,
@@ -1010,16 +1469,28 @@
             "low": 2935.0,
             "close": 2940.0,
             "volume": 1000.0,
-            "ts_event": 3000,
-            "ts_init": 3000
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000003000Z",
+              "unix_nanos": "3000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000003000Z",
+              "unix_nanos": "3000"
+            }
           },
-          "ts_init": 3000
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000003000Z",
+            "unix_nanos": "3000"
+          }
         }
       ],
       "expected": {
         "intents": [
           {
-            "ts_init": 1000,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000001000Z",
+              "unix_nanos": "1000"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "RELIANCE",
@@ -1044,9 +1515,18 @@
             "side": "buy",
             "quantity": 10.0,
             "price": 2950.0,
-            "costs": 0.0,
-            "ts_event": 1000,
-            "ts_init": 1000
+            "costs": {
+              "amount": 0,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000001000Z",
+              "unix_nanos": "1000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000001000Z",
+              "unix_nanos": "1000"
+            }
           }
         ],
         "observations": [],
@@ -1059,7 +1539,10 @@
             "quantity": 10.0
           }
         ],
-        "cash": -29500.0
+        "cash": {
+          "amount": -2950000,
+          "currency": "INR"
+        }
       }
     },
     {
@@ -1098,10 +1581,19 @@
             "low": 10.0,
             "close": 10.0,
             "volume": 1000.0,
-            "ts_event": 1000,
-            "ts_init": 1000
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000001000Z",
+              "unix_nanos": "1000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000001000Z",
+              "unix_nanos": "1000"
+            }
           },
-          "ts_init": 1000
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000001000Z",
+            "unix_nanos": "1000"
+          }
         },
         {
           "schema_version": 2,
@@ -1123,10 +1615,19 @@
             "low": 11.0,
             "close": 11.0,
             "volume": 1000.0,
-            "ts_event": 2000,
-            "ts_init": 2000
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000002000Z",
+              "unix_nanos": "2000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000002000Z",
+              "unix_nanos": "2000"
+            }
           },
-          "ts_init": 2000
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000002000Z",
+            "unix_nanos": "2000"
+          }
         },
         {
           "schema_version": 2,
@@ -1148,10 +1649,19 @@
             "low": 12.0,
             "close": 12.0,
             "volume": 1000.0,
-            "ts_event": 3000,
-            "ts_init": 3000
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000003000Z",
+              "unix_nanos": "3000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000003000Z",
+              "unix_nanos": "3000"
+            }
           },
-          "ts_init": 3000
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000003000Z",
+            "unix_nanos": "3000"
+          }
         },
         {
           "schema_version": 2,
@@ -1173,10 +1683,19 @@
             "low": 11.0,
             "close": 11.0,
             "volume": 1000.0,
-            "ts_event": 4000,
-            "ts_init": 4000
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000004000Z",
+              "unix_nanos": "4000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000004000Z",
+              "unix_nanos": "4000"
+            }
           },
-          "ts_init": 4000
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000004000Z",
+            "unix_nanos": "4000"
+          }
         },
         {
           "schema_version": 2,
@@ -1198,10 +1717,19 @@
             "low": 10.0,
             "close": 10.0,
             "volume": 1000.0,
-            "ts_event": 5000,
-            "ts_init": 5000
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000005000Z",
+              "unix_nanos": "5000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000005000Z",
+              "unix_nanos": "5000"
+            }
           },
-          "ts_init": 5000
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000005000Z",
+            "unix_nanos": "5000"
+          }
         },
         {
           "schema_version": 2,
@@ -1223,10 +1751,19 @@
             "low": 9.0,
             "close": 9.0,
             "volume": 1000.0,
-            "ts_event": 6000,
-            "ts_init": 6000
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000006000Z",
+              "unix_nanos": "6000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000006000Z",
+              "unix_nanos": "6000"
+            }
           },
-          "ts_init": 6000
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000006000Z",
+            "unix_nanos": "6000"
+          }
         },
         {
           "schema_version": 2,
@@ -1248,10 +1785,19 @@
             "low": 10.0,
             "close": 10.0,
             "volume": 1000.0,
-            "ts_event": 7000,
-            "ts_init": 7000
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000007000Z",
+              "unix_nanos": "7000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000007000Z",
+              "unix_nanos": "7000"
+            }
           },
-          "ts_init": 7000
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000007000Z",
+            "unix_nanos": "7000"
+          }
         },
         {
           "schema_version": 2,
@@ -1273,16 +1819,28 @@
             "low": 12.0,
             "close": 12.0,
             "volume": 1000.0,
-            "ts_event": 8000,
-            "ts_init": 8000
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000008000Z",
+              "unix_nanos": "8000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000008000Z",
+              "unix_nanos": "8000"
+            }
           },
-          "ts_init": 8000
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000008000Z",
+            "unix_nanos": "8000"
+          }
         }
       ],
       "expected": {
         "intents": [
           {
-            "ts_init": 5000,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000005000Z",
+              "unix_nanos": "5000"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "INFY",
@@ -1297,7 +1855,10 @@
             }
           },
           {
-            "ts_init": 8000,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000008000Z",
+              "unix_nanos": "8000"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "INFY",
@@ -1322,9 +1883,18 @@
             "side": "sell",
             "quantity": 5.0,
             "price": 10.0,
-            "costs": 0.0,
-            "ts_event": 5000,
-            "ts_init": 5000
+            "costs": {
+              "amount": 0,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000005000Z",
+              "unix_nanos": "5000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000005000Z",
+              "unix_nanos": "5000"
+            }
           },
           {
             "order_id": "sma_crossover-1",
@@ -1335,14 +1905,26 @@
             "side": "buy",
             "quantity": 5.0,
             "price": 12.0,
-            "costs": 0.0,
-            "ts_event": 8000,
-            "ts_init": 8000
+            "costs": {
+              "amount": 0,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000008000Z",
+              "unix_nanos": "8000"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000008000Z",
+              "unix_nanos": "8000"
+            }
           }
         ],
         "observations": [],
         "positions": [],
-        "cash": -10.0
+        "cash": {
+          "amount": -1000,
+          "currency": "INR"
+        }
       }
     },
     {
@@ -1378,10 +1960,19 @@
             "low": 50.0,
             "close": 50.0,
             "volume": 100.0,
-            "ts_event": 95,
-            "ts_init": 100
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000000095Z",
+              "unix_nanos": "95"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            }
           },
-          "ts_init": 100
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000000100Z",
+            "unix_nanos": "100"
+          }
         },
         {
           "schema_version": 2,
@@ -1395,10 +1986,19 @@
             "size": 1.0,
             "aggressor_side": "no_aggressor",
             "trade_id": "T-1",
-            "ts_event": 90,
-            "ts_init": 100
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000000090Z",
+              "unix_nanos": "90"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            }
           },
-          "ts_init": 100
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000000100Z",
+            "unix_nanos": "100"
+          }
         },
         {
           "schema_version": 2,
@@ -1412,16 +2012,28 @@
             "size": 1.0,
             "aggressor_side": "no_aggressor",
             "trade_id": "T-2",
-            "ts_event": 200,
-            "ts_init": 210
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000000200Z",
+              "unix_nanos": "200"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000210Z",
+              "unix_nanos": "210"
+            }
           },
-          "ts_init": 210
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000000210Z",
+            "unix_nanos": "210"
+          }
         }
       ],
       "expected": {
         "intents": [
           {
-            "ts_init": 100,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "ACME",
@@ -1436,7 +2048,10 @@
             }
           },
           {
-            "ts_init": 100,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "ACME",
@@ -1451,7 +2066,10 @@
             }
           },
           {
-            "ts_init": 210,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000210Z",
+              "unix_nanos": "210"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "ACME",
@@ -1476,9 +2094,18 @@
             "side": "buy",
             "quantity": 1.0,
             "price": 50.0,
-            "costs": 0.0,
-            "ts_event": 100,
-            "ts_init": 100
+            "costs": {
+              "amount": 0,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            }
           },
           {
             "order_id": "contract_probe-1",
@@ -1489,9 +2116,18 @@
             "side": "sell",
             "quantity": 1.0,
             "price": 50.0,
-            "costs": 0.0,
-            "ts_event": 101,
-            "ts_init": 101
+            "costs": {
+              "amount": 0,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000000101Z",
+              "unix_nanos": "101"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000101Z",
+              "unix_nanos": "101"
+            }
           },
           {
             "order_id": "contract_probe-2",
@@ -1502,73 +2138,130 @@
             "side": "buy",
             "quantity": 1.0,
             "price": 50.0,
-            "costs": 0.0,
-            "ts_event": 210,
-            "ts_init": 210
+            "costs": {
+              "amount": 0,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000000210Z",
+              "unix_nanos": "210"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000210Z",
+              "unix_nanos": "210"
+            }
           }
         ],
         "observations": [
           {
             "hook": "on_start",
-            "now": 0,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000000Z",
+              "unix_nanos": "0"
+            },
             "position": 0.0,
-            "cash": 1000.0,
+            "cash": {
+              "amount": 100000,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 0
           },
           {
             "hook": "on_bar",
-            "now": 100,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            },
             "position": 0.0,
-            "cash": 1000.0,
+            "cash": {
+              "amount": 100000,
+              "currency": "INR"
+            },
             "busy": true,
             "open_positions": 0
           },
           {
             "hook": "on_fill",
-            "now": 100,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            },
             "position": 1.0,
-            "cash": 950.0,
+            "cash": {
+              "amount": 95000,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 1
           },
           {
             "hook": "on_trade",
-            "now": 100,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            },
             "position": 1.0,
-            "cash": 950.0,
+            "cash": {
+              "amount": 95000,
+              "currency": "INR"
+            },
             "busy": true,
             "open_positions": 1
           },
           {
             "hook": "on_fill",
-            "now": 100,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            },
             "position": 0.0,
-            "cash": 1000.0,
+            "cash": {
+              "amount": 100000,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 0
           },
           {
             "hook": "on_trade",
-            "now": 210,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000210Z",
+              "unix_nanos": "210"
+            },
             "position": 0.0,
-            "cash": 1000.0,
+            "cash": {
+              "amount": 100000,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 0
           },
           {
             "hook": "on_fill",
-            "now": 210,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000210Z",
+              "unix_nanos": "210"
+            },
             "position": 1.0,
-            "cash": 950.0,
+            "cash": {
+              "amount": 95000,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 1
           },
           {
             "hook": "on_stop",
-            "now": 210,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000210Z",
+              "unix_nanos": "210"
+            },
             "position": 1.0,
-            "cash": 950.0,
+            "cash": {
+              "amount": 95000,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 1
           }
@@ -1582,7 +2275,10 @@
             "quantity": 1.0
           }
         ],
-        "cash": 950.0
+        "cash": {
+          "amount": 95000,
+          "currency": "INR"
+        }
       }
     },
     {
@@ -1618,10 +2314,19 @@
             "low": 64.0,
             "close": 64.0,
             "volume": 1000.0,
-            "ts_event": 100,
-            "ts_init": 100
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            }
           },
-          "ts_init": 100
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000000100Z",
+            "unix_nanos": "100"
+          }
         },
         {
           "schema_version": 2,
@@ -1635,10 +2340,19 @@
             "size": 1.0,
             "aggressor_side": "no_aggressor",
             "trade_id": "T-7",
-            "ts_event": 200,
-            "ts_init": 200
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000000200Z",
+              "unix_nanos": "200"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000200Z",
+              "unix_nanos": "200"
+            }
           },
-          "ts_init": 200
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000000200Z",
+            "unix_nanos": "200"
+          }
         },
         {
           "schema_version": 2,
@@ -1660,16 +2374,28 @@
             "low": 32.0,
             "close": 32.0,
             "volume": 1000.0,
-            "ts_event": 300,
-            "ts_init": 300
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000000300Z",
+              "unix_nanos": "300"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000300Z",
+              "unix_nanos": "300"
+            }
           },
-          "ts_init": 300
+          "ts_init": {
+            "iso": "1970-01-01T00:00:00.000000300Z",
+            "unix_nanos": "300"
+          }
         }
       ],
       "expected": {
         "intents": [
           {
-            "ts_init": 100,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "ACME",
@@ -1684,7 +2410,10 @@
             }
           },
           {
-            "ts_init": 200,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000200Z",
+              "unix_nanos": "200"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "ACME",
@@ -1699,7 +2428,10 @@
             }
           },
           {
-            "ts_init": 300,
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000300Z",
+              "unix_nanos": "300"
+            },
             "intent": {
               "instrument_id": {
                 "symbol": "ACME",
@@ -1724,9 +2456,18 @@
             "side": "buy",
             "quantity": 1.0,
             "price": 64.0,
-            "costs": 4.5,
-            "ts_event": 100,
-            "ts_init": 100
+            "costs": {
+              "amount": 450,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            }
           },
           {
             "order_id": "contract_probe-1",
@@ -1737,9 +2478,18 @@
             "side": "sell",
             "quantity": 1.0,
             "price": 64.0,
-            "costs": 4.5,
-            "ts_event": 200,
-            "ts_init": 200
+            "costs": {
+              "amount": 450,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000000200Z",
+              "unix_nanos": "200"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000200Z",
+              "unix_nanos": "200"
+            }
           },
           {
             "order_id": "contract_probe-2",
@@ -1750,73 +2500,130 @@
             "side": "buy",
             "quantity": 1.0,
             "price": 32.0,
-            "costs": 2.5,
-            "ts_event": 300,
-            "ts_init": 300
+            "costs": {
+              "amount": 250,
+              "currency": "INR"
+            },
+            "ts_event": {
+              "iso": "1970-01-01T00:00:00.000000300Z",
+              "unix_nanos": "300"
+            },
+            "ts_init": {
+              "iso": "1970-01-01T00:00:00.000000300Z",
+              "unix_nanos": "300"
+            }
           }
         ],
         "observations": [
           {
             "hook": "on_start",
-            "now": 0,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000000Z",
+              "unix_nanos": "0"
+            },
             "position": 0.0,
-            "cash": 0.0,
+            "cash": {
+              "amount": 0,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 0
           },
           {
             "hook": "on_bar",
-            "now": 100,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            },
             "position": 0.0,
-            "cash": 0.0,
+            "cash": {
+              "amount": 0,
+              "currency": "INR"
+            },
             "busy": true,
             "open_positions": 0
           },
           {
             "hook": "on_fill",
-            "now": 100,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000100Z",
+              "unix_nanos": "100"
+            },
             "position": 1.0,
-            "cash": -68.5,
+            "cash": {
+              "amount": -6850,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 1
           },
           {
             "hook": "on_trade",
-            "now": 200,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000200Z",
+              "unix_nanos": "200"
+            },
             "position": 1.0,
-            "cash": -68.5,
+            "cash": {
+              "amount": -6850,
+              "currency": "INR"
+            },
             "busy": true,
             "open_positions": 1
           },
           {
             "hook": "on_fill",
-            "now": 200,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000200Z",
+              "unix_nanos": "200"
+            },
             "position": 0.0,
-            "cash": -9.0,
+            "cash": {
+              "amount": -900,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 0
           },
           {
             "hook": "on_bar",
-            "now": 300,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000300Z",
+              "unix_nanos": "300"
+            },
             "position": 0.0,
-            "cash": -9.0,
+            "cash": {
+              "amount": -900,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 0
           },
           {
             "hook": "on_fill",
-            "now": 300,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000300Z",
+              "unix_nanos": "300"
+            },
             "position": 1.0,
-            "cash": -43.5,
+            "cash": {
+              "amount": -4350,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 1
           },
           {
             "hook": "on_stop",
-            "now": 300,
+            "now": {
+              "iso": "1970-01-01T00:00:00.000000300Z",
+              "unix_nanos": "300"
+            },
             "position": 1.0,
-            "cash": -43.5,
+            "cash": {
+              "amount": -4350,
+              "currency": "INR"
+            },
             "busy": false,
             "open_positions": 1
           }
@@ -1830,7 +2637,10 @@
             "quantity": 1.0
           }
         ],
-        "cash": -43.5
+        "cash": {
+          "amount": -4350,
+          "currency": "INR"
+        }
       },
       "fill_costs": {
         "flat": 0.5,

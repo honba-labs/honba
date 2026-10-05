@@ -34,7 +34,7 @@ fn run_strategy_matches_every_conformance_scenario() {
     }
 }
 
-const BAR: &str = r#"[{"schema_version": 2, "event": {"type": "bar", "bar_type": {"instrument_id": {"symbol": "RELIANCE", "exchange": "NSE"}, "spec": {"step": 1, "aggregation": "minute", "price_type": "last"}}, "open": 2945.0, "high": 2955.0, "low": 2940.0, "close": 2950.0, "volume": 1000.0, "ts_event": 1000, "ts_init": 1000}, "ts_init": 1000}]"#;
+const BAR: &str = r#"[{"schema_version": 2, "event": {"type": "bar", "bar_type": {"instrument_id": {"symbol": "RELIANCE", "exchange": "NSE"}, "spec": {"step": 1, "aggregation": "minute", "price_type": "last"}}, "open": 2945.0, "high": 2955.0, "low": 2940.0, "close": 2950.0, "volume": 1000.0, "ts_event": {"iso": "1970-01-01T00:00:00.000001000Z", "unix_nanos": "1000"}, "ts_init": {"iso": "1970-01-01T00:00:00.000001000Z", "unix_nanos": "1000"}}, "ts_init": {"iso": "1970-01-01T00:00:00.000001000Z", "unix_nanos": "1000"}}]"#;
 const BUY_AND_HOLD: &str =
     r#"{"instrument_id": {"symbol": "RELIANCE", "exchange": "NSE"}, "quantity": QTY}"#;
 
@@ -50,7 +50,7 @@ fn run_strategy_reports_rejected_intents() {
     assert_eq!(got["intents"], serde_json::json!([]));
     let rejections = got["rejections"].as_array().expect("rejections array");
     assert_eq!(rejections.len(), 1);
-    assert_eq!(rejections[0]["ts_init"], 1000);
+    assert_eq!(rejections[0]["ts_init"]["unix_nanos"], "1000");
     assert_eq!(rejections[0]["intent"]["quantity"], -1.0);
     assert_eq!(rejections[0]["error"]["kind"], "non_positive_quantity");
     assert_eq!(
@@ -73,9 +73,9 @@ fn run_strategy_costed_charges_costs_and_the_plain_entry_point_charges_none() {
     let out =
         run_strategy_costed_json("buy_and_hold", &params, BAR, "[]", 0.0, 5.0, 100.0).unwrap();
     let got: Value = serde_json::from_str(&out).unwrap();
-    assert_eq!(got["fills"][0]["costs"], 300.0);
-    assert_eq!(got["cash"], -29800.0);
-    assert_eq!(run_buy_and_hold("10.0")["fills"][0]["costs"], 0.0);
+    assert_eq!(got["fills"][0]["costs"]["amount"], 30000);
+    assert_eq!(got["cash"]["amount"], -2980000);
+    assert_eq!(run_buy_and_hold("10.0")["fills"][0]["costs"]["amount"], 0);
 }
 
 #[test]

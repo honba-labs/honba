@@ -190,6 +190,7 @@ impl ExecutionGateway for StubGateway {
                 order.side(),
                 order.quantity(),
                 100.0,
+                Currency::Inr,
                 UnixNanos::from_u64(2),
                 UnixNanos::from_u64(2),
             )

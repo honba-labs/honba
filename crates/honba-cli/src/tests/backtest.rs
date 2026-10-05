@@ -1,6 +1,6 @@
 //! Unit tests for the pure helpers in `crate::backtest`.
 
-use honba_entities::Trade;
+use honba_entities::{Currency, Money, Trade};
 use honba_messages::{Exchange, InstrumentId, OrderId, OrderSide, UnixNanos};
 
 use crate::backtest::{equity_curve, pair_fills, BacktestConfig};
@@ -16,6 +16,7 @@ fn fill(side: OrderSide, price: f64, ts: u64) -> Trade {
         side,
         1.0,
         price,
+        Currency::Inr,
         UnixNanos::from_u64(ts),
         UnixNanos::from_u64(ts),
     )

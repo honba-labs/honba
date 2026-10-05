@@ -1,6 +1,6 @@
 //! The `StrategyContext` port is object-safe and usable through `&mut dyn`.
 
-use honba_entities::Instrument;
+use honba_entities::{Currency, Instrument, Money};
 use honba_messages::{InstrumentId, UnixNanos};
 
 use super::any_instrument;
@@ -23,8 +23,8 @@ impl StrategyContext for FixedContext {
     fn positions(&self) -> Vec<(InstrumentId, f64)> {
         vec![(any_instrument(), 3.0)]
     }
-    fn cash(&self) -> f64 {
-        100.0
+    fn cash(&self) -> Money {
+        Money::new(10_000, Currency::Inr)
     }
     fn busy(&self, _instrument_id: &InstrumentId) -> bool {
         !self.submitted.is_empty()
@@ -54,5 +54,5 @@ fn a_custom_context_works_as_a_trait_object() {
     assert_eq!(view.now(), UnixNanos::from_u64(42));
     assert_eq!(view.position(&any_instrument()), 3.0);
     assert_eq!(view.positions(), vec![(any_instrument(), 3.0)]);
-    assert_eq!(view.cash(), 100.0);
+    assert_eq!(view.cash().minor(), 10000);
 }

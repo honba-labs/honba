@@ -1,7 +1,7 @@
 //! `LedgerContext`: the reference `StrategyContext` (ADR 008). Mirrors
 //! `python/tests/unit/test_ledger_context.py`.
 
-use honba_entities::{Currency, Instrument, InstrumentKind, Trade};
+use honba_entities::{Currency, Instrument, InstrumentKind, Money, Trade};
 use honba_messages::{Exchange, InstrumentId, OrderSide, UnixNanos};
 
 use crate::{LedgerContext, OrderIntent, StrategyContext};
@@ -17,10 +17,11 @@ fn fill(instrument_id: &InstrumentId, side: OrderSide, qty: f64, px: f64, costs:
         side,
         qty,
         px,
+        Currency::Inr,
         UnixNanos::from_u64(1),
         UnixNanos::from_u64(1),
     )
-    .with_costs(costs)
+    .with_costs(Money::from_major_f64(costs, Currency::Inr).unwrap())
 }
 
 #[test]
@@ -28,7 +29,7 @@ fn starts_empty() {
     let ctx = LedgerContext::new();
     let nifty = id("NIFTY50", "NSE");
     assert_eq!(ctx.now(), UnixNanos::from_u64(0));
-    assert_eq!(ctx.cash(), 0.0);
+    assert_eq!(ctx.cash().minor(), 0);
     assert!(ctx.positions().is_empty());
     assert_eq!(ctx.position(&nifty), 0.0);
     assert!(!ctx.busy(&nifty));
@@ -88,13 +89,13 @@ fn release_clears_pending_for_a_rejected_intent() {
 #[test]
 fn fills_move_position_and_cash_including_costs() {
     let nifty = id("NIFTY50", "NSE");
-    let mut ctx = LedgerContext::with_cash(1_000.0);
+    let mut ctx = LedgerContext::with_cash(Money::from_major_f64(1_000.0, Currency::Inr).unwrap());
     ctx.apply_fill(&fill(&nifty, OrderSide::Buy, 3.0, 100.0, 1.5));
     assert_eq!(ctx.position(&nifty), 3.0);
-    assert_eq!(ctx.cash(), 1_000.0 - (3.0 * 100.0 + 1.5));
+    assert_eq!(ctx.cash().minor(), 100_000 - 30_000 - 150);
     ctx.apply_fill(&fill(&nifty, OrderSide::Sell, 5.0, 110.0, 2.0));
     assert_eq!(ctx.position(&nifty), -2.0, "signed: short 2");
-    assert_eq!(ctx.cash(), 698.5 + (5.0 * 110.0 - 2.0));
+    assert_eq!(ctx.cash().minor(), 69_850 + 55_000 - 200);
 }
 
 #[test]

@@ -14,11 +14,11 @@ use crate::position::Position;
 /// use honba_entities::{Account, Currency, Money};
 /// use honba_messages::{InstrumentId, Exchange};
 ///
-/// let mut acct = Account::new("MAIN", Money::new(1_000_000.0, Currency::Inr));
-/// assert_eq!(acct.cash().amount(), 1_000_000.0);
+/// let mut acct = Account::new("MAIN", Money::new(100_000_000, Currency::Inr));
+/// assert_eq!(acct.cash().minor(), 100_000_000);
 ///
-/// acct.debit(Money::new(250_000.0, Currency::Inr)).unwrap();
-/// assert_eq!(acct.cash().amount(), 750_000.0);
+/// acct.debit(Money::new(25_000_000, Currency::Inr)).unwrap();
+/// assert_eq!(acct.cash().minor(), 75_000_000);
 /// ```
 #[derive(Clone, Debug)]
 pub struct Account {
@@ -94,7 +94,7 @@ impl Account {
 /// use honba_entities::{Account, Currency, Money, Portfolio};
 ///
 /// let mut p = Portfolio::new();
-/// p.add_account(Account::new("MAIN", Money::new(500_000.0, Currency::Inr)));
+/// p.add_account(Account::new("MAIN", Money::new(50_000_000, Currency::Inr)));
 /// assert!(p.account("MAIN").is_some());
 /// ```
 #[derive(Clone, Debug, Default)]
