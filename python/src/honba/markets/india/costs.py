@@ -21,6 +21,8 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 
+from honba.domain.money import Currency, Money
+
 if TYPE_CHECKING:
     from honba.domain.order import OrderSide
 else:
@@ -203,3 +205,33 @@ def cost_for_segment(
         return nse_equity_intraday_cost(side, quantity, price)
     # F&O schedules can be added later; return 0 for now so callers don't break
     return 0.0
+
+
+def _fill_cost_money(legs: CostBreakdown) -> Money:
+    # Each leg is rounded to paise once, then summed (ADR 0011): a total a contract note can show.
+    total = Money.zero(Currency.INR)
+    for leg in (
+        legs.brokerage,
+        legs.stt,
+        legs.exchange,
+        legs.sebi,
+        legs.ipft,
+        legs.stamp_duty,
+        legs.gst,
+    ):
+        total = total + Money.from_major(leg, Currency.INR)
+    return total
+
+
+def nse_equity_delivery_fill_cost(side: OrderSide, quantity: float, price: float) -> Money:
+    """NSE equity delivery (CNC) cost of one fill as INR ``Money``, each leg rounded once.
+
+    The ``(side, quantity, price) -> Money`` shape is the simulator's fill-cost function
+    (``honba.backtest.simulated.FillCostFn``).
+    """
+    return _fill_cost_money(nse_equity_delivery_breakdown(side, quantity, price))
+
+
+def nse_equity_intraday_fill_cost(side: OrderSide, quantity: float, price: float) -> Money:
+    """NSE equity intraday (MIS) cost of one fill as INR ``Money``, each leg rounded once."""
+    return _fill_cost_money(nse_equity_intraday_breakdown(side, quantity, price))

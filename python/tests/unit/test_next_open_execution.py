@@ -1,0 +1,290 @@
+"""``honba.backtest.simulated.NextOpenExecution``: the multi-instrument next-open simulator.
+
+Port-level rules (no runner): next-session-open timing, sells before buys, integer
+``Money`` cash, T+N availability of sale proceeds, funding cuts, long-only caps, and
+the reject/cancel path. The runner-level flow is in
+``tests/integration/test_backtest_next_open.py``.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from honba.backtest.simulated import (
+    NextOpenExecution,
+    SessionOpen,
+    group_sessions,
+    make_simulator,
+    resolve_fill_costs,
+    zero_costs,
+)
+from honba.domain.money import Currency, Money
+from honba.entities.bar import Bar
+from honba.entities.instrument import InstrumentId
+from honba.entities.order import OrderIntent, OrderSide
+from honba.markets.india.costs import (
+    nse_equity_delivery_breakdown,
+    nse_equity_delivery_fill_cost,
+)
+from honba.strategies.testing import BarCloseFills
+
+A = InstrumentId("AAA", "NSE")
+B = InstrumentId("BBB", "NSE")
+INR = Currency.INR
+
+
+def rupees(x: float) -> Money:
+    return Money.from_major(x, INR)
+
+
+def bar(iid: InstrumentId, ts: int, open_: float, close: float | None = None) -> Bar:
+    c = open_ if close is None else close
+    return Bar(iid, ts, open_, max(open_, c), min(open_, c), c, 1_000.0)
+
+
+def port(cash: float = 10_000.0, **kw) -> NextOpenExecution:
+    return NextOpenExecution(cash=rupees(cash), **kw)
+
+
+def test_an_order_fills_at_the_next_session_open_never_the_decision_close() -> None:
+    p = port()
+    p.open_session(1, [bar(A, 1, 100.0, close=105.0)])
+    p.submit("o-0", OrderIntent.market_buy(A, 10), 1)
+    assert p.drain_fills() == []  # not at the decision bar
+    p.open_session(2, [bar(A, 2, 110.0, close=120.0)])
+    (fill,) = p.drain_fills()
+    assert (fill.order_id, fill.price, fill.ts, fill.quantity) == ("o-0", 110.0, 2, 10)
+    assert p.cash == rupees(10_000.0 - 1_100.0)
+    assert p.positions == {A: 10}
+
+
+def test_an_order_waits_for_its_instrument_to_print() -> None:
+    p = port()
+    p.open_session(1, [bar(A, 1, 100.0)])
+    p.submit("o-0", OrderIntent.market_buy(B, 1), 1)
+    p.open_session(2, [bar(A, 2, 100.0)])  # B does not print
+    assert p.drain_fills() == []
+    p.open_session(3, [bar(B, 3, 50.0)])
+    assert [f.price for f in p.drain_fills()] == [50.0]
+
+
+def test_sells_fill_before_buys_within_a_session() -> None:
+    p = port(cash=1_000.0, settlement_days=0)
+    p.open_session(1, [bar(A, 1, 100.0), bar(B, 1, 100.0)])
+    p.submit("o-0", OrderIntent.market_buy(A, 10), 1)
+    p.open_session(2, [bar(A, 2, 100.0), bar(B, 2, 100.0)])
+    p.drain_fills()
+    # Rotate A -> B with no spare cash: the buy is listed first but the sell funds it.
+    p.submit("o-1", OrderIntent.market_buy(B, 10), 2)
+    p.submit("o-2", OrderIntent.market_sell(A, 10), 2)
+    p.open_session(3, [bar(A, 3, 100.0), bar(B, 3, 100.0)])
+    assert [(f.order_id, f.side) for f in p.drain_fills()] == [
+        ("o-2", OrderSide.SELL),
+        ("o-1", OrderSide.BUY),
+    ]
+    assert p.positions == {B: 10}
+
+
+def test_sale_proceeds_settle_after_settlement_days_sessions() -> None:
+    p = port(cash=0.0, settlement_days=2)
+    p.positions[A] = 10.0  # seeded holding
+    p.open_session(1, [bar(A, 1, 100.0)])
+    p.submit("s", OrderIntent.market_sell(A, 10), 1)
+    p.open_session(2, [bar(A, 2, 100.0)])
+    assert p.cash == rupees(1_000.0)
+    assert p.available_cash == Money.zero(INR)
+    p.open_session(3, [bar(A, 3, 100.0)])
+    assert p.available_cash == Money.zero(INR)
+    p.open_session(4, [bar(A, 4, 100.0)])
+    assert p.available_cash == rupees(1_000.0)
+
+
+def test_an_unfunded_buy_waits_for_settlement_then_is_cut_and_the_rest_rejected() -> None:
+    p = port(cash=250.0, settlement_days=1)
+    p.open_session(1, [bar(A, 1, 100.0)])
+    p.submit("b", OrderIntent.market_buy(A, 5), 1)
+    p.open_session(2, [bar(A, 2, 100.0)])  # first try: waits one session
+    assert p.drain_fills() == [] and p.drain_rejections() == []
+    p.open_session(3, [bar(A, 3, 100.0)])  # still short: cut to 2 shares
+    (fill,) = p.drain_fills()
+    (rej,) = p.drain_rejections()
+    assert fill.quantity == 2
+    assert (rej.order_id, rej.intent.quantity, rej.reason, rej.cancelled) == (
+        "b",
+        3,
+        "insufficient_funds",
+        False,
+    )
+    assert p.cash == rupees(50.0)
+
+
+def test_with_t0_settlement_an_unfunded_buy_is_cut_at_once() -> None:
+    p = port(cash=150.0, settlement_days=0)
+    p.open_session(1, [bar(A, 1, 100.0)])
+    p.submit("b", OrderIntent.market_buy(A, 3), 1)
+    p.open_session(2, [bar(A, 2, 100.0)])
+    assert [f.quantity for f in p.drain_fills()] == [1]
+    assert [r.intent.quantity for r in p.drain_rejections()] == [2]
+
+
+def test_long_only_caps_a_sell_at_the_position_held() -> None:
+    p = port()
+    p.positions[A] = 4.0
+    p.open_session(1, [bar(A, 1, 10.0)])
+    p.submit("s", OrderIntent.market_sell(A, 6), 1)
+    p.open_session(2, [bar(A, 2, 10.0)])
+    assert [f.quantity for f in p.drain_fills()] == [4]
+    assert [(r.intent.quantity, r.reason) for r in p.drain_rejections()] == [(2, "no_position")]
+    assert A not in p.positions
+
+
+def test_shorting_is_allowed_when_not_long_only() -> None:
+    p = port(long_only=False)
+    p.open_session(1, [bar(A, 1, 10.0)])
+    p.submit("s", OrderIntent.market_sell(A, 3), 1)
+    p.open_session(2, [bar(A, 2, 10.0)])
+    assert p.positions == {A: -3}
+
+
+def test_cancel_releases_a_working_order_and_ignores_unknown_ids() -> None:
+    p = port()
+    p.open_session(1, [bar(A, 1, 10.0)])
+    p.submit("o", OrderIntent.market_buy(A, 1), 1)
+    p.cancel("nope")
+    p.cancel("o")
+    (rej,) = p.drain_rejections()
+    assert rej.cancelled and rej.order_id == "o"
+    p.open_session(2, [bar(A, 2, 10.0)])
+    assert p.drain_fills() == []
+
+
+def test_non_market_orders_are_rejected() -> None:
+    p = port()
+    p.submit("l", OrderIntent.limit_buy(A, 1, 9.0), 0)
+    (rej,) = p.drain_rejections()
+    assert rej.reason == "unsupported_order_type"
+
+
+def test_sessions_must_move_forward() -> None:
+    p = port()
+    p.open_session(5, [bar(A, 5, 10.0)])
+    with pytest.raises(ValueError):
+        p.open_session(5, [bar(A, 5, 10.0)])
+
+
+def test_plain_bar_events_open_sessions_by_timestamp() -> None:
+    p = port()
+    p.on_event(bar(A, 1, 10.0), 1)
+    p.on_event(bar(B, 1, 20.0), 1)
+    p.submit("a", OrderIntent.market_buy(A, 1), 1)
+    p.submit("b", OrderIntent.market_buy(B, 1), 1)
+    p.on_event(bar(A, 2, 11.0), 2)  # opens session 2 with A only
+    assert [f.order_id for f in p.drain_fills()] == ["a"]
+    p.on_event(bar(B, 2, 21.0), 2)  # B prints later in the same session
+    assert [(f.order_id, f.price) for f in p.drain_fills()] == [("b", 21.0)]
+    p.on_event(bar(B, 2, 99.0), 2)  # a repeated bar does not fill anything twice
+    assert p.drain_fills() == []
+
+
+def test_a_session_open_event_opens_every_instrument_at_once() -> None:
+    p = port(cash=0.0, settlement_days=0)
+    p.positions[B] = 1.0
+    p.on_event(SessionOpen(1, (bar(A, 1, 10.0), bar(B, 1, 10.0))), 1)
+    p.submit("buy-a", OrderIntent.market_buy(A, 1), 1)
+    p.submit("sell-b", OrderIntent.market_sell(B, 1), 1)
+    p.on_event(SessionOpen(2, (bar(A, 2, 10.0), bar(B, 2, 10.0))), 2)
+    assert [f.order_id for f in p.drain_fills()] == ["sell-b", "buy-a"]
+    p.on_event(bar(A, 2, 10.0), 2)  # the bars that follow change nothing
+    assert p.drain_fills() == []
+
+
+def test_costs_are_charged_in_money_and_reach_the_fill() -> None:
+    def flat(side: OrderSide, qty: float, px: float) -> Money:
+        return rupees(20.0)
+
+    p = port(costs=flat)
+    p.open_session(1, [bar(A, 1, 100.0)])
+    p.submit("o", OrderIntent.market_buy(A, 1), 1)
+    p.open_session(2, [bar(A, 2, 100.0)])
+    (fill,) = p.drain_fills()
+    assert fill.costs == rupees(20.0)
+    assert p.cash == rupees(10_000.0 - 120.0)
+    assert p.fees == rupees(20.0) and p.traded_notional == rupees(100.0)
+
+
+def test_india_delivery_fill_cost_rounds_each_leg_once() -> None:
+    legs = nse_equity_delivery_breakdown(OrderSide.SELL, 37, 1234.55)
+    want = sum(
+        Money.from_major(v, INR).amount
+        for v in (
+            legs.brokerage,
+            legs.stt,
+            legs.exchange,
+            legs.sebi,
+            legs.ipft,
+            legs.stamp_duty,
+            legs.gst,
+        )
+    )
+    assert nse_equity_delivery_fill_cost(OrderSide.SELL, 37, 1234.55) == Money(want, INR)
+
+
+def test_resolve_fill_costs_names() -> None:
+    assert resolve_fill_costs("none") is zero_costs
+    assert resolve_fill_costs("india.equity") is nse_equity_delivery_fill_cost
+    with pytest.raises(ValueError):
+        resolve_fill_costs("mars.equity")
+
+
+def test_make_simulator_selects_by_fill_model_and_india_settlement() -> None:
+    sim = make_simulator(fill="next_open", cash=rupees(1.0), exchange="NSE")
+    assert isinstance(sim, NextOpenExecution) and sim.settlement_days == 2
+    assert (
+        make_simulator(fill="next_open", cash=rupees(1.0), settlement_days=0).settlement_days == 0
+    )
+    assert isinstance(make_simulator(fill="bar_close", cash=rupees(1.0)), BarCloseFills)
+    with pytest.raises(ValueError):
+        make_simulator(fill="vwap", cash=rupees(1.0))  # type: ignore[arg-type]
+
+
+def test_invalid_construction_is_refused() -> None:
+    with pytest.raises(ValueError):
+        port(settlement_days=-1)
+    with pytest.raises(ValueError):
+        port(cash=-1.0)
+
+
+def test_zero_costs_work_in_any_currency() -> None:
+    p = NextOpenExecution(cash=Money.from_major(100.0, Currency.USD))
+    p.open_session(1, [bar(A, 1, 10.0)])
+    p.submit("o", OrderIntent.market_buy(A, 1), 1)
+    p.open_session(2, [bar(A, 2, 10.0)])
+    assert p.drain_fills()[0].costs == Money.zero(Currency.USD)
+
+
+def test_group_sessions_emits_a_session_open_before_each_sessions_bars() -> None:
+    bars = [bar(B, 2, 1.0), bar(A, 1, 1.0), bar(A, 2, 1.0), bar(B, 1, 1.0)]
+    events = group_sessions(bars)
+    kinds = [(type(e).__name__, ts) for e, ts in events]
+    assert kinds == [
+        ("SessionOpen", 1),
+        ("Bar", 1),
+        ("Bar", 1),
+        ("SessionOpen", 2),
+        ("Bar", 2),
+        ("Bar", 2),
+    ]
+    assert [b.instrument_id for b in events[0][0].bars] == [A, B]
+
+
+def test_group_sessions_accepts_a_session_key() -> None:
+    day = 86_400 * 10**9
+    bars = [bar(A, day + 5, 1.0), bar(B, day + 9, 1.0), bar(A, 2 * day + 5, 1.0)]
+    events = group_sessions(bars, key=lambda b: b.ts // day)
+    assert [(type(e).__name__, ts) for e, ts in events] == [
+        ("SessionOpen", day + 5),
+        ("Bar", day + 5),
+        ("Bar", day + 9),
+        ("SessionOpen", 2 * day + 5),
+        ("Bar", 2 * day + 5),
+    ]

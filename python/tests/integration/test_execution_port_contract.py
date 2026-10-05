@@ -19,6 +19,8 @@ from collections.abc import Callable
 
 import pytest
 
+from honba.backtest.simulated import NextOpenExecution
+from honba.domain.money import Currency, Money
 from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
 from honba.entities.order import OrderIntent
@@ -33,6 +35,9 @@ B = InstrumentId("BBB", "NSE")
 
 PORTS: dict[str, Callable[[], ExecutionPort]] = {
     "bar_close_fills": BarCloseFills,
+    "next_open": lambda: NextOpenExecution(
+        cash=Money.from_major(1_000_000.0, Currency.INR), settlement_days=2
+    ),
 }
 
 

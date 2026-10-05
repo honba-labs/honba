@@ -46,24 +46,28 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Literal, Protocol
+from typing import Protocol, cast
 
 # ---------------------------------------------------------------------------
 # Domain / strategy imports
 # These are the stable contracts. Session depends on them; they must not
 # depend on Session (no circular imports).
 # ---------------------------------------------------------------------------
+from honba.backtest.simulated import FillCostFn, FillModel, make_simulator
+from honba.domain.money import Currency, Money
 from honba.entities.bar import Bar
 from honba.entities.instrument import Instrument, InstrumentId
 from honba.entities.trade import Trade
 from honba.strategies.base import Strategy
 from honba.strategies.context import LedgerContext, StrategyContext
-from honba.strategies.runner import ExecutionPort, RunResult, StrategyRunner
-
-# Optional: loader lives next to the strategy package. Import lazily in
-# _resolve_strategy if you want to keep session importable without loader.
-# from honba.strategies.loader import load_strategy
-
+from honba.strategies.execution import OrderRejection
+from honba.strategies.runner import (
+    ExecutionPort,
+    IntentRejection,
+    StrategyRunner,
+    SubmittedIntent,
+    SuppressedIntent,
+)
 
 # =============================================================================
 # Protocols — what Session needs from the rest of the SDK
@@ -115,11 +119,6 @@ class ReportPrinter(Protocol):
     def print(self, result: BacktestResult, *, format: str = "table") -> None: ...
 
 
-# Fill model names the Session understands. Concrete exchange simulators
-# map these to bar-close, next-open, or more realistic matching engines.
-FillModel = Literal["bar_close", "next_open"]
-
-
 # =============================================================================
 # Configuration
 # =============================================================================
@@ -141,11 +140,20 @@ class BacktestConfig:
     timeframe: str = "1d"
     cash: float = 1_000_000.0
     currency: str = "INR"
-    # Named cost pack ("india.equity") or a CostModel instance. Resolved in Session.
-    costs: str | CostModel = "india.equity"
-    fill: FillModel = "bar_close"
+    # Named cost pack ("india.equity", "none"), a per-fill cost function
+    # (side, quantity, price) -> Money, or a CostModel applied to fills afterwards.
+    costs: str | FillCostFn | CostModel = "india.equity"
+    # "next_open" (default): fill at the next session's open (honba.backtest.simulated).
+    # "bar_close": fill at the decision bar's close (conformance simulator only).
+    fill: FillModel = "next_open"
     # Optional override; if None, Session uses the default registry provider.
     data: DataProvider | None = None
+    # Driving bars fed to the strategy before orders are allowed; None uses the
+    # strategy's own ``warmup_bars`` (or its catalog config's).
+    warmup_bars: int | None = None
+    # Sale-proceeds settlement cycle in sessions; None uses the market pack
+    # (honba.markets.india.settlement_days_for(exchange): T+2 for NSE/BSE equity).
+    settlement_days: int | None = None
 
     def __post_init__(self) -> None:
         if not self.symbol:
@@ -177,9 +185,13 @@ class BacktestResult:
     strategy_name: str
     config: BacktestConfig
     # Raw runner output
-    intents: list[Any] = field(default_factory=list)
+    intents: list[SubmittedIntent] = field(default_factory=list)
     fills: list[Trade] = field(default_factory=list)
-    rejections: list[Any] = field(default_factory=list)
+    rejections: list[IntentRejection] = field(default_factory=list)
+    # Orders (or parts) the simulator rejected or cancelled, incl. unfilled at the end.
+    order_rejections: list[OrderRejection] = field(default_factory=list)
+    # Intents the warm-up gate released instead of sending.
+    suppressed: list[SuppressedIntent] = field(default_factory=list)
     ctx: StrategyContext | None = None
     # Derived
     metrics: dict[str, float] = field(default_factory=dict)
@@ -248,10 +260,16 @@ class BacktestSession:
         self.execution = execution
         self.cost_model = cost_model
         self.on_bar = on_bar
-        # Fresh ledger unless caller injects one (tests).
-        self.ctx = ctx if ctx is not None else LedgerContext()
-        # Runner binds strategy ↔ ctx and talks to execution.
-        self.runner = StrategyRunner(strategy, execution, ctx=self.ctx)
+        # Fresh ledger seeded with the starting cash unless the caller injects one (tests).
+        self.ctx = (
+            ctx
+            if ctx is not None
+            else LedgerContext(cash=config.cash, currency=Currency(config.currency))
+        )
+        # Runner binds strategy ↔ ctx, gates warm-up and talks to execution.
+        self.runner = StrategyRunner(
+            strategy, execution, ctx=self.ctx, warmup_bars=config.warmup_bars
+        )
         self._ran = False
 
     def run(self) -> BacktestResult:
@@ -297,21 +315,26 @@ class BacktestSession:
                 notes=["no bars returned for the requested range"],
             )
 
-        # Events are (event, ts_init) as required by StrategyRunner.
-        # ts_init is the bar's init/close timestamp in unix ns (Bar contract).
-        events: list[tuple[Any, int]] = [(bar, _bar_ts(bar)) for bar in bars]
-
-        if self.on_bar is not None:
-            # Wrap execution so we can observe bars without changing the runner.
-            # Prefer a thin callback after each on_event if you extend the runner;
-            # for now we rely on the runner's observe path (execution.on_event).
-            pass
-
         # --- 3. Drive -----------------------------------------------------------
-        run_result: RunResult = self.runner.run(events)
+        # Events are (event, ts_init) as required by StrategyRunner; a simulator
+        # with on_event sees each one before the strategy.
+        runner = self.runner
+        observe = getattr(self.execution, "on_event", None)
+        runner.start()
+        for index, bar in enumerate(bars):
+            ts = _bar_ts(bar)
+            if observe is not None:
+                observe(bar, ts)
+            runner.on_event(bar, ts)
+            if self.on_bar is not None:
+                self.on_bar(index, bar)
+        # End of data: cancel what is still working so the ledger releases it.
+        for submitted in list(runner.intents):
+            runner.cancel(submitted.order_id)
+        runner.stop()
 
-        # Optional: apply cost model to fills if the simulator did not.
-        fills = list(run_result.fills)
+        # Optional: apply a post-hoc CostModel to fills if the simulator did not.
+        fills = list(runner.fills)
         if self.cost_model is not None:
             fills = [self.cost_model.apply(t) for t in fills]
 
@@ -320,38 +343,27 @@ class BacktestSession:
             fills=fills,
             bars=bars,
             initial_cash=self.config.cash,
-            ctx=run_result.ctx,
+            ctx=runner.ctx,
         )
 
         return BacktestResult(
             strategy_name=self.strategy.name,
             config=self.config,
-            intents=list(run_result.intents),
+            intents=list(runner.intents),
             fills=fills,
-            rejections=list(run_result.rejections),
-            ctx=run_result.ctx,
+            rejections=list(runner.rejections),
+            order_rejections=list(runner.order_rejections),
+            suppressed=list(runner.suppressed),
+            ctx=runner.ctx,
             metrics=metrics,
             equity_curve=equity_curve,
         )
 
     def _seed_context(self, instrument: Instrument) -> None:
-        """Register instrument metadata and starting cash on the ledger.
-
-        LedgerContext may grow explicit APIs (set_cash, register). Until then
-        we use duck-typing so this file stays compatible with the current
-        context implementation and with test doubles.
-        """
-        ctx = self.ctx
-        if hasattr(ctx, "register_instrument"):
-            ctx.register_instrument(instrument)  # type: ignore[attr-defined]
-        if hasattr(ctx, "set_cash"):
-            ctx.set_cash(self.config.cash)  # type: ignore[attr-defined]
-        elif hasattr(ctx, "cash"):
-            # Some ledgers expose a mutable cash attribute.
-            try:
-                ctx.cash = float(self.config.cash)
-            except Exception:
-                pass
+        """Register instrument metadata on the ledger (starting cash is set at construction)."""
+        add = getattr(self.ctx, "add_instrument", None)
+        if add is not None:
+            add(instrument)
 
 
 # =============================================================================
@@ -378,11 +390,13 @@ class Honba:
         timeframe: str = "1d",
         cash: float = 1_000_000.0,
         currency: str = "INR",
-        costs: str | CostModel = "india.equity",
-        fill: FillModel = "bar_close",
+        costs: str | FillCostFn | CostModel = "india.equity",
+        fill: FillModel = "next_open",
         data: DataProvider | None = None,
         execution: ExecutionPort | None = None,
         on_bar: Callable[[int, Bar], None] | None = None,
+        warmup_bars: int | None = None,
+        settlement_days: int | None = None,
     ) -> BacktestSession:
         """Build a BacktestSession ready for .run().
 
@@ -392,6 +406,8 @@ class Honba:
           * Strategy instance
           * Strategy subclass (instantiated with no args)
           * path to a .py file containing one Strategy subclass
+          * a registry name in the honba-strategies catalog ($HONBA_STRATEGIES_DIR),
+            instantiated with its config.toml
         symbol / exchange:
           Primary instrument for this run (multi-leg later can take a list).
         start / end:
@@ -401,13 +417,20 @@ class Honba:
         cash:
           Starting portfolio cash in account currency.
         costs:
-          Named pack ("india.equity") or a CostModel instance.
+          Named pack ("india.equity", "india.equity.intraday", "none"), a fill-cost
+          function ``(side, quantity, price) -> Money``, or a CostModel applied to
+          fills after the run.
         fill:
-          "bar_close" or "next_open" — selects the simulated execution port
-          when ``execution`` is not passed explicitly.
+          "next_open" (default) or "bar_close" — selects the simulated execution
+          port when ``execution`` is not passed explicitly.
+        warmup_bars:
+          Driving bars before orders are allowed; None uses the strategy's.
+        settlement_days:
+          Settlement cycle override; None uses the market pack (T+2 for NSE/BSE).
         data / execution:
           Optional overrides for tests or custom infrastructure.
         """
+        resolved_strategy, config_warmup = _resolve_strategy(strategy)
         config = BacktestConfig(
             symbol=symbol,
             exchange=exchange,
@@ -419,15 +442,14 @@ class Honba:
             costs=costs,
             fill=fill,
             data=data,
+            warmup_bars=warmup_bars if warmup_bars is not None else config_warmup,
+            settlement_days=settlement_days,
         )
 
-        resolved_strategy = _resolve_strategy(strategy)
         resolved_data = data if data is not None else _default_data_provider()
-        cost_model = _resolve_costs(costs)
+        cost_model = costs if _is_cost_model(costs) else None
         resolved_execution = (
-            execution
-            if execution is not None
-            else _default_execution(fill=fill, cost_model=cost_model)
+            execution if execution is not None else _default_execution(config, cost_model)
         )
 
         return BacktestSession(
@@ -453,31 +475,35 @@ class Honba:
 # =============================================================================
 
 
-def _resolve_strategy(strategy: Strategy | type[Strategy] | str | Path) -> Strategy:
-    """Turn instance / class / file path into a Strategy instance."""
+def _resolve_strategy(
+    strategy: Strategy | type[Strategy] | str | Path,
+) -> tuple[Strategy, int | None]:
+    """Turn instance / class / file path / catalog name into a Strategy instance.
+
+    Returns the strategy and the ``warmup_bars`` of its catalog config (None otherwise).
+    """
     if isinstance(strategy, Strategy):
-        return strategy
+        return strategy, None
 
     if isinstance(strategy, type) and issubclass(strategy, Strategy):
-        return strategy()
+        return strategy(), None
 
-    # Path or string path → load module and pick Strategy subclass.
-    path = Path(strategy)
-    if not path.suffix == ".py":
-        # Allow "package.module:ClassName" later; for now require a file.
+    if not isinstance(strategy, (str, Path)):
         raise TypeError(
-            f"strategy must be a Strategy instance, subclass, or .py path; got {strategy!r}"
+            "strategy must be a Strategy instance, subclass, .py path or catalog name; "
+            f"got {strategy!r}"
         )
 
-    try:
-        from honba.strategies.loader import load_strategy
-    except ImportError as e:
-        raise ImportError(
-            "honba.strategies.loader is required to load a strategy from a file path"
-        ) from e
+    from honba.strategies.loader import find_catalog, load_catalog_strategy, load_strategy
 
-    cls = load_strategy(path)
-    return cls()
+    path = Path(strategy)
+    if path.suffix == ".py":
+        return load_strategy(path)(), None
+
+    # A bare registry name in the honba-strategies catalog.
+    loaded = load_catalog_strategy(str(strategy), find_catalog())
+    warmup = loaded.config.warmup_bars or None
+    return loaded.instantiate(), warmup
 
 
 def _default_data_provider() -> DataProvider:
@@ -497,47 +523,25 @@ def _default_data_provider() -> DataProvider:
         ) from e
 
 
-def _resolve_costs(costs: str | CostModel) -> CostModel | None:
-    if not isinstance(costs, str):
-        return costs
-    try:
-        from honba.markets.india.costs import get_cost_model
-
-        return get_cost_model(costs)
-    except ImportError:
-        # Costs optional during early bootstrap; simulator may be zero-cost.
-        return None
+def _is_cost_model(costs: object) -> bool:
+    """A post-hoc CostModel (``apply(trade) -> Trade``), as opposed to a pack name or fill fn."""
+    return not isinstance(costs, str) and hasattr(costs, "apply")
 
 
-def _default_execution(
-    *,
-    fill: FillModel,
-    cost_model: CostModel | None,
-) -> ExecutionPort:
-    """Build a simulated execution port for the chosen fill model.
+def _default_execution(config: BacktestConfig, cost_model: CostModel | None) -> ExecutionPort:
+    """Build the simulated execution port for the config (``honba.backtest.simulated``).
 
-    Preferred path: honba.exchange.simulated (Python or Rust-backed).
-    Fallback: testing.BarCloseFills from the strategy test harness so
-    backtests can run before the full exchange package exists.
+    A pack name or fill-cost function is charged by the simulator itself; a post-hoc
+    CostModel is applied by the session instead, so the simulator charges nothing.
     """
-    try:
-        from honba.exchange.simulated import make_simulator
-
-        return make_simulator(fill=fill, cost_model=cost_model)
-    except ImportError:
-        pass
-
-    # Bootstrap: reuse the conformance simulator if present.
-    try:
-        from honba.strategies.testing import BarCloseFills
-
-        # BarCloseFills may accept cost kwargs; keep call minimal.
-        return BarCloseFills()  # type: ignore[return-value]
-    except ImportError as e:
-        raise ImportError(
-            "No simulated ExecutionPort available. Implement "
-            "honba.exchange.simulated.make_simulator or pass execution="
-        ) from e
+    fill_costs = "none" if cost_model is not None else cast("str | FillCostFn", config.costs)
+    return make_simulator(
+        fill=config.fill,
+        cash=Money.from_major(config.cash, Currency(config.currency)),
+        costs=fill_costs,
+        exchange=config.exchange,
+        settlement_days=config.settlement_days,
+    )
 
 
 def _parse_time(value: str | date | datetime) -> datetime:
@@ -588,12 +592,8 @@ def _compute_metrics(
     }
 
     # Final cash / equity from context if available
-    final_cash = initial_cash
-    if hasattr(ctx, "cash"):
-        try:
-            final_cash = float(ctx.cash)
-        except Exception:
-            pass
+    cash = ctx.cash()
+    final_cash = cash.to_major() if isinstance(cash, Money) else float(cash)
     metrics["final_cash"] = final_cash
 
     # Mark-to-market: last bar close * net position if we can read position
@@ -601,13 +601,8 @@ def _compute_metrics(
     if bars:
         last = bars[-1]
         iid = getattr(last, "instrument_id", None)
-        if iid is not None and hasattr(ctx, "position"):
-            try:
-                qty = float(ctx.position(iid))
-                close = float(getattr(last, "close", 0.0) or 0.0)
-                final_equity = final_cash + qty * close
-            except Exception:
-                pass
+        if iid is not None:
+            final_equity = final_cash + float(ctx.position(iid)) * float(last.close)
     metrics["final_equity"] = final_equity
     metrics["total_return_pct"] = (
         (final_equity - initial_cash) / initial_cash * 100.0 if initial_cash else 0.0
