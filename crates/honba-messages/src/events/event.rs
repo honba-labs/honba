@@ -23,7 +23,11 @@ fn last_px<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
 /// Bump it on any breaking change to the serialized form of a message type,
 /// together with the golden vectors in `schema/golden/` and the Python
 /// constant `honba.entities.wire.SCHEMA_VERSION` (see ADR 006).
-pub const SCHEMA_VERSION: u32 = 2;
+///
+/// History: 1 initial contract (E0-S2); 2 instrument exchange semantics; 3
+/// timestamps as `{iso, unix_nanos}` and money as integer minor units (ADR
+/// 0011, E11-S2). Only the current version is read; see CHANGELOG.md.
+pub const SCHEMA_VERSION: u32 = 3;
 
 /// Any typed event that can flow through the Honba event kernel.
 ///

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-SCHEMA_VERSION: int = 2
+SCHEMA_VERSION: int = 3
 API_VERSION: str = "1.0.0"
 CORE_VERSION: str = "0.1.0"
 

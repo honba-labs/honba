@@ -32,7 +32,7 @@ from honba.domain.tick import AggressorSide
 from honba.wire.base import Str, _canonical, _Wire
 from honba.wire.screener import ScreenerFilterPredicate
 
-SCHEMA_VERSION: Final[int] = 2
+SCHEMA_VERSION: Final[int] = 3
 """Wire-contract version; must equal ``honba_messages::SCHEMA_VERSION``."""
 
 API_VERSION: Final[str] = "1.0.0"

@@ -2,6 +2,49 @@
 
 ## [Unreleased]
 
+### Wire contract v3: integer money and timestamp objects (E0-S6, E11-S2, ADR 0011)
+
+`SCHEMA_VERSION` is now **3** (single owner `honba_messages::SCHEMA_VERSION`; mirrored by
+`honba.entities.wire.SCHEMA_VERSION`, the generated `.pyi`, `domain_schema.json`, the golden
+vectors and the strategy conformance fixture).
+
+What changed on the wire:
+
+- **Money is integer minor units.** `Money` serializes as `{"amount": <i64>, "currency": "INR"}`
+  where `amount` is paise (cents for USD/EUR/GBP), never a JSON float. `Trade.costs` and
+  `Position.realized_pnl` are `Money` objects (they were bare floats).
+- **Timestamps are objects.** Every `UnixNanos` (`ts_event`, `ts_init`, `now`) serializes as
+  `{"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}`.
+  `unix_nanos` is a decimal string (a u64 exceeds JS `Number.MAX_SAFE_INTEGER`) and is the
+  value readers use; `iso` is informational.
+
+Legacy-float read path (kept for old journals and fixtures, Rust and Python behave the same):
+
+- A float `Money.amount` is read as **major** units and rounded once to minor units, half away
+  from zero (`45.676` -> `4568`). Integers are taken as minor units.
+- A bare number for `Trade.costs` is read as INR major units (`45.67` -> `{"amount": 4567,
+  "currency": "INR"}`); a bare number for `Position.realized_pnl` takes the position's
+  currency. Writers only ever emit the integer object form.
+- There is **no** legacy read path for integer timestamps or for the envelope: a `Message`
+  with `schema_version` 2 (or anything other than 3) is rejected with "unsupported
+  schema_version". Re-export v2 journals with a v3 writer, or rewrite `schema_version`,
+  timestamps and money fields, before replaying them.
+
+Migration for code:
+
+- Rust: `Money::new` takes `i64` minor units; use `Money::from_major_f64` at float boundaries,
+  `Money::payout_from_major_f64` (floor) / `Money::stake_from_major_f64` (ceil) where money
+  leaves the model, `Instrument::stake_quantity` (round up to lots) and
+  `Instrument::settle_notional` (rejects off-tick prices with `MoneyError::OffTick`).
+  `LedgerContext::apply_fill` now returns `Result` and refuses a fill it cannot book.
+- Python: `StrategyContext.cash()` returns `honba.entities.Money` (was `float`); use
+  `.to_major()` to display or size. `Trade.costs`, `Position.realized_pnl` and `Account.cash`
+  are `Money`; a plain number for `Trade(costs=...)` is treated as legacy INR major units.
+  `Money.from_major` now rounds half away from zero (it used Python's half-to-even `round`).
+  `honba.entities.wire.UnixNanos.from_ns(n)` / `.to_ns()` convert timestamps.
+- Consumers in other repos (honba-strategies, honba-examples, honba-frontend generated types)
+  that read `cash()` as a float or timestamps/costs as numbers need the same update.
+
 ### Adapter contract (E1-S1, ADR 0010)
 
 - `honba.adapters` package: `Adapter` (facade, capabilities, lifecycle), `MarketDataAdapter`

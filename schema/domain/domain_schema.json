@@ -2707,6 +2707,6 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "api_version": "1.0.0",
   "description": "Canonical Honba wire models, generated from the Rust source of truth",
-  "schema_version": 2,
+  "schema_version": 3,
   "title": "HonbaDomainBundle"
 }

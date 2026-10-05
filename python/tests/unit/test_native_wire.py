@@ -10,7 +10,11 @@ _honba = pytest.importorskip("honba._honba")
 
 
 def test_schema_version_is_exported():
-    assert _honba.SCHEMA_VERSION == 2
+    from honba.entities import wire
+
+    # v3: integer Money and {iso, unix_nanos} timestamps (ADR 0011, E11-S2).
+    assert _honba.SCHEMA_VERSION == 3
+    assert wire.SCHEMA_VERSION == _honba.SCHEMA_VERSION
 
 
 def test_canonical_json_parses_and_reserializes_with_rust():
