@@ -66,12 +66,18 @@ macro_rules! enum_with_all {
     };
 }
 
+pub mod api;
+pub mod endpoints;
+pub mod errors;
 pub mod events;
 pub mod identifiers;
 pub mod market_data;
 pub mod orders;
 pub mod validation;
 
+pub use api::{ApiResponse, ApiVersion, ResponseEnvelope, API_VERSION};
+pub use endpoints::{Access, Endpoint, HttpMethod, ParamLocation, ENDPOINTS, WRITE_PATHS, write_endpoints};
+pub use errors::{ErrorCategory, ErrorCode, ErrorDetail};
 pub use events::{timestamp::UnixNanos, Event, Message, SCHEMA_VERSION};
 pub use identifiers::{Exchange, InstrumentId, OrderId, TradeId};
 pub use market_data::{

@@ -18,7 +18,7 @@ use std::collections::BTreeMap;
 use honba_entities::{Currency, Position, PositionSide, ScreenerFilterPredicate, Trade};
 use honba_messages::{
     AggressorSide, Bar, BarAggregation, Event, InstrumentId, Message, Order, OrderSide,
-    OrderStatus, OrderType, PriceType, TimeInForce, SCHEMA_VERSION,
+    OrderStatus, OrderType, PriceType, TimeInForce, SCHEMA_VERSION, API_VERSION,
 };
 use honba_strategy::OrderIntent;
 
@@ -125,6 +125,7 @@ pub fn wire_enum_values() -> BTreeMap<&'static str, Vec<String>> {
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("SCHEMA_VERSION", SCHEMA_VERSION)?;
+    m.add("API_VERSION", API_VERSION)?;
     m.add_function(wrap_pyfunction!(canonical_json, m)?)?;
     m.add_function(wrap_pyfunction!(wire_enum_values, m)?)?;
     Ok(())

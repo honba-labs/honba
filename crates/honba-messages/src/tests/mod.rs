@@ -1,6 +1,7 @@
 //! Unit tests for this crate, one file per area.
 
 mod bar;
+mod error_taxonomy;
 mod event;
 mod identifiers;
 mod order;
