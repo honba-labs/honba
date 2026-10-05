@@ -13,6 +13,7 @@ members = [
     "crates/honba-data",
     "crates/honba-cli",
     "crates/honba-market",
+    "crates/honba-config",
     "crates/honba-codegen",
     "crates/honba-ports",
     "crates/honba-async",
@@ -38,6 +39,7 @@ honba-py = { path = "crates/honba-py" }
 honba-analytics = { path = "crates/honba-analytics" }
 honba-data = { path = "crates/honba-data" }
 honba-market = { path = "crates/honba-market" }
+honba-config = { path = "crates/honba-config" }
 honba-codegen = { path = "crates/honba-codegen" }
 honba-ports = { path = "crates/honba-ports" }
 honba-async = { path = "crates/honba-async" }
