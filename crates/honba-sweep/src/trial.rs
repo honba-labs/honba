@@ -25,7 +25,7 @@ use std::sync::{Arc, Mutex};
 use honba_analytics::{AnalyticsError, EquityStats, RoundTrip, TradeStats};
 use honba_data::{Dataset, DatasetFeed};
 use honba_engine::{Engine, EngineOutput, ExecutionEngine, Handler};
-use honba_entities::{Currency, Money, Trade};
+use honba_entities::{Money, Trade};
 use honba_messages::Event;
 use honba_messages::{Order, UnixNanos};
 use honba_sim::BarFillEngine;
