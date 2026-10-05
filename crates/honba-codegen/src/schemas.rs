@@ -65,8 +65,8 @@ impl SchemaSet {
     /// `preferred_name` is used as a fallback when a type has no title (newtype
     /// wrappers such as `InstrumentId`).
     pub fn add_type<T: JsonSchema>(&mut self, preferred_name: &str) {
-        let root: RootSchema = schemars::gen::SchemaGenerator::default()
-            .into_root_schema_for::<T>();
+        let root: RootSchema =
+            schemars::gen::SchemaGenerator::default().into_root_schema_for::<T>();
         let root_value = serde_json::to_value(&root).unwrap_or_else(|_| json!({}));
 
         if let Some(defs) = root_value.get("definitions").and_then(Value::as_object) {
@@ -240,7 +240,9 @@ fn rewrite_refs(value: &Value, prefix: &str) -> Value {
             }
             Value::Object(out)
         }
-        Value::Array(items) => Value::Array(items.iter().map(|i| rewrite_refs(i, prefix)).collect()),
+        Value::Array(items) => {
+            Value::Array(items.iter().map(|i| rewrite_refs(i, prefix)).collect())
+        }
         other => other.clone(),
     }
 }
@@ -263,9 +265,15 @@ mod tests {
     fn refs_are_normalized_to_bare_names() {
         let mut set = SchemaSet::new();
         set.insert("Bar", json!({"type": "object"}));
-        set.insert("Holder", json!({"properties": {"bar": {"$ref": "#/definitions/Bar"}}}));
+        set.insert(
+            "Holder",
+            json!({"properties": {"bar": {"$ref": "#/definitions/Bar"}}}),
+        );
         let defs = set.to_defs("#/$defs/");
-        assert_eq!(defs["Holder"]["properties"]["bar"]["$ref"], json!("#/$defs/Bar"));
+        assert_eq!(
+            defs["Holder"]["properties"]["bar"]["$ref"],
+            json!("#/$defs/Bar")
+        );
     }
 
     #[test]
@@ -273,7 +281,10 @@ mod tests {
         // This is the defect that shipped StrategyManifest-less MCP tools.
         let mut set = SchemaSet::new();
         set.insert("Tool", json!({"$ref": "#/definitions/StrategyManifest"}));
-        assert_eq!(set.dangling_references(), vec!["StrategyManifest".to_string()]);
+        assert_eq!(
+            set.dangling_references(),
+            vec!["StrategyManifest".to_string()]
+        );
     }
 
     #[test]
@@ -306,7 +317,7 @@ mod tests {
     #[test]
     fn the_canonical_registry_has_no_dangling_references() {
         let set = canonical_schemas();
-        assert!(set.len() > 0, "registry is empty");
+        assert!(!set.is_empty(), "registry is empty");
         assert_eq!(
             set.dangling_references(),
             Vec::<String>::new(),

@@ -89,13 +89,12 @@ impl TryFrom<TradeRepr> for Trade {
             MoneyRepr::Exact(money) => money,
             MoneyRepr::LegacyMajor(major) => {
                 // Older producers wrote `45.67`; round once, at the door.
-                Money::from_major_f64(major, crate::instrument::Currency::Inr)
-                    .map_err(|_| {
-                        // The legacy path has no currency attached, so INR is
-                        // assumed — the platform's market — and a non-finite
-                        // value fails the fill rather than producing a NaN.
-                        InvariantError::NonFinite { field: "costs" }
-                    })?
+                Money::from_major_f64(major, crate::instrument::Currency::Inr).map_err(|_| {
+                    // The legacy path has no currency attached, so INR is
+                    // assumed — the platform's market — and a non-finite
+                    // value fails the fill rather than producing a NaN.
+                    InvariantError::NonFinite { field: "costs" }
+                })?
             }
         };
         let trade = Trade {

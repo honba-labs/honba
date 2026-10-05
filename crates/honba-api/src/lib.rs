@@ -19,8 +19,8 @@ pub mod responses;
 
 pub use capabilities::{Capabilities, CapabilityManifest};
 pub use honba_messages::{
-    Access, ApiResponse, ApiVersion, Endpoint, ErrorCategory, ErrorCode, ErrorDetail, HttpMethod,
-    ParamLocation, ResponseEnvelope, WRITE_PATHS, ENDPOINTS, write_endpoints, API_VERSION,
+    write_endpoints, Access, ApiResponse, ApiVersion, Endpoint, ErrorCategory, ErrorCode,
+    ErrorDetail, HttpMethod, ParamLocation, ResponseEnvelope, API_VERSION, ENDPOINTS, WRITE_PATHS,
 };
 pub use requests::{
     BacktestRequest, BarsQuery, DepthQuery, InstrumentsQuery, OrdersRequest, QuotesQuery,

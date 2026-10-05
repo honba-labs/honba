@@ -2,9 +2,9 @@ mod backtest;
 mod calendars;
 mod data;
 mod schema;
-mod verify;
 #[cfg(test)]
 mod tests;
+mod verify;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};

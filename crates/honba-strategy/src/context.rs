@@ -140,15 +140,16 @@ impl LedgerContext {
         let notional = Money::mul_qty(fill.quantity(), fill.price(), self.currency);
         if fill.side() == OrderSide::Buy {
             *entry += fill.quantity();
-            let debit = notional
-                .and_then(|n| (n + fill.costs()).map_err(|_| honba_entities::MoneyError::InvalidQuantity.into()));
+            let debit = notional.and_then(|n| {
+                (n + fill.costs()).map_err(|_| honba_entities::MoneyError::InvalidQuantity)
+            });
             if let Ok(debit) = debit {
                 self.cash = (self.cash - debit).unwrap_or(self.cash);
             }
         } else {
             *entry -= fill.quantity();
             let credit = notional.and_then(|n| {
-                (n - fill.costs()).map_err(|_| honba_entities::MoneyError::InvalidQuantity.into())
+                (n - fill.costs()).map_err(|_| honba_entities::MoneyError::InvalidQuantity)
             });
             if let Ok(credit) = credit {
                 self.cash = (self.cash + credit).unwrap_or(self.cash);

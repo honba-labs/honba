@@ -3,7 +3,7 @@
 use std::sync::{Arc, Mutex};
 
 use honba_engine::Result;
-use honba_entities::{Currency, Money, Trade};
+use honba_entities::{Currency, Trade};
 use honba_messages::{
     AggressorSide, Bar, BarAggregation, BarSpecification, BarType, Exchange, InstrumentId, OrderId,
     OrderSide, PriceType, QuoteTick, TradeId, TradeTick, UnixNanos,

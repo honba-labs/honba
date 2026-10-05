@@ -136,8 +136,11 @@ fn hooks_dispatch_by_event_type_with_the_clock_at_ts_init() {
 #[test]
 fn runner_uses_the_given_context() {
     let (s, _) = Recorder::new(vec![]);
-    let runner =
-        StrategyRunner::with_context(s, FakeExecution::default(), LedgerContext::with_cash(Money::from_major_f64(5.0, Currency::Inr).unwrap()));
+    let runner = StrategyRunner::with_context(
+        s,
+        FakeExecution::default(),
+        LedgerContext::with_cash(Money::from_major_f64(5.0, Currency::Inr).unwrap()),
+    );
     assert_eq!(runner.context().cash().minor(), 500);
 }
 

@@ -1,6 +1,6 @@
 //! Unit tests for the pure helpers in `crate::backtest`.
 
-use honba_entities::{Currency, Money, Trade};
+use honba_entities::{Currency, Trade};
 use honba_messages::{Exchange, InstrumentId, OrderId, OrderSide, UnixNanos};
 
 use crate::backtest::{equity_curve, pair_fills, BacktestConfig};

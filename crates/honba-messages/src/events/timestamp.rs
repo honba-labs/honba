@@ -29,17 +29,7 @@ struct UnixNanosJson {
 /// assert_eq!(ts.as_secs(), 1_700_000_000);
 /// assert_eq!(ts.as_millis(), 1_700_000_000_000);
 /// ```
-#[derive(
-    Clone,
-    Copy,
-    Debug,
-    Default,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UnixNanos(u64);
 
 impl UnixNanos {
@@ -122,7 +112,10 @@ impl<'de> Deserialize<'de> for UnixNanos {
         D: Deserializer<'de>,
     {
         let json = UnixNanosJson::deserialize(deserializer)?;
-        let nanos = json.unix_nanos.parse::<u64>().map_err(serde::de::Error::custom)?;
+        let nanos = json
+            .unix_nanos
+            .parse::<u64>()
+            .map_err(serde::de::Error::custom)?;
         Ok(Self(nanos))
     }
 }

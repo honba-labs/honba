@@ -108,7 +108,11 @@ pub fn run_trial_with(
     })?;
 
     let fills = take_tape(&tape);
-    let metrics = metrics(&fills, config.initial_cash.to_major_f64(), config.periods_per_year)?;
+    let metrics = metrics(
+        &fills,
+        config.initial_cash.to_major_f64(),
+        config.periods_per_year,
+    )?;
     Ok(TrialReport {
         trial_id,
         params: params.clone(),

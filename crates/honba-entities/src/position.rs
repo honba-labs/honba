@@ -99,8 +99,9 @@ impl TryFrom<PositionRepr> for Position {
             super::trade::MoneyRepr::Exact(money) => money,
             super::trade::MoneyRepr::LegacyMajor(major) => {
                 // Older producers wrote `-80.0`; round once, at the door.
-                Money::from_major_f64(major, r.currency)
-                    .map_err(|_| InvariantError::NonFinite { field: "realized_pnl" })?
+                Money::from_major_f64(major, r.currency).map_err(|_| InvariantError::NonFinite {
+                    field: "realized_pnl",
+                })?
             }
         };
         let position = Position {
@@ -155,8 +156,8 @@ impl Position {
     }
 
     /// Returns realized profit and loss in the position's currency.
-///
-/// Realized PnL is a ledger entry: it accrues per fill, in minor units, on
+    ///
+    /// Realized PnL is a ledger entry: it accrues per fill, in minor units, on
     // every reduction or reversal, so it never accumulates in `f64`.
     pub fn realized_pnl(&self) -> Money {
         self.realized_pnl
@@ -223,7 +224,11 @@ impl Position {
         // once per fill and rounded to minor units immediately (ADR 0011), so
         // the ledger accumulates integers, not floats.
         let closable = self.quantity.min(qty);
-        let leg = Money::mul_qty(closable * self.side.sign() * (px - self.avg_price), 1.0, self.currency);
+        let leg = Money::mul_qty(
+            closable * self.side.sign() * (px - self.avg_price),
+            1.0,
+            self.currency,
+        );
         if let Ok(leg) = leg {
             self.realized_pnl = (self.realized_pnl + leg).unwrap_or(self.realized_pnl);
         }

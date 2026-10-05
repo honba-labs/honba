@@ -8,8 +8,8 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use honba_entities::{
-    Currency, FilterOp, Money, MetricPeriod, MetricRef, Position, PositionSide, ScreenerFilterPredicate,
-    Timeframe, Trade,
+    Currency, FilterOp, MetricPeriod, MetricRef, Money, Position, PositionSide,
+    ScreenerFilterPredicate, Timeframe, Trade,
 };
 use honba_messages::{Exchange, InstrumentId, OrderId, OrderSide, UnixNanos, SCHEMA_VERSION};
 use serde::de::DeserializeOwned;

@@ -213,7 +213,8 @@ pub fn run_strategy_costed_json(
     let costs = FillCosts::new(flat_cost, cost_bps).map_err(|e| e.to_string())?;
     let messages: Vec<Message> = parse("events", events)?;
     let raw_instruments: Vec<Value> = parse("instruments", instruments)?;
-    let mut ctx = LedgerContext::with_cash(Money::from_major_f64(initial_cash, Currency::Inr).unwrap());
+    let mut ctx =
+        LedgerContext::with_cash(Money::from_major_f64(initial_cash, Currency::Inr).unwrap());
     for raw in &raw_instruments {
         ctx.add_instrument(parse_instrument(raw)?);
     }

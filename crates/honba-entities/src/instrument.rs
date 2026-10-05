@@ -175,9 +175,7 @@ impl JsonSchema for Money {
                     (
                         "currency".to_string(),
                         schemars::schema::Schema::Object(schemars::schema::SchemaObject {
-                            instance_type: Some(
-                                schemars::schema::InstanceType::String.into(),
-                            ),
+                            instance_type: Some(schemars::schema::InstanceType::String.into()),
                             ..Default::default()
                         }),
                     ),
@@ -264,10 +262,12 @@ impl From<MoneyError> for crate::EntitiesError {
         match value {
             MoneyError::NonFinite => crate::EntitiesError::InvalidMoney("non-finite".into()),
             MoneyError::Overflow => crate::EntitiesError::InvalidMoney("overflow".into()),
-            MoneyError::CurrencyMismatch { left, right } => crate::EntitiesError::CurrencyMismatch {
-                left: left.to_string(),
-                right: right.to_string(),
-            },
+            MoneyError::CurrencyMismatch { left, right } => {
+                crate::EntitiesError::CurrencyMismatch {
+                    left: left.to_string(),
+                    right: right.to_string(),
+                }
+            }
             MoneyError::InvalidQuantity => {
                 crate::EntitiesError::InvalidMoney("non-finite quantity".into())
             }
@@ -302,7 +302,10 @@ impl Money {
 
     /// Returns a zero amount in the given currency.
     pub const fn zero(currency: Currency) -> Self {
-        Self { amount: 0, currency }
+        Self {
+            amount: 0,
+            currency,
+        }
     }
 
     /// Returns the amount in minor units.
@@ -351,7 +354,10 @@ impl std::ops::Add for Money {
         let (left, right) = self.checked_currency(rhs)?;
         left.amount
             .checked_add(right.amount)
-            .map(|amount| Money { amount, currency: left.currency })
+            .map(|amount| Money {
+                amount,
+                currency: left.currency,
+            })
             .ok_or_else(|| crate::EntitiesError::Arithmetic("money addition overflowed".into()))
     }
 }
@@ -364,7 +370,10 @@ impl std::ops::Sub for Money {
         let (left, right) = self.checked_currency(rhs)?;
         left.amount
             .checked_sub(right.amount)
-            .map(|amount| Money { amount, currency: left.currency })
+            .map(|amount| Money {
+                amount,
+                currency: left.currency,
+            })
             .ok_or_else(|| crate::EntitiesError::Arithmetic("money subtraction overflowed".into()))
     }
 }

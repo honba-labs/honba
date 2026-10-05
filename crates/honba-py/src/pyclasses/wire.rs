@@ -18,7 +18,7 @@ use std::collections::BTreeMap;
 use honba_entities::{Currency, Position, PositionSide, ScreenerFilterPredicate, Trade};
 use honba_messages::{
     AggressorSide, Bar, BarAggregation, Event, InstrumentId, Message, Order, OrderSide,
-    OrderStatus, OrderType, PriceType, TimeInForce, SCHEMA_VERSION, API_VERSION,
+    OrderStatus, OrderType, PriceType, TimeInForce, API_VERSION, SCHEMA_VERSION,
 };
 use honba_strategy::OrderIntent;
 

@@ -68,7 +68,12 @@ fn class(name: &str, schema: &Value) -> String {
     let required: Vec<String> = schema
         .get("required")
         .and_then(Value::as_array)
-        .map(|a| a.iter().filter_map(|v| v.as_str()).map(String::from).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str())
+                .map(String::from)
+                .collect()
+        })
         .unwrap_or_default();
 
     let mut fields = String::new();
@@ -84,7 +89,11 @@ fn class(name: &str, schema: &Value) -> String {
             } else {
                 format!("{base} | None")
             };
-            let default = if required.contains(prop) { "" } else { " = None" };
+            let default = if required.contains(prop) {
+                ""
+            } else {
+                " = None"
+            };
             fields.push_str(&format!("    {prop}: {rendered}{default}\n"));
         }
     }
@@ -95,7 +104,11 @@ fn class(name: &str, schema: &Value) -> String {
 }
 
 fn type_ref(reference: &str) -> String {
-    reference.rsplit('/').next().unwrap_or(reference).to_string()
+    reference
+        .rsplit('/')
+        .next()
+        .unwrap_or(reference)
+        .to_string()
 }
 
 /// Returns the comma-separated `Literal[...]` payload for an enum schema.
@@ -161,7 +174,10 @@ pub fn py_type(schema: &Value) -> String {
         Some("boolean") => "bool".to_string(),
         Some("null") => "None".to_string(),
         Some("array") => {
-            let item = schema.get("items").map(py_type).unwrap_or_else(|| "Any".to_string());
+            let item = schema
+                .get("items")
+                .map(py_type)
+                .unwrap_or_else(|| "Any".to_string());
             format!("list[{item}]")
         }
         Some("object") => {
@@ -212,7 +228,10 @@ mod tests {
             }
         });
         let out = alias("Response", &schema);
-        assert_eq!(out, "class Response:\n    error: ErrorDetail | None = None\n");
+        assert_eq!(
+            out,
+            "class Response:\n    error: ErrorDetail | None = None\n"
+        );
     }
 
     #[test]
@@ -227,7 +246,10 @@ mod tests {
         );
         set.insert("ErrorDetail", json!({"type": "object", "properties": {}}));
         let pyi = render_pyi(&set, 2, "1.0.0");
-        assert!(!pyi.contains("Optional["), "stubs must not use Optional:\n{pyi}");
+        assert!(
+            !pyi.contains("Optional["),
+            "stubs must not use Optional:\n{pyi}"
+        );
     }
 
     #[test]
@@ -239,7 +261,10 @@ mod tests {
 
     #[test]
     fn an_enum_becomes_a_literal_alias() {
-        let out = alias("OrderSide", &json!({"oneOf": [{"enum": ["buy"]}, {"enum": ["sell"]}]}));
+        let out = alias(
+            "OrderSide",
+            &json!({"oneOf": [{"enum": ["buy"]}, {"enum": ["sell"]}]}),
+        );
         assert_eq!(out, "OrderSide = Literal[\"buy\", \"sell\"]\n");
     }
 

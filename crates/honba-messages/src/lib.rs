@@ -76,7 +76,9 @@ pub mod orders;
 pub mod validation;
 
 pub use api::{ApiResponse, ApiVersion, ResponseEnvelope, API_VERSION};
-pub use endpoints::{Access, Endpoint, HttpMethod, ParamLocation, ENDPOINTS, WRITE_PATHS, write_endpoints};
+pub use endpoints::{
+    write_endpoints, Access, Endpoint, HttpMethod, ParamLocation, ENDPOINTS, WRITE_PATHS,
+};
 pub use errors::{ErrorCategory, ErrorCode, ErrorDetail};
 pub use events::{timestamp::UnixNanos, Event, Message, SCHEMA_VERSION};
 pub use identifiers::{Exchange, InstrumentId, OrderId, TradeId};

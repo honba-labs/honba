@@ -12,15 +12,33 @@ fn whole_major_amounts_construct_exactly_from_minor() {
 #[test]
 fn from_major_rounds_half_away_from_zero() {
     // Half away from zero is symmetric: buys and sells bias identically.
-    assert_eq!(Money::from_major_f64(10.005, Currency::Inr).unwrap().minor(), 1001);
-    assert_eq!(Money::from_major_f64(-10.005, Currency::Inr).unwrap().minor(), -1001);
-    assert_eq!(Money::from_major_f64(10.004, Currency::Inr).unwrap().minor(), 1000);
+    assert_eq!(
+        Money::from_major_f64(10.005, Currency::Inr)
+            .unwrap()
+            .minor(),
+        1001
+    );
+    assert_eq!(
+        Money::from_major_f64(-10.005, Currency::Inr)
+            .unwrap()
+            .minor(),
+        -1001
+    );
+    assert_eq!(
+        Money::from_major_f64(10.004, Currency::Inr)
+            .unwrap()
+            .minor(),
+        1000
+    );
 }
 
 #[test]
 fn from_major_rejects_non_finite_values() {
     for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-        assert!(Money::from_major_f64(bad, Currency::Inr).is_err(), "accepted {bad}");
+        assert!(
+            Money::from_major_f64(bad, Currency::Inr).is_err(),
+            "accepted {bad}"
+        );
     }
 }
 
@@ -32,7 +50,7 @@ fn from_major_rejects_overflow() {
 
 #[test]
 fn to_major_is_exact_division() {
-    let m = Money::new(123_45, Currency::Inr);
+    let m = Money::new(12_345, Currency::Inr);
     assert_eq!(m.to_major_f64(), 123.45);
 }
 
@@ -61,7 +79,7 @@ fn repeated_addition_does_not_drift() {
 fn quantity_times_price_rounds_to_the_nearest_minor_unit() {
     // 75 lots at 22,000.25 rounds to the paise it settles at.
     let notional = Money::mul_qty(75.0, 22_000.25, Currency::Inr).unwrap();
-    assert_eq!(notional.minor(), 1_650_018_75);
+    assert_eq!(notional.minor(), 165_001_875);
 }
 
 #[test]
@@ -93,7 +111,7 @@ fn a_negative_balance_is_representable() {
 fn a_money_value_round_trips_through_json() {
     // Serialization emits the integer — never a JSON float — so the wire is exact.
     let m = Money::from_major_f64(123.45, Currency::Inr).unwrap();
-    let v = serde_json::to_value(&m).unwrap();
+    let v = serde_json::to_value(m).unwrap();
     assert_eq!(v["amount"], serde_json::json!(12345));
     let back: Money = serde_json::from_value(v).unwrap();
     assert_eq!(back, m);
@@ -128,6 +146,6 @@ fn an_unknown_field_on_the_wire_is_rejected() {
 
 #[test]
 fn display_reads_in_major_units() {
-    assert_eq!(Money::new(123_45, Currency::Inr).to_string(), "INR 123.45");
+    assert_eq!(Money::new(12_345, Currency::Inr).to_string(), "INR 123.45");
     assert_eq!(Money::new(-50, Currency::Usd).to_string(), "USD -0.50");
 }

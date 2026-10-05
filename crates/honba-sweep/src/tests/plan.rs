@@ -128,7 +128,10 @@ fn invalid_cash_and_periods_are_refused_with_the_value_that_was_given() {
     for cash in [0.0, -1.0] {
         let minor = Money::from_major_f64(cash, Currency::Inr).unwrap().minor();
         assert_eq!(
-            plan_with(1).with_initial_cash(Money::from_major_f64(cash, Currency::Inr).unwrap()).validate().unwrap_err(),
+            plan_with(1)
+                .with_initial_cash(Money::from_major_f64(cash, Currency::Inr).unwrap())
+                .validate()
+                .unwrap_err(),
             SweepError::InvalidPlan(format!(
                 "initial_cash must be finite and positive, got {minor}"
             ))

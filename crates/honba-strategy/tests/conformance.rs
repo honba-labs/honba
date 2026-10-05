@@ -50,7 +50,9 @@ fn instrument(v: &Value) -> Instrument {
 }
 
 fn context(scenario: &Value) -> LedgerContext {
-    let mut ctx = LedgerContext::with_cash(Money::from_major_f64(scenario["initial_cash"].as_f64().unwrap(), Currency::Inr).unwrap());
+    let mut ctx = LedgerContext::with_cash(
+        Money::from_major_f64(scenario["initial_cash"].as_f64().unwrap(), Currency::Inr).unwrap(),
+    );
     for i in scenario["instruments"].as_array().unwrap() {
         ctx.add_instrument(instrument(i));
     }

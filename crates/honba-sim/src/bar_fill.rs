@@ -67,11 +67,7 @@ impl FillCosts {
         // settle to minor units once, so the total is a ledger-reproducible
         // value rather than a rounded-after-summation approximation.
         let flat = Money::from_major_f64(self.flat, currency);
-        let bps = Money::mul_qty(
-            quantity * price * self.bps / 10_000.0,
-            1.0,
-            currency,
-        );
+        let bps = Money::mul_qty(quantity * price * self.bps / 10_000.0, 1.0, currency);
         match (flat, bps) {
             (Ok(f), Ok(b)) => (f + b).unwrap_or_else(|_| Money::zero(currency)),
             // A non-finite input cannot produce a cost; fall back to zero costs

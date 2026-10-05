@@ -54,7 +54,12 @@ fn interface(name: &str, schema: &Value) -> String {
     let required: Vec<String> = schema
         .get("required")
         .and_then(Value::as_array)
-        .map(|a| a.iter().filter_map(|v| v.as_str()).map(String::from).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str())
+                .map(String::from)
+                .collect()
+        })
         .unwrap_or_default();
 
     if let Some(props) = schema.get("properties").and_then(Value::as_object) {
@@ -90,7 +95,11 @@ fn prop_name(name: &str) -> String {
 
 /// Strips a `#/...` prefix from a `$ref`.
 fn type_ref(reference: &str) -> String {
-    reference.rsplit('/').next().unwrap_or(reference).to_string()
+    reference
+        .rsplit('/')
+        .next()
+        .unwrap_or(reference)
+        .to_string()
 }
 
 /// Returns a literal union when `schema` enumerates string values.
@@ -189,7 +198,12 @@ fn record_or_map(schema: &Value) -> String {
         let required: Vec<String> = schema
             .get("required")
             .and_then(Value::as_array)
-            .map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect())
+            .map(|a| {
+                a.iter()
+                    .filter_map(Value::as_str)
+                    .map(String::from)
+                    .collect()
+            })
             .unwrap_or_default();
         if let Some(props) = props {
             let fields: Vec<String> = props
@@ -269,7 +283,10 @@ mod tests {
 
     #[test]
     fn a_ref_becomes_a_bare_type_name() {
-        assert_eq!(ts_type(&json!({"$ref": "#/components/schemas/Order"})), "Order");
+        assert_eq!(
+            ts_type(&json!({"$ref": "#/components/schemas/Order"})),
+            "Order"
+        );
     }
 
     #[test]

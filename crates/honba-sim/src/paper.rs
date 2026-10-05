@@ -92,7 +92,14 @@ impl ExecutionEngine for PaperExecution {
             OrderSide::Buy
         };
         self.fills.push(Trade::new(
-            order_id, instrument, side, qty, self.price, self.currency, t, t,
+            order_id,
+            instrument,
+            side,
+            qty,
+            self.price,
+            self.currency,
+            t,
+            t,
         ));
         Ok(())
     }

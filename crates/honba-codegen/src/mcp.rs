@@ -46,8 +46,18 @@ const TOOLS: &[Tool] = &[
         name: "sweep",
         description: "Run a seeded parameter sweep over a strategy manifest.",
         args: &[
-            ("strategy_manifest", "StrategyManifest", true, "The strategy to sweep."),
-            ("request", "SweepRequest", true, "Parameter ranges, trial count, and seed."),
+            (
+                "strategy_manifest",
+                "StrategyManifest",
+                true,
+                "The strategy to sweep.",
+            ),
+            (
+                "request",
+                "SweepRequest",
+                true,
+                "Parameter ranges, trial count, and seed.",
+            ),
         ],
     },
     Tool {
@@ -73,14 +83,22 @@ const TOOLS: &[Tool] = &[
     Tool {
         name: "get_instruments",
         description: "List instruments, optionally filtered by exchange or symbol.",
-        args: &[("query", "InstrumentsQuery", false, "Optional exchange and symbol filters.")],
+        args: &[(
+            "query",
+            "InstrumentsQuery",
+            false,
+            "Optional exchange and symbol filters.",
+        )],
     },
     Tool {
         name: "get_bars",
         description: "Fetch historical bars for an instrument.",
-        args: &[
-            ("query", "BarsQuery", true, "Timeframe and inclusive date range."),
-        ],
+        args: &[(
+            "query",
+            "BarsQuery",
+            true,
+            "Timeframe and inclusive date range.",
+        )],
     },
 ];
 
@@ -160,7 +178,10 @@ mod tests {
         let rendered = render(&set);
         let mut missing = Vec::new();
         collect_dangling(&rendered, &set, &mut missing);
-        assert!(missing.is_empty(), "MCP tools reference missing types: {missing:?}");
+        assert!(
+            missing.is_empty(),
+            "MCP tools reference missing types: {missing:?}"
+        );
     }
 
     #[test]
@@ -171,7 +192,10 @@ mod tests {
         assert!(manifest.get("properties").is_some());
         let tools = rendered["tools"].as_array().expect("tools array");
         let backtest = tools.iter().find(|t| t["name"] == "backtest").unwrap();
-        assert_eq!(backtest["inputSchema"]["properties"]["strategy_manifest"]["type"], "object");
+        assert_eq!(
+            backtest["inputSchema"]["properties"]["strategy_manifest"]["type"],
+            "object"
+        );
     }
 
     #[test]
@@ -192,7 +216,10 @@ mod tests {
             let props = tool["inputSchema"]["properties"].as_object().unwrap();
             for (name, schema) in props {
                 assert!(
-                    schema.get("description").and_then(Value::as_str).is_some_and(|d| !d.is_empty()),
+                    schema
+                        .get("description")
+                        .and_then(Value::as_str)
+                        .is_some_and(|d| !d.is_empty()),
                     "argument {name} of {} has no description",
                     tool["name"]
                 );

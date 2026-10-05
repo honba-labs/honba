@@ -211,7 +211,12 @@ mod tests {
     fn no_duplicate_endpoint_keys() {
         let mut seen = std::collections::BTreeSet::new();
         for (m, p) in ENDPOINTS {
-            assert!(seen.insert(format!("{} {}", m, p)), "duplicate: {} {}", m, p);
+            assert!(
+                seen.insert(format!("{} {}", m, p)),
+                "duplicate: {} {}",
+                m,
+                p
+            );
         }
     }
 }

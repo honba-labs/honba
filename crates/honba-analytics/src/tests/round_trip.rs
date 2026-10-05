@@ -20,8 +20,7 @@ fn fill(side: OrderSide, qty: f64, price: f64, ts: u64) -> Trade {
 }
 
 fn fill_with_costs(side: OrderSide, qty: f64, price: f64, ts: u64, costs: f64) -> Trade {
-    fill(side, qty, price, ts)
-        .with_costs(Money::from_major_f64(costs, Currency::Inr).unwrap())
+    fill(side, qty, price, ts).with_costs(Money::from_major_f64(costs, Currency::Inr).unwrap())
 }
 
 #[test]

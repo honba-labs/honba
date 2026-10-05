@@ -75,10 +75,7 @@ pub fn openapi_paths(set: &SchemaSet) -> Value {
 fn operation(set: &SchemaSet, method: &str, path: &'static str) -> Value {
     let mut op = Map::new();
     op.insert("summary".into(), json!(summary(method, path)));
-    op.insert(
-        "operationId".into(),
-        json!(operation_id(method, path)),
-    );
+    op.insert("operationId".into(), json!(operation_id(method, path)));
     op.insert("tags".into(), json!([tag_for(path)]));
 
     let mut params = Vec::new();
@@ -129,10 +126,12 @@ fn operation(set: &SchemaSet, method: &str, path: &'static str) -> Value {
     );
     op.insert("responses".into(), Value::Object(responses));
 
-    let is_write = WRITE_PATHS
-        .iter()
-        .any(|(m, p)| *m == method && *p == path);
-    let access = if is_write { Access::Write } else { Access::ReadOnly };
+    let is_write = WRITE_PATHS.iter().any(|(m, p)| *m == method && *p == path);
+    let access = if is_write {
+        Access::Write
+    } else {
+        Access::ReadOnly
+    };
     op.insert("x-honba-access".into(), json!(access_label(access)));
 
     Value::Object(op)
@@ -159,13 +158,18 @@ fn query_params(set: &SchemaSet, type_name: &str) -> Vec<Value> {
     let required: Vec<String> = schema
         .get("required")
         .and_then(Value::as_array)
-        .map(|a| a.iter().filter_map(|v| v.as_str()).map(String::from).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str())
+                .map(String::from)
+                .collect()
+        })
         .unwrap_or_default();
 
     props
         .iter()
         .filter(|(name, _)| !required.contains(*name))
-        .map(|(name, schema)| {
+        .map(|(name, _)| {
             json!({
                 "name": name,
                 "in": "query",
@@ -245,7 +249,10 @@ mod tests {
             let op = paths[path][method.to_ascii_lowercase()]
                 .as_object()
                 .unwrap_or_else(|| panic!("{method} {path} missing from spec"));
-            assert!(op.contains_key("responses"), "{method} {path} has no responses");
+            assert!(
+                op.contains_key("responses"),
+                "{method} {path} has no responses"
+            );
         }
     }
 
@@ -280,15 +287,27 @@ mod tests {
         // plan.md 4.3: the approval queue is gated off this label.
         let paths = paths();
         assert_eq!(paths["/orders"]["post"]["x-honba-access"], json!("write"));
-        assert_eq!(paths["/orders/{id}"]["delete"]["x-honba-access"], json!("write"));
-        assert_eq!(paths["/positions/close"]["post"]["x-honba-access"], json!("write"));
+        assert_eq!(
+            paths["/orders/{id}"]["delete"]["x-honba-access"],
+            json!("write")
+        );
+        assert_eq!(
+            paths["/positions/close"]["post"]["x-honba-access"],
+            json!("write")
+        );
     }
 
     #[test]
     fn a_read_endpoint_is_labelled_read_only() {
         let paths = paths();
-        assert_eq!(paths["/health"]["get"]["x-honba-access"], json!("read_only"));
-        assert_eq!(paths["/instruments"]["get"]["x-honba-access"], json!("read_only"));
+        assert_eq!(
+            paths["/health"]["get"]["x-honba-access"],
+            json!("read_only")
+        );
+        assert_eq!(
+            paths["/instruments"]["get"]["x-honba-access"],
+            json!("read_only")
+        );
     }
 
     #[test]
@@ -322,7 +341,10 @@ mod tests {
         let paths = openapi_paths(&set);
         let mut missing = Vec::new();
         check(&paths, &set, &mut missing);
-        assert!(missing.is_empty(), "unresolvable refs in paths: {missing:?}");
+        assert!(
+            missing.is_empty(),
+            "unresolvable refs in paths: {missing:?}"
+        );
     }
 
     fn check(value: &Value, set: &SchemaSet, missing: &mut Vec<String>) {

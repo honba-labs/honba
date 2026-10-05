@@ -193,7 +193,10 @@ mod tests {
         // added, so the artifact silently omits it.
         let set = full_registry();
         for name in published_names() {
-            assert!(set.get(name).is_some(), "{name} is published but not registered");
+            assert!(
+                set.get(name).is_some(),
+                "{name} is published but not registered"
+            );
         }
     }
 
@@ -201,7 +204,10 @@ mod tests {
     fn every_declared_request_and_response_name_is_registered() {
         let set = full_registry();
         for name in request_type_names() {
-            assert!(set.get(name).is_some(), "{name} is declared but not registered");
+            assert!(
+                set.get(name).is_some(),
+                "{name} is declared but not registered"
+            );
         }
     }
 

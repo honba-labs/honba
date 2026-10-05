@@ -194,8 +194,7 @@ impl Codegen {
 pub fn write_json_pretty(path: &Path, value: &Value) -> Result<()> {
     let mut text = serde_json::to_string_pretty(value).context("serializing JSON")?;
     text.push('\n');
-    std::fs::write(path, text)
-        .with_context(|| format!("writing {}", path.display()))
+    std::fs::write(path, text).with_context(|| format!("writing {}", path.display()))
 }
 
 #[cfg(test)]
@@ -214,7 +213,10 @@ mod tests {
     #[test]
     fn the_bundle_declares_a_draft_that_supports_defs() {
         let schema = Codegen::new().json_schema();
-        assert_eq!(schema["$schema"], json!("https://json-schema.org/draft/2020-12/schema"));
+        assert_eq!(
+            schema["$schema"],
+            json!("https://json-schema.org/draft/2020-12/schema")
+        );
         assert!(schema["$defs"].is_object());
     }
 
@@ -276,7 +278,10 @@ mod tests {
     fn the_openapi_document_has_no_dangling_refs() {
         let spec = Codegen::new().openapi();
         let components = &spec["components"]["schemas"];
-        assert_eq!(spec["paths"], endpoints::openapi_paths(&Codegen::new().schemas().clone()));
+        assert_eq!(
+            spec["paths"],
+            endpoints::openapi_paths(&Codegen::new().schemas().clone())
+        );
         let _ = components;
         let mut missing = Vec::new();
         check_component_refs(&spec, &mut missing);

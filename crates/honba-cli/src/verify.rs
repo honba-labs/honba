@@ -11,8 +11,8 @@ use std::path::Path;
 use honba_strategy::StrategyManifest;
 
 pub fn run(path: &Path) -> Result<()> {
-    let text = std::fs::read_to_string(path)
-        .with_context(|| format!("reading {}", path.display()))?;
+    let text =
+        std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
     let manifest: StrategyManifest = serde_json::from_str(&text)
         .with_context(|| format!("parsing {} as StrategyManifest", path.display()))?;
     manifest.validate().map_err(|e| anyhow::anyhow!("{e}"))?;
