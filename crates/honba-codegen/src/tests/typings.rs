@@ -100,3 +100,70 @@ fn rendering_is_deterministic_and_declares_versions() {
     assert!(a.contains("API_VERSION: str = \"2.0.0\""));
     assert!(a.contains("DO NOT EDIT"));
 }
+
+#[test]
+fn a_nullable_type_array_renders_as_an_optional_type_not_any() {
+    assert_eq!(py_type(&json!({"type": ["string", "null"]})), "str | None");
+    let out = class(
+        "Query",
+        &json!({"type": "object", "properties": {"tf": {"type": ["string", "null"]}}}),
+    );
+    assert_eq!(out, "class Query:\n    tf: str | None = None\n");
+}
+
+#[test]
+fn an_any_of_of_enums_collapses_to_one_literal() {
+    let schema = json!({"anyOf": [{"enum": ["a"]}, {"enum": ["b"]}]});
+    assert_eq!(py_type(&schema), "Literal[\"a\", \"b\"]");
+}
+
+#[test]
+fn a_nullable_enum_keeps_its_none_member() {
+    assert_eq!(
+        py_type(&json!({"enum": ["a", null]})),
+        "Literal[\"a\"] | None"
+    );
+    assert_eq!(py_type(&json!({"enum": [1, 2]})), "Literal[1, 2]");
+}
+
+#[test]
+fn duplicate_union_members_are_rendered_once() {
+    let schema = json!({"oneOf": [
+        {"type": "object", "properties": {"a": {"type": "string"}}},
+        {"type": "object", "properties": {"b": {"type": "string"}}}
+    ]});
+    assert_eq!(py_type(&schema), "dict[str, Any]");
+}
+
+#[test]
+fn a_class_with_a_keyword_field_uses_the_functional_typed_dict_form() {
+    // `class BarsQuery:\n    from: ...` is a SyntaxError; the shipped stub
+    // could not be imported or type-checked at all.
+    let schema = json!({
+        "type": "object",
+        "properties": {"from": {"type": ["string", "null"]}, "tf": {"type": "string"}},
+        "required": ["tf"]
+    });
+    let out = alias("BarsQuery", &schema);
+    assert_eq!(
+        out,
+        "BarsQuery = TypedDict(\"BarsQuery\", {\"from\": NotRequired[str | None], \"tf\": str})\n"
+    );
+}
+
+#[test]
+fn the_generic_envelope_has_its_type_variable_declared() {
+    // `Generic[T]` was emitted without importing Generic or defining T.
+    let mut set = SchemaSet::new();
+    set.insert("ResponseEnvelope", json!({"type": "object"}));
+    let pyi = render_pyi(&set, 3, "1.0.0");
+    assert!(pyi.contains("T = TypeVar(\"T\")\n"), "{pyi}");
+    assert!(pyi.contains("Generic"), "{pyi}");
+    let imports = pyi
+        .lines()
+        .find(|l| l.starts_with("from typing import"))
+        .unwrap();
+    for name in ["Generic", "TypeVar", "TypedDict", "Literal", "Any"] {
+        assert!(imports.contains(name), "{imports}");
+    }
+}

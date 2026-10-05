@@ -310,6 +310,75 @@ pub fn unresolved_local_refs(doc: &Value) -> Vec<String> {
         .collect()
 }
 
+/// The literal values a schema enumerates, when it is an enumeration.
+///
+/// Recognizes `{"enum": [...]}`, `{"const": v}`, and a `oneOf`/`anyOf` whose
+/// every member is one of those — the form `schemars` emits for a unit enum
+/// with documented variants. `allOf` is an intersection and is never read as
+/// a union of its members. Values are returned unfiltered (strings, numbers,
+/// booleans, `null`) so a renderer cannot silently drop a non-string member.
+pub(crate) fn enum_values(schema: &Value) -> Option<Vec<Value>> {
+    if let Some(values) = schema.get("enum").and_then(Value::as_array) {
+        return (!values.is_empty()).then(|| values.clone());
+    }
+    if let Some(value) = schema.get("const") {
+        return Some(vec![value.clone()]);
+    }
+    for key in ["oneOf", "anyOf"] {
+        if let Some(variants) = schema.get(key).and_then(Value::as_array) {
+            let mut out = Vec::new();
+            for variant in variants {
+                for value in enum_values(variant)? {
+                    if !out.contains(&value) {
+                        out.push(value);
+                    }
+                }
+            }
+            return (!out.is_empty()).then_some(out);
+        }
+    }
+    None
+}
+
+/// Joins union members, dropping repeats while keeping first-seen order.
+pub(crate) fn join_union(members: impl IntoIterator<Item = String>) -> String {
+    let mut seen: Vec<String> = Vec::new();
+    for member in members {
+        for part in split_union(&member) {
+            if !seen.iter().any(|s| s == part) {
+                seen.push(part.to_string());
+            }
+        }
+    }
+    seen.join(" | ")
+}
+
+/// Splits a rendered union at its top level only (not inside brackets/braces).
+fn split_union(rendered: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut depth = 0i32;
+    let mut start = 0;
+    let bytes = rendered.as_bytes();
+    let mut in_string = false;
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\\' if in_string => i += 1,
+            b'"' => in_string = !in_string,
+            b'[' | b'{' | b'(' | b'<' if !in_string => depth += 1,
+            b']' | b'}' | b')' | b'>' if !in_string => depth -= 1,
+            b'|' if !in_string && depth == 0 => {
+                parts.push(rendered[start..i].trim());
+                start = i + 1;
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    parts.push(rendered[start..].trim());
+    parts
+}
+
 /// The canonical registry: every type the wire contract publishes.
 ///
 /// Returned bare (no `#/...` prefix) so consumers can render it for their own

@@ -3,7 +3,11 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Generic, Literal, TypedDict, TypeVar
+
+from typing_extensions import NotRequired
+
+T = TypeVar("T")
 
 SCHEMA_VERSION: int = 3
 API_VERSION: str = "1.0.0"
@@ -27,13 +31,13 @@ class BacktestMetrics:
     trades: int
 
 class BacktestRequest:
-    bar_spec: Any | None = None
-    end: Any | None = None
-    initial_capital: Any | None = None
-    seed: Any | None = None
-    start: Any | None = None
-    strategy: Any | None = None
-    universe: Any | None = None
+    bar_spec: str | None = None
+    end: str | None = None
+    initial_capital: float | None = None
+    seed: int | None = None
+    start: str | None = None
+    strategy: str | None = None
+    universe: str | None = None
 
 class BacktestResponse:
     assumptions: Any | None = None
@@ -69,10 +73,7 @@ class BarType:
     instrument_id: InstrumentId
     spec: BarSpecification
 
-class BarsQuery:
-    from: Any | None = None
-    tf: Any | None = None
-    to: Any | None = None
+BarsQuery = TypedDict("BarsQuery", {"from": NotRequired[str | None], "tf": NotRequired[str | None], "to": NotRequired[str | None]})
 
 class BarsResponse:
     bars: list[Bar]
@@ -90,14 +91,14 @@ class CapabilityManifest:
 
 Currency = Literal["INR", "USD", "EUR", "GBP"]
 
-DataSourceConfig = dict[str, Any] | dict[str, Any]
+DataSourceConfig = dict[str, Any]
 
 class DepthLevel:
     price: float
     qty: float
 
 class DepthQuery:
-    depth: Any | None = None
+    depth: int | None = None
 
 class DepthResponse:
     asks: list[DepthLevel]
@@ -113,7 +114,7 @@ class ErrorDetail:
     message: str
     retryable: bool
 
-Event = dict[str, Any] | dict[str, Any] | dict[str, Any] | dict[str, Any] | dict[str, Any] | dict[str, Any] | dict[str, Any] | dict[str, Any]
+Event = dict[str, Any]
 
 Exchange = str
 
@@ -134,8 +135,8 @@ class InstrumentId:
     symbol: str
 
 class InstrumentsQuery:
-    exchange: Any | None = None
-    symbol: Any | None = None
+    exchange: str | None = None
+    symbol: str | None = None
 
 class InstrumentsResponse:
     instruments: list[Any]
@@ -155,12 +156,12 @@ class Order:
     instrument_id: InstrumentId
     order_id: OrderId
     order_type: OrderType
-    price: Any | None = None
+    price: float | None = None
     quantity: float
     side: OrderSide
     status: OrderStatus
     time_in_force: TimeInForce
-    trigger_price: Any | None = None
+    trigger_price: float | None = None
     ts_event: UnixNanos
     ts_init: UnixNanos
 
@@ -169,11 +170,11 @@ OrderId = str
 class OrderIntent:
     instrument_id: InstrumentId
     order_type: OrderType
-    price: Any | None = None
+    price: float | None = None
     quantity: float
     side: OrderSide
     time_in_force: TimeInForce
-    trigger_price: Any | None = None
+    trigger_price: float | None = None
 
 OrderSide = Literal["buy", "sell", "no_order_side"]
 
@@ -183,11 +184,11 @@ OrderType = Literal["market", "limit", "stop_market", "stop_limit"]
 
 class OrdersRequest:
     instrument_id: InstrumentId | None = None
-    order_type: Any | None = None
-    price: Any | None = None
-    qty: Any | None = None
-    side: Any | None = None
-    tif: Any | None = None
+    order_type: str | None = None
+    price: float | None = None
+    qty: float | None = None
+    side: str | None = None
+    tif: str | None = None
 
 class OrdersResponse:
     orders: list[Order]
@@ -219,8 +220,8 @@ class QuoteTick:
     ts_init: UnixNanos
 
 class QuotesQuery:
-    symbols: Any | None = None
-    venue: Any | None = None
+    symbols: str | None = None
+    venue: str | None = None
 
 class QuotesResponse:
     quotes: list[QuoteTick]
@@ -239,8 +240,8 @@ class ScreenerFilterPredicate:
     value: Any
 
 class StrategiesRequest:
-    code: Any | None = None
-    name: Any | None = None
+    code: str | None = None
+    name: str | None = None
 
 class StrategiesResponse:
     strategies: list[Any]
@@ -266,9 +267,9 @@ class SweepReportResponse:
 
 class SweepRequest:
     params: Any | None = None
-    seed: Any | None = None
-    strategy: Any | None = None
-    trials: Any | None = None
+    seed: int | None = None
+    strategy: str | None = None
+    trials: int | None = None
 
 class SweepResponse:
     job_id: str
@@ -298,7 +299,7 @@ TradeId = str
 class TradesResponse:
     trades: list[Trade]
 
-Universe = dict[str, Any] | dict[str, Any]
+Universe = dict[str, Any]
 
 class UnixNanos:
     iso: str

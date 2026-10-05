@@ -52,7 +52,7 @@ def test_no_python_module_redeclares_a_version_literal() -> None:
     offenders = [
         hit
         for path in sorted(SRC.rglob("*.py"))
-        if "_generated" not in path.parts
+        if "generated" not in path.parts
         for hit in _literal_version_assignments(path)
     ]
     assert offenders == []

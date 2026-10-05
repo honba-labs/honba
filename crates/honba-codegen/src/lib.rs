@@ -151,8 +151,9 @@ impl Codegen {
 
     /// Writes [`Codegen::pyi`] into `output_dir/__init__.pyi`.
     ///
-    /// The target is `wire/generated/__init__.pyi`: generated and never edited,
-    /// with hand-extended types living beside it.
+    /// The committed target is `python/src/honba/wire/generated/__init__.pyi`
+    /// (`make pyi`): generated and never edited, with the hand-written wire
+    /// models (`honba.wire`) living beside it.
     pub fn write_pyi(&self, output_dir: &Path) -> Result<PathBuf> {
         std::fs::create_dir_all(output_dir).context("creating output directory")?;
         let path = output_dir.join("__init__.pyi");

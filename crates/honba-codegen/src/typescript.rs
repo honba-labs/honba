@@ -102,42 +102,20 @@ fn type_ref(reference: &str) -> String {
         .to_string()
 }
 
-/// Returns a literal union when `schema` enumerates string values.
+/// Returns a literal union when `schema` enumerates values.
 ///
-/// Handles both the plain `{"enum": [...]}` form and the `oneOf`-of-single-value
-/// `enum`s that `schemars` emits for unit enums — the form that previously
-/// collapsed every enum to `any`. Returns `None` when the values are not all
-/// strings.
+/// Handles the plain `{"enum": [...]}` form, `const`, and the
+/// `oneOf`-of-single-value `enum`s that `schemars` emits for unit enums — the
+/// form that previously collapsed every enum to `any`. Every value is kept:
+/// a `null` member renders as `null` rather than being dropped.
 fn enum_union(schema: &Value) -> Option<String> {
-    if let Some(values) = direct_enum(schema) {
-        return Some(values);
-    }
-    for key in ["oneOf", "anyOf", "allOf"] {
-        let variants = schema.get(key)?.as_array()?;
-        let mut literals = Vec::new();
-        for variant in variants {
-            let found = direct_enum(variant)?;
-            literals.extend(found.split(" | ").map(str::to_string));
-        }
-        if !literals.is_empty() {
-            return Some(literals.join(" | "));
-        }
-    }
-    None
+    let values = crate::schemas::enum_values(schema)?;
+    Some(crate::schemas::join_union(values.iter().map(ts_literal)))
 }
 
-fn direct_enum(schema: &Value) -> Option<String> {
-    let values = schema.get("enum")?.as_array()?;
-    let literals: Vec<String> = values
-        .iter()
-        .filter_map(Value::as_str)
-        .map(|s| format!("\"{s}\""))
-        .collect();
-    if literals.is_empty() {
-        None
-    } else {
-        Some(literals.join(" | "))
-    }
+/// A JSON value as a TypeScript literal type; JSON string syntax is valid JS.
+fn ts_literal(value: &Value) -> String {
+    value.to_string()
 }
 
 /// Maps a JSON Schema fragment to a TypeScript type expression.
@@ -148,10 +126,16 @@ pub fn ts_type(schema: &Value) -> String {
     if let Some(literals) = enum_union(schema) {
         return literals;
     }
+    // `Option<T>` arrives as {"type": ["T", "null"]}: render each member.
+    if let Some(types) = schema.get("type").and_then(Value::as_array) {
+        return crate::schemas::join_union(types.iter().map(|t| {
+            let mut member = schema.clone();
+            member["type"] = t.clone();
+            ts_type(&member)
+        }));
+    }
     match schema.get("type").and_then(Value::as_str) {
         Some("string") => "string".to_string(),
-        // u64 nanosecond timestamps exceed Number.MAX_SAFE_INTEGER (plan.md 4.2),
-        // so they cross the TypeScript boundary as strings, not numbers.
         Some("integer") => "number".to_string(),
         Some("number") => "number".to_string(),
         Some("boolean") => "boolean".to_string(),
@@ -161,22 +145,30 @@ pub fn ts_type(schema: &Value) -> String {
                 .get("items")
                 .map(ts_type)
                 .unwrap_or_else(|| "unknown".to_string());
-            format!("{item}[]")
+            if item.contains(" | ") {
+                format!("({item})[]")
+            } else {
+                format!("{item}[]")
+            }
         }
         Some("object") => record_or_map(schema),
         _ => {
             // `allOf` is an intersection, not a union: a single member must be
             // rendered as that member (this is how a newtype wrapper around a
-            // ref arrives), and several members as an inline object shape.
-            for key in ["oneOf", "anyOf", "allOf"] {
+            // ref arrives), and several members as an intersection.
+            for key in ["oneOf", "anyOf"] {
                 if let Some(variants) = schema.get(key).and_then(Value::as_array) {
-                    let types: Vec<String> = variants.iter().map(ts_type).collect();
-                    if types.len() == 1 {
-                        return types.into_iter().next().expect("one variant");
+                    if !variants.is_empty() {
+                        return crate::schemas::join_union(variants.iter().map(ts_type));
                     }
-                    if !types.is_empty() {
-                        return types.join(" | ");
-                    }
+                }
+            }
+            if let Some(members) = schema.get("allOf").and_then(Value::as_array) {
+                let types: Vec<String> = members.iter().map(ts_type).collect();
+                match types.len() {
+                    0 => {}
+                    1 => return types.into_iter().next().expect("one member"),
+                    _ => return types.join(" & "),
                 }
             }
             if schema.get("properties").is_some() || schema.get("additionalProperties").is_some() {

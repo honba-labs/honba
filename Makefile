@@ -40,11 +40,11 @@ check-openapi:
 	git diff --exit-code schema/openapi
 
 pyi:
-	cargo run --bin honba -- schema export --pyi python/src/honba/_generated
+	cargo run --bin honba -- schema export --pyi python/src/honba/wire/generated
 
 check-pyi:
-	cargo run --bin honba -- schema export --pyi python/src/honba/_generated
-	git diff --exit-code python/src/honba/_generated
+	cargo run --bin honba -- schema export --pyi python/src/honba/wire/generated
+	git diff --exit-code python/src/honba/wire/generated
 
 mcp:
 	cargo run --bin honba -- schema export --mcp schema/mcp

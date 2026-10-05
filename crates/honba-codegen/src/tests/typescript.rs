@@ -117,3 +117,53 @@ fn rendering_is_deterministic() {
     assert_eq!(first, second);
     assert!(first.find("Apple").unwrap() < first.find("Zebra").unwrap());
 }
+
+#[test]
+fn a_nullable_type_array_renders_as_a_union_not_unknown() {
+    // schemars emits `Option<String>` as {"type": ["string", "null"]}; the old
+    // renderer only read a string `type` and fell through to `unknown`.
+    assert_eq!(
+        ts_type(&json!({"type": ["string", "null"]})),
+        "string | null"
+    );
+    assert_eq!(
+        ts_type(&json!({"type": ["integer", "null"], "format": "uint64"})),
+        "number | null"
+    );
+}
+
+#[test]
+fn a_nullable_enum_keeps_its_null_member() {
+    // Non-string enum values used to be dropped silently.
+    assert_eq!(ts_type(&json!({"enum": ["a", null]})), "\"a\" | null");
+    assert_eq!(ts_type(&json!({"enum": [1, 2]})), "1 | 2");
+}
+
+#[test]
+fn an_any_of_of_enums_collapses_to_one_union() {
+    let schema = json!({"anyOf": [{"enum": ["a"]}, {"enum": ["b", "c"]}]});
+    assert_eq!(ts_type(&schema), "\"a\" | \"b\" | \"c\"");
+}
+
+#[test]
+fn an_all_of_of_enums_is_not_rendered_as_a_union() {
+    // allOf is an intersection; a single member is that member.
+    let schema = json!({"allOf": [{"$ref": "#/$defs/Side"}]});
+    assert_eq!(ts_type(&schema), "Side");
+}
+
+#[test]
+fn a_const_renders_as_a_literal() {
+    assert_eq!(ts_type(&json!({"const": "quote"})), "\"quote\"");
+}
+
+#[test]
+fn a_string_literal_with_quotes_is_escaped() {
+    assert_eq!(ts_type(&json!({"enum": ["a\"b"]})), "\"a\\\"b\"");
+}
+
+#[test]
+fn duplicate_union_members_are_rendered_once() {
+    let schema = json!({"anyOf": [{"type": "string"}, {"type": "string"}, {"type": "null"}]});
+    assert_eq!(ts_type(&schema), "string | null");
+}
