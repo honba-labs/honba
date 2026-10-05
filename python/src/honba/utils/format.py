@@ -1,5 +1,7 @@
 """Formatting utilities for different locales."""
+
 from __future__ import annotations
+
 from typing import Any
 
 CURRENCY_SYMBOLS = {
@@ -68,7 +70,8 @@ def format_eur(amount: Any) -> str:
 def format_date_indian(dt: Any) -> str:
     """Format date in Indian style DD-MM-YYYY."""
     try:
-        from datetime import datetime, date
+        from datetime import date, datetime
+
         if isinstance(dt, (datetime, date)):
             return dt.strftime("%d-%m-%Y")
         if hasattr(dt, "strftime"):
@@ -87,7 +90,8 @@ def format_date_indian(dt: Any) -> str:
 def format_date_us(dt: Any) -> str:
     """Format date in US style MM-DD-YYYY."""
     try:
-        from datetime import datetime, date
+        from datetime import date, datetime
+
         if isinstance(dt, (datetime, date)):
             return dt.strftime("%m-%d-%Y")
         if hasattr(dt, "strftime"):
@@ -105,7 +109,8 @@ def format_date_us(dt: Any) -> str:
 
 def format_date_iso(dt: Any) -> str:
     try:
-        from datetime import datetime, date
+        from datetime import date, datetime
+
         if isinstance(dt, (datetime, date)):
             return dt.strftime("%Y-%m-%d")
         return str(dt)

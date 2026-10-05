@@ -1,5 +1,5 @@
 import datetime as dt
-import pytest
+
 from honba.entities.instrument import InstrumentId
 from honba.research.data_loader.nse import NseBhavcopyProvider, parse_bhavcopy_csv
 from honba.screener.coverage import DateInterval

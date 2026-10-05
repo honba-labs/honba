@@ -85,7 +85,11 @@ class DataService:
 
             records = self.store.coverage(inst, timeframe)
             # Filter out empty records if needed or keep final/provisional
-            covered = [r.interval for r in records if r.status in (CoverageStatus.FINAL, CoverageStatus.PROVISIONAL)]
+            covered = [
+                r.interval
+                for r in records
+                if r.status in (CoverageStatus.FINAL, CoverageStatus.PROVISIONAL)
+            ]
             gaps = plan_gaps(required_interval, covered, max_gap_days=max_gap_days)
             if gaps:
                 gaps_map[inst] = gaps
@@ -117,7 +121,9 @@ class DataService:
 
                 for provider in self.providers:
                     try:
-                        bars = provider.fetch(inst, plan.timeframe, gap, progress_callback=progress_callback)
+                        bars = provider.fetch(
+                            inst, plan.timeframe, gap, progress_callback=progress_callback
+                        )
                         if not bars:
                             continue
                         source_used = provider.name

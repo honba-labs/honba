@@ -73,17 +73,17 @@ class CostBreakdown:
 # Rate tables (2025-26)
 # ---------------------------------------------------------------------------
 # Equity delivery (CNC)
-_EQ_DEL_STT_SELL = 0.0010          # 0.10 % on sell
-_EQ_DEL_STAMP_BUY = 0.00015        # 0.015 % on buy
-_EQ_DEL_EXCH = 0.0000297           # NSE transaction charge
-_EQ_DEL_SEBI = 0.000001            # ₹10 / crore
-_EQ_DEL_IPFT = 0.000001            # approx
-_EQ_DEL_BROKERAGE_PCT = 0.0003     # 0.03 %
-_EQ_DEL_BROKERAGE_CAP = 20.0       # ₹20 per order
+_EQ_DEL_STT_SELL = 0.0010  # 0.10 % on sell
+_EQ_DEL_STAMP_BUY = 0.00015  # 0.015 % on buy
+_EQ_DEL_EXCH = 0.0000297  # NSE transaction charge
+_EQ_DEL_SEBI = 0.000001  # ₹10 / crore
+_EQ_DEL_IPFT = 0.000001  # approx
+_EQ_DEL_BROKERAGE_PCT = 0.0003  # 0.03 %
+_EQ_DEL_BROKERAGE_CAP = 20.0  # ₹20 per order
 
 # Equity intraday (MIS)
-_EQ_INT_STT_SELL = 0.00025         # 0.025 % on sell
-_EQ_INT_STAMP_BUY = 0.00003        # 0.003 % on buy
+_EQ_INT_STT_SELL = 0.00025  # 0.025 % on sell
+_EQ_INT_STAMP_BUY = 0.00003  # 0.003 % on buy
 _EQ_INT_EXCH = 0.0000297
 _EQ_INT_SEBI = 0.000001
 _EQ_INT_IPFT = 0.000001

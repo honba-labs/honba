@@ -1,5 +1,7 @@
 import datetime as dt
+
 import pytest
+
 from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
 from honba.screener.coverage import (
@@ -8,13 +10,11 @@ from honba.screener.coverage import (
     DateInterval,
 )
 from honba.screener.ports import (
-    BarStore,
     InMemoryBarStore,
     InMemoryMarketDataProvider,
-    MarketDataProvider,
     validate_bar,
 )
-from honba.screener.service import DataService, MissingDataPolicy
+from honba.screener.service import DataService
 
 
 def test_validate_bar():
@@ -41,8 +41,24 @@ def test_in_memory_bar_store_roundtrip():
     assert store.coverage(inst, timeframe) == []
 
     # Create dummy bars for 2025-01-06 and 2025-01-07
-    b1 = Bar(inst, int(dt.datetime(2025, 1, 6, 9, 15).timestamp() * 1e9), 100.0, 105.0, 95.0, 102.0, 1000.0)
-    b2 = Bar(inst, int(dt.datetime(2025, 1, 7, 9, 15).timestamp() * 1e9), 102.0, 108.0, 101.0, 107.0, 1500.0)
+    b1 = Bar(
+        inst,
+        int(dt.datetime(2025, 1, 6, 9, 15).timestamp() * 1e9),
+        100.0,
+        105.0,
+        95.0,
+        102.0,
+        1000.0,
+    )
+    b2 = Bar(
+        inst,
+        int(dt.datetime(2025, 1, 7, 9, 15).timestamp() * 1e9),
+        102.0,
+        108.0,
+        101.0,
+        107.0,
+        1500.0,
+    )
 
     record = CoverageRecord(
         exchange="NSE",

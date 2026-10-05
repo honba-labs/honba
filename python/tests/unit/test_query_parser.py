@@ -114,7 +114,13 @@ def catalog() -> MetricCatalog:
                 group="SECURITY",
                 value_type=ValueType.ENUM,
             ),
-            _m("description", "name", ["company name"], group="SECURITY", value_type=ValueType.STRING),
+            _m(
+                "description",
+                "name",
+                ["company name"],
+                group="SECURITY",
+                value_type=ValueType.STRING,
+            ),
         ]
     )
 
@@ -153,9 +159,7 @@ def test_comparison_phrases(catalog, phrase, expected_op, expected_val):
 
 
 def test_between_operator(catalog):
-    group = parse_filters(
-        "market cap between 5000 Cr and 2 Tn", catalog=catalog, market="india"
-    )
+    group = parse_filters("market cap between 5000 Cr and 2 Tn", catalog=catalog, market="india")
     assert len(group.items) == 1
     pred = group.items[0]
     assert pred.key == "market_cap_basic"
@@ -195,9 +199,7 @@ def test_contains_and_like(catalog):
 
 
 def test_crossovers(catalog):
-    group = parse_filters(
-        "50 day sma crosses above 200 day sma", catalog=catalog, market="india"
-    )
+    group = parse_filters("50 day sma crosses above 200 day sma", catalog=catalog, market="india")
     pred = group.items[0]
     assert pred.key == "SMA50"
     assert pred.op == FilterOp.CROSSES_ABOVE

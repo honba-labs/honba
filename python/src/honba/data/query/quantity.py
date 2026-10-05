@@ -11,8 +11,8 @@ import re
 from dataclasses import dataclass
 from typing import NamedTuple
 
-from honba.wire.screener import MetricDefinition, UnitType, ValueType
 from honba.markets.india.units import INDIA_CURRENCY_SYMBOLS, INDIA_MULTIPLIERS
+from honba.wire.screener import MetricDefinition, UnitType, ValueType
 
 
 class QuantityError(ValueError):
@@ -138,7 +138,9 @@ def parse_quantity(text: str, market: str | None = None) -> Quantity:
 
             if curr_token in curr_map:
                 if currency and currency != curr_map[curr_token]:
-                    raise QuantityError(f"conflicting currencies: {currency} and {curr_map[curr_token]}")
+                    raise QuantityError(
+                        f"conflicting currencies: {currency} and {curr_map[curr_token]}"
+                    )
                 currency = curr_map[curr_token]
             else:
                 raise QuantityError(f"unsupported currency marker: {tokens[1]!r}")

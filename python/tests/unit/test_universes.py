@@ -1,9 +1,6 @@
-import pytest
 from honba.entities.instrument import InstrumentId
 from honba.markets.india.universes import (
-    NIFTY_50_SYMBOLS,
     NIFTY_200_ALPHA_30_SYMBOLS,
-    UNIVERSES,
     resolve_universe,
 )
 

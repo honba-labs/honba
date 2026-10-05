@@ -600,5 +600,6 @@ async def verify_adapter_contract(
             await adapter.disconnect()
     if disconnect:
         _expect(
-            adapter.is_connected() is False, "disconnect() left the adapter claiming to be connected"
+            adapter.is_connected() is False,
+            "disconnect() left the adapter claiming to be connected",
         )

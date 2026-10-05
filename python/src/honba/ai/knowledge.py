@@ -13,15 +13,14 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Any
 
 from honba.entities.screener import FilterOp, MetricPeriod, Timeframe
-from honba.markets.india.units import INDIA_CURRENCY_SYMBOLS, INDIA_MULTIPLIERS
+from honba.markets.india.units import INDIA_MULTIPLIERS
 from honba.query.quantity import SHARED_MULTIPLIERS
 from honba.screener.catalog import load_catalog
 from honba.screener.presets import LOOKBACK_BARS, PRESETS
-
 
 FILTER_GRAMMAR_EBNF = """
 filters    := or_expr
@@ -60,7 +59,11 @@ FEW_SHOT_EXAMPLES: list[dict[str, Any]] = [
         "query": "stocks near 52 week low with pe under 20",
         "filter_text": "close near 52 week low and pe ratio under 20",
         "resolved_predicates": [
-            {"key": "close", "op": "lte", "value": {"metric": "price_52_week_low", "tolerance": 0.05}},
+            {
+                "key": "close",
+                "op": "lte",
+                "value": {"metric": "price_52_week_low", "tolerance": 0.05},
+            },
             {"key": "price_earnings_ttm", "op": "lt", "value": 20.0},
         ],
     },

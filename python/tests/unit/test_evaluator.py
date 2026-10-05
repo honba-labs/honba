@@ -1,18 +1,15 @@
 import datetime as dt
-import pytest
+
 from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
 from honba.entities.screener import (
     FilterOp,
-    MetricRef,
     ScreenerFilterGroup,
     ScreenerFilterPredicate,
-    ScreenerScanRequest,
 )
 from honba.screener.evaluator import (
-    evaluate_predicate_on_bars,
     evaluate_group_on_bars,
-    extract_metrics_from_bars,
+    evaluate_predicate_on_bars,
 )
 
 
@@ -54,9 +51,13 @@ def test_evaluate_moving_averages():
     bars = []
     base_ts = int(dt.datetime(2025, 1, 1, 9, 15).timestamp() * 1e9)
     for i in range(20):
-        bars.append(Bar(inst, base_ts + i * 86400 * 1_000_000_000, 100.0, 100.0, 100.0, 100.0, 1000.0))
+        bars.append(
+            Bar(inst, base_ts + i * 86400 * 1_000_000_000, 100.0, 100.0, 100.0, 100.0, 1000.0)
+        )
     for i in range(20, 25):
-        bars.append(Bar(inst, base_ts + i * 86400 * 1_000_000_000, 200.0, 200.0, 200.0, 200.0, 1000.0))
+        bars.append(
+            Bar(inst, base_ts + i * 86400 * 1_000_000_000, 200.0, 200.0, 200.0, 200.0, 1000.0)
+        )
 
     # SMA20 of last 20 bars: 15 bars of 100 + 5 bars of 200 = (1500 + 1000) / 20 = 125.0
     pred_sma = ScreenerFilterPredicate(key="SMA20", op=FilterOp.GT, value=120.0)

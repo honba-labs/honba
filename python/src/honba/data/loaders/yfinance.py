@@ -19,7 +19,7 @@ import yfinance as yf
 from honba.domain.bar import Bar
 from honba.domain.instrument import InstrumentId
 from honba.screener.coverage import DateInterval
-from honba.screener.ports import MarketDataProvider, validate_bar
+from honba.screener.ports import validate_bar
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +90,7 @@ TIMEFRAME_MAP: dict[str, str] = {
 
 # Maximum chunk size in days per request to prevent yfinance truncation or timeouts
 MAX_CHUNK_DAYS: dict[str, int] = {
-    "1m": 7,     # yfinance allows max 7 days per 1m call
+    "1m": 7,  # yfinance allows max 7 days per 1m call
     "2m": 50,
     "5m": 50,
     "15m": 50,
@@ -112,7 +112,7 @@ def to_yfinance_symbol(
     custom_map: dict[str, str] | None = None,
 ) -> str:
     """Translate an InstrumentId or symbol string to a yfinance ticker.
-    
+
     Examples:
         InstrumentId("RELIANCE", "NSE") -> "RELIANCE.NS"
         InstrumentId("TCS", "BSE")      -> "TCS.BO"
@@ -197,13 +197,15 @@ def dataframe_to_bars(
         if not {"open", "high", "low", "close", "volume"}.issubset(col_map.keys()):
             logger.warning("Missing required OHLCV columns in DataFrame: %s", df.columns.tolist())
             return []
-        df = df.rename(columns={
-            col_map["open"]: "Open",
-            col_map["high"]: "High",
-            col_map["low"]: "Low",
-            col_map["close"]: "Close",
-            col_map["volume"]: "Volume",
-        })
+        df = df.rename(
+            columns={
+                col_map["open"]: "Open",
+                col_map["high"]: "High",
+                col_map["low"]: "Low",
+                col_map["close"]: "Close",
+                col_map["volume"]: "Volume",
+            }
+        )
 
     # Nano timestamps calculation
     start_ns = 0
@@ -224,7 +226,13 @@ def dataframe_to_bars(
         except (ValueError, TypeError):
             continue
 
-        if not (math.isfinite(op) and math.isfinite(hi) and math.isfinite(lo) and math.isfinite(cl) and math.isfinite(vo)):
+        if not (
+            math.isfinite(op)
+            and math.isfinite(hi)
+            and math.isfinite(lo)
+            and math.isfinite(cl)
+            and math.isfinite(vo)
+        ):
             continue
 
         # Clamp minor precision artifacts where hi < max(op, cl) or lo > min(op, cl)
@@ -244,7 +252,11 @@ def dataframe_to_bars(
                 ts = int(idx.timestamp() * 1e9)
         elif isinstance(idx, (dt.datetime, dt.date)):
             if is_daily_or_longer and is_india:
-                bar_date = idx if isinstance(idx, dt.date) and not isinstance(idx, dt.datetime) else idx.date()
+                bar_date = (
+                    idx
+                    if isinstance(idx, dt.date) and not isinstance(idx, dt.datetime)
+                    else idx.date()
+                )
                 dt_bar = dt.datetime.combine(bar_date, dt.time(9, 15), tzinfo=IST_TZ)
                 ts = int(dt_bar.timestamp() * 1e9)
             elif isinstance(idx, dt.datetime):
@@ -297,7 +309,7 @@ def _chunk_interval(
 
 class YFinanceProvider:
     """MarketDataProvider implementation for fetching historical market data via yfinance.
-    
+
     Supports:
     - NSE and BSE equities with automatic '.NS' / '.BO' ticker resolution
     - Indian indices (NIFTY50, BANKNIFTY, SENSEX, etc.)
@@ -414,7 +426,14 @@ class YFinanceProvider:
                     time.sleep(self.rate_limit_pause * (2 ** (attempt - 1)))
 
         if last_error:
-            logger.warning("Failed fetching %s [%s, %s] after %d attempts: %s", instrument, start_str, end_str, self.max_retries, last_error)
+            logger.warning(
+                "Failed fetching %s [%s, %s] after %d attempts: %s",
+                instrument,
+                start_str,
+                end_str,
+                self.max_retries,
+                last_error,
+            )
         return []
 
     def fetch_df(
@@ -431,8 +450,16 @@ class YFinanceProvider:
         else:
             inst = InstrumentId(symbol_or_instrument, exchange)
 
-        start_date = dt.date.fromisoformat(start) if isinstance(start, str) else (start or dt.date(2020, 1, 1))
-        end_date = dt.date.fromisoformat(end) if isinstance(end, str) else (end or dt.date.today() + dt.timedelta(days=1))
+        start_date = (
+            dt.date.fromisoformat(start)
+            if isinstance(start, str)
+            else (start or dt.date(2020, 1, 1))
+        )
+        end_date = (
+            dt.date.fromisoformat(end)
+            if isinstance(end, str)
+            else (end or dt.date.today() + dt.timedelta(days=1))
+        )
 
         ticker_sym = to_yfinance_symbol(inst, custom_map=self.symbol_map)
         yf_interval = normalize_timeframe(timeframe)

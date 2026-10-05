@@ -6,8 +6,6 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from honba.domain.bar import Bar
-from honba.domain.instrument import InstrumentId
 from honba.data.loaders.yfinance import (
     YFinanceProvider,
     _chunk_interval,
@@ -16,6 +14,7 @@ from honba.data.loaders.yfinance import (
     normalize_timeframe,
     to_yfinance_symbol,
 )
+from honba.domain.instrument import InstrumentId
 from honba.screener.coverage import DateInterval
 from honba.screener.ports import InMemoryBarStore, validate_bar
 from honba.screener.service import DataService
@@ -51,7 +50,9 @@ class TestSymbolTranslation:
         assert from_yfinance_symbol("TCS.BO") == InstrumentId("TCS", "BSE")
         assert from_yfinance_symbol("^NSEI") == InstrumentId("NIFTY50", "NSE")
         assert from_yfinance_symbol("^BSESN") == InstrumentId("SENSEX", "BSE")
-        assert from_yfinance_symbol("AAPL", default_exchange="NASDAQ") == InstrumentId("AAPL", "NASDAQ")
+        assert from_yfinance_symbol("AAPL", default_exchange="NASDAQ") == InstrumentId(
+            "AAPL", "NASDAQ"
+        )
 
 
 class TestTimeframeNormalization:

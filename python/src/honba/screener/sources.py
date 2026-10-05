@@ -17,7 +17,6 @@ from honba.markets.india.calendar import NseCalendar
 from honba.markets.india.universes import resolve_universe
 from honba.screener.coverage import DateInterval
 from honba.screener.evaluator import evaluate_group_on_bars, extract_metrics_from_bars
-from honba.screener.ports import ScreenerSource
 from honba.screener.presets import get_lookback_bars
 from honba.screener.service import DataService
 
@@ -59,7 +58,9 @@ class LocalScreenerSource:
     ) -> None:
         self.data_service = data_service
         self.calendar = calendar or NseCalendar()
-        self.default_instruments = list(default_instruments) if default_instruments is not None else None
+        self.default_instruments = (
+            list(default_instruments) if default_instruments is not None else None
+        )
 
     def scan(
         self, request: ScreenerScanRequest, asof: dt.date | None = None

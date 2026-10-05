@@ -140,11 +140,19 @@ class OrderIntent:
     ) -> OrderIntent: ...
     @staticmethod
     def stop_limit_buy(
-        symbol: str, quantity: float, trigger_price: float, limit_price: float, exchange: str = "NSE"
+        symbol: str,
+        quantity: float,
+        trigger_price: float,
+        limit_price: float,
+        exchange: str = "NSE",
     ) -> OrderIntent: ...
     @staticmethod
     def stop_limit_sell(
-        symbol: str, quantity: float, trigger_price: float, limit_price: float, exchange: str = "NSE"
+        symbol: str,
+        quantity: float,
+        trigger_price: float,
+        limit_price: float,
+        exchange: str = "NSE",
     ) -> OrderIntent: ...
 
 class RustSmaCrossover:

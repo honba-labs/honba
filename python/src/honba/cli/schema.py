@@ -8,7 +8,9 @@ import typer
 
 from honba.cli._schema_export import export_json_schema, generate_typescript
 
-app = typer.Typer(help="Export canonical schemas and generate client contracts", no_args_is_help=True)
+app = typer.Typer(
+    help="Export canonical schemas and generate client contracts", no_args_is_help=True
+)
 
 
 @app.command("export")

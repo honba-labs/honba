@@ -69,9 +69,7 @@ def _compute_series(metric_key: str, bars: Sequence[Bar]) -> list[float | None]:
     return [None] * len(bars)
 
 
-def extract_metrics_from_bars(
-    metric_keys: Sequence[str], bars: Sequence[Bar]
-) -> dict[str, Any]:
+def extract_metrics_from_bars(metric_keys: Sequence[str], bars: Sequence[Bar]) -> dict[str, Any]:
     """Extract latest metric values from bar series."""
     values: dict[str, Any] = {}
     for key in metric_keys:

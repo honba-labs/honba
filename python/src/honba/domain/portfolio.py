@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+
 from honba.domain.instrument import InstrumentId
 from honba.domain.position import Position
 

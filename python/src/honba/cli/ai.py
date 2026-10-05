@@ -28,14 +28,18 @@ def export_knowledge(
     dumped = pack.to_json()
     if out:
         out.write_text(dumped, encoding="utf-8")
-        console.print(f"[green]Exported knowledge pack to[/green] {out} (hash: {pack.content_hash})")
+        console.print(
+            f"[green]Exported knowledge pack to[/green] {out} (hash: {pack.content_hash})"
+        )
     else:
         typer.echo(dumped)
 
 
 @knowledge_app.command("check")
 def check_knowledge(
-    reference: Annotated[Path, typer.Option("--reference", "-r", help="Reference JSON file to verify against")],
+    reference: Annotated[
+        Path, typer.Option("--reference", "-r", help="Reference JSON file to verify against")
+    ],
 ) -> None:
     """Verify that current knowledge pack matches a reference file (fails CI on drift)."""
     if not reference.exists():

@@ -9,11 +9,10 @@ free text -> select knowledge slice -> LLM -> parse & validate
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Sequence
 
 from honba.ai.knowledge import KnowledgePack, build_knowledge_pack
 from honba.ai.llm.provider import LlmPort
-from honba.entities.screener import ScreenerFilterGroup, ScreenerScanRequest
+from honba.entities.screener import ScreenerFilterGroup
 from honba.query.parser import FilterParseError, parse_filters
 from honba.screener.catalog import MetricCatalog, MetricResolutionError, load_catalog
 
@@ -29,7 +28,7 @@ class AskResult:
 
 class QueryTranslationError(Exception):
     """Raised when the LLM output cannot be parsed or validated within repair limit."""
-    pass
+
 
 
 def build_system_prompt(knowledge: KnowledgePack) -> str:

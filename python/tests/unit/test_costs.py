@@ -11,9 +11,6 @@ Or standalone (this file imports the local costs module):
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import pytest
 
 from honba.entities.order import OrderSide
@@ -54,6 +51,7 @@ def _approx(a: float, b: float, tol: float = 0.05) -> bool:
 #   rest similar → total sell ≈ ₹27.8
 # ---------------------------------------------------------------------------
 
+
 class TestEquityDeliveryBuy:
     def test_buy_10_shares_2000(self) -> None:
         b = nse_equity_delivery_breakdown(OrderSide.BUY, 10, 2000.0)
@@ -83,7 +81,7 @@ class TestEquityDeliverySell:
     def test_sell_10_shares_2000(self) -> None:
         b = nse_equity_delivery_breakdown(OrderSide.SELL, 10, 2000.0)
         assert _approx(b.brokerage, 6.0)
-        assert _approx(b.stt, 20.0)          # 0.10 % of 20k
+        assert _approx(b.stt, 20.0)  # 0.10 % of 20k
         assert b.stamp_duty == 0.0
         assert b.total > 20.0
         # total should be in the 26–29 INR band
@@ -107,13 +105,11 @@ class TestRoundTrip:
         assert 35.0 <= rt <= 45.0
 
     def test_round_trip_scales_with_notional(self) -> None:
-        small = (
-            nse_equity_delivery_cost(OrderSide.BUY, 1, 1000)
-            + nse_equity_delivery_cost(OrderSide.SELL, 1, 1000)
+        small = nse_equity_delivery_cost(OrderSide.BUY, 1, 1000) + nse_equity_delivery_cost(
+            OrderSide.SELL, 1, 1000
         )
-        large = (
-            nse_equity_delivery_cost(OrderSide.BUY, 10, 1000)
-            + nse_equity_delivery_cost(OrderSide.SELL, 10, 1000)
+        large = nse_equity_delivery_cost(OrderSide.BUY, 10, 1000) + nse_equity_delivery_cost(
+            OrderSide.SELL, 10, 1000
         )
         assert large > small * 5  # not strictly linear because of brokerage cap
 

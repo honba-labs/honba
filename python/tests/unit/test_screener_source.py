@@ -1,5 +1,5 @@
 import datetime as dt
-import pytest
+
 from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
 from honba.entities.screener import (

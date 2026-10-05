@@ -20,6 +20,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from honba.data.query.quantity import QuantityError, parse_quantity, validate_quantity_for_metric
+from honba.screener.catalog import MetricCatalog, MetricResolutionError
 from honba.wire.screener import (
     FilterOp,
     MetricDefinition,
@@ -29,8 +31,6 @@ from honba.wire.screener import (
     ScreenerFilterPredicate,
     Timeframe,
 )
-from honba.data.query.quantity import QuantityError, parse_quantity, validate_quantity_for_metric
-from honba.screener.catalog import MetricCatalog, MetricResolutionError
 
 
 class FilterParseError(ValueError):
@@ -88,7 +88,6 @@ _PERIOD_MAP = {
 
 
 class Token:
-
     def __init__(self, kind: str, value: str, pos: int) -> None:
         self.kind = kind
         self.value = value
@@ -154,7 +153,6 @@ def tokenize(text: str) -> list[Token]:
 
 
 class Parser:
-
     def __init__(self, text: str, catalog: MetricCatalog, market: str | None = None) -> None:
         self.text = text
         self.catalog = catalog
@@ -343,9 +341,7 @@ class Parser:
     def _consume_period(self) -> MetricPeriod:
         start_tok = self.current
         # Check up to 3 words
-        three_words = (
-            f"{self.current.value} {self.peek(1).value} {self.peek(2).value}".lower()
-        )
+        three_words = f"{self.current.value} {self.peek(1).value} {self.peek(2).value}".lower()
         if three_words in _PERIOD_MAP:
             self.advance()
             self.advance()
@@ -403,11 +399,17 @@ class Parser:
             if self.peek(1).value.lower() not in ("least", "most"):
                 self.advance()
                 preset_phrase_tokens = []
-                while self.current.kind != "EOF" and self.current.value.lower() not in ("and", "or", "end", ")"):
+                while self.current.kind != "EOF" and self.current.value.lower() not in (
+                    "and",
+                    "or",
+                    "end",
+                    ")",
+                ):
                     preset_phrase_tokens.append(self.current.value)
                     self.advance()
                 preset_str = " ".join(preset_phrase_tokens)
                 from honba.screener.presets import expand_preset, resolve_preset_key
+
                 p_def = resolve_preset_key(preset_str)
                 if p_def is None:
                     raise self.error(f"unknown preset {preset_str!r}")

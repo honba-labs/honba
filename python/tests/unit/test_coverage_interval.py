@@ -1,13 +1,11 @@
 import datetime as dt
-import pytest
+
 from honba.screener.coverage import (
     DateInterval,
-    CoverageStatus,
-    CoverageRecord,
-    subtract_intervals,
-    merge_intervals,
     merge_close_intervals,
+    merge_intervals,
     plan_gaps,
+    subtract_intervals,
 )
 
 
@@ -84,6 +82,7 @@ def test_merge_close_intervals():
 
 def test_plan_gaps():
     from honba.markets.india.calendar import NseCalendar
+
     cal = NseCalendar()
 
     # Suppose instrument requires 5 trading sessions ending on 2025-01-10

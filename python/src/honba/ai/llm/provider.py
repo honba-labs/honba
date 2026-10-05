@@ -7,7 +7,8 @@ and offline scaffolding when no local or remote LLM is running.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 
 class LlmPort(ABC):
@@ -43,7 +44,9 @@ class ScriptedFakeLlm(LlmPort):
     Can return pre-scripted responses sequentially, or simulate repair loops.
     """
 
-    def __init__(self, responses: Sequence[str | Exception] | None = None, default_response: str = "") -> None:
+    def __init__(
+        self, responses: Sequence[str | Exception] | None = None, default_response: str = ""
+    ) -> None:
         self.responses = list(responses) if responses else []
         self.default_response = default_response
         self.call_history: list[dict[str, Any]] = []

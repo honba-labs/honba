@@ -21,11 +21,11 @@ Logged event types mirror ``honba-messages::Event`` wire types exactly so that
 from __future__ import annotations
 
 import logging
-import honba.log as _honba_log  # noqa: F401 — triggers auto-init from HONBA_LOG_EVENTS
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+import honba.log as _honba_log  # noqa: F401 — triggers auto-init from HONBA_LOG_EVENTS
 from honba.entities.bar import Bar
 from honba.entities.order import OrderIntent, validate_intent
 from honba.entities.tick import QuoteTick, TradeTick
@@ -194,6 +194,7 @@ class StrategyRunner:
             ts_ns = fill.ts or 0
             if ts_ns > 0:
                 from datetime import datetime, timezone
+
                 bar_date = datetime.fromtimestamp(ts_ns / 1e9, tz=timezone.utc).strftime("%Y-%m-%d")
             else:
                 bar_date = "?"

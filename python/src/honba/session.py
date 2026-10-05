@@ -42,10 +42,11 @@ Python::
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Callable, Iterable, Literal, Protocol, Sequence
+from typing import Any, Literal, Protocol
 
 # ---------------------------------------------------------------------------
 # Domain / strategy imports
@@ -54,7 +55,6 @@ from typing import Any, Callable, Iterable, Literal, Protocol, Sequence
 # ---------------------------------------------------------------------------
 from honba.entities.bar import Bar
 from honba.entities.instrument import Instrument, InstrumentId
-from honba.entities.order import OrderIntent
 from honba.entities.trade import Trade
 from honba.strategies.base import Strategy
 from honba.strategies.context import LedgerContext, StrategyContext
@@ -112,7 +112,7 @@ class CostModel(Protocol):
 class ReportPrinter(Protocol):
     """How BacktestResult is shown (table, JSON, HTML)."""
 
-    def print(self, result: "BacktestResult", *, format: str = "table") -> None: ...
+    def print(self, result: BacktestResult, *, format: str = "table") -> None: ...
 
 
 # Fill model names the Session understands. Concrete exchange simulators
@@ -349,7 +349,7 @@ class BacktestSession:
         elif hasattr(ctx, "cash"):
             # Some ledgers expose a mutable cash attribute.
             try:
-                setattr(ctx, "cash", float(self.config.cash))
+                ctx.cash = float(self.config.cash)
             except Exception:
                 pass
 
@@ -565,9 +565,7 @@ def _bar_ts(bar: Bar) -> int:
             val = getattr(bar, attr)
             if val is not None:
                 return int(val)
-    raise AttributeError(
-        f"Bar {bar!r} has no known timestamp field (ts_init / ts_event / ts)"
-    )
+    raise AttributeError(f"Bar {bar!r} has no known timestamp field (ts_init / ts_event / ts)")
 
 
 def _compute_metrics(
@@ -593,7 +591,7 @@ def _compute_metrics(
     final_cash = initial_cash
     if hasattr(ctx, "cash"):
         try:
-            final_cash = float(getattr(ctx, "cash"))
+            final_cash = float(ctx.cash)
         except Exception:
             pass
     metrics["final_cash"] = final_cash

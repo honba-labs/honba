@@ -9,16 +9,17 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from honba.entities.bar import Bar
-from honba.entities.instrument import InstrumentId
-from honba.screener.coverage import DateInterval
-from honba.screener.ports import InMemoryBarStore, InMemoryMarketDataProvider
-from honba.screener.store import ParquetBarStore
-from honba.research.data_loader.nse import NseBhavcopyProvider
 from honba.data.loaders.yfinance import YFinanceProvider
+from honba.entities.instrument import InstrumentId
+from honba.research.data_loader.nse import NseBhavcopyProvider
+from honba.screener.coverage import DateInterval
+from honba.screener.ports import InMemoryMarketDataProvider
 from honba.screener.service import DataService
+from honba.screener.store import ParquetBarStore
 
-app = typer.Typer(help="Data inspection and fetch commands: coverage, gaps, fetch", no_args_is_help=True)
+app = typer.Typer(
+    help="Data inspection and fetch commands: coverage, gaps, fetch", no_args_is_help=True
+)
 console = Console()
 err_console = Console(stderr=True)
 
@@ -30,14 +31,23 @@ _YFINANCE_PROVIDER = YFinanceProvider()
 _MOCK_PROVIDER = InMemoryMarketDataProvider()
 
 # Default service: NSE bhavcopy first, yfinance fallback for daily / primary for intraday
-_DATA_SERVICE = DataService(store=_STORE, providers=[_NSE_PROVIDER, _YFINANCE_PROVIDER, _MOCK_PROVIDER])
+_DATA_SERVICE = DataService(
+    store=_STORE, providers=[_NSE_PROVIDER, _YFINANCE_PROVIDER, _MOCK_PROVIDER]
+)
 
 
 @app.command("coverage")
 def coverage_cmd(
     symbol: Annotated[str | None, typer.Argument(help="Optional symbol, e.g. RELIANCE")] = None,
-    exchange: Annotated[str, typer.Option("--exchange", "-e", "--exchange", help="Market exchange / exchange [default: NSE]")] = "NSE",
-    timeframe: Annotated[str, typer.Option("--timeframe", "-t", help="Timeframe [default: 1D]")] = "1D",
+    exchange: Annotated[
+        str,
+        typer.Option(
+            "--exchange", "-e", "--exchange", help="Market exchange / exchange [default: NSE]"
+        ),
+    ] = "NSE",
+    timeframe: Annotated[
+        str, typer.Option("--timeframe", "-t", help="Timeframe [default: 1D]")
+    ] = "1D",
 ) -> None:
     """Show covered ranges in the data store."""
     table = Table(title="Data Store Coverage")
@@ -48,10 +58,14 @@ def coverage_cmd(
     table.add_column("Status", style="white")
     table.add_column("Rows", justify="right")
 
-    instruments = [InstrumentId(symbol, exchange)] if symbol else [
-        InstrumentId("RELIANCE", exchange),
-        InstrumentId("TCS", exchange),
-    ]
+    instruments = (
+        [InstrumentId(symbol, exchange)]
+        if symbol
+        else [
+            InstrumentId("RELIANCE", exchange),
+            InstrumentId("TCS", exchange),
+        ]
+    )
 
     found = False
     for inst in instruments:
@@ -76,10 +90,21 @@ def coverage_cmd(
 @app.command("gaps")
 def gaps_cmd(
     symbol: Annotated[str, typer.Argument(help="Instrument symbol, e.g. RELIANCE")],
-    exchange: Annotated[str, typer.Option("--exchange", "-e", "--exchange", help="Market exchange / exchange [default: NSE]")] = "NSE",
-    timeframe: Annotated[str, typer.Option("--timeframe", "-t", help="Timeframe [default: 1D]")] = "1D",
-    start: Annotated[str, typer.Option("--start", "-s", help="Start date YYYY-MM-DD", show_default="2024-01-01")] = "2024-01-01",
-    end: Annotated[str | None, typer.Option("--end", "-d", help="End date YYYY-MM-DD", show_default="today")] = None,
+    exchange: Annotated[
+        str,
+        typer.Option(
+            "--exchange", "-e", "--exchange", help="Market exchange / exchange [default: NSE]"
+        ),
+    ] = "NSE",
+    timeframe: Annotated[
+        str, typer.Option("--timeframe", "-t", help="Timeframe [default: 1D]")
+    ] = "1D",
+    start: Annotated[
+        str, typer.Option("--start", "-s", help="Start date YYYY-MM-DD", show_default="2024-01-01")
+    ] = "2024-01-01",
+    end: Annotated[
+        str | None, typer.Option("--end", "-d", help="End date YYYY-MM-DD", show_default="today")
+    ] = None,
 ) -> None:
     """Show missing ranges that a request would fetch."""
     inst = InstrumentId(symbol, exchange)
@@ -107,11 +132,24 @@ def gaps_cmd(
 @app.command("fetch")
 def fetch_cmd(
     symbol: Annotated[str, typer.Argument(help="Instrument symbol, e.g. RELIANCE")],
-    exchange: Annotated[str, typer.Option("--exchange", "-e", "--exchange", help="Market exchange / exchange [default: NSE]")] = "NSE",
-    timeframe: Annotated[str, typer.Option("--timeframe", "-t", help="Timeframe [default: 1D]")] = "1D",
-    start: Annotated[str, typer.Option("--start", "-s", help="Start date YYYY-MM-DD", show_default="2024-01-01")] = "2024-01-01",
-    end: Annotated[str | None, typer.Option("--end", "-d", help="End date YYYY-MM-DD", show_default="today")] = None,
-    provider: Annotated[str, typer.Option("--provider", "-p", help="Provider: auto, yfinance, nse [default: auto]")] = "auto",
+    exchange: Annotated[
+        str,
+        typer.Option(
+            "--exchange", "-e", "--exchange", help="Market exchange / exchange [default: NSE]"
+        ),
+    ] = "NSE",
+    timeframe: Annotated[
+        str, typer.Option("--timeframe", "-t", help="Timeframe [default: 1D]")
+    ] = "1D",
+    start: Annotated[
+        str, typer.Option("--start", "-s", help="Start date YYYY-MM-DD", show_default="2024-01-01")
+    ] = "2024-01-01",
+    end: Annotated[
+        str | None, typer.Option("--end", "-d", help="End date YYYY-MM-DD", show_default="today")
+    ] = None,
+    provider: Annotated[
+        str, typer.Option("--provider", "-p", help="Provider: auto, yfinance, nse [default: auto]")
+    ] = "auto",
 ) -> None:
     """Fetch missing data and fill gaps without running a scan."""
     inst = InstrumentId(symbol, exchange)
@@ -163,7 +201,9 @@ def fetch_cmd(
 
     if res.success:
         total_bars = sum(len(b) for b in res.bars.values())
-        console.print(f"[green]Successfully fetched {len(gaps)} gap(s) ({total_bars} bars stored in {_STORE.catalog_dir}) for {symbol}.{exchange}[/green]")
+        console.print(
+            f"[green]Successfully fetched {len(gaps)} gap(s) ({total_bars} bars stored in {_STORE.catalog_dir}) for {symbol}.{exchange}[/green]"
+        )
     else:
         err_console.print(f"[red]Failed to fill gaps:[/red] {res.warnings}")
         raise typer.Exit(code=2)
@@ -179,8 +219,8 @@ def housekeeping_cmd() -> None:
         ratio = (comp / orig * 100) if orig else 0
         console.print(
             f"[green]Compressed {count} cache file(s): "
-            f"{orig / (1024*1024):.1f}MB -> {comp / (1024*1024):.1f}MB "
-            f"({ratio:.1f}%, saved {saved / (1024*1024):.1f}MB)[/green]"
+            f"{orig / (1024 * 1024):.1f}MB -> {comp / (1024 * 1024):.1f}MB "
+            f"({ratio:.1f}%, saved {saved / (1024 * 1024):.1f}MB)[/green]"
         )
     else:
         console.print("[green]Cache files are already compressed in .xz format.[/green]")
@@ -191,7 +231,8 @@ def housekeeping_cmd() -> None:
     for k, records in ledger.items():
         before_len = len(records)
         ledger[k] = _STORE._merge_ledger_entries(records)
-        consolidated_entries += (before_len - len(ledger[k]))
+        consolidated_entries += before_len - len(ledger[k])
     _STORE._save_ledger(ledger)
-    console.print(f"[green]Ledger consolidated: merged {consolidated_entries} overlapping/contiguous records.[/green]")
-
+    console.print(
+        f"[green]Ledger consolidated: merged {consolidated_entries} overlapping/contiguous records.[/green]"
+    )

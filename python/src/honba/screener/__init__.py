@@ -39,9 +39,9 @@ from honba.screener.service import (
 )
 
 __all__ = [
+    "CATALOG_ENV_VAR",
     "AmbiguousMetric",
     "BarStore",
-    "CATALOG_ENV_VAR",
     "CatalogError",
     "CoverageRecord",
     "CoverageStatus",
@@ -67,4 +67,3 @@ __all__ = [
     "subtract_intervals",
     "validate_bar",
 ]
-

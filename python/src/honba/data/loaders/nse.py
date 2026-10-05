@@ -8,9 +8,7 @@ import io
 import logging
 import lzma
 import zipfile
-from collections.abc import Iterable
 from pathlib import Path
-from typing import BinaryIO
 
 import httpx
 
@@ -18,7 +16,7 @@ from honba.domain.bar import Bar
 from honba.domain.instrument import InstrumentId
 from honba.markets.india.calendar import NseCalendar
 from honba.screener.coverage import DateInterval
-from honba.screener.ports import MarketDataProvider, validate_bar
+from honba.screener.ports import validate_bar
 
 logger = logging.getLogger(__name__)
 
@@ -151,8 +149,12 @@ class NseBhavcopyProvider:
     def _get_client(self) -> httpx.Client:
         if self._client is None or self._client.is_closed:
             # Persistent connection pool with keep-alive
-            limits = httpx.Limits(max_keepalive_connections=self.max_workers * 2, max_connections=self.max_workers * 4)
-            self._client = httpx.Client(headers=DEFAULT_HEADERS, timeout=self.timeout, limits=limits, follow_redirects=True)
+            limits = httpx.Limits(
+                max_keepalive_connections=self.max_workers * 2, max_connections=self.max_workers * 4
+            )
+            self._client = httpx.Client(
+                headers=DEFAULT_HEADERS, timeout=self.timeout, limits=limits, follow_redirects=True
+            )
         return self._client
 
     @property
@@ -184,7 +186,9 @@ class NseBhavcopyProvider:
             f"https://archives.nseindia.com/products/content/sec_bhavdata_full_{dmy}.csv",
         ]
 
-    def download_session_bhavcopy(self, session_date: dt.date, client: httpx.Client | None = None) -> dict[str, Bar]:
+    def download_session_bhavcopy(
+        self, session_date: dt.date, client: httpx.Client | None = None
+    ) -> dict[str, Bar]:
         """Download and parse Bhavcopy for one session date (with local xz-compressed file caching)."""
         date_str = session_date.strftime("%Y%m%d")
         xz_cache_file = self.cache_dir / f"bhavcopy_{date_str}.csv.xz" if self.cache_dir else None
@@ -259,7 +263,7 @@ class NseBhavcopyProvider:
 
     def compress_existing_cache(self) -> tuple[int, int, int]:
         """Housekeeping: compress existing legacy .csv files in cache to .csv.xz.
-        
+
         Returns:
             (migrated_count, original_bytes, compressed_bytes)
         """

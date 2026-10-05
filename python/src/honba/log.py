@@ -39,7 +39,8 @@ import logging
 import os
 import re
 import sys
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 DEFAULT_LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
@@ -49,26 +50,28 @@ _STRATEGY_EVENT_PATTERN = re.compile(r"^(EVENT_[A-Z0-9_]+)")
 # ---------------------------------------------------------------------------
 # Wire layer — mirrors honba-messages::Event (ADR 006)
 # ---------------------------------------------------------------------------
-WIRE_EVENT_TYPES: frozenset[str] = frozenset({
-    "bar",
-    "quote",
-    "trade",
-    "order",
-    "order_accepted",
-    "order_filled",
-    "order_rejected",
-    "order_cancelled",
-})
+WIRE_EVENT_TYPES: frozenset[str] = frozenset(
+    {
+        "bar",
+        "quote",
+        "trade",
+        "order",
+        "order_accepted",
+        "order_filled",
+        "order_rejected",
+        "order_cancelled",
+    }
+)
 
 _WIRE_EVENT_DESCRIPTIONS: dict[str, str] = {
-    "bar":              "Aggregated OHLCV bar (market data)",
-    "quote":            "Top-of-book quote tick (market data)",
-    "trade":            "Market trade print / last-sale tick (market data)",
-    "order":            "Intent submitted to execution port (DEBUG)",
-    "order_accepted":   "Exchange acknowledged the order",
-    "order_filled":     "Fill received from execution port (qty, px, cost)",
-    "order_rejected":   "Intent failed validation or was rejected by exchange (WARNING)",
-    "order_cancelled":  "Order cancelled by exchange or strategy",
+    "bar": "Aggregated OHLCV bar (market data)",
+    "quote": "Top-of-book quote tick (market data)",
+    "trade": "Market trade print / last-sale tick (market data)",
+    "order": "Intent submitted to execution port (DEBUG)",
+    "order_accepted": "Exchange acknowledged the order",
+    "order_filled": "Fill received from execution port (qty, px, cost)",
+    "order_rejected": "Intent failed validation or was rejected by exchange (WARNING)",
+    "order_cancelled": "Order cancelled by exchange or strategy",
 }
 
 # ---------------------------------------------------------------------------
@@ -76,10 +79,10 @@ _WIRE_EVENT_DESCRIPTIONS: dict[str, str] = {
 # ---------------------------------------------------------------------------
 # Built-in events emitted by honba.strategies.base.Strategy
 _BUILTIN_STRATEGY_EVENTS: dict[str, str] = {
-    "EVENT_BUY":              "Strategy issued a buy order (auto-emitted by Strategy.buy())",
-    "EVENT_SELL":             "Strategy issued a sell order (auto-emitted by Strategy.sell())",
-    "EVENT_MEMBERSHIP_ADD":   "Symbols added to a dynamic universe (e.g. index rebalance)",
-    "EVENT_MEMBERSHIP_DEL":   "Symbols removed from a dynamic universe",
+    "EVENT_BUY": "Strategy issued a buy order (auto-emitted by Strategy.buy())",
+    "EVENT_SELL": "Strategy issued a sell order (auto-emitted by Strategy.sell())",
+    "EVENT_MEMBERSHIP_ADD": "Symbols added to a dynamic universe (e.g. index rebalance)",
+    "EVENT_MEMBERSHIP_DEL": "Symbols removed from a dynamic universe",
 }
 
 # Mutable registry — strategies add entries via register_event()
@@ -107,7 +110,7 @@ def register_event(name: str, description: str = "") -> None:
 
 
 @property  # type: ignore[misc]
-def KNOWN_EVENTS() -> dict[str, str]:  # noqa: N802
+def KNOWN_EVENTS() -> dict[str, str]:
     """Full event catalogue (wire + strategy). Read-only view."""
     return {**_WIRE_EVENT_DESCRIPTIONS, **STRATEGY_EVENT_TYPES}
 
@@ -304,5 +307,3 @@ def setup_event_logging(
 # ---------------------------------------------------------------------------
 if os.environ.get("HONBA_LOG_EVENTS", "").strip():
     setup_event_logging()
-
-

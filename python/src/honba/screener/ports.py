@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import datetime as dt
 import math
-from typing import Protocol, Sequence
+from collections.abc import Sequence
+from typing import Protocol
 
 from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
 from honba.entities.screener import ScreenerScanRequest, ScreenerScanResponse
-from honba.screener.coverage import CoverageRecord, CoverageStatus, DateInterval
+from honba.screener.coverage import CoverageRecord, DateInterval
 
 
 def validate_bar(bar: Bar) -> bool:
@@ -28,10 +29,14 @@ def validate_bar(bar: Bar) -> bool:
         raise ValueError(f"high must be >= low, got high={bar.high}, low={bar.low}")
 
     if not (bar.low <= bar.open <= bar.high):
-        raise ValueError(f"open must be between low and high, got open={bar.open}, high={bar.high}, low={bar.low}")
+        raise ValueError(
+            f"open must be between low and high, got open={bar.open}, high={bar.high}, low={bar.low}"
+        )
 
     if not (bar.low <= bar.close <= bar.high):
-        raise ValueError(f"close must be between low and high, got close={bar.close}, high={bar.high}, low={bar.low}")
+        raise ValueError(
+            f"close must be between low and high, got close={bar.close}, high={bar.high}, low={bar.low}"
+        )
 
     if bar.volume < 0:
         raise ValueError(f"volume must be >= 0, got {bar.volume}")
@@ -46,9 +51,7 @@ class BarStore(Protocol):
         """Return the list of covered intervals for an instrument and timeframe."""
         ...
 
-    def read(
-        self, instrument: InstrumentId, timeframe: str, interval: DateInterval
-    ) -> list[Bar]:
+    def read(self, instrument: InstrumentId, timeframe: str, interval: DateInterval) -> list[Bar]:
         """Read deduplicated bars within the given half-open interval."""
         ...
 
@@ -60,17 +63,14 @@ class BarStore(Protocol):
 class ScreenerSource(Protocol):
     """Port for executing a screener scan request and returning ScreenerScanResponse."""
 
-    def scan(self, request: ScreenerScanRequest) -> ScreenerScanResponse:
-        ...
+    def scan(self, request: ScreenerScanRequest) -> ScreenerScanResponse: ...
 
 
 class MarketDataProvider(Protocol):
     """Port for fetching market data bars from a provider."""
 
-
     @property
-    def name(self) -> str:
-        ...
+    def name(self) -> str: ...
 
     def fetch(
         self,
@@ -96,9 +96,7 @@ class InMemoryBarStore:
         key = (instrument.exchange, instrument.symbol, timeframe)
         return list(self._coverage.get(key, []))
 
-    def read(
-        self, instrument: InstrumentId, timeframe: str, interval: DateInterval
-    ) -> list[Bar]:
+    def read(self, instrument: InstrumentId, timeframe: str, interval: DateInterval) -> list[Bar]:
         key_prefix = (instrument.exchange, instrument.symbol, timeframe)
         # Convert date interval to nanoseconds range [start_ns, end_ns)
         start_ns = int(dt.datetime.combine(interval.start, dt.time.min).timestamp() * 1e9)
@@ -152,6 +150,9 @@ class InMemoryMarketDataProvider:
         matched = [
             bar
             for (v, s, tf, ts), bar in self._bars.items()
-            if v == instrument.exchange and s == instrument.symbol and tf == timeframe and start_ns <= ts < end_ns
+            if v == instrument.exchange
+            and s == instrument.symbol
+            and tf == timeframe
+            and start_ns <= ts < end_ns
         ]
         return sorted(matched, key=lambda b: b.ts)

@@ -197,13 +197,15 @@ def explain_cmd(
     columns: Annotated[
         str | None, typer.Option("--columns", "-c", help="Comma-separated metric keys")
     ] = None,
-    column_set: Annotated[str | None, typer.Option("--column-set", "-C", help="Named column set")] = None,
-    sort: Annotated[str | None, typer.Option("--sort", "-s", help="Sort spec, e.g. close:desc")] = None,
+    column_set: Annotated[
+        str | None, typer.Option("--column-set", "-C", help="Named column set")
+    ] = None,
+    sort: Annotated[
+        str | None, typer.Option("--sort", "-s", help="Sort spec, e.g. close:desc")
+    ] = None,
     limit: Annotated[int, typer.Option("--limit", "-l", help="Max results")] = 50,
     offset: Annotated[int, typer.Option("--offset", "-o", help="Offset")] = 0,
-    filters: Annotated[
-        list[str] | None, typer.Argument(help="Trailing filter words")
-    ] = None,
+    filters: Annotated[list[str] | None, typer.Argument(help="Trailing filter words")] = None,
 ) -> None:
     """Parse and validate; print the parse tree and resolved request without running."""
     catalog = load_catalog()
@@ -239,8 +241,12 @@ def scan_cmd(
     columns: Annotated[
         str | None, typer.Option("--columns", "-c", help="Comma-separated metric keys")
     ] = None,
-    column_set: Annotated[str | None, typer.Option("--column-set", "-C", help="Named column set")] = None,
-    sort: Annotated[str | None, typer.Option("--sort", "-s", help="Sort spec, e.g. close:desc")] = None,
+    column_set: Annotated[
+        str | None, typer.Option("--column-set", "-C", help="Named column set")
+    ] = None,
+    sort: Annotated[
+        str | None, typer.Option("--sort", "-s", help="Sort spec, e.g. close:desc")
+    ] = None,
     limit: Annotated[int, typer.Option("--limit", "-l", help="Max results")] = 50,
     offset: Annotated[int, typer.Option("--offset", "-o", help="Offset")] = 0,
     print_request: Annotated[
@@ -252,9 +258,7 @@ def scan_cmd(
     fetch: Annotated[
         str, typer.Option("--fetch", "-F", help="Missing-data policy: auto, never, force")
     ] = "auto",
-    filters: Annotated[
-        list[str] | None, typer.Argument(help="Trailing filter words")
-    ] = None,
+    filters: Annotated[list[str] | None, typer.Argument(help="Trailing filter words")] = None,
 ) -> None:
     """Run a scan and render results (or print the request JSON)."""
     catalog = load_catalog()
@@ -284,7 +288,9 @@ def scan_cmd(
     try:
         policy = MissingDataPolicy(fetch.lower())
     except ValueError:
-        err_console.print(f"[red]Invalid --fetch policy:[/red] {fetch} (choose from auto, never, force)")
+        err_console.print(
+            f"[red]Invalid --fetch policy:[/red] {fetch} (choose from auto, never, force)"
+        )
         raise typer.Exit(code=1)
 
     _DATA_SERVICE.policy = policy
@@ -323,11 +329,19 @@ def scan_cmd(
 def ask_cmd(
     query_text: Annotated[list[str], typer.Argument(help="Free-text query to translate and run")],
     market: Annotated[str, typer.Option("--market", "-m", help="Market identifier")] = "india",
-    timescale: Annotated[str | None, typer.Option("--timescale", "-t", help="Default timeframe")] = None,
-    sort: Annotated[str | None, typer.Option("--sort", "-s", help="Sort spec, e.g. close:desc")] = None,
+    timescale: Annotated[
+        str | None, typer.Option("--timescale", "-t", help="Default timeframe")
+    ] = None,
+    sort: Annotated[
+        str | None, typer.Option("--sort", "-s", help="Sort spec, e.g. close:desc")
+    ] = None,
     limit: Annotated[int, typer.Option("--limit", "-l", help="Max results")] = 50,
-    yes: Annotated[bool, typer.Option("--yes", "-y", help="Execute scan without interactive confirmation")] = False,
-    format: Annotated[str, typer.Option("--format", "-f", help="Output format: table, json")] = "table",
+    yes: Annotated[
+        bool, typer.Option("--yes", "-y", help="Execute scan without interactive confirmation")
+    ] = False,
+    format: Annotated[
+        str, typer.Option("--format", "-f", help="Output format: table, json")
+    ] = "table",
 ) -> None:
     """Translate natural language into validated filters and run the scan (Design.md Section 13)."""
     from honba.ai.ask import QueryTranslationError, translate_query
@@ -350,7 +364,9 @@ def ask_cmd(
         raise typer.Exit(code=1)
 
     console.print(f"[bold cyan]Translated Filter:[/bold cyan] {result.filter_text}")
-    console.print(f"[dim]Equivalent command:[/dim] honba screener scan --market {market} {result.filter_text}")
+    console.print(
+        f"[dim]Equivalent command:[/dim] honba screener scan --market {market} {result.filter_text}"
+    )
 
     if not yes:
         confirm = typer.confirm("Run scan with this filter?", default=True)
@@ -376,4 +392,3 @@ def ask_cmd(
         fetch="auto",
         filters=filter_words,
     )
-
