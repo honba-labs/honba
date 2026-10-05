@@ -97,6 +97,35 @@ where
         let res: Result<T, _> = serde_json::from_value(json.clone());
         assert!(res.is_err(), "{file}/{name}: invalid case was accepted");
     }
+    for (name, value, canonical) in load_tolerated(file) {
+        let got: T = serde_json::from_value(value)
+            .unwrap_or_else(|e| panic!("{file}/{name}: unknown fields must be ignored: {e}"));
+        let want: T = serde_json::from_value(canonical.clone()).unwrap();
+        assert_eq!(got, want, "{file}/{name}: tolerated value");
+        assert_eq!(
+            serde_json::to_value(&got).unwrap(),
+            canonical,
+            "{file}/{name}"
+        );
+    }
+}
+
+/// Loads the `tolerated` cases: payloads with unknown fields a reader must
+/// accept (ADR 0012 rule 1) and the canonical JSON they reduce to.
+fn load_tolerated(file: &str) -> Vec<(String, Value, Value)> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../schema/golden")
+        .join(file);
+    let doc: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    doc.get("tolerated")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .map(|c| {
+            let name = c["name"].as_str().unwrap().to_owned();
+            (name, c["value"].clone(), c["canonical"].clone())
+        })
+        .collect()
 }
 
 fn nse(sym: &str) -> InstrumentId {

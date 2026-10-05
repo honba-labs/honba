@@ -186,5 +186,8 @@
         "ts_init": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}
       }
     }
+  ],
+  "tolerated": [
+    {"name": "unknown_field", "value": {"order_id": "O-1", "instrument_id": {"symbol": "NIFTY50", "exchange": "NSE"}, "side": "buy", "order_type": "market", "quantity": 75.0, "price": null, "trigger_price": null, "status": "initialized", "time_in_force": "day", "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}, "ts_init": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}, "tag": "algo-1"}, "canonical": {"order_id": "O-1", "instrument_id": {"symbol": "NIFTY50", "exchange": "NSE"}, "side": "buy", "order_type": "market", "quantity": 75.0, "price": null, "trigger_price": null, "status": "initialized", "time_in_force": "day", "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}, "ts_init": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}}}
   ]
 }

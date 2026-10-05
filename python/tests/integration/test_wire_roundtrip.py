@@ -57,6 +57,27 @@ def test_rust_and_python_reject_the_same_payloads(kind, bad):
         wire.loads(kind, payload)
 
 
+def _tolerated_cases():
+    for path in sorted(GOLDEN.glob("*.json")):
+        doc = json.loads(path.read_text())
+        for case in doc.get("tolerated", []):
+            yield pytest.param(
+                doc["type"], case["value"], case["canonical"], id=f"{path.name}:{case['name']}"
+            )
+
+
+@pytest.mark.parametrize(("kind", "value", "canonical"), list(_tolerated_cases()))
+def test_rust_and_python_drop_the_same_unknown_fields(kind, value, canonical):
+    """ADR 0012 rule 1: both readers accept extras and agree on what remains."""
+    payload = json.dumps(value)
+    rust_json = _honba.canonical_json(kind, payload)
+    assert json.loads(rust_json) == canonical
+    model = wire.loads(kind, payload)
+    py_json = TypeAdapter(wire.MODELS[kind]).dump_json(model).decode()
+    assert json.loads(py_json) == canonical
+    assert _honba.canonical_json(kind, py_json) == rust_json
+
+
 def _text_cases():
     for path in sorted(GOLDEN.glob("*.json")):
         doc = json.loads(path.read_text())

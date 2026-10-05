@@ -22,5 +22,8 @@
       "name": "duplicate_symbol",
       "text": "{\"symbol\":\"RELIANCE\",\"exchange\":\"NSE\",\"symbol\":\"TCS\"}"
     }
+  ],
+  "tolerated": [
+    {"name": "unknown_field", "value": {"symbol": "RELIANCE", "exchange": "NSE", "isin": "INE002A01018"}, "canonical": {"symbol": "RELIANCE", "exchange": "NSE"}}
   ]
 }

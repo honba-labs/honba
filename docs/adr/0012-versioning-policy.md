@@ -48,6 +48,34 @@ Rules (plan.md §4.2, restated as the binding version):
 5. **Every breaking wire change gets a migration note** in the crate's
    `CHANGELOG.md` at the same time as the code, not in a follow-up.
 
+## Unknown fields: records tolerate, inputs reject
+
+Rule 1 ("readers ignore unknown fields") and the `deny_unknown_fields` on the
+config and manifest types pull in opposite directions. They are resolved by
+what the payload *is*, not where it travels:
+
+| Kind | Examples | Unknown field | Why |
+|---|---|---|---|
+| **Record** — data a newer producer may extend | `Message` (envelope), every `Event` variant, `Bar`, `QuoteTick`, `TradeTick`, `Order`, `Trade`, `Position`, `Money`, `InstrumentId`, `UnixNanos`, `StrategyIr` | ignored (dropped on parse) | forward compatibility: a v3-with-extras stream from a newer producer must not kill an older reader mid-run |
+| **Input** — authored by a person, an agent or a strategy | `BacktestRunConfig` and its sections, `StrategyManifest`, `OrderIntent`, `ScreenerFilterPredicate` and the screener request types, `honba-api` request bodies | rejected | a dropped field silently changes what the author asked for (`slipage_multiplier = 2` would run at 1.0; an intent's misspelt `trigger_price` would become a market order), so a typo is an error |
+
+What still protects records is the version: an unknown `schema_version` is
+rejected (rule 1), and a field whose *meaning* changes is a reshape that bumps
+it. Inputs gain fields only with defaults, so an older author's document still
+parses.
+
+Both languages implement the same split: Rust omits `deny_unknown_fields` on
+records and keeps it on inputs; Python's `honba.wire.base._Wire` uses
+`extra="ignore"` and `_Command` (inputs) `extra="forbid"`. The golden vectors
+pin it: each record file has a `tolerated` section (`value` with extras,
+`canonical` with them dropped) that Rust and Python must both reduce to the
+same JSON, and each input file keeps an `unknown_field` case under `invalid`
+(`python/tests/unit/test_wire_golden.py::test_golden_files_pin_the_unknown_field_policy`).
+
+Known gap: `honba-api` *response* types still carry `deny_unknown_fields`;
+they are records by this rule and should be relaxed with the codegen/OpenAPI
+owner (the change regenerates `schema/openapi`).
+
 ## Consequences
 
 - The Python `SCHEMA_VERSION` constant becomes a runtime read of

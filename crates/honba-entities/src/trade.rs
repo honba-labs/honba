@@ -53,7 +53,6 @@ pub struct Trade {
 
 /// The raw wire form, validated into a [`Trade`].
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
 struct TradeRepr {
     order_id: OrderId,
     instrument_id: InstrumentId,

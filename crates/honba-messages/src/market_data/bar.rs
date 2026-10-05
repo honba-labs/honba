@@ -68,7 +68,6 @@ pub struct BarSpecification {
 
 /// The raw wire form, validated into a [`BarSpecification`].
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
 struct BarSpecificationRepr {
     step: usize,
     aggregation: BarAggregation,
@@ -118,7 +117,6 @@ impl BarSpecification {
 
 /// Fully identifies a bar: which instrument, and how it aggregates.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct BarType {
     instrument_id: InstrumentId,
     spec: BarSpecification,
@@ -189,7 +187,6 @@ pub struct Bar {
 
 /// The raw wire form, validated into a [`Bar`].
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
 struct BarRepr {
     bar_type: BarType,
     open: f64,

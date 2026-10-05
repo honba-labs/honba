@@ -30,7 +30,7 @@ from honba.domain import money as _money
 from honba.domain import order as _order
 from honba.domain.order import OrderSide, OrderStatus, OrderType, TimeInForce
 from honba.domain.tick import AggressorSide
-from honba.wire.base import Str, _canonical, _Wire
+from honba.wire.base import Str, _canonical, _Command, _Wire
 from honba.wire.screener import ScreenerFilterPredicate
 
 SCHEMA_VERSION: Final[int] = _native.SCHEMA_VERSION
@@ -228,7 +228,7 @@ class Order(_Wire):
     ts_init: UnixNanos
 
 
-class OrderIntent(_Wire):
+class OrderIntent(_Command):
     instrument_id: InstrumentId
     side: WireOrderSide
     quantity: Float

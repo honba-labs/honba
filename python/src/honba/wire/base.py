@@ -28,6 +28,22 @@ def _canonical(enum: type[Enum]) -> BeforeValidator:
 
 
 class _Wire(BaseModel):
+    """A wire *record*: data a newer producer may extend.
+
+    Unknown fields are ignored (dropped on parse), as the Rust serde readers do
+    (ADR 0012 rule 1); an unknown ``schema_version`` is what a reader rejects.
+    """
+
     model_config = ConfigDict(
-        extra="forbid", frozen=True, allow_inf_nan=False, populate_by_name=True
+        extra="ignore", frozen=True, allow_inf_nan=False, populate_by_name=True
     )
+
+
+class _Command(_Wire):
+    """A wire *command*: authored input (an order intent, a screener request).
+
+    Unknown fields are rejected, as in Rust (``deny_unknown_fields``): a dropped
+    field would silently change what the sender asked for, so a typo is an error.
+    """
+
+    model_config = ConfigDict(extra="forbid")

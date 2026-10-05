@@ -176,30 +176,10 @@
         "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"},
         "ts_init": {"iso": "2023-11-14T22:14:20.000000001Z", "unix_nanos": "1700000060000000001"}
       }
-    },
-    {
-      "name": "unknown_field",
-      "value": {
-        "bar_type": {
-          "instrument_id": {
-            "symbol": "BANKNIFTY",
-            "exchange": "NSE"
-          },
-          "spec": {
-            "step": 5,
-            "aggregation": "minute",
-            "price_type": "last"
-          }
-        },
-        "open": 48000.0,
-        "high": 48200.5,
-        "low": 47900.05,
-        "close": 48150.3,
-        "volume": 12345.0,
-        "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"},
-        "ts_init": {"iso": "2023-11-14T22:14:20.000000001Z", "unix_nanos": "1700000060000000001"},
-        "vwap": 48100.0
-      }
     }
+  ],
+  "tolerated": [
+    {"name": "unknown_top_level_field", "value": {"bar_type": {"instrument_id": {"symbol": "BANKNIFTY", "exchange": "NSE"}, "spec": {"step": 5, "aggregation": "minute", "price_type": "last"}}, "open": 48000.0, "high": 48200.5, "low": 47900.05, "close": 48150.3, "volume": 12345.0, "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}, "ts_init": {"iso": "2023-11-14T22:14:20.000000001Z", "unix_nanos": "1700000060000000001"}, "vwap": 48100.0}, "canonical": {"bar_type": {"instrument_id": {"symbol": "BANKNIFTY", "exchange": "NSE"}, "spec": {"step": 5, "aggregation": "minute", "price_type": "last"}}, "open": 48000.0, "high": 48200.5, "low": 47900.05, "close": 48150.3, "volume": 12345.0, "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}, "ts_init": {"iso": "2023-11-14T22:14:20.000000001Z", "unix_nanos": "1700000060000000001"}}},
+    {"name": "unknown_nested_fields", "value": {"bar_type": {"instrument_id": {"symbol": "BANKNIFTY", "exchange": "NSE"}, "spec": {"step": 5, "aggregation": "minute", "price_type": "last", "session": "regular"}}, "open": 48000.0, "high": 48200.5, "low": 47900.05, "close": 48150.3, "volume": 12345.0, "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000", "tz": "Asia/Kolkata"}, "ts_init": {"iso": "2023-11-14T22:14:20.000000001Z", "unix_nanos": "1700000060000000001"}}, "canonical": {"bar_type": {"instrument_id": {"symbol": "BANKNIFTY", "exchange": "NSE"}, "spec": {"step": 5, "aggregation": "minute", "price_type": "last"}}, "open": 48000.0, "high": 48200.5, "low": 47900.05, "close": 48150.3, "volume": 12345.0, "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}, "ts_init": {"iso": "2023-11-14T22:14:20.000000001Z", "unix_nanos": "1700000060000000001"}}}
   ]
 }

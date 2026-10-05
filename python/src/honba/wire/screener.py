@@ -14,7 +14,7 @@ from pydantic import (
     model_validator,
 )
 
-from honba.wire.base import Str, _canonical, _Wire
+from honba.wire.base import Str, _canonical, _Command
 
 
 class ValueType(Enum):
@@ -79,7 +79,7 @@ WireTimeframe = Annotated[Timeframe, _canonical(Timeframe)]
 WireFilterOp = Annotated[FilterOp, _canonical(FilterOp)]
 
 
-class MetricKeySpec(_Wire):
+class MetricKeySpec(_Command):
     """Specification of a metric with optional period and timeframe dimensions."""
 
     key: Str
@@ -96,7 +96,7 @@ def _omit_absent_dimensions(data: Any) -> Any:
     return data
 
 
-class MetricRef(_Wire):
+class MetricRef(_Command):
     """A metric used as the right-hand operand of a predicate.
 
     Makes metric-to-metric comparisons expressible on the wire, e.g.
@@ -112,7 +112,7 @@ class MetricRef(_Wire):
         return _omit_absent_dimensions(handler(self))
 
 
-class MetricDefinition(_Wire):
+class MetricDefinition(_Command):
     """Catalog definition of a metric.
 
     ``key`` is the wire key sent to the backend. ``ui_id`` (``uiId``) is the frontend
@@ -197,7 +197,7 @@ PredicateValue = (
 """Typed predicate operand matching the supported scalar, MetricRef, array, or object values."""
 
 
-class ScreenerFilterPredicate(_Wire):
+class ScreenerFilterPredicate(_Command):
     """Filter predicate for screening instruments.
 
     ``value`` must fit ``op``: ``crosses_above`` / ``crosses_below`` take a finite number
@@ -225,14 +225,14 @@ class ScreenerFilterPredicate(_Wire):
         return _omit_absent_dimensions(handler(self))
 
 
-class ScreenerFilterGroup(_Wire):
+class ScreenerFilterGroup(_Command):
     """Logical group of filter predicates."""
 
     operator: Literal["AND", "OR"] = "AND"
     items: list[Any]
 
 
-class ScreenerSortSpec(_Wire):
+class ScreenerSortSpec(_Command):
     """Sorting specification for screener results."""
 
     key: Str
@@ -241,7 +241,7 @@ class ScreenerSortSpec(_Wire):
     timeframe: WireTimeframe | None = None
 
 
-class ScreenerScanRequest(_Wire):
+class ScreenerScanRequest(_Command):
     """Request payload for POST /api/v1/screener/scan."""
 
     market: Str
@@ -254,7 +254,7 @@ class ScreenerScanRequest(_Wire):
     range: tuple[int, int] = (0, 50)
 
 
-class ScreenerRow(_Wire):
+class ScreenerRow(_Command):
     """A row of screened instrument results."""
 
     full_symbol: Str = Field(alias="fullSymbol")
@@ -263,7 +263,7 @@ class ScreenerRow(_Wire):
     values: dict[str, Any]
 
 
-class ScreenerScanResponse(_Wire):
+class ScreenerScanResponse(_Command):
     """Response payload for POST /api/v1/screener/scan."""
 
     total: Annotated[int, Strict()]

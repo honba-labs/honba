@@ -81,7 +81,6 @@ pub struct Position {
 
 /// The raw wire form, validated into a [`Position`].
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
 struct PositionRepr {
     instrument_id: InstrumentId,
     currency: Currency,

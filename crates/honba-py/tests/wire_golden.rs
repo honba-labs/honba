@@ -88,3 +88,22 @@ fn golden_invalid_values_and_texts_are_rejected() {
     }
     assert!(checked > 0, "no invalid golden cases found");
 }
+
+/// ADR 0012 rule 1: record readers ignore unknown fields. Every `tolerated`
+/// case parses and reserializes to its `canonical` form (unknowns dropped).
+#[test]
+fn golden_tolerated_values_drop_unknown_fields() {
+    let mut checked = 0;
+    for (file, doc) in golden_files() {
+        let kind = doc["type"].as_str().unwrap();
+        for case in entries(&doc, "tolerated") {
+            let name = &case["name"];
+            let out = canonical(kind, &case["value"].to_string())
+                .unwrap_or_else(|e| panic!("{file} {name}: {e}"));
+            let parsed: Value = serde_json::from_str(&out).unwrap();
+            assert_eq!(parsed, case["canonical"], "{file} {name}");
+            checked += 1;
+        }
+    }
+    assert!(checked > 0, "no tolerated golden cases found");
+}

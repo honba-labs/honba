@@ -70,7 +70,6 @@ pub struct Money {
 /// rounded to minor units once, at the door — so an old stream does not fail a
 /// whole run, but nothing new depends on float input.
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
 struct MoneyRepr {
     amount: MoneyAmount,
     currency: Currency,

@@ -77,6 +77,7 @@
         "ts_init": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}
       }
     },
+    {"name": "schema_version_1", "value": {"schema_version": 1, "event": {"type": "order_filled", "order_id": "O-1", "last_qty": 75.0, "last_px": 22000.0, "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}}, "ts_init": {"iso": "2023-11-14T22:14:20.000000010Z", "unix_nanos": "1700000060000000010"}}},
     {
       "name": "missing_schema_version",
       "value": {
@@ -94,5 +95,8 @@
       "name": "duplicate_key_in_nested_event",
       "text": "{\"schema_version\":3,\"event\":{\"type\":\"order_cancelled\",\"order_id\":\"O-1\",\"order_id\":\"O-2\",\"ts_event\":1},\"ts_init\":1}"
     }
+  ],
+  "tolerated": [
+    {"name": "unknown_envelope_and_event_fields", "value": {"schema_version": 3, "event": {"type": "order_filled", "order_id": "O-1", "last_qty": 75.0, "last_px": 22000.0, "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}, "venue_fill_id": "F-9"}, "ts_init": {"iso": "2023-11-14T22:14:20.000000010Z", "unix_nanos": "1700000060000000010"}, "trace_id": "abc"}, "canonical": {"schema_version": 3, "event": {"type": "order_filled", "order_id": "O-1", "last_qty": 75.0, "last_px": 22000.0, "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}}, "ts_init": {"iso": "2023-11-14T22:14:20.000000010Z", "unix_nanos": "1700000060000000010"}}}
   ]
 }

@@ -134,7 +134,6 @@ pub struct Order {
 
 /// The raw wire form, validated into an [`Order`].
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
 struct OrderRepr {
     order_id: OrderId,
     instrument_id: InstrumentId,

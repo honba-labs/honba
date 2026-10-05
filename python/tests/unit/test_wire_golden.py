@@ -73,6 +73,46 @@ def test_golden_invalid_case_rejected(kind, value):
         wire.loads(kind, json.dumps(value))
 
 
+# ADR 0012: records (data a newer producer may extend) ignore unknown fields;
+# commands (authored input whose dropped field would change its meaning) reject them.
+RECORDS = {"InstrumentId", "Bar", "Order", "Trade", "Position", "Event", "Message"}
+COMMANDS = {"OrderIntent", "ScreenerFilterPredicate"}
+
+
+def test_every_wire_kind_has_an_unknown_field_policy():
+    assert RECORDS | COMMANDS == set(wire.MODELS)
+    assert not RECORDS & COMMANDS
+
+
+@pytest.mark.parametrize("file", FILES)
+def test_golden_files_pin_the_unknown_field_policy(file):
+    doc = _load(file)
+    if doc["type"] in RECORDS:
+        assert doc.get("tolerated"), f"{file}: a record needs a tolerated unknown-field case"
+    else:
+        assert not doc.get("tolerated"), f"{file}: a command must not tolerate unknown fields"
+        names = [c["name"] for c in doc.get("invalid", [])]
+        assert any("unknown_field" in n for n in names), f"{file}: no unknown_field rejection"
+
+
+def _tolerated_cases():
+    for file in FILES:
+        doc = _load(file)
+        for case in doc.get("tolerated", []):
+            yield pytest.param(
+                doc["type"], case["value"], case["canonical"], id=f"{file}:{case['name']}"
+            )
+
+
+@pytest.mark.parametrize(("kind", "value", "canonical"), list(_tolerated_cases()))
+def test_golden_tolerated_case_drops_unknown_fields(kind, value, canonical):
+    adapter = ADAPTERS[kind]
+    model = adapter.validate_python(value)
+    assert adapter.dump_python(model, mode="json") == canonical
+    assert model == adapter.validate_python(canonical)
+    assert wire.loads(kind, json.dumps(value)) == model
+
+
 def test_golden_has_raw_text_cases():
     assert list(_text_cases())
 
@@ -112,14 +152,20 @@ def test_loads_rejects_unknown_kind():
 
 def test_event_ids_are_order_ids():
     ev = ADAPTERS["Event"].validate_python(
-        {"type": "order_accepted", "order_id": "O-1", "ts_event": {"iso": "1970-01-01T00:00:00.000000005Z", "unix_nanos": "5"}}
+        {
+            "type": "order_accepted",
+            "order_id": "O-1",
+            "ts_event": {"iso": "1970-01-01T00:00:00.000000005Z", "unix_nanos": "5"},
+        }
     )
     assert isinstance(ev, wire.OrderAccepted)
     assert ev.order_id == "O-1"
 
 
 def test_message_wrap_sets_current_schema_version():
-    ev = wire.OrderCancelled(order_id="O-3", ts_event={"iso": "1970-01-01T00:00:00.000000001Z", "unix_nanos": "1"})
+    ev = wire.OrderCancelled(
+        order_id="O-3", ts_event={"iso": "1970-01-01T00:00:00.000000001Z", "unix_nanos": "1"}
+    )
     msg = wire.Message.wrap(ev, ts_init=2)
     assert msg.schema_version == wire.SCHEMA_VERSION
     assert msg.model_dump(mode="json")["event"]["type"] == "order_cancelled"

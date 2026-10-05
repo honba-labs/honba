@@ -24,6 +24,9 @@ struct Golden {
     /// Raw JSON text that must be rejected (e.g. duplicate keys, which a
     /// parsed `Value` cannot represent).
     invalid_text: BTreeMap<String, String>,
+    /// Payloads with unknown fields that a reader must accept (ADR 0012 rule
+    /// 1), paired with the canonical JSON the unknown fields are dropped to.
+    tolerated: BTreeMap<String, (Value, Value)>,
 }
 
 fn load(file: &str, type_name: &str) -> Golden {
@@ -55,10 +58,21 @@ fn load(file: &str, type_name: &str) -> Golden {
             (name, c["text"].as_str().unwrap().to_owned())
         })
         .collect();
+    let tolerated = doc
+        .get("tolerated")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .map(|c| {
+            let name = c["name"].as_str().unwrap().to_owned();
+            (name, (c["value"].clone(), c["canonical"].clone()))
+        })
+        .collect();
     Golden {
         cases: collect("cases"),
         invalid: collect("invalid"),
         invalid_text,
+        tolerated,
     }
 }
 
@@ -95,6 +109,17 @@ where
     for (name, text) in &golden.invalid_text {
         let res: Result<T, _> = serde_json::from_str(text);
         assert!(res.is_err(), "{file}/{name}: invalid text was accepted");
+    }
+    for (name, (value, canonical)) in &golden.tolerated {
+        let got: T = serde_json::from_value(value.clone())
+            .unwrap_or_else(|e| panic!("{file}/{name}: unknown fields must be ignored: {e}"));
+        let want: T = serde_json::from_value(canonical.clone()).unwrap();
+        assert_eq!(got, want, "{file}/{name}: tolerated value");
+        assert_eq!(
+            &serde_json::to_value(&got).unwrap(),
+            canonical,
+            "{file}/{name}"
+        );
     }
 }
 

@@ -57,7 +57,6 @@ pub struct QuoteTick {
 
 /// The raw wire form, validated into a [`QuoteTick`].
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
 struct QuoteTickRepr {
     instrument_id: InstrumentId,
     bid_price: f64,
@@ -207,7 +206,6 @@ pub struct TradeTick {
 
 /// The raw wire form, validated into a [`TradeTick`].
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
 struct TradeTickRepr {
     instrument_id: InstrumentId,
     price: f64,

@@ -139,9 +139,11 @@ fn an_unknown_currency_on_the_wire_is_rejected() {
 }
 
 #[test]
-fn an_unknown_field_on_the_wire_is_rejected() {
-    let err = serde_json::from_str::<Money>(r#"{"amount": 100, "currency": "INR", "extra": 1}"#);
-    assert!(err.is_err());
+fn an_unknown_field_on_the_wire_is_ignored() {
+    // ADR 0012 rule 1: Money is a record; a newer producer's extra field is
+    // dropped, never fatal (an unknown schema_version is what rejects).
+    let m = serde_json::from_str::<Money>(r#"{"amount": 100, "currency": "INR", "extra": 1}"#);
+    assert_eq!(m.unwrap(), Money::new(100, Currency::Inr));
 }
 
 #[test]

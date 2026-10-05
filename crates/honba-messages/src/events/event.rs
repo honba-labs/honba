@@ -41,7 +41,7 @@ pub const SCHEMA_VERSION: u32 = 3;
 /// }
 /// ```
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum Event {
     /// A quote (top-of-book) update.
@@ -114,8 +114,11 @@ impl Event {
 /// The envelope that carries an [`Event`] plus Honba-side metadata.
 ///
 /// This is the versioned unit of the wire contract: its JSON form is
-/// `{"schema_version": 1, "event": {...}, "ts_init": n}`, and deserializing a
-/// message with any other `schema_version` fails.
+/// `{"schema_version": 3, "event": {...}, "ts_init": {...}}`, and deserializing a
+/// message with any other `schema_version` fails. Unknown fields, in the
+/// envelope or the event, are ignored (ADR 0012 rule 1): a newer producer's
+/// additive fields never break this reader, while a reshaped wire bumps the
+/// version and is rejected.
 ///
 /// ```
 /// use honba_messages::{Event, Message, UnixNanos, QuoteTick, InstrumentId, Exchange};
@@ -131,7 +134,6 @@ impl Event {
 /// assert_eq!(msg.schema_version(), honba_messages::SCHEMA_VERSION);
 /// ```
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct Message {
     /// Rendered as a plain `u32` in the schema, matching the JSON wire form
     /// (the internal `SchemaVersion` unit type would otherwise emit `{}`).
