@@ -150,7 +150,9 @@ impl Position {
         self.quantity
     }
 
-    /// Returns the volume-weighted average entry price.
+    /// Returns the volume-weighted average entry price, rounded to the minor
+    /// unit on every fill (ADR 0011): a statistic that never carries an `f64`
+    /// tail into realized PnL.
     pub fn avg_price(&self) -> f64 {
         self.avg_price
     }
@@ -158,7 +160,7 @@ impl Position {
     /// Returns realized profit and loss in the position's currency.
     ///
     /// Realized PnL is a ledger entry: it accrues per fill, in minor units, on
-    // every reduction or reversal, so it never accumulates in `f64`.
+    /// every reduction or reversal, so it never accumulates in `f64`.
     pub fn realized_pnl(&self) -> Money {
         self.realized_pnl
     }
@@ -209,13 +211,13 @@ impl Position {
         if self.is_flat() {
             self.side = fill_side;
             self.quantity = qty;
-            self.avg_price = px;
+            self.avg_price = round_to_minor(px);
             return;
         }
 
         if fill_side == self.side {
             let new_qty = self.quantity + qty;
-            self.avg_price = (self.avg_price * self.quantity + px * qty) / new_qty;
+            self.avg_price = round_to_minor((self.avg_price * self.quantity + px * qty) / new_qty);
             self.quantity = new_qty;
             return;
         }
@@ -242,7 +244,7 @@ impl Position {
             // Reverse.
             self.side = fill_side;
             self.quantity = qty - self.quantity;
-            self.avg_price = px;
+            self.avg_price = round_to_minor(px);
         }
     }
 
@@ -257,4 +259,9 @@ impl Position {
             )))
         }
     }
+}
+
+/// Rounds a price to the nearest minor unit, half away from zero (ADR 0011).
+fn round_to_minor(price: f64) -> f64 {
+    (price * 100.0).round() / 100.0
 }

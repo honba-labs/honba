@@ -223,6 +223,30 @@ fn round_major_to_minor(value: f64, currency: Currency) -> Result<Money, MoneyEr
     })
 }
 
+/// Float noise below this many minor units is treated as an exact amount
+/// before a directional (floor or ceiling) rounding, so `0.1 * 3` is a stake of
+/// 30 paise rather than 31. Far below one minor unit, far above f64 noise at
+/// ledger magnitudes.
+const DIRECTIONAL_NOISE_MINOR: f64 = 1e-6;
+
+/// Scales a major-unit value to minor units, rejecting NaN, infinities and
+/// overflow, and snaps sub-[`DIRECTIONAL_NOISE_MINOR`] noise to the integer.
+fn scaled_minor(value: f64) -> Result<f64, MoneyError> {
+    if !value.is_finite() {
+        return Err(MoneyError::NonFinite);
+    }
+    let scaled = value * MINOR_PER_MAJOR;
+    if scaled.abs() > i64::MAX as f64 {
+        return Err(MoneyError::Overflow);
+    }
+    let nearest = scaled.round();
+    Ok(if (scaled - nearest).abs() < DIRECTIONAL_NOISE_MINOR {
+        nearest
+    } else {
+        scaled
+    })
+}
+
 /// Why a money value was rejected.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -238,8 +262,12 @@ pub enum MoneyError {
         /// The right operand's currency.
         right: Currency,
     },
-    /// A non-finite quantity met a finite price (or vice versa).
+    /// A non-finite quantity met a finite price (or vice versa), or a
+    /// quantity was negative where only a size makes sense.
     InvalidQuantity,
+    /// A settlement price that does not sit on the instrument's tick. It is
+    /// rejected, never snapped (ADR 0011).
+    OffTick,
 }
 
 impl std::fmt::Display for MoneyError {
@@ -251,6 +279,7 @@ impl std::fmt::Display for MoneyError {
                 write!(f, "currency mismatch: {left} vs {right}")
             }
             Self::InvalidQuantity => write!(f, "quantity must be finite"),
+            Self::OffTick => write!(f, "settlement price is not on the instrument's tick"),
         }
     }
 }
@@ -271,6 +300,7 @@ impl From<MoneyError> for crate::EntitiesError {
             MoneyError::InvalidQuantity => {
                 crate::EntitiesError::InvalidMoney("non-finite quantity".into())
             }
+            MoneyError::OffTick => crate::EntitiesError::InvalidMoney("off-tick price".into()),
         }
     }
 }
@@ -329,6 +359,46 @@ impl Money {
             amount: -self.amount,
             currency: self.currency,
         }
+    }
+
+    /// Creates a **payout** from major units, rounding down (towards negative
+    /// infinity) to the minor unit.
+    ///
+    /// Money credited to the portfolio rounds against it, so equity is never
+    /// overstated; a loss rounds to the larger loss (ADR 0011). Float noise
+    /// below a millionth of a minor unit is treated as exact first.
+    ///
+    /// ```
+    /// use honba_entities::{Currency, Money};
+    ///
+    /// assert_eq!(Money::payout_from_major_f64(10.019, Currency::Inr).unwrap().minor(), 1001);
+    /// assert_eq!(Money::payout_from_major_f64(-10.011, Currency::Inr).unwrap().minor(), -1002);
+    /// ```
+    pub fn payout_from_major_f64(major: f64, currency: Currency) -> Result<Self, MoneyError> {
+        Ok(Self {
+            amount: scaled_minor(major)?.floor() as i64,
+            currency,
+        })
+    }
+
+    /// Creates a **stake** from major units, rounding up (towards positive
+    /// infinity) to the minor unit.
+    ///
+    /// Money committed by the portfolio rounds against it, so a stake is never
+    /// silently under-sized (ADR 0011). Float noise below a millionth of a minor
+    /// unit is treated as exact first.
+    ///
+    /// ```
+    /// use honba_entities::{Currency, Money};
+    ///
+    /// assert_eq!(Money::stake_from_major_f64(10.011, Currency::Inr).unwrap().minor(), 1002);
+    /// assert_eq!(Money::stake_from_major_f64(0.1 * 3.0, Currency::Inr).unwrap().minor(), 30);
+    /// ```
+    pub fn stake_from_major_f64(major: f64, currency: Currency) -> Result<Self, MoneyError> {
+        Ok(Self {
+            amount: scaled_minor(major)?.ceil() as i64,
+            currency,
+        })
     }
 
     /// Multiplies a quantity by a price and rounds to minor units.
@@ -484,4 +554,74 @@ impl Instrument {
     pub fn tick_size(&self) -> f64 {
         self.tick_size
     }
+
+    /// Rounds a desired quantity **up** to the next lot multiple (ADR 0011).
+    ///
+    /// A stake that rounded down would silently under-size the position, so it
+    /// rounds up; a quantity already on a lot multiple (within float noise) is
+    /// kept. Negative or non-finite input is rejected.
+    ///
+    /// ```
+    /// use honba_entities::{Currency, Instrument, InstrumentKind};
+    /// use honba_messages::{Exchange, InstrumentId};
+    ///
+    /// let nifty = Instrument::new(
+    ///     InstrumentId::new("NIFTY", Exchange::new("NSE")),
+    ///     InstrumentKind::Future, Currency::Inr, 75.0, 0.05,
+    /// );
+    /// assert_eq!(nifty.stake_quantity(76.0), Ok(150.0));
+    /// ```
+    pub fn stake_quantity(&self, quantity: f64) -> Result<f64, MoneyError> {
+        if !quantity.is_finite() || quantity < 0.0 {
+            return Err(MoneyError::InvalidQuantity);
+        }
+        let lots = quantity / self.lot_size;
+        let nearest = lots.round();
+        let lots = if (lots - nearest).abs() < LOT_TICK_TOLERANCE {
+            nearest
+        } else {
+            lots.ceil()
+        };
+        Ok(lots * self.lot_size)
+    }
+
+    /// Returns `true` when `price` sits on a tick, within float noise.
+    pub fn is_on_tick(&self, price: f64) -> bool {
+        if !price.is_finite() {
+            return false;
+        }
+        let ticks = price / self.tick_size;
+        (ticks - ticks.round()).abs() < LOT_TICK_TOLERANCE
+    }
+
+    /// The notional `quantity * price` that settles, rounded once to minor
+    /// units in the instrument's currency.
+    ///
+    /// A price that is not on a tick is rejected with [`MoneyError::OffTick`],
+    /// not silently snapped (ADR 0011).
+    ///
+    /// ```
+    /// use honba_entities::{Currency, Instrument, InstrumentKind, MoneyError};
+    /// use honba_messages::{Exchange, InstrumentId};
+    ///
+    /// let nifty = Instrument::new(
+    ///     InstrumentId::new("NIFTY", Exchange::new("NSE")),
+    ///     InstrumentKind::Future, Currency::Inr, 75.0, 0.05,
+    /// );
+    /// assert_eq!(nifty.settle_notional(75.0, 100.05).unwrap().minor(), 750_375);
+    /// assert_eq!(nifty.settle_notional(75.0, 100.03), Err(MoneyError::OffTick));
+    /// ```
+    pub fn settle_notional(&self, quantity: f64, price: f64) -> Result<Money, MoneyError> {
+        if !quantity.is_finite() || !price.is_finite() {
+            return Err(MoneyError::InvalidQuantity);
+        }
+        if !self.is_on_tick(price) {
+            return Err(MoneyError::OffTick);
+        }
+        Money::mul_qty(quantity, price, self.currency)
+    }
 }
+
+/// Relative float noise (in lots or ticks) below which a quantity or price
+/// counts as sitting exactly on a lot multiple or tick.
+const LOT_TICK_TOLERANCE: f64 = 1e-6;

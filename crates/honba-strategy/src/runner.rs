@@ -188,7 +188,8 @@ impl<S: Strategy, E: ExecutionEngine> Handler for StrategyRunner<S, E> {
         let new_fills = self.execution.drain_fills()?;
         let (strategy, ctx) = self.adapter.parts_mut();
         for fill in &new_fills {
-            ctx.apply_fill(fill);
+            ctx.apply_fill(fill)
+                .map_err(|e| AlgoError::Component(format!("booking fill: {e}")))?;
             strategy.on_fill(ctx, fill)?;
         }
         self.fills.extend(new_fills);

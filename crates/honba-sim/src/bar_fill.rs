@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use honba_engine::{ExecutionEngine, Handler, Result};
+use honba_engine::{AlgoError, ExecutionEngine, Handler, Result};
 use honba_entities::{Currency, Money, Trade};
 use honba_messages::{Event, Order, OrderId, UnixNanos};
 
@@ -62,18 +62,18 @@ impl FillCosts {
         self.bps
     }
 
-    fn of(&self, quantity: f64, price: f64, currency: Currency) -> Money {
-        // Round per leg, then sum (ADR 0011): the flat leg and the bps leg each
-        // settle to minor units once, so the total is a ledger-reproducible
-        // value rather than a rounded-after-summation approximation.
-        let flat = Money::from_major_f64(self.flat, currency);
-        let bps = Money::mul_qty(quantity * price * self.bps / 10_000.0, 1.0, currency);
-        match (flat, bps) {
-            (Ok(f), Ok(b)) => (f + b).unwrap_or_else(|_| Money::zero(currency)),
-            // A non-finite input cannot produce a cost; fall back to zero costs
-            // rather than a NaN on the trade.
-            _ => Money::zero(currency),
-        }
+    /// The cost of one fill: each leg rounded to minor units once, then summed.
+    ///
+    /// A leg that cannot be represented (a non-finite or i64-overflowing
+    /// notional) is an error, never a zero cost: a free fill would round in the
+    /// reporter's favour (ADR 0011).
+    fn of(&self, quantity: f64, price: f64, currency: Currency) -> Result<Money> {
+        let leg_error =
+            |e: honba_entities::MoneyError| AlgoError::Component(format!("fill cost: {e}"));
+        let flat = Money::from_major_f64(self.flat, currency).map_err(leg_error)?;
+        let bps = Money::from_major_f64(quantity * price * self.bps / 10_000.0, currency)
+            .map_err(leg_error)?;
+        (flat + bps).map_err(|e| AlgoError::Component(format!("fill cost: {e}")))
     }
 }
 
@@ -190,9 +190,11 @@ impl ExecutionEngine for BarFillEngine {
     fn submit(&mut self, order: Order) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
         let price = inner.last_price.unwrap_or(0.0);
+        // Costs first: a fill whose cost cannot be represented is refused
+        // before it consumes a timestamp or reaches the fill buffer.
+        let costs = self.costs.of(order.quantity(), price, self.currency)?;
         let ts = UnixNanos::from_u64(inner.next_ts.max(order.ts_event().as_u64()));
         inner.next_ts = ts.as_u64() + 1;
-        let costs = self.costs.of(order.quantity(), price, self.currency);
         inner.fills.push(
             Trade::new(
                 OrderId::new(order.order_id().as_str()),

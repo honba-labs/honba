@@ -198,3 +198,35 @@ fn paper_execution_fills_strategy_orders_at_the_bar_price() {
         ]
     );
 }
+
+/// ADR 0011 through the engine: every fill's costs round per leg, so the run's
+/// total is the sum of integer per-fill costs, each 1 paisa flat + 1 bps.
+#[test]
+fn costs_round_per_leg_on_every_fill_of_a_run() {
+    use honba_sim::FillCosts;
+
+    // 1 bps of each close (96..104) is ~0.01: each leg rounds to a paisa once.
+    let exec = BarFillEngine::with_costs(FillCosts::new(0.005, 1.0).unwrap());
+    let mut engine = Engine::new();
+    engine.add_handler(exec.clone());
+    engine.add_handler(Threshold::new(100.0, exec.clone(), |_, _| {}));
+    engine.run(&mut feed()).unwrap();
+    let fills = exec.clone().drain_fills().unwrap();
+    let costs: Vec<i64> = fills.iter().map(|f| f.costs().minor()).collect();
+    assert_eq!(costs, [2, 2, 2, 2]);
+}
+
+/// A cost that cannot be represented stops the run with an error instead of
+/// settling a free fill.
+#[test]
+fn an_unrepresentable_cost_stops_the_run() {
+    use honba_sim::FillCosts;
+
+    let exec = BarFillEngine::with_costs(FillCosts::new(0.0, 10_000.0).unwrap());
+    let mut engine = Engine::new();
+    engine.add_handler(exec.clone());
+    engine.add_handler(Threshold::new(100.0, exec.clone(), |_, _| {}));
+    let mut huge = Feed(vec![bar(99.0, 1_000), bar(2e18, 2_000)].into());
+    let err = engine.run(&mut huge).unwrap_err();
+    assert!(err.to_string().contains("fill cost"), "{err}");
+}

@@ -1,6 +1,6 @@
 //! Tests for integer minor-unit money (ADR 0011, plan.md E0-S6).
 
-use crate::{Currency, Money};
+use crate::{Currency, Money, MoneyError};
 
 #[test]
 fn whole_major_amounts_construct_exactly_from_minor() {
@@ -148,4 +148,85 @@ fn an_unknown_field_on_the_wire_is_rejected() {
 fn display_reads_in_major_units() {
     assert_eq!(Money::new(12_345, Currency::Inr).to_string(), "INR 123.45");
     assert_eq!(Money::new(-50, Currency::Usd).to_string(), "USD -0.50");
+}
+
+// --- Conservative edges (ADR 0011): payouts floor, stakes round up. ---
+
+#[test]
+fn a_payout_floors_to_the_minor_unit() {
+    // 10.019 is 1001.9 paise: a payout never rounds up in the portfolio's favour.
+    let p = Money::payout_from_major_f64(10.019, Currency::Inr).unwrap();
+    assert_eq!(p.minor(), 1001);
+    // Half a paisa still floors (nearest would round it up).
+    assert_eq!(
+        Money::payout_from_major_f64(10.005, Currency::Inr)
+            .unwrap()
+            .minor(),
+        1000
+    );
+}
+
+#[test]
+fn a_negative_payout_floors_towards_negative_infinity() {
+    // A loss rounds to the larger loss: equity is understated, never overstated.
+    assert_eq!(
+        Money::payout_from_major_f64(-10.011, Currency::Inr)
+            .unwrap()
+            .minor(),
+        -1002
+    );
+}
+
+#[test]
+fn a_stake_rounds_up_to_the_minor_unit() {
+    assert_eq!(
+        Money::stake_from_major_f64(10.011, Currency::Inr)
+            .unwrap()
+            .minor(),
+        1002
+    );
+    assert_eq!(
+        Money::stake_from_major_f64(-10.019, Currency::Inr)
+            .unwrap()
+            .minor(),
+        -1001
+    );
+}
+
+#[test]
+fn float_noise_on_an_exact_amount_is_not_rounded_against_anyone() {
+    // 0.1 * 3 is 0.30000000000000004 in f64: a stake of 30 paise, not 31,
+    // and a payout of 30, not 29 when the noise is below the paisa.
+    let noisy_up = 0.1 * 3.0;
+    let noisy_down = 0.7 * 3.0; // 2.0999999999999996
+    assert_eq!(
+        Money::stake_from_major_f64(noisy_up, Currency::Inr)
+            .unwrap()
+            .minor(),
+        30
+    );
+    assert_eq!(
+        Money::payout_from_major_f64(noisy_down, Currency::Inr)
+            .unwrap()
+            .minor(),
+        210
+    );
+}
+
+#[test]
+fn payout_and_stake_reject_non_finite_and_overflow() {
+    for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        assert_eq!(
+            Money::payout_from_major_f64(bad, Currency::Inr),
+            Err(MoneyError::NonFinite)
+        );
+        assert_eq!(
+            Money::stake_from_major_f64(bad, Currency::Inr),
+            Err(MoneyError::NonFinite)
+        );
+    }
+    assert_eq!(
+        Money::stake_from_major_f64(1e30, Currency::Inr),
+        Err(MoneyError::Overflow)
+    );
 }

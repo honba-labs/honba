@@ -245,3 +245,27 @@ fn fill_costs_reject_invalid_values_with_typed_errors() {
     assert!(FillCosts::new(MAX_FLAT_COST, MAX_COST_BPS).is_ok());
     assert!(FillCostsError::InvalidBps(-1.0).to_string().contains("bps"));
 }
+
+#[test]
+fn each_cost_leg_rounds_once_before_the_legs_are_summed() {
+    // ADR 0011: flat 0.005 rounds to 1 paisa and 1 bps of 50.00 (0.005) rounds
+    // to 1 paisa: 2 paise. Summing first (0.01) and rounding once would charge
+    // 1 paisa, a total the broker's per-leg ledger cannot reproduce.
+    let mut exec = costed(0.005, 1.0);
+    observe(&mut exec, 50.0, 1);
+    exec.submit(market("O-1", OrderSide::Buy, 1.0, 1)).unwrap();
+    assert_eq!(exec.drain_fills().unwrap()[0].costs().minor(), 2);
+}
+
+#[test]
+fn a_cost_that_cannot_be_represented_fails_the_fill_instead_of_charging_zero() {
+    // A notional so large its bps leg overflows i64 paise must not settle as a
+    // free fill: zero costs would round in the reporter's favour.
+    let mut exec = costed(0.0, MAX_COST_BPS);
+    observe(&mut exec, 1e10, 1);
+    let err = exec
+        .submit(market("O-1", OrderSide::Buy, 1e10, 1))
+        .unwrap_err();
+    assert!(err.to_string().contains("cost"), "{err}");
+    assert!(exec.drain_fills().unwrap().is_empty());
+}

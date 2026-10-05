@@ -296,3 +296,35 @@ fn fill_costs_reach_the_context_cash_through_the_runner() {
     // A sell credits the notional minus the cost.
     assert_eq!(runner.context().cash().minor(), -150);
 }
+
+#[test]
+fn a_fill_the_ledger_cannot_book_fails_the_event_and_leaves_the_ledger_untouched() {
+    // ADR 0011: a USD-costed fill booked into an INR ledger used to move the
+    // position and silently skip the cash. The runner now surfaces it.
+    let (s, _) = Recorder::new(vec![]);
+    let ex = FakeExecution::default();
+    let mut runner = StrategyRunner::with_context(
+        s,
+        ex.clone(),
+        LedgerContext::with_cash(Money::new(1_000, Currency::Inr)),
+    );
+    runner.on_start().unwrap();
+    let usd = Trade::new(
+        "rec-0".into(),
+        x(),
+        OrderSide::Buy,
+        1.0,
+        1.0,
+        Currency::Usd,
+        UnixNanos::from_u64(5),
+        UnixNanos::from_u64(5),
+    )
+    .with_costs(Money::new(1, Currency::Usd));
+    ex.fills.lock().unwrap().push(usd);
+    let err = runner
+        .on_event(&bar_event(1.0, 5), UnixNanos::from_u64(5))
+        .unwrap_err();
+    assert!(err.to_string().contains("booking fill"), "{err}");
+    assert_eq!(runner.context().cash(), Money::new(1_000, Currency::Inr));
+    assert_eq!(runner.context().position(&x()), 0.0);
+}

@@ -65,3 +65,37 @@ fn position_side_serializes_lowercase() {
     assert_eq!(serde_json::to_value(PositionSide::Long).unwrap(), "long");
     assert_eq!(serde_json::to_value(PositionSide::Short).unwrap(), "short");
 }
+
+#[test]
+fn avg_price_rounds_to_the_minor_unit_on_every_fill() {
+    // ADR 0011: avg_price is a statistic rounded to minor units per fill, so
+    // it never carries an f64 tail into the realized PnL.
+    let mut p = Position::flat(any_instrument(), Currency::Inr);
+    p.apply_fill(PositionSide::Long, 3.0, 10.00);
+    p.apply_fill(PositionSide::Long, 1.0, 10.01); // exact average 10.0025
+    assert_eq!(p.avg_price(), 10.00);
+    p.apply_fill(PositionSide::Short, 4.0, 10.01);
+    assert_eq!(p.realized_pnl().minor(), 4, "4 * (10.01 - 10.00), in paise");
+}
+
+#[test]
+fn opening_and_reversing_fills_also_round_avg_price() {
+    let mut p = Position::flat(any_instrument(), Currency::Inr);
+    p.apply_fill(PositionSide::Long, 1.0, 10.006);
+    assert_eq!(p.avg_price(), 10.01);
+    p.apply_fill(PositionSide::Short, 3.0, 9.994);
+    assert_eq!(p.side(), PositionSide::Short);
+    assert_eq!(p.avg_price(), 9.99);
+}
+
+#[test]
+fn realized_pnl_accumulates_exactly_over_many_fills() {
+    // 1000 round trips of 1 share bought at 0.10 and sold at 0.1 + 0.2: exactly
+    // 20 paise each. Summing the f64 legs would drift away from 20_000.
+    let mut p = Position::flat(any_instrument(), Currency::Inr);
+    for _ in 0..1000 {
+        p.apply_fill(PositionSide::Long, 1.0, 0.1);
+        p.apply_fill(PositionSide::Short, 1.0, 0.1 + 0.2);
+    }
+    assert_eq!(p.realized_pnl(), Money::new(20_000, Currency::Inr));
+}

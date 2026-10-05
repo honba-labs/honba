@@ -130,32 +130,33 @@ impl LedgerContext {
     }
 
     /// Books a fill: position, cash (notional plus costs) and the pending
-    /// quantity of the instrument. The notional rounds to minor units once, at
-    /// the point of booking (ADR 0011), so cash accumulates integers.
-    pub fn apply_fill(&mut self, fill: &Trade) {
-        let entry = self
+    /// quantity of the instrument.
+    ///
+    /// The notional rounds to minor units once, at the point of booking, and
+    /// the costs are already integer `Money` (ADR 0011), so cash accumulates
+    /// integers. Booking is all-or-nothing: a fill whose notional cannot be
+    /// represented, whose costs are in another currency, or that would
+    /// overflow the balance is refused with an error and leaves the ledger
+    /// untouched, rather than moving the position without the cash.
+    pub fn apply_fill(&mut self, fill: &Trade) -> honba_entities::Result<()> {
+        let notional = Money::mul_qty(fill.quantity(), fill.price(), self.currency)?;
+        let cash = if fill.side() == OrderSide::Buy {
+            (self.cash - (notional + fill.costs())?)?
+        } else {
+            (self.cash + (notional - fill.costs())?)?
+        };
+        let signed = if fill.side() == OrderSide::Buy {
+            fill.quantity()
+        } else {
+            -fill.quantity()
+        };
+        self.cash = cash;
+        *self
             .positions
             .entry(fill.instrument_id().clone())
-            .or_insert(0.0);
-        let notional = Money::mul_qty(fill.quantity(), fill.price(), self.currency);
-        if fill.side() == OrderSide::Buy {
-            *entry += fill.quantity();
-            let debit = notional.and_then(|n| {
-                (n + fill.costs()).map_err(|_| honba_entities::MoneyError::InvalidQuantity)
-            });
-            if let Ok(debit) = debit {
-                self.cash = (self.cash - debit).unwrap_or(self.cash);
-            }
-        } else {
-            *entry -= fill.quantity();
-            let credit = notional.and_then(|n| {
-                (n - fill.costs()).map_err(|_| honba_entities::MoneyError::InvalidQuantity)
-            });
-            if let Ok(credit) = credit {
-                self.cash = (self.cash + credit).unwrap_or(self.cash);
-            }
-        }
+            .or_insert(0.0) += signed;
         self.reduce_pending(fill.instrument_id(), fill.side(), fill.quantity());
+        Ok(())
     }
 
     /// An intent was rejected or its order cancelled unfilled: it no longer

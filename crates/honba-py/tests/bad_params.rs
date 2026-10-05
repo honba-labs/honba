@@ -60,3 +60,14 @@ fn malformed_quantity_is_a_typed_error() {
         assert!(run_sma("2", "3", q).is_err(), "quantity {q}");
     }
 }
+
+#[test]
+fn a_non_finite_or_overflowing_initial_cash_is_a_typed_error_not_a_panic() {
+    // ADR 0011: initial cash crosses into integer Money at the boundary; a NaN
+    // used to `unwrap()` a MoneyError and panic across the FFI.
+    let params = format!(r#"{{"instrument_id": {INSTRUMENT}, "quantity": 1.0}}"#);
+    for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 1e30] {
+        let err = run_strategy_json("buy_and_hold", &params, "[]", "[]", bad).unwrap_err();
+        assert!(err.contains("initial_cash"), "{bad}: {err}");
+    }
+}
