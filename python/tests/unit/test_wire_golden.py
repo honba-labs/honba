@@ -112,14 +112,14 @@ def test_loads_rejects_unknown_kind():
 
 def test_event_ids_are_order_ids():
     ev = ADAPTERS["Event"].validate_python(
-        {"type": "order_accepted", "order_id": "O-1", "ts_event": 5}
+        {"type": "order_accepted", "order_id": "O-1", "ts_event": {"iso": "1970-01-01T00:00:00.000000005Z", "unix_nanos": "5"}}
     )
     assert isinstance(ev, wire.OrderAccepted)
     assert ev.order_id == "O-1"
 
 
 def test_message_wrap_sets_current_schema_version():
-    ev = wire.OrderCancelled(order_id="O-3", ts_event=1)
+    ev = wire.OrderCancelled(order_id="O-3", ts_event={"iso": "1970-01-01T00:00:00.000000001Z", "unix_nanos": "1"})
     msg = wire.Message.wrap(ev, ts_init=2)
     assert msg.schema_version == wire.SCHEMA_VERSION
     assert msg.model_dump(mode="json")["event"]["type"] == "order_cancelled"

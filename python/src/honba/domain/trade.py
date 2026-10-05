@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from honba.domain.instrument import InstrumentId
+from honba.domain.money import Currency, Money
 from honba.domain.order import OrderSide
 
 
@@ -18,4 +19,4 @@ class Trade:
     price: float
     ts: int = 0
     order_id: str | None = None
-    costs: float = 0.0
+    costs: Money = Money.zero(Currency.INR)

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from honba.domain.instrument import InstrumentId
+from honba.domain.money import Currency, Money
 
 
 class PositionSide(Enum):
@@ -30,19 +31,19 @@ class Position:
     """
 
     instrument_id: InstrumentId
-    currency: str = "INR"
+    currency: Currency = Currency.INR
     side: PositionSide = PositionSide.LONG
     quantity: float = 0.0
     avg_price: float = 0.0
-    realized_pnl: float = 0.0
+    realized_pnl: Money = Money.zero(Currency.INR)
 
     def __post_init__(self) -> None:
         if self.quantity < 0:
             raise ValueError(f"quantity must be >= 0, got {self.quantity}")
         if self.avg_price < 0:
             raise ValueError(f"avg_price must be >= 0, got {self.avg_price}")
-        if not math.isfinite(self.realized_pnl):
-            raise ValueError(f"realized_pnl must be finite, got {self.realized_pnl}")
+        if not isinstance(self.realized_pnl, Money):
+            raise ValueError(f"realized_pnl must be Money, got {type(self.realized_pnl)}")
 
     @property
     def is_flat(self) -> bool:
@@ -72,18 +73,18 @@ class Position:
             if fill_qty < self.quantity:
                 closed_qty = fill_qty
                 pnl = closed_qty * (fill_px - self.avg_price) * self.side.sign
-                self.realized_pnl += pnl
+                self.realized_pnl += Money.from_major(pnl, self.currency)
                 self.quantity -= fill_qty
             elif fill_qty == self.quantity:
                 closed_qty = fill_qty
                 pnl = closed_qty * (fill_px - self.avg_price) * self.side.sign
-                self.realized_pnl += pnl
+                self.realized_pnl += Money.from_major(pnl, self.currency)
                 self.quantity = 0.0
                 self.avg_price = 0.0
             else:
                 closed_qty = self.quantity
                 pnl = closed_qty * (fill_px - self.avg_price) * self.side.sign
-                self.realized_pnl += pnl
+                self.realized_pnl += Money.from_major(pnl, self.currency)
                 remainder = fill_qty - self.quantity
                 self.side = fill_side
                 self.quantity = remainder

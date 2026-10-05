@@ -32,10 +32,21 @@ from honba.wire.screener import ScreenerFilterPredicate
 SCHEMA_VERSION: Final[int] = 2
 """Wire-contract version; must equal ``honba_messages::SCHEMA_VERSION``."""
 
+API_VERSION: Final[str] = "1.0.0"
+"""API surface version; must equal ``honba_messages::API_VERSION``."""
+
 _U64_MAX = 2**64 - 1
 
-UnixNanos = Annotated[int, Strict(), Field(ge=0, le=_U64_MAX)]
-"""Nanoseconds since the Unix epoch, as a JSON integer (u64)."""
+
+class UnixNanos(_Wire):
+    """Nanosecond timestamp with ISO-8601 string and unix_nanos string fields.
+
+    Crosses JSON as an object (never a raw number, which exceeds
+    Number.MAX_SAFE_INTEGER in JS/TS consumers).
+    """
+
+    iso: Str
+    unix_nanos: Str
 Float = Annotated[float, Strict()]
 """A finite f64 (ints are accepted and widened, strings are not)."""
 PositiveFloat = Annotated[float, Strict(), Field(gt=0)]
@@ -54,6 +65,13 @@ class Currency(Enum):
 class PositionSide(Enum):
     LONG = "long"
     SHORT = "short"
+
+
+class Money(_Wire):
+    """Monetary amount in integer minor units (paise/cents)."""
+
+    amount: int
+    currency: Currency
 
 
 class BarAggregation(Enum):
@@ -215,7 +233,7 @@ class Trade(_Wire):
     side: WireOrderSide
     quantity: PositiveFloat
     price: PositiveFloat
-    costs: Float
+    costs: Money
     ts_event: UnixNanos
     ts_init: UnixNanos
 
@@ -234,7 +252,7 @@ class Position(_Wire):
     side: PositionSide
     quantity: NonNegativeFloat
     avg_price: NonNegativeFloat
-    realized_pnl: Float
+    realized_pnl: Money
 
 
 # Event variants: internally tagged by "type", like the Rust enum.
@@ -316,7 +334,11 @@ class Message(_Wire):
     @classmethod
     def wrap(cls, event: Any, ts_init: int) -> Message:
         """Wrap an event in an envelope stamped with the current schema version."""
-        return cls(schema_version=SCHEMA_VERSION, event=event, ts_init=ts_init)
+        ts_init_obj = UnixNanos(
+            iso=f"1970-01-01T00:00:00.{ts_init:09d}Z",
+            unix_nanos=str(ts_init)
+        )
+        return cls(schema_version=SCHEMA_VERSION, event=event, ts_init=ts_init_obj)
 
 
 MODELS: Final[dict[str, Any]] = {

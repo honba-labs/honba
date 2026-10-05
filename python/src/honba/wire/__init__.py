@@ -1,6 +1,6 @@
 """Wire models and serialization contracts (ADR 006)."""
 
-from honba.wire.base import Str, _Wire, _canonical
+from honba.wire.base import Str, _canonical, _Wire
 from honba.wire.screener import (
     FilterOp,
     MetricDefinition,
@@ -20,6 +20,7 @@ from honba.wire.screener import (
 from honba.wire.wire import (
     ENUMS,
     MODELS,
+    API_VERSION,
     SCHEMA_VERSION,
     Bar,
     BarAggregation,
@@ -56,6 +57,7 @@ from honba.wire.wire import (
 __all__ = [
     "ENUMS",
     "MODELS",
+    "API_VERSION",
     "SCHEMA_VERSION",
     "Bar",
     "BarAggregation",
