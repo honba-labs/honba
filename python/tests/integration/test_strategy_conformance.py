@@ -14,6 +14,7 @@ from typing import Any
 
 import pytest
 
+from honba.domain.money import Money
 from honba.entities import wire
 from honba.entities.instrument import Instrument, InstrumentKind
 from honba.strategies.context import LedgerContext
@@ -47,12 +48,26 @@ def build_instrument(raw: dict[str, Any]) -> Instrument:
     )
 
 
+def _money(value: Money) -> dict[str, Any]:
+    return wire.Money.from_domain(value).model_dump(mode="json")
+
+
+def _ts(ns: int) -> dict[str, Any]:
+    return wire.UnixNanos.from_ns(ns).model_dump(mode="json")
+
+
+def _observation(obs: dict[str, Any]) -> dict[str, Any]:
+    """A ContractProbe observation in wire form: ``now`` as ``{iso, unix_nanos}``, ``cash``
+    as integer Money (ADR 0011, E11-S2)."""
+    return {**obs, "now": _ts(obs["now"]), "cash": _money(obs["cash"])}
+
+
 def outcome(result: RunResult, strategy) -> dict[str, Any]:
     """The run in the fixture's JSON shape."""
     return {
         "intents": [
             {
-                "ts_init": s.ts_init,
+                "ts_init": _ts(s.ts_init),
                 "intent": wire.OrderIntent.from_domain(s.intent).model_dump(mode="json"),
             }
             for s in result.intents
@@ -64,18 +79,18 @@ def outcome(result: RunResult, strategy) -> dict[str, Any]:
                 side=f.side,
                 quantity=f.quantity,
                 price=f.price,
-                costs=f.costs,
-                ts_event=f.ts,
-                ts_init=f.ts,
+                costs=wire.Money.from_domain(f.costs),
+                ts_event=wire.UnixNanos.from_ns(f.ts),
+                ts_init=wire.UnixNanos.from_ns(f.ts),
             ).model_dump(mode="json")
             for f in result.fills
         ],
-        "observations": getattr(strategy, "observations", []),
+        "observations": [_observation(o) for o in getattr(strategy, "observations", [])],
         "positions": [
             {"instrument_id": {"symbol": i.symbol, "exchange": i.exchange}, "quantity": q}
             for i, q in result.ctx.positions().items()
         ],
-        "cash": result.ctx.cash(),
+        "cash": _money(result.ctx.cash()),
     }
 
 
@@ -105,7 +120,7 @@ def test_fixture_covers_non_zero_costs():
     costed = [s for s in SCENARIOS if s.get("fill_costs")]
     assert costed, "no scenario exercises fill costs"
     for s in costed:
-        assert any(f["costs"] > 0 for f in s["expected"]["fills"]), s["name"]
+        assert any(f["costs"]["amount"] > 0 for f in s["expected"]["fills"]), s["name"]
 
 
 def test_fixture_payloads_are_valid_wire_values():

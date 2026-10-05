@@ -11,6 +11,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 
+from honba.domain.money import Currency, Money
 from honba.entities.instrument import Instrument, InstrumentId
 from honba.entities.order import OrderIntent, OrderSide, validate_intent
 from honba.entities.trade import Trade
@@ -44,8 +45,11 @@ class StrategyContext(ABC):
         """Every non-flat position, ordered by instrument id (symbol, then exchange)."""
 
     @abstractmethod
-    def cash(self) -> float:
-        """Initial cash plus the net cash flow of all fills (buys debit, sells credit, costs debit)."""
+    def cash(self) -> Money:
+        """Initial cash plus the net cash flow of all fills (buys debit notional plus costs,
+        sells credit notional minus costs), as integer minor-unit ``Money`` (ADR 0011).
+
+        Use ``cash().to_major()`` for a float to display or size with."""
 
     @abstractmethod
     def busy(self, instrument_id: InstrumentId) -> bool:
@@ -66,11 +70,19 @@ class LedgerContext(StrategyContext):
     A deterministic in-memory ledger: the runner sets the clock, applies fills and
     releases rejected intents; the strategy reads it and submits intents, which the
     runner drains. Pure: no I/O and no wall clock, so backtest and live share it.
+
+    Cash is integer ``Money`` (ADR 0011). ``cash`` may be ``Money`` or a major-unit
+    number, converted once here (half away from zero; non-finite raises ``ValueError``).
     """
 
-    def __init__(self, cash: float = 0.0, instruments: Iterable[Instrument] = ()) -> None:
+    def __init__(
+        self,
+        cash: Money | float = 0.0,
+        instruments: Iterable[Instrument] = (),
+        currency: Currency = Currency.INR,
+    ) -> None:
         self._now = 0
-        self._cash = float(cash)
+        self._cash = cash if isinstance(cash, Money) else Money.from_major(cash, currency)
         self._positions: dict[InstrumentId, float] = {}
         self._pending: dict[tuple[InstrumentId, OrderSide], float] = {}
         self._instruments: dict[InstrumentId, Instrument] = {}
@@ -89,8 +101,13 @@ class LedgerContext(StrategyContext):
         held = (item for item in self._positions.items() if item[1] != 0.0)
         return dict(sorted(held, key=lambda item: (item[0].symbol, item[0].exchange)))
 
-    def cash(self) -> float:
+    def cash(self) -> Money:
         return self._cash
+
+    @property
+    def currency(self) -> Currency:
+        """The currency this ledger settles in."""
+        return self._cash.currency
 
     def busy(self, instrument_id: InstrumentId) -> bool:
         return any(q > 0 for (iid, _), q in self._pending.items() if iid == instrument_id)
@@ -121,13 +138,22 @@ class LedgerContext(StrategyContext):
         return intents
 
     def apply_fill(self, fill: Trade) -> None:
-        """Book a fill: position, cash (``quantity * price`` and costs) and pending quantity."""
+        """Book a fill: position, cash (notional plus costs) and pending quantity.
+
+        The notional rounds to minor units once (ADR 0011) and costs are ``Money``.
+        All-or-nothing, like the Rust ledger: a fill whose notional cannot be
+        represented or whose costs are in another currency raises ``ValueError``
+        and leaves the ledger untouched.
+        """
+        notional = Money.mul_qty(fill.quantity, fill.price, self.currency)
         if fill.side is OrderSide.BUY:
-            self._positions[fill.instrument_id] = self.position(fill.instrument_id) + fill.quantity
-            self._cash -= fill.quantity * fill.price + fill.costs
+            cash = self._cash - (notional + fill.costs)
+            signed = fill.quantity
         else:
-            self._positions[fill.instrument_id] = self.position(fill.instrument_id) - fill.quantity
-            self._cash += fill.quantity * fill.price - fill.costs
+            cash = self._cash + (notional - fill.costs)
+            signed = -fill.quantity
+        self._cash = cash
+        self._positions[fill.instrument_id] = self.position(fill.instrument_id) + signed
         self._reduce_pending(fill.instrument_id, fill.side, fill.quantity)
 
     def release(self, intent: OrderIntent) -> None:

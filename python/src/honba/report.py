@@ -420,6 +420,8 @@ def _print_tui(
             qty = getattr(t, "quantity", 0)
             price = getattr(t, "price", 0)
             costs = getattr(t, "costs", 0)
+            if hasattr(costs, "to_major"):  # integer Money (ADR 0011): display in major units
+                costs = costs.to_major()
             inst = getattr(t, "instrument_id", None)
             sym = f"{inst.symbol}.{inst.exchange}" if inst else "?"
 
@@ -513,7 +515,10 @@ def _trade_to_dict(t: Any) -> dict[str, Any]:
     for k in ("instrument_id", "side", "quantity", "price", "ts", "order_id", "costs"):
         if hasattr(t, k):
             v = getattr(t, k)
-            if hasattr(v, "value"):
+            if hasattr(v, "amount") and hasattr(v, "currency"):
+                # Integer Money: the wire form, never a float (ADR 0011).
+                d[k] = {"amount": v.amount, "currency": v.currency.value}
+            elif hasattr(v, "value"):
                 d[k] = v.value
             elif hasattr(v, "symbol"):
                 d[k] = f"{v.symbol}.{v.exchange}" if hasattr(v, "exchange") else str(v)

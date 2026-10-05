@@ -11,6 +11,7 @@ API; ``from_domain`` / ``to_domain`` convert where the mapping is lossless.
 
 from __future__ import annotations
 
+import datetime as _dt
 import json
 from enum import Enum
 from typing import Annotated, Any, Final, Literal
@@ -19,10 +20,12 @@ from pydantic import (
     Field,
     Strict,
     TypeAdapter,
+    field_validator,
     model_validator,
 )
 
 from honba.domain import instrument as _instrument
+from honba.domain import money as _money
 from honba.domain import order as _order
 from honba.domain.order import OrderSide, OrderStatus, OrderType, TimeInForce
 from honba.domain.tick import AggressorSide
@@ -38,15 +41,41 @@ API_VERSION: Final[str] = "1.0.0"
 _U64_MAX = 2**64 - 1
 
 
+_EPOCH = _dt.datetime(1970, 1, 1, tzinfo=_dt.timezone.utc)
+
+
 class UnixNanos(_Wire):
     """Nanosecond timestamp with ISO-8601 string and unix_nanos string fields.
 
     Crosses JSON as an object (never a raw number, which exceeds
-    Number.MAX_SAFE_INTEGER in JS/TS consumers).
+    Number.MAX_SAFE_INTEGER in JS/TS consumers). Like the Rust reader, the
+    value is ``unix_nanos`` (a decimal ``u64``); ``iso`` is informational.
     """
 
     iso: Str
     unix_nanos: Str
+
+    @field_validator("unix_nanos")
+    @classmethod
+    def _check_u64(cls, value: str) -> str:
+        if not value.isascii() or not value.isdigit() or int(value) > _U64_MAX:
+            raise ValueError(f"unix_nanos must be a decimal u64, got {value!r}")
+        return value
+
+    @classmethod
+    def from_ns(cls, ns: int) -> UnixNanos:
+        """The wire form of ``ns``, with the same ISO string Rust emits."""
+        if isinstance(ns, bool) or not isinstance(ns, int) or not 0 <= ns <= _U64_MAX:
+            raise ValueError(f"timestamp must be a u64 of nanoseconds, got {ns!r}")
+        secs, nanos = divmod(ns, 1_000_000_000)
+        stamp = (_EPOCH + _dt.timedelta(seconds=secs)).strftime("%Y-%m-%dT%H:%M:%S")
+        return cls(iso=f"{stamp}.{nanos:09d}Z", unix_nanos=str(ns))
+
+    def to_ns(self) -> int:
+        """Nanoseconds since the Unix epoch."""
+        return int(self.unix_nanos)
+
+
 Float = Annotated[float, Strict()]
 """A finite f64 (ints are accepted and widened, strings are not)."""
 PositiveFloat = Annotated[float, Strict(), Field(gt=0)]
@@ -55,11 +84,8 @@ NonNegativeFloat = Annotated[float, Strict(), Field(ge=0)]
 """A finite f64 that must be >= 0."""
 
 
-class Currency(Enum):
-    INR = "INR"
-    USD = "USD"
-    EUR = "EUR"
-    GBP = "GBP"
+Currency = _money.Currency
+"""The settlement currency: the same enum as ``honba.domain.money.Currency``."""
 
 
 class PositionSide(Enum):
@@ -70,8 +96,24 @@ class PositionSide(Enum):
 class Money(_Wire):
     """Monetary amount in integer minor units (paise/cents)."""
 
-    amount: int
+    amount: Annotated[int, Strict(), Field(ge=-(2**63) + 1, le=2**63 - 1)]
     currency: Currency
+
+    @field_validator("amount", mode="before")
+    @classmethod
+    def _legacy_major(cls, value: Any) -> Any:
+        # Older producers wrote major-unit floats; round once, at the door
+        # (half away from zero, like the Rust reader). Integers pass through.
+        if isinstance(value, float):
+            return _money.Money.from_major(value, _money.Currency.INR).amount
+        return value
+
+    @classmethod
+    def from_domain(cls, value: _money.Money) -> Money:
+        return cls(amount=value.amount, currency=value.currency)
+
+    def to_domain(self) -> _money.Money:
+        return _money.Money(self.amount, self.currency)
 
 
 class BarAggregation(Enum):
@@ -237,6 +279,15 @@ class Trade(_Wire):
     ts_event: UnixNanos
     ts_init: UnixNanos
 
+    @field_validator("costs", mode="before")
+    @classmethod
+    def _legacy_costs(cls, value: Any) -> Any:
+        # Legacy journals wrote a bare major-unit float; it has no currency, so
+        # INR is assumed (the Rust reader does the same).
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return {"amount": float(value), "currency": "INR"}
+        return value
+
     @model_validator(mode="after")
     def _check_side(self) -> Trade:
         if self.side not in (OrderSide.BUY, OrderSide.SELL):
@@ -253,6 +304,18 @@ class Position(_Wire):
     quantity: NonNegativeFloat
     avg_price: NonNegativeFloat
     realized_pnl: Money
+
+    @model_validator(mode="before")
+    @classmethod
+    def _legacy_realized_pnl(cls, data: Any) -> Any:
+        # Legacy writers emitted a bare major-unit float; it takes the
+        # position's currency (as in the Rust reader).
+        if isinstance(data, dict):
+            pnl = data.get("realized_pnl")
+            if isinstance(pnl, (int, float)) and not isinstance(pnl, bool):
+                currency = data.get("currency")
+                return {**data, "realized_pnl": {"amount": float(pnl), "currency": currency}}
+        return data
 
 
 # Event variants: internally tagged by "type", like the Rust enum.
@@ -334,11 +397,7 @@ class Message(_Wire):
     @classmethod
     def wrap(cls, event: Any, ts_init: int) -> Message:
         """Wrap an event in an envelope stamped with the current schema version."""
-        ts_init_obj = UnixNanos(
-            iso=f"1970-01-01T00:00:00.{ts_init:09d}Z",
-            unix_nanos=str(ts_init)
-        )
-        return cls(schema_version=SCHEMA_VERSION, event=event, ts_init=ts_init_obj)
+        return cls(schema_version=SCHEMA_VERSION, event=event, ts_init=UnixNanos.from_ns(ts_init))
 
 
 MODELS: Final[dict[str, Any]] = {

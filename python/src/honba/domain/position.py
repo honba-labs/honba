@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 from honba.domain.instrument import InstrumentId
-from honba.domain.money import Currency, Money
+from honba.domain.money import MINOR_PER_MAJOR, Currency, Money, _round_half_away
 
 
 class PositionSide(Enum):
@@ -28,6 +27,8 @@ class Position:
     """A position in a single instrument.
 
     A position is flat when quantity == 0. Fills update the position via apply_fill.
+    ``avg_price`` rounds to the minor unit on every fill and ``realized_pnl`` is
+    integer ``Money`` booked once per fill (ADR 0011), as in Rust.
     """
 
     instrument_id: InstrumentId
@@ -35,7 +36,7 @@ class Position:
     side: PositionSide = PositionSide.LONG
     quantity: float = 0.0
     avg_price: float = 0.0
-    realized_pnl: Money = Money.zero(Currency.INR)
+    realized_pnl: Money = field(default_factory=lambda: Money.zero(Currency.INR))
 
     def __post_init__(self) -> None:
         if self.quantity < 0:
@@ -43,7 +44,7 @@ class Position:
         if self.avg_price < 0:
             raise ValueError(f"avg_price must be >= 0, got {self.avg_price}")
         if not isinstance(self.realized_pnl, Money):
-            raise ValueError(f"realized_pnl must be Money, got {type(self.realized_pnl)}")
+            raise TypeError(f"realized_pnl must be Money, got {type(self.realized_pnl)}")
 
     @property
     def is_flat(self) -> bool:
@@ -62,30 +63,37 @@ class Position:
         if self.is_flat:
             self.side = fill_side
             self.quantity = fill_qty
-            self.avg_price = fill_px
+            self.avg_price = _round_to_minor(fill_px)
             return
 
         if self.side == fill_side:
             new_qty = self.quantity + fill_qty
-            self.avg_price = ((self.quantity * self.avg_price) + (fill_qty * fill_px)) / new_qty
+            self.avg_price = _round_to_minor(
+                ((self.quantity * self.avg_price) + (fill_qty * fill_px)) / new_qty
+            )
             self.quantity = new_qty
         else:
             if fill_qty < self.quantity:
                 closed_qty = fill_qty
                 pnl = closed_qty * (fill_px - self.avg_price) * self.side.sign
-                self.realized_pnl += Money.from_major(pnl, self.currency)
+                self.realized_pnl += Money.mul_qty(pnl, 1.0, self.currency)
                 self.quantity -= fill_qty
             elif fill_qty == self.quantity:
                 closed_qty = fill_qty
                 pnl = closed_qty * (fill_px - self.avg_price) * self.side.sign
-                self.realized_pnl += Money.from_major(pnl, self.currency)
+                self.realized_pnl += Money.mul_qty(pnl, 1.0, self.currency)
                 self.quantity = 0.0
                 self.avg_price = 0.0
             else:
                 closed_qty = self.quantity
                 pnl = closed_qty * (fill_px - self.avg_price) * self.side.sign
-                self.realized_pnl += Money.from_major(pnl, self.currency)
+                self.realized_pnl += Money.mul_qty(pnl, 1.0, self.currency)
                 remainder = fill_qty - self.quantity
                 self.side = fill_side
                 self.quantity = remainder
-                self.avg_price = fill_px
+                self.avg_price = _round_to_minor(fill_px)
+
+
+def _round_to_minor(price: float) -> float:
+    """Nearest minor unit, half away from zero (``f64::round``, as in Rust)."""
+    return _round_half_away(price * MINOR_PER_MAJOR) / MINOR_PER_MAJOR

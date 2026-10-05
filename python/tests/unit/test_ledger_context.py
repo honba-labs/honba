@@ -1,5 +1,8 @@
 """``LedgerContext``: the reference ``StrategyContext`` (ADR 008)."""
 
+import pytest
+
+from honba.domain.money import Currency, Money
 from honba.entities.instrument import Instrument, InstrumentId, InstrumentKind
 from honba.entities.order import OrderIntent, OrderSide
 from honba.entities.trade import Trade
@@ -14,7 +17,7 @@ ACME_NSE = InstrumentId("ACME", "NSE")
 def test_is_a_strategy_context_and_starts_empty():
     ctx = LedgerContext()
     assert isinstance(ctx, StrategyContext)
-    assert (ctx.now(), ctx.cash(), ctx.positions()) == (0, 0.0, {})
+    assert (ctx.now(), ctx.cash(), ctx.positions()) == (0, Money(0, Currency.INR), {})
     assert ctx.position(NIFTY) == 0.0
     assert not ctx.busy(NIFTY)
     assert ctx.instrument(NIFTY) is None
@@ -59,13 +62,39 @@ def test_release_clears_pending_for_a_rejected_intent():
 
 
 def test_fills_move_position_and_cash_including_costs():
+    # Integer minor units (ADR 0011); mirrors the Rust ledger test.
     ctx = LedgerContext(cash=1_000.0)
-    ctx.apply_fill(Trade(NIFTY, OrderSide.BUY, 3, 100.0, costs=1.5))
+    ctx.apply_fill(Trade(NIFTY, OrderSide.BUY, 3, 100.0, costs=Money(150, Currency.INR)))
     assert ctx.position(NIFTY) == 3.0
-    assert ctx.cash() == 1_000.0 - (3 * 100.0 + 1.5)
-    ctx.apply_fill(Trade(NIFTY, OrderSide.SELL, 5, 110.0, costs=2.0))
+    assert ctx.cash() == Money(100_000 - 30_000 - 150, Currency.INR)
+    ctx.apply_fill(Trade(NIFTY, OrderSide.SELL, 5, 110.0, costs=Money(200, Currency.INR)))
     assert ctx.position(NIFTY) == -2.0  # signed: short 2
-    assert ctx.cash() == 698.5 + (5 * 110.0 - 2.0)
+    assert ctx.cash() == Money(69_850 + 55_000 - 200, Currency.INR)
+
+
+def test_cash_accepts_money_and_rejects_non_finite_major_units():
+    assert LedgerContext(cash=Money(5, Currency.USD)).cash() == Money(5, Currency.USD)
+    assert LedgerContext(cash=0.125).cash() == Money(13, Currency.INR)  # half away from zero
+    with pytest.raises(ValueError):
+        LedgerContext(cash=float("nan"))
+
+
+def test_notional_rounds_once_per_fill_to_minor_units():
+    ctx = LedgerContext(cash=Money(100_000, Currency.INR))
+    ctx.apply_fill(Trade(NIFTY, OrderSide.BUY, 3, 33.333))
+    assert ctx.cash() == Money(90_000, Currency.INR)
+
+
+def test_a_fill_the_ledger_cannot_book_is_refused_whole():
+    ctx = LedgerContext(cash=Money(100_000, Currency.INR))
+    ctx.submit(OrderIntent.market_buy(NIFTY, 3))
+    with pytest.raises(ValueError, match="currency"):
+        ctx.apply_fill(Trade(NIFTY, OrderSide.BUY, 3, 100.0, costs=Money(150, Currency.USD)))
+    with pytest.raises(ValueError):
+        ctx.apply_fill(Trade(NIFTY, OrderSide.BUY, 1e12, 1e12))
+    assert ctx.cash() == Money(100_000, Currency.INR)
+    assert ctx.position(NIFTY) == 0.0
+    assert ctx.busy(NIFTY)  # the refused fill did not fill the intent
 
 
 def test_positions_lists_non_flat_ordered_by_symbol_then_exchange():

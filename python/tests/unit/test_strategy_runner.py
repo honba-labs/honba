@@ -2,6 +2,8 @@
 
 import pytest
 
+from honba.domain.money import Currency, Money
+from honba.entities import wire
 from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
 from honba.entities.order import OrderIntent, OrderSide
@@ -113,7 +115,7 @@ def test_fills_update_the_context_before_on_fill_and_on_fill_intents_wait_for_th
     runner.start()
     ex.pending_fills = [Trade(X, OrderSide.BUY, 2, 10.0, 5, "rec-0")]
     runner.on_event(bar(10.0, 5), ts_init=5)
-    assert s.ctx.position(X) == 2.0 and s.ctx.cash() == -20.0
+    assert s.ctx.position(X) == 2.0 and s.ctx.cash() == Money(-2000, Currency.INR)
     assert [o[0] for o in ex.orders] == ["rec-0"]  # protect not yet sent
     runner.on_event(bar(10.0, 6), ts_init=6)
     assert ex.orders[1] == ("rec-1", protect, 6)
@@ -143,7 +145,7 @@ def test_bar_close_fills_default_charges_no_costs():
     ex = BarCloseFills()
     ex.on_event(bar(101.0, 1), ts_init=1)
     ex.submit("a-0", OrderIntent.market_buy(X, 3), 1)
-    assert ex.drain_fills()[0].costs == 0.0
+    assert ex.drain_fills()[0].costs == Money(0, Currency.INR)
 
 
 def test_bar_close_fills_costs_are_flat_plus_bps_of_the_notional():
@@ -153,7 +155,8 @@ def test_bar_close_fills_costs_are_flat_plus_bps_of_the_notional():
     ex.submit("a-0", OrderIntent.market_buy(X, 10), 1)
     ex.submit("a-1", OrderIntent.market_sell(X, 10), 1)
     buy, sell = ex.drain_fills()
-    assert (buy.costs, sell.costs) == (21.0, 21.0)  # an amount, not signed by side
+    # An amount in integer minor units, not signed by side (ADR 0011).
+    assert (buy.costs, sell.costs) == (Money(2100, Currency.INR), Money(2100, Currency.INR))
     assert buy.price == 100.0
 
 
@@ -161,11 +164,27 @@ def test_bar_close_fills_flat_only_and_bps_only():
     flat = BarCloseFills(flat_cost=2.5)
     flat.on_event(bar(100.0, 1), ts_init=1)
     flat.submit("a-0", OrderIntent.market_buy(X, 3), 1)
-    assert flat.drain_fills()[0].costs == 2.5
+    assert flat.drain_fills()[0].costs == Money(250, Currency.INR)
     bps = BarCloseFills(cost_bps=625.0)
     bps.on_event(bar(64.0, 1), ts_init=1)
     bps.submit("a-0", OrderIntent.market_sell(X, 1), 1)
-    assert bps.drain_fills()[0].costs == 4.0
+    assert bps.drain_fills()[0].costs == Money(400, Currency.INR)
+
+
+def test_bar_close_fills_round_each_cost_leg_once_before_summing():
+    # ADR 0011, mirrors honba-sim: 0.005 flat -> 1 paisa, 1 bps of 50.00 -> 1 paisa: 2 paise.
+    ex = BarCloseFills(flat_cost=0.005, cost_bps=1.0)
+    ex.on_event(bar(50.0, 1), ts_init=1)
+    ex.submit("a-0", OrderIntent.market_buy(X, 1), 1)
+    assert ex.drain_fills()[0].costs == Money(2, Currency.INR)
+
+
+def test_bar_close_fills_refuses_a_cost_it_cannot_represent():
+    ex = BarCloseFills(cost_bps=MAX_COST_BPS)
+    ex.on_event(bar(1e10, 1), ts_init=1)
+    with pytest.raises(ValueError):
+        ex.submit("a-0", OrderIntent.market_buy(X, 1e10), 1)
+    assert ex.drain_fills() == []
 
 
 def test_costs_reach_the_context_cash_through_the_simulator():
@@ -183,10 +202,10 @@ def test_costs_reach_the_context_cash_through_the_simulator():
     runner = StrategyRunner(BuySell(), ex)
     ex.on_event(bar(64.0, 1), ts_init=1)
     runner.on_event(bar(64.0, 1), ts_init=1)  # buy: debit 64 + (0.5 + 4.0)
-    assert runner.ctx.cash() == -68.5
+    assert runner.ctx.cash() == Money(-6850, Currency.INR)
     ex.on_event(bar(64.0, 2), ts_init=2)
     runner.on_event(bar(64.0, 2), ts_init=2)  # sell: credit 64 - 4.5
-    assert runner.ctx.cash() == -9.0
+    assert runner.ctx.cash() == Money(-900, Currency.INR)
 
 
 @pytest.mark.parametrize(
@@ -239,15 +258,24 @@ def test_from_wire_messages_parses_market_data_strictly():
         "ask_price": 1.5,
         "bid_size": 2.0,
         "ask_size": 3.0,
-        "ts_event": 4,
-        "ts_init": 5,
+        # Timestamps cross the wire as {iso, unix_nanos} (E11-S2).
+        "ts_event": wire.UnixNanos.from_ns(4).model_dump(),
+        "ts_init": wire.UnixNanos.from_ns(5).model_dump(),
     }
-    msgs = [{"schema_version": 2, "event": quote, "ts_init": 6}]
+    msgs = [
+        {
+            "schema_version": wire.SCHEMA_VERSION,
+            "event": quote,
+            "ts_init": wire.UnixNanos.from_ns(6).model_dump(),
+        }
+    ]
     assert from_wire_messages(json.dumps(msgs)) == [(QuoteTick(X, 4, 1.0, 1.5, 2.0, 3.0), 6)]
 
-    accepted = {"type": "order_accepted", "order_id": "O-1", "ts_event": 1}
+    one = wire.UnixNanos.from_ns(1).model_dump()
+    accepted = {"type": "order_accepted", "order_id": "O-1", "ts_event": one}
+    envelope = {"schema_version": wire.SCHEMA_VERSION, "event": accepted, "ts_init": one}
     with pytest.raises(ValueError, match="unsupported event type"):
-        from_wire_messages(json.dumps([{"schema_version": 2, "event": accepted, "ts_init": 1}]))
+        from_wire_messages(json.dumps([envelope]))
     duplicate = '[{"schema_version": 2, "schema_version": 2, "event": {}, "ts_init": 1}]'
     with pytest.raises(ValueError, match="duplicate key"):
         from_wire_messages(duplicate)
@@ -318,10 +346,16 @@ def test_fill_costs_reach_the_context_cash_through_the_runner():
     ex = FakeExecution()
     runner = StrategyRunner(s, ex)
     runner.start()
-    ex.pending_fills = [Trade(X, OrderSide.BUY, 2, 10.0, 5, "rec-0", costs=1.5)]
+    ex.pending_fills = [
+        Trade(X, OrderSide.BUY, 2, 10.0, 5, "rec-0", costs=Money(150, Currency.INR))
+    ]
     runner.on_event(bar(10.0, 5), ts_init=5)
-    assert runner.ctx.cash() == -(2 * 10.0 + 1.5)  # a buy debits cost on top of the notional
-    ex.pending_fills = [Trade(X, OrderSide.SELL, 2, 11.0, 6, "rec-1", costs=2.0)]
+    # A buy debits cost on top of the notional (integer paise, ADR 0011).
+    assert runner.ctx.cash() == Money(-(2000 + 150), Currency.INR)
+    ex.pending_fills = [
+        Trade(X, OrderSide.SELL, 2, 11.0, 6, "rec-1", costs=Money(200, Currency.INR))
+    ]
     runner.on_event(QuoteTick(X, 6, 10.9, 11.1, 1.0, 1.0), ts_init=6)
     assert runner.ctx.position(X) == 0.0
-    assert runner.ctx.cash() == -21.5 + (2 * 11.0 - 2.0)  # a sell credits notional minus cost
+    # A sell credits notional minus cost.
+    assert runner.ctx.cash() == Money(-2150 + (2200 - 200), Currency.INR)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from honba.domain.money import Currency, Money
 from honba.entities import wire
 from honba.entities.instrument import InstrumentId
 from honba.entities.order import OrderIntent, OrderSide, OrderType, TimeInForce
@@ -71,6 +72,11 @@ def test_wire_intent_maps_to_and_from_domain():
 
 def test_trade_has_order_id_and_costs_defaults():
     t = Trade(NIFTY, OrderSide.BUY, 4, 100.0)
-    assert (t.order_id, t.costs) == (None, 0.0)
+    # ADR 0011: costs are integer Money; a number is the legacy major-unit form.
+    assert (t.order_id, t.costs) == (None, Money(0, Currency.INR))
     t = Trade(NIFTY, OrderSide.BUY, 4, 100.0, ts=1, order_id="O-1", costs=2.5)
-    assert (t.order_id, t.costs) == ("O-1", 2.5)
+    assert (t.order_id, t.costs) == ("O-1", Money(250, Currency.INR))
+    t = Trade(NIFTY, OrderSide.BUY, 4, 100.0, costs=Money(7, Currency.USD))
+    assert t.costs == Money(7, Currency.USD)
+    with pytest.raises(TypeError):
+        Trade(NIFTY, OrderSide.BUY, 4, 100.0, costs="2.5")  # type: ignore[arg-type]

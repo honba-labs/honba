@@ -206,7 +206,7 @@ class StrategyRunner:
                 fill.side.name,
                 fill.quantity,
                 fill.price,
-                fill.costs,
+                fill.costs.to_major(),
                 extra={
                     "event_type": "order_filled",
                     "ts_event": bar_date,
@@ -215,6 +215,6 @@ class StrategyRunner:
                     "side": fill.side.name,
                     "last_qty": fill.quantity,
                     "last_px": fill.price,
-                    "cost": fill.costs,
+                    "cost": fill.costs.to_major(),
                 },
             )
