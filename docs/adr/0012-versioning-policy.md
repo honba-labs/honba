@@ -15,7 +15,20 @@ a field becomes a liar: one bumps, the other does not, and readers disagree.
 |---|---|---|---|
 | `schema_version` | `u32` integer | `honba-messages::SCHEMA_VERSION`, re-exported (not redeclared) by `honba-codegen` | any wire-shape change, additive or breaking |
 | `api_version` | semver string | `honba-messages::API_VERSION` (it rides the envelope), served at `/api/v1` | endpoint added/removed/reshaped |
+| `strategy_api_version` | semver string | `honba-strategy::STRATEGY_API_VERSION` (stamped into every `StrategyManifest.api_version`) | a strategy hook or context signature changes |
 | crate version | semver | the release process (`Cargo.toml`, PyPI) | releases |
+
+`strategy_api_version` is a fourth axis, not an alias of `api_version`: the
+REST surface and the strategy contract move independently (a new endpoint does
+not invalidate compiled strategies, and a new strategy hook does not change
+`/api/v1`). Folding them into one constant would force a bump of one whenever
+the other moves. It has one owner like the others.
+
+Python never declares a version literal. `honba.wire.SCHEMA_VERSION`,
+`honba.wire.API_VERSION` and `honba.strategies.manifest.STRATEGY_API_VERSION`
+are read from `honba._honba` at import time, and
+`python/tests/unit/test_versioning.py` fails on any literal assignment to
+those names anywhere under `python/src/honba` (generated code excepted).
 
 Rules (plan.md §4.2, restated as the binding version):
 

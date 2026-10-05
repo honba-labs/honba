@@ -20,6 +20,7 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, model_validator
 
+from honba import _honba as _native
 from honba.entities.instrument import InstrumentId
 from honba.wire.wire import BarAggregation
 from honba.wire.wire import InstrumentId as WireInstrumentId
@@ -34,8 +35,8 @@ __all__ = [
     "WarmupBars",
 ]
 
-STRATEGY_API_VERSION = "1.0.0"
-"""Version of the strategy contract (mirrors ``honba_strategy::STRATEGY_API_VERSION``)."""
+STRATEGY_API_VERSION: str = _native.STRATEGY_API_VERSION
+"""Strategy contract version, read from its one owner ``honba_strategy::STRATEGY_API_VERSION``."""
 
 _U32_MAX = 2**32 - 1
 

@@ -3,6 +3,8 @@
 from typing import Final
 
 SCHEMA_VERSION: Final[int]
+API_VERSION: Final[str]
+STRATEGY_API_VERSION: Final[str]
 
 def canonical_json(kind: str, payload: str) -> str: ...
 def wire_enum_values() -> dict[str, list[str]]: ...

@@ -24,6 +24,7 @@ from pydantic import (
     model_validator,
 )
 
+from honba import _honba as _native
 from honba.domain import instrument as _instrument
 from honba.domain import money as _money
 from honba.domain import order as _order
@@ -32,11 +33,11 @@ from honba.domain.tick import AggressorSide
 from honba.wire.base import Str, _canonical, _Wire
 from honba.wire.screener import ScreenerFilterPredicate
 
-SCHEMA_VERSION: Final[int] = 3
-"""Wire-contract version; must equal ``honba_messages::SCHEMA_VERSION``."""
+SCHEMA_VERSION: Final[int] = _native.SCHEMA_VERSION
+"""Wire-contract version, read from its one owner ``honba_messages::SCHEMA_VERSION`` (ADR 0012)."""
 
-API_VERSION: Final[str] = "1.0.0"
-"""API surface version; must equal ``honba_messages::API_VERSION``."""
+API_VERSION: Final[str] = _native.API_VERSION
+"""API surface version, read from its one owner ``honba_messages::API_VERSION`` (ADR 0012)."""
 
 _U64_MAX = 2**64 - 1
 
