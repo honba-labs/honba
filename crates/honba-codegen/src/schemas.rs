@@ -137,18 +137,42 @@ impl SchemaSet {
         Value::Object(out)
     }
 
-    /// The set as a bare object of schemas, with references left unprefixed.
+    /// The set as an OpenAPI `components.schemas` map.
     ///
-    /// OpenAPI `components.schemas` and MCP tool definitions both want the
-    /// component-map form, not a `$defs` block.
+    /// Every reference is written `#/components/schemas/<name>`. A bare
+    /// `{"$ref": "Bar"}` is a relative URI reference, which OpenAPI tooling
+    /// resolves against the document's location rather than the component map,
+    /// so it never names the component.
     pub fn to_components(&self) -> Value {
-        let mut out = serde_json::Map::new();
-        for (name, schema) in &self.entries {
-            out.insert(name.clone(), rewrite_refs(schema, ""));
+        self.to_defs(COMPONENTS_PREFIX)
+    }
+
+    /// The names `roots` reference, directly or transitively, roots included.
+    ///
+    /// Used to give a self-contained schema (an MCP tool's `inputSchema`) the
+    /// exact `$defs` it needs and nothing more.
+    pub fn closure<'a>(
+        &self,
+        roots: impl IntoIterator<Item = &'a str>,
+    ) -> std::collections::BTreeSet<String> {
+        let mut seen = std::collections::BTreeSet::new();
+        let mut pending: Vec<String> = roots.into_iter().map(str::to_string).collect();
+        while let Some(name) = pending.pop() {
+            if !seen.insert(name.clone()) {
+                continue;
+            }
+            if let Some(schema) = self.get(&name) {
+                let mut refs = std::collections::BTreeSet::new();
+                collect_refs(schema, &mut refs);
+                pending.extend(refs.into_iter().filter(|r| !seen.contains(r)));
+            }
         }
-        Value::Object(out)
+        seen
     }
 }
+
+/// The `$ref` prefix of an OpenAPI component.
+pub const COMPONENTS_PREFIX: &str = "#/components/schemas/";
 
 /// Normalizes a `schemars` title to a published contract name.
 ///
@@ -245,6 +269,45 @@ fn rewrite_refs(value: &Value, prefix: &str) -> Value {
         }
         other => other.clone(),
     }
+}
+
+/// Every `$ref` string in `doc`, in document order.
+pub fn local_refs(doc: &Value) -> Vec<String> {
+    let mut out = Vec::new();
+    collect_ref_strings(doc, &mut out);
+    out
+}
+
+fn collect_ref_strings(value: &Value, out: &mut Vec<String>) {
+    match value {
+        Value::Object(map) => {
+            for (key, child) in map {
+                match (key.as_str(), child.as_str()) {
+                    ("$ref", Some(reference)) => out.push(reference.to_string()),
+                    _ => collect_ref_strings(child, out),
+                }
+            }
+        }
+        Value::Array(items) => items.iter().for_each(|i| collect_ref_strings(i, out)),
+        _ => {}
+    }
+}
+
+/// The `$ref`s in `doc` that do not resolve as a local JSON Pointer into `doc`.
+///
+/// Resolution follows RFC 6901 the way a schema or OpenAPI validator would: a
+/// reference must be a `#`-fragment whose pointer (with `~1` and `~0` decoded)
+/// names an existing node of the same document. A bare name such as
+/// `"AccountConfig"` is a relative URI, not a local reference, and is reported.
+pub fn unresolved_local_refs(doc: &Value) -> Vec<String> {
+    local_refs(doc)
+        .into_iter()
+        .filter(|reference| {
+            reference
+                .strip_prefix('#')
+                .map_or(true, |pointer| doc.pointer(pointer).is_none())
+        })
+        .collect()
 }
 
 /// The canonical registry: every type the wire contract publishes.

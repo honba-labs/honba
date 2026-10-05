@@ -3,6 +3,7 @@
 use crate::mcp::*;
 use crate::registry;
 use crate::schemas::SchemaSet;
+use honba_messages::{ENDPOINTS, WRITE_PATHS};
 use serde_json::{json, Value};
 
 fn full() -> SchemaSet {
@@ -118,4 +119,81 @@ fn collect_dangling(value: &Value, set: &SchemaSet, missing: &mut Vec<String>) {
         }
         _ => {}
     }
+}
+
+#[test]
+fn every_tool_input_schema_is_self_contained() {
+    // An MCP client receives each tool on its own, so its inputSchema must
+    // resolve every `$ref` within itself. The old document referenced a
+    // top-level `definitions` block (and mixed bare and `#/definitions/` refs)
+    // that a client never sees.
+    let rendered = render(&full());
+    for tool in rendered["tools"].as_array().unwrap() {
+        let schema = &tool["inputSchema"];
+        let unresolved = crate::unresolved_local_refs(schema);
+        assert!(
+            unresolved.is_empty(),
+            "tool {} has unresolvable refs: {unresolved:?}",
+            tool["name"]
+        );
+    }
+}
+
+#[test]
+fn tool_defs_carry_only_what_the_tool_references() {
+    let set = full();
+    let rendered = render(&set);
+    let tools = rendered["tools"].as_array().unwrap();
+    let instruments = tools
+        .iter()
+        .find(|t| t["name"] == "get_instruments")
+        .unwrap();
+    // InstrumentsQuery has only scalar fields, so it needs no $defs at all.
+    let defs = instruments["inputSchema"]["$defs"].as_object();
+    assert!(defs.map_or(true, |d| d.is_empty()), "{defs:?}");
+}
+
+#[test]
+fn every_tool_maps_to_a_registered_endpoint() {
+    for tool in TOOLS {
+        let (method, path) = tool.endpoint;
+        assert!(
+            ENDPOINTS.contains(&(method, path)),
+            "tool {} names unregistered endpoint {method} {path}",
+            tool.name
+        );
+    }
+}
+
+#[test]
+fn the_read_only_hint_comes_from_the_write_registry() {
+    let rendered = render(&full());
+    for (tool, out) in TOOLS.iter().zip(rendered["tools"].as_array().unwrap()) {
+        let is_write = WRITE_PATHS.contains(&tool.endpoint);
+        assert_eq!(
+            out["annotations"]["readOnlyHint"],
+            json!(!is_write),
+            "tool {}",
+            tool.name
+        );
+    }
+}
+
+#[test]
+fn endpoint_path_parameters_become_required_string_arguments() {
+    let rendered = render(&full());
+    let tools = rendered["tools"].as_array().unwrap();
+    let bars = tools.iter().find(|t| t["name"] == "get_bars").unwrap();
+    assert_eq!(
+        bars["inputSchema"]["properties"]["id"]["type"],
+        json!("string")
+    );
+    let required = bars["inputSchema"]["required"].as_array().unwrap();
+    assert!(required.contains(&json!("id")), "{required:?}");
+}
+
+#[test]
+fn the_document_has_no_detached_definitions_block() {
+    let rendered = render(&full());
+    assert!(rendered.get("definitions").is_none());
 }

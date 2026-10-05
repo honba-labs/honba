@@ -39,7 +39,7 @@ pub use registry::{
     published_names, request_type_names, API_TYPES, CONFIG_TYPES, MANIFEST_TYPES, WIRE_ENUMS,
     WIRE_TYPES,
 };
-pub use schemas::SchemaSet;
+pub use schemas::{local_refs, unresolved_local_refs, SchemaSet};
 
 /// Version of the JSON wire contract, owned here per plan.md §4.1.
 ///

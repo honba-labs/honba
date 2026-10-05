@@ -178,7 +178,7 @@
           "metrics": {
             "anyOf": [
               {
-                "$ref": "BacktestMetrics"
+                "$ref": "#/components/schemas/BacktestMetrics"
               },
               {
                 "type": "null"
@@ -193,7 +193,7 @@
           "status": {
             "allOf": [
               {
-                "$ref": "RunStatus"
+                "$ref": "#/components/schemas/RunStatus"
               }
             ],
             "description": "Current lifecycle state."
@@ -212,7 +212,7 @@
           "account": {
             "allOf": [
               {
-                "$ref": "AccountConfig"
+                "$ref": "#/components/schemas/AccountConfig"
               }
             ],
             "default": {
@@ -224,7 +224,7 @@
           "data": {
             "allOf": [
               {
-                "$ref": "DataSourceConfig"
+                "$ref": "#/components/schemas/DataSourceConfig"
               }
             ],
             "default": {
@@ -237,7 +237,7 @@
           "execution": {
             "allOf": [
               {
-                "$ref": "ExecutionConfig"
+                "$ref": "#/components/schemas/ExecutionConfig"
               }
             ],
             "default": {
@@ -257,7 +257,7 @@
           "strategy": {
             "allOf": [
               {
-                "$ref": "StrategyManifest"
+                "$ref": "#/components/schemas/StrategyManifest"
               }
             ],
             "description": "The verified strategy to run."
@@ -273,7 +273,7 @@
         "description": "An aggregated OHLCV bar.\n\n``` use honba_messages::{ Bar, BarAggregation, BarSpecification, BarType, InstrumentId, PriceType, UnixNanos, Exchange, };\n\nlet bar_type = BarType::new( InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), BarSpecification::new(1, BarAggregation::Minute, PriceType::Last), ); let bar = Bar::new( bar_type, 22_000.0, 22_050.0, 21_980.0, 22_020.0, 15_000.0, UnixNanos::from_u64(1_700_000_060_000_000_000), UnixNanos::from_u64(1_700_000_060_000_000_000), ); assert_eq!(bar.open(), 22_000.0); assert_eq!(bar.close(), 22_020.0); ```\n\nInvariants (checked by [`Bar::validate`] and on deserialization): all prices and the volume are finite, `low <= open, close <= high`, and `volume >= 0`.",
         "properties": {
           "bar_type": {
-            "$ref": "BarType"
+            "$ref": "#/components/schemas/BarType"
           },
           "close": {
             "format": "double",
@@ -292,10 +292,10 @@
             "type": "number"
           },
           "ts_event": {
-            "$ref": "UnixNanos"
+            "$ref": "#/components/schemas/UnixNanos"
           },
           "ts_init": {
-            "$ref": "UnixNanos"
+            "$ref": "#/components/schemas/UnixNanos"
           },
           "volume": {
             "format": "double",
@@ -372,10 +372,10 @@
         "description": "Describes how a [`Bar`] aggregates its inputs.\n\n``` use honba_messages::{BarAggregation, BarSpecification, PriceType};\n\nlet spec = BarSpecification::new(1, BarAggregation::Minute, PriceType::Last); assert_eq!(spec.step(), 1); assert_eq!(spec.aggregation(), BarAggregation::Minute); ```\n\n`step` must be at least 1; deserializing a zero step fails.",
         "properties": {
           "aggregation": {
-            "$ref": "BarAggregation"
+            "$ref": "#/components/schemas/BarAggregation"
           },
           "price_type": {
-            "$ref": "PriceType"
+            "$ref": "#/components/schemas/PriceType"
           },
           "step": {
             "format": "uint",
@@ -395,10 +395,10 @@
         "description": "Fully identifies a bar: which instrument, and how it aggregates.",
         "properties": {
           "instrument_id": {
-            "$ref": "InstrumentId"
+            "$ref": "#/components/schemas/InstrumentId"
           },
           "spec": {
-            "$ref": "BarSpecification"
+            "$ref": "#/components/schemas/BarSpecification"
           }
         },
         "required": [
@@ -442,7 +442,7 @@
           "bars": {
             "description": "Bars in ascending `ts_event` order.",
             "items": {
-              "$ref": "Bar"
+              "$ref": "#/components/schemas/Bar"
             },
             "type": "array"
           }
@@ -459,7 +459,7 @@
           "capabilities": {
             "allOf": [
               {
-                "$ref": "CapabilityManifest"
+                "$ref": "#/components/schemas/CapabilityManifest"
               }
             ],
             "description": "Capability manifest."
@@ -655,14 +655,14 @@
           "asks": {
             "description": "Ask levels, best (lowest) first.",
             "items": {
-              "$ref": "DepthLevel"
+              "$ref": "#/components/schemas/DepthLevel"
             },
             "type": "array"
           },
           "bids": {
             "description": "Bid levels, best (highest) first.",
             "items": {
-              "$ref": "DepthLevel"
+              "$ref": "#/components/schemas/DepthLevel"
             },
             "type": "array"
           }
@@ -871,7 +871,7 @@
           "code": {
             "allOf": [
               {
-                "$ref": "ErrorCode"
+                "$ref": "#/components/schemas/ErrorCode"
               }
             ],
             "description": "The stable machine-readable code."
@@ -918,13 +918,13 @@
                 "type": "number"
               },
               "instrument_id": {
-                "$ref": "InstrumentId"
+                "$ref": "#/components/schemas/InstrumentId"
               },
               "ts_event": {
-                "$ref": "UnixNanos"
+                "$ref": "#/components/schemas/UnixNanos"
               },
               "ts_init": {
-                "$ref": "UnixNanos"
+                "$ref": "#/components/schemas/UnixNanos"
               },
               "type": {
                 "enum": [
@@ -949,10 +949,10 @@
             "description": "A trade (last-sale) update.",
             "properties": {
               "aggressor_side": {
-                "$ref": "AggressorSide"
+                "$ref": "#/components/schemas/AggressorSide"
               },
               "instrument_id": {
-                "$ref": "InstrumentId"
+                "$ref": "#/components/schemas/InstrumentId"
               },
               "price": {
                 "format": "double",
@@ -963,13 +963,13 @@
                 "type": "number"
               },
               "trade_id": {
-                "$ref": "TradeId"
+                "$ref": "#/components/schemas/TradeId"
               },
               "ts_event": {
-                "$ref": "UnixNanos"
+                "$ref": "#/components/schemas/UnixNanos"
               },
               "ts_init": {
-                "$ref": "UnixNanos"
+                "$ref": "#/components/schemas/UnixNanos"
               },
               "type": {
                 "enum": [
@@ -994,7 +994,7 @@
             "description": "An aggregated bar.",
             "properties": {
               "bar_type": {
-                "$ref": "BarType"
+                "$ref": "#/components/schemas/BarType"
               },
               "close": {
                 "format": "double",
@@ -1013,10 +1013,10 @@
                 "type": "number"
               },
               "ts_event": {
-                "$ref": "UnixNanos"
+                "$ref": "#/components/schemas/UnixNanos"
               },
               "ts_init": {
-                "$ref": "UnixNanos"
+                "$ref": "#/components/schemas/UnixNanos"
               },
               "type": {
                 "enum": [
@@ -1046,13 +1046,13 @@
             "description": "A new order that has been submitted.",
             "properties": {
               "instrument_id": {
-                "$ref": "InstrumentId"
+                "$ref": "#/components/schemas/InstrumentId"
               },
               "order_id": {
-                "$ref": "OrderId"
+                "$ref": "#/components/schemas/OrderId"
               },
               "order_type": {
-                "$ref": "OrderType"
+                "$ref": "#/components/schemas/OrderType"
               },
               "price": {
                 "format": "double",
@@ -1066,13 +1066,13 @@
                 "type": "number"
               },
               "side": {
-                "$ref": "OrderSide"
+                "$ref": "#/components/schemas/OrderSide"
               },
               "status": {
-                "$ref": "OrderStatus"
+                "$ref": "#/components/schemas/OrderStatus"
               },
               "time_in_force": {
-                "$ref": "TimeInForce"
+                "$ref": "#/components/schemas/TimeInForce"
               },
               "trigger_price": {
                 "description": "Stop trigger price; `None` unless the order is a stop order.",
@@ -1083,10 +1083,10 @@
                 ]
               },
               "ts_event": {
-                "$ref": "UnixNanos"
+                "$ref": "#/components/schemas/UnixNanos"
               },
               "ts_init": {
-                "$ref": "UnixNanos"
+                "$ref": "#/components/schemas/UnixNanos"
               },
               "type": {
                 "enum": [
@@ -1116,7 +1116,7 @@
               "order_id": {
                 "allOf": [
                   {
-                    "$ref": "OrderId"
+                    "$ref": "#/components/schemas/OrderId"
                   }
                 ],
                 "description": "The client order identifier."
@@ -1124,7 +1124,7 @@
               "ts_event": {
                 "allOf": [
                   {
-                    "$ref": "UnixNanos"
+                    "$ref": "#/components/schemas/UnixNanos"
                   }
                 ],
                 "description": "The exchange timestamp at which acceptance occurred."
@@ -1150,7 +1150,7 @@
               "order_id": {
                 "allOf": [
                   {
-                    "$ref": "OrderId"
+                    "$ref": "#/components/schemas/OrderId"
                   }
                 ],
                 "description": "The client order identifier."
@@ -1162,7 +1162,7 @@
               "ts_event": {
                 "allOf": [
                   {
-                    "$ref": "UnixNanos"
+                    "$ref": "#/components/schemas/UnixNanos"
                   }
                 ],
                 "description": "The exchange timestamp at which rejection occurred."
@@ -1199,7 +1199,7 @@
               "order_id": {
                 "allOf": [
                   {
-                    "$ref": "OrderId"
+                    "$ref": "#/components/schemas/OrderId"
                   }
                 ],
                 "description": "The client order identifier."
@@ -1207,7 +1207,7 @@
               "ts_event": {
                 "allOf": [
                   {
-                    "$ref": "UnixNanos"
+                    "$ref": "#/components/schemas/UnixNanos"
                   }
                 ],
                 "description": "The exchange timestamp at which the fill occurred."
@@ -1235,7 +1235,7 @@
               "order_id": {
                 "allOf": [
                   {
-                    "$ref": "OrderId"
+                    "$ref": "#/components/schemas/OrderId"
                   }
                 ],
                 "description": "The client order identifier."
@@ -1243,7 +1243,7 @@
               "ts_event": {
                 "allOf": [
                   {
-                    "$ref": "UnixNanos"
+                    "$ref": "#/components/schemas/UnixNanos"
                   }
                 ],
                 "description": "The exchange timestamp at which cancellation occurred."
@@ -1285,7 +1285,7 @@
           "fill_model": {
             "allOf": [
               {
-                "$ref": "FillModel"
+                "$ref": "#/components/schemas/FillModel"
               }
             ],
             "description": "Fill model to use."
@@ -1454,7 +1454,7 @@
         "description": "A trading instrument, combining a symbol and its exchange.",
         "properties": {
           "exchange": {
-            "$ref": "Exchange"
+            "$ref": "#/components/schemas/Exchange"
           },
           "symbol": {
             "type": "string"
@@ -1507,7 +1507,7 @@
         "description": "The envelope that carries an [`Event`] plus Honba-side metadata.\n\nThis is the versioned unit of the wire contract: its JSON form is `{\"schema_version\": 1, \"event\": {...}, \"ts_init\": n}`, and deserializing a message with any other `schema_version` fails.\n\n``` use honba_messages::{Event, Message, UnixNanos, QuoteTick, InstrumentId, Exchange};\n\nlet quote = QuoteTick::new( InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), 22_000.0, 22_001.0, 50.0, 75.0, UnixNanos::from_u64(1), UnixNanos::from_u64(1), ); let msg = Message::new(Event::Quote(quote), UnixNanos::from_u64(2)); assert!(msg.event().is_market_data()); assert_eq!(msg.schema_version(), honba_messages::SCHEMA_VERSION); ```",
         "properties": {
           "event": {
-            "$ref": "Event"
+            "$ref": "#/components/schemas/Event"
           },
           "schema_version": {
             "description": "Rendered as a plain `u32` in the schema, matching the JSON wire form (the internal `SchemaVersion` unit type would otherwise emit `{}`).",
@@ -1516,7 +1516,7 @@
             "type": "integer"
           },
           "ts_init": {
-            "$ref": "UnixNanos"
+            "$ref": "#/components/schemas/UnixNanos"
           }
         },
         "required": [
@@ -1594,13 +1594,13 @@
         "description": "A client order.\n\n``` use honba_messages::{ InstrumentId, Order, OrderId, OrderSide, OrderStatus, OrderType, TimeInForce, UnixNanos, Exchange, };\n\nlet order = Order::new( OrderId::new(\"O-1\"), InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), OrderSide::Buy, OrderType::Limit, 75.0, Some(22_000.0), TimeInForce::Day, UnixNanos::from_u64(1), UnixNanos::from_u64(1), ); assert_eq!(order.status(), OrderStatus::Initialized); assert_eq!(order.quantity(), 75.0); ```\n\nInvariants (checked by [`Order::validate`] and on deserialization): `quantity` is finite and `> 0`; `price` and `trigger_price` are finite when present. An order is a record (it may come back from an exchange), so `side` may be `no_order_side`; intents are stricter.",
         "properties": {
           "instrument_id": {
-            "$ref": "InstrumentId"
+            "$ref": "#/components/schemas/InstrumentId"
           },
           "order_id": {
-            "$ref": "OrderId"
+            "$ref": "#/components/schemas/OrderId"
           },
           "order_type": {
-            "$ref": "OrderType"
+            "$ref": "#/components/schemas/OrderType"
           },
           "price": {
             "format": "double",
@@ -1614,13 +1614,13 @@
             "type": "number"
           },
           "side": {
-            "$ref": "OrderSide"
+            "$ref": "#/components/schemas/OrderSide"
           },
           "status": {
-            "$ref": "OrderStatus"
+            "$ref": "#/components/schemas/OrderStatus"
           },
           "time_in_force": {
-            "$ref": "TimeInForce"
+            "$ref": "#/components/schemas/TimeInForce"
           },
           "trigger_price": {
             "description": "Stop trigger price; `None` unless the order is a stop order.",
@@ -1631,10 +1631,10 @@
             ]
           },
           "ts_event": {
-            "$ref": "UnixNanos"
+            "$ref": "#/components/schemas/UnixNanos"
           },
           "ts_init": {
-            "$ref": "UnixNanos"
+            "$ref": "#/components/schemas/UnixNanos"
           }
         },
         "required": [
@@ -1660,7 +1660,7 @@
           "instrument_id": {
             "allOf": [
               {
-                "$ref": "InstrumentId"
+                "$ref": "#/components/schemas/InstrumentId"
               }
             ],
             "description": "The instrument to trade."
@@ -1668,7 +1668,7 @@
           "order_type": {
             "allOf": [
               {
-                "$ref": "OrderType"
+                "$ref": "#/components/schemas/OrderType"
               }
             ],
             "description": "Execution instruction."
@@ -1689,7 +1689,7 @@
           "side": {
             "allOf": [
               {
-                "$ref": "OrderSide"
+                "$ref": "#/components/schemas/OrderSide"
               }
             ],
             "description": "Buy or sell."
@@ -1697,7 +1697,7 @@
           "time_in_force": {
             "allOf": [
               {
-                "$ref": "TimeInForce"
+                "$ref": "#/components/schemas/TimeInForce"
               }
             ],
             "description": "How long the order remains active."
@@ -1847,7 +1847,7 @@
           "instrument_id": {
             "anyOf": [
               {
-                "$ref": "InstrumentId"
+                "$ref": "#/components/schemas/InstrumentId"
               },
               {
                 "type": "null"
@@ -1902,7 +1902,7 @@
           "orders": {
             "description": "Orders matching the query.",
             "items": {
-              "$ref": "Order"
+              "$ref": "#/components/schemas/Order"
             },
             "type": "array"
           }
@@ -1946,20 +1946,20 @@
             "type": "number"
           },
           "currency": {
-            "$ref": "Currency"
+            "$ref": "#/components/schemas/Currency"
           },
           "instrument_id": {
-            "$ref": "InstrumentId"
+            "$ref": "#/components/schemas/InstrumentId"
           },
           "quantity": {
             "format": "double",
             "type": "number"
           },
           "realized_pnl": {
-            "$ref": "Money"
+            "$ref": "#/components/schemas/Money"
           },
           "side": {
-            "$ref": "PositionSide"
+            "$ref": "#/components/schemas/PositionSide"
           }
         },
         "required": [
@@ -1998,7 +1998,7 @@
           "positions": {
             "description": "Open positions.",
             "items": {
-              "$ref": "Position"
+              "$ref": "#/components/schemas/Position"
             },
             "type": "array"
           }
@@ -2061,13 +2061,13 @@
             "type": "number"
           },
           "instrument_id": {
-            "$ref": "InstrumentId"
+            "$ref": "#/components/schemas/InstrumentId"
           },
           "ts_event": {
-            "$ref": "UnixNanos"
+            "$ref": "#/components/schemas/UnixNanos"
           },
           "ts_init": {
-            "$ref": "UnixNanos"
+            "$ref": "#/components/schemas/UnixNanos"
           }
         },
         "required": [
@@ -2109,7 +2109,7 @@
           "quotes": {
             "description": "Latest top-of-book per requested symbol.",
             "items": {
-              "$ref": "QuoteTick"
+              "$ref": "#/components/schemas/QuoteTick"
             },
             "type": "array"
           }
@@ -2133,7 +2133,7 @@
           "error": {
             "anyOf": [
               {
-                "$ref": "ErrorDetail"
+                "$ref": "#/components/schemas/ErrorDetail"
               },
               {
                 "type": "null"
@@ -2197,7 +2197,7 @@
           "op": {
             "allOf": [
               {
-                "$ref": "FilterOp"
+                "$ref": "#/components/schemas/FilterOp"
               }
             ],
             "description": "Comparison operator."
@@ -2205,7 +2205,7 @@
           "period": {
             "anyOf": [
               {
-                "$ref": "MetricPeriod"
+                "$ref": "#/components/schemas/MetricPeriod"
               },
               {
                 "type": "null"
@@ -2216,7 +2216,7 @@
           "timeframe": {
             "anyOf": [
               {
-                "$ref": "Timeframe"
+                "$ref": "#/components/schemas/Timeframe"
               },
               {
                 "type": "null"
@@ -2282,7 +2282,7 @@
           "driving_timeframe": {
             "allOf": [
               {
-                "$ref": "TimeframeSpec"
+                "$ref": "#/components/schemas/TimeframeSpec"
               }
             ],
             "description": "The bar timeframe that drives the strategy's clock."
@@ -2305,7 +2305,7 @@
           "subscriptions": {
             "allOf": [
               {
-                "$ref": "Subscriptions"
+                "$ref": "#/components/schemas/Subscriptions"
               }
             ],
             "description": "What the strategy needs fed to it."
@@ -2313,7 +2313,7 @@
           "universe": {
             "allOf": [
               {
-                "$ref": "Universe"
+                "$ref": "#/components/schemas/Universe"
               }
             ],
             "description": "The universe the strategy may trade, as a named set or explicit list."
@@ -2343,7 +2343,7 @@
           "instruments": {
             "description": "Instruments whose bars this strategy consumes.",
             "items": {
-              "$ref": "InstrumentId"
+              "$ref": "#/components/schemas/InstrumentId"
             },
             "type": "array"
           },
@@ -2427,7 +2427,7 @@
           "report": {
             "anyOf": [
               {
-                "$ref": "SweepReportResponse"
+                "$ref": "#/components/schemas/SweepReportResponse"
               },
               {
                 "type": "null"
@@ -2438,7 +2438,7 @@
           "status": {
             "allOf": [
               {
-                "$ref": "RunStatus"
+                "$ref": "#/components/schemas/RunStatus"
               }
             ],
             "description": "Current lifecycle state."
@@ -2572,7 +2572,7 @@
           "aggregation": {
             "allOf": [
               {
-                "$ref": "BarAggregation"
+                "$ref": "#/components/schemas/BarAggregation"
               }
             ],
             "description": "The unit the interval counts."
@@ -2594,13 +2594,13 @@
         "description": "A completed fill, recorded after the exchange confirms execution.\n\n`costs` is the total transaction cost of the fill (brokerage, taxes, exchange fees) as [`Money`] in the settlement currency; it defaults to zero and is set with [`Trade::with_costs`]. `quantity` and `price` stay `f64`: they are observations, and [`Trade::notional`] rounds to minor units once, at the point of use.\n\n``` use honba_entities::{Currency, Trade}; use honba_messages::{InstrumentId, OrderId, OrderSide, UnixNanos, Exchange};\n\nlet t = Trade::new( OrderId::new(\"O-1\"), InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), OrderSide::Buy, 75.0, 22_000.0, Currency::Inr, UnixNanos::from_u64(1), UnixNanos::from_u64(2), ); assert_eq!(t.notional(), 75.0 * 22_000.0); assert_eq!(t.costs().minor(), 0); ```\n\nInvariants (checked by [`Trade::validate`] and on deserialization): `side` is buy or sell, `quantity` and `price` are finite and `> 0`. Costs are an integer `Money` and so cannot be non-finite.",
         "properties": {
           "costs": {
-            "$ref": "Money"
+            "$ref": "#/components/schemas/Money"
           },
           "instrument_id": {
-            "$ref": "InstrumentId"
+            "$ref": "#/components/schemas/InstrumentId"
           },
           "order_id": {
-            "$ref": "OrderId"
+            "$ref": "#/components/schemas/OrderId"
           },
           "price": {
             "format": "double",
@@ -2611,13 +2611,13 @@
             "type": "number"
           },
           "side": {
-            "$ref": "OrderSide"
+            "$ref": "#/components/schemas/OrderSide"
           },
           "ts_event": {
-            "$ref": "UnixNanos"
+            "$ref": "#/components/schemas/UnixNanos"
           },
           "ts_init": {
-            "$ref": "UnixNanos"
+            "$ref": "#/components/schemas/UnixNanos"
           }
         },
         "required": [
@@ -2643,7 +2643,7 @@
           "trades": {
             "description": "Realized trades.",
             "items": {
-              "$ref": "Trade"
+              "$ref": "#/components/schemas/Trade"
             },
             "type": "array"
           }
@@ -2675,7 +2675,7 @@
             "properties": {
               "explicit": {
                 "items": {
-                  "$ref": "InstrumentId"
+                  "$ref": "#/components/schemas/InstrumentId"
                 },
                 "type": "array"
               }

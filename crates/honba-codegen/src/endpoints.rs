@@ -8,10 +8,7 @@
 use honba_messages::{Access, HttpMethod, ENDPOINTS, WRITE_PATHS};
 use serde_json::{json, Map, Value};
 
-use crate::schemas::SchemaSet;
-
-/// The `$ref` prefix used inside the OpenAPI document.
-const COMPONENT_PREFIX: &str = "#/components/schemas/";
+use crate::schemas::{SchemaSet, COMPONENTS_PREFIX};
 
 /// The response payload type for each endpoint, so a path can name it.
 fn response_type_for(method: &str, path: &str) -> Option<&'static str> {
@@ -100,14 +97,14 @@ fn operation(set: &SchemaSet, method: &str, path: &'static str) -> Value {
         if let Some(body) = request_type_for(method, path) {
             op.insert("requestBody".into(), json!({
                 "required": true,
-                "content": {"application/json": {"schema": {"$ref": format!("{COMPONENT_PREFIX}{body}")}}},
+                "content": {"application/json": {"schema": {"$ref": format!("{COMPONENTS_PREFIX}{body}")}}},
             }));
         }
     }
 
     let response = response_type_for(method, path)
-        .map(|name| format!("{COMPONENT_PREFIX}{name}"))
-        .unwrap_or_else(|| "#/components/schemas/Capabilities".to_string());
+        .map(|name| format!("{COMPONENTS_PREFIX}{name}"))
+        .unwrap_or_else(|| format!("{COMPONENTS_PREFIX}Capabilities"));
 
     let mut responses = Map::new();
     responses.insert(
@@ -121,7 +118,7 @@ fn operation(set: &SchemaSet, method: &str, path: &'static str) -> Value {
         "default".into(),
         json!({
             "description": "Failure. Carries the envelope's `error` with a stable ErrorCode.",
-            "content": {"application/json": {"schema": {"$ref": format!("{COMPONENT_PREFIX}ResponseEnvelope")}}},
+            "content": {"application/json": {"schema": {"$ref": format!("{COMPONENTS_PREFIX}ResponseEnvelope")}}},
         }),
     );
     op.insert("responses".into(), Value::Object(responses));
@@ -148,7 +145,7 @@ fn access_label(access: Access) -> &'static str {
 pub(crate) fn query_params(set: &SchemaSet, type_name: &str) -> Vec<Value> {
     // Read the normalized copy: a fragment embedded in the spec must carry the
     // spec's own $ref spelling, not the generator's internal one.
-    let normalized = set.normalized(type_name, COMPONENT_PREFIX);
+    let normalized = set.normalized(type_name, COMPONENTS_PREFIX);
     let Some(schema) = set.get(type_name) else {
         return Vec::new();
     };

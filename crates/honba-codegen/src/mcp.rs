@@ -1,18 +1,31 @@
-//! Building MCP tool schemas from the shared registry.
+//! Building MCP tool schemas from the shared registries.
 //!
-//! The previous implementation was a hand-written `json!` array whose arguments
-//! referenced `#/definitions/StrategyManifest` — a type that did not exist, so
-//! the emitted tool schemas were invalid JSON Schema. Every tool here is built
-//! from a real registered type, and a test asserts no reference dangles.
+//! Each tool names a registered endpoint (`honba_messages::ENDPOINTS`) and its
+//! arguments name registered wire types, so neither the route nor the shape of
+//! an argument can drift from the Rust source of truth:
+//!
+//! - the endpoint's `{path}` placeholders become required string arguments;
+//! - `annotations.readOnlyHint` is derived from `WRITE_PATHS`, the same list
+//!   the approval queue is gated on;
+//! - each `inputSchema` is self-contained: it carries exactly the `$defs` its
+//!   arguments reach, and every `$ref` is `#/$defs/<name>`, because an MCP
+//!   client receives a tool on its own and has nowhere else to resolve from.
 
+use honba_messages::WRITE_PATHS;
 use serde_json::{json, Value};
 
+use crate::endpoints::path_params;
 use crate::schemas::SchemaSet;
+
+/// The `$ref` prefix inside a tool's self-contained `inputSchema`.
+const DEFS_PREFIX: &str = "#/$defs/";
 
 /// One tool the agent surface exposes, derived from the registry.
 pub(crate) struct Tool {
     pub(crate) name: &'static str,
     pub(crate) description: &'static str,
+    /// The registered endpoint this tool drives, as `(method, path)`.
+    pub(crate) endpoint: (&'static str, &'static str),
     /// Arguments, as `(name, registered type, required, description)`.
     pub(crate) args: &'static [(&'static str, &'static str, bool, &'static str)],
 }
@@ -21,6 +34,7 @@ pub(crate) const TOOLS: &[Tool] = &[
     Tool {
         name: "backtest",
         description: "Run a backtest over historical data with a verified strategy manifest.",
+        endpoint: ("POST", "/backtests"),
         args: &[
             (
                 "strategy_manifest",
@@ -29,13 +43,13 @@ pub(crate) const TOOLS: &[Tool] = &[
                 "A verified strategy manifest, as returned by verify_strategy.",
             ),
             (
-                "dataset_id",
+                "data_range",
                 "BarsQuery",
                 false,
                 "Data range to load: timeframe plus inclusive from and exclusive to.",
             ),
             (
-                "seed",
+                "run_config",
                 "BacktestRunConfig",
                 true,
                 "Run configuration, including the seed that makes the run reproducible.",
@@ -45,6 +59,7 @@ pub(crate) const TOOLS: &[Tool] = &[
     Tool {
         name: "sweep",
         description: "Run a seeded parameter sweep over a strategy manifest.",
+        endpoint: ("POST", "/sweeps"),
         args: &[
             (
                 "strategy_manifest",
@@ -63,6 +78,7 @@ pub(crate) const TOOLS: &[Tool] = &[
     Tool {
         name: "verify_strategy",
         description: "Verify strategy source and compile it to a runnable manifest.",
+        endpoint: ("POST", "/strategies"),
         args: &[(
             "request",
             "StrategiesRequest",
@@ -73,6 +89,7 @@ pub(crate) const TOOLS: &[Tool] = &[
     Tool {
         name: "screen",
         description: "Evaluate a screener predicate over the instrument catalog.",
+        endpoint: ("GET", "/screener/scan"),
         args: &[(
             "predicate",
             "ScreenerFilterPredicate",
@@ -83,6 +100,7 @@ pub(crate) const TOOLS: &[Tool] = &[
     Tool {
         name: "get_instruments",
         description: "List instruments, optionally filtered by exchange or symbol.",
+        endpoint: ("GET", "/instruments"),
         args: &[(
             "query",
             "InstrumentsQuery",
@@ -93,6 +111,7 @@ pub(crate) const TOOLS: &[Tool] = &[
     Tool {
         name: "get_bars",
         description: "Fetch historical bars for an instrument.",
+        endpoint: ("GET", "/bars/{id}"),
         args: &[(
             "query",
             "BarsQuery",
@@ -105,28 +124,33 @@ pub(crate) const TOOLS: &[Tool] = &[
 /// Renders the MCP tool schemas.
 pub fn render(set: &SchemaSet) -> Value {
     let tools: Vec<Value> = TOOLS.iter().map(|tool| render_tool(set, tool)).collect();
-    json!({
-        "tools": tools,
-        "definitions": set.to_components(),
-    })
+    json!({ "tools": tools })
 }
 
-/// Renders one tool, replacing each argument's type with a `$ref`.
+/// Renders one tool with a self-contained `inputSchema`.
 fn render_tool(set: &SchemaSet, tool: &Tool) -> Value {
+    let (method, path) = tool.endpoint;
     let mut properties = serde_json::Map::new();
     let mut required = Vec::new();
 
+    for param in path_params(path) {
+        properties.insert(
+            param.to_string(),
+            json!({"type": "string", "description": format!("The `{{{param}}}` segment of {method} {path}.")}),
+        );
+        required.push(Value::String(param.to_string()));
+    }
+
     for (arg_name, type_name, is_required, description) in tool.args {
-        // An argument naming an unregistered type is a bug in this file, and the
-        // test below proves the emitted document has no dangling reference.
-        let schema = match set.get(type_name) {
-            Some(schema) => schema.clone(),
+        // An argument naming an unregistered type is a bug in this file; a
+        // test asserts every argument type is registered.
+        let mut arg = match set.get(type_name) {
+            Some(_) => set.normalized(type_name, DEFS_PREFIX),
             None => json!({
                 "type": "object",
                 "description": format!("unknown type {type_name}")
             }),
         };
-        let mut arg = schema;
         if let Value::Object(map) = &mut arg {
             map.insert("description".into(), Value::String((*description).into()));
         }
@@ -136,14 +160,47 @@ fn render_tool(set: &SchemaSet, tool: &Tool) -> Value {
         }
     }
 
+    let mut input = json!({
+        "type": "object",
+        "properties": properties,
+        "required": required,
+        "additionalProperties": false,
+    });
+    let defs = tool_defs(set, tool);
+    if !defs.is_empty() {
+        input["$defs"] = Value::Object(defs);
+    }
+
+    let is_write = WRITE_PATHS.contains(&tool.endpoint);
     json!({
         "name": tool.name,
         "description": tool.description,
-        "inputSchema": {
-            "type": "object",
-            "properties": properties,
-            "required": required,
-            "additionalProperties": false,
-        },
+        "inputSchema": input,
+        "annotations": {"readOnlyHint": !is_write},
     })
+}
+
+/// The `$defs` a tool needs: everything its argument types reach, excluding
+/// the argument types themselves (they are inlined) unless something refers
+/// back to them.
+fn tool_defs(set: &SchemaSet, tool: &Tool) -> serde_json::Map<String, Value> {
+    let roots: Vec<&str> = tool.args.iter().map(|(_, t, _, _)| *t).collect();
+    let mut referenced = std::collections::BTreeSet::new();
+    for root in &roots {
+        if let Some(schema) = set.get(root) {
+            let refs: Vec<String> = crate::schemas::local_refs(schema)
+                .iter()
+                .map(|r| r.rsplit('/').next().unwrap_or(r).to_string())
+                .collect();
+            referenced.extend(set.closure(refs.iter().map(String::as_str)));
+        }
+    }
+    referenced
+        .into_iter()
+        .filter(|name| set.get(name).is_some())
+        .map(|name| {
+            let schema = set.normalized(&name, DEFS_PREFIX);
+            (name, schema)
+        })
+        .collect()
 }

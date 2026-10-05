@@ -48,12 +48,14 @@ fn nested_references_are_collected_at_any_depth() {
 }
 
 #[test]
-fn components_render_bare_names() {
+fn components_render_component_pointer_refs() {
+    // A bare `{"$ref": "Bar"}` inside `components.schemas` is a relative URI
+    // reference, not a component reference; OpenAPI tooling cannot resolve it.
     let mut set = SchemaSet::new();
     set.insert("Bar", json!({"type": "object"}));
     set.insert("Holder", json!({"$ref": "#/definitions/Bar"}));
     let comps = set.to_components();
-    assert_eq!(comps["Holder"]["$ref"], json!("Bar"));
+    assert_eq!(comps["Holder"]["$ref"], json!("#/components/schemas/Bar"));
 }
 
 #[test]
