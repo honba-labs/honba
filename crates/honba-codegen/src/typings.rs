@@ -211,11 +211,11 @@ fn py_literal(value: &Value) -> String {
 /// `schemars` expresses an optional field as `{"oneOf": [{"$ref": "T"},
 /// {"type": "null"}]}`, which renders as `T | None`. Adding a second `| None`
 /// for the field's own optionality is what produced
-/// `Optional[Optional[...]]`.
+/// `Optional[Optional[...]]`. `Any` already includes `None`.
 fn admits_none(rendered: &str) -> bool {
     rendered
         .split(" | ")
-        .any(|part| part == "None" || part == "type(None)")
+        .any(|part| part == "None" || part == "Any")
 }
 
 /// Maps a JSON Schema fragment to a Python type expression.

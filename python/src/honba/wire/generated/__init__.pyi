@@ -40,7 +40,7 @@ class BacktestRequest:
     universe: str | None = None
 
 class BacktestResponse:
-    assumptions: Any | None = None
+    assumptions: Any = None
     metrics: BacktestMetrics | None = None
     run_id: str
     status: RunStatus
@@ -110,7 +110,7 @@ ErrorCode = Literal["validation_invalid_request", "not_found", "unauthorized", "
 
 class ErrorDetail:
     code: ErrorCode
-    context: Any | None = None
+    context: Any = None
     message: str
     retryable: bool
 
@@ -262,11 +262,11 @@ class Subscriptions:
     trades: bool | None = None
 
 class SweepReportResponse:
-    best: Any | None = None
+    best: Any = None
     ranked: list[Any]
 
 class SweepRequest:
-    params: Any | None = None
+    params: Any = None
     seed: int | None = None
     strategy: str | None = None
     trials: int | None = None

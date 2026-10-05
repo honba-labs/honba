@@ -167,3 +167,13 @@ fn the_generic_envelope_has_its_type_variable_declared() {
         assert!(imports.contains(name), "{imports}");
     }
 }
+
+#[test]
+fn an_optional_any_field_is_not_widened_with_none() {
+    // `Any | None` is just `Any`.
+    let out = class(
+        "Holder",
+        &json!({"type": "object", "properties": {"extra": {}}}),
+    );
+    assert_eq!(out, "class Holder:\n    extra: Any = None\n");
+}
