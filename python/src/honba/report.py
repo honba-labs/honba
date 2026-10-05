@@ -43,7 +43,7 @@ def _format_timestamp_ns(ts_ns: int) -> str:
         return "?"
     try:
         return datetime.fromtimestamp(ts_ns / 1e9, tz=timezone.utc).strftime("%Y-%m-%d")
-    except (ValueError, OSError):
+    except (ValueError, OSError, OverflowError):
         return "?"
 
 
