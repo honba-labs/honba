@@ -18,6 +18,9 @@ members = [
     "crates/honba-ports",
     "crates/honba-async",
     "crates/honba-sweep",
+    "crates/honba-api",
+    "crates/honba-api-rest",
+    "crates/honba-api-wasm",
 ]
 
 [workspace.package]
@@ -61,3 +64,6 @@ schemars = { version = "0.8", features = ["derive"] }
 itertools = "0.13"
 indexmap = "2"
 
+
+honba-api = { path = "crates/honba-api" }
+honba-api-rest = { path = "crates/honba-api-rest" }
