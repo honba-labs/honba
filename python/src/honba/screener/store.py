@@ -12,6 +12,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
+import os
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,12 @@ from honba.screener.ports import validate_bar
 
 logger = logging.getLogger(__name__)
 
+DATA_DIR_ENV = "HONBA_DATA_DIR"
+"""Environment variable naming the data root explicitly (beats discovery from cwd)."""
+
+_EPOCH = dt.date(1970, 1, 1)
+_NS_PER_DAY = 86_400 * 1_000_000_000
+
 BAR_SCHEMA = pa.schema(
     [
         ("ts", pa.int64()),
@@ -39,10 +46,18 @@ BAR_SCHEMA = pa.schema(
 
 
 def find_data_root(start_path: Path | None = None) -> Path:
-    """Find the project root data directory (`honba/data` or `<root>/data`).
+    """Resolve the data root. Pure: never creates a directory.
 
-    If no project root is found (not a git repo or source tree), falls back to `./data`.
+    First match wins:
+
+    1. ``$HONBA_DATA_DIR`` (:data:`DATA_DIR_ENV`), when set and non-empty;
+    2. the nearest project root at or above ``start_path`` (default: cwd) that has
+       ``honba/data``, or ``data`` next to ``crates/``, ``Cargo.toml`` or ``pyproject.toml``;
+    3. ``<start_path>/data`` (it is not created; writers create it lazily).
     """
+    env = os.environ.get(DATA_DIR_ENV, "").strip()
+    if env:
+        return Path(env).expanduser().resolve()
     cur = (start_path or Path.cwd()).resolve()
     for p in [cur, *cur.parents]:
         # Check if this directory is the repo root containing 'data' or 'honba/data'
@@ -54,19 +69,25 @@ def find_data_root(start_path: Path | None = None) -> Path:
             or (p / "pyproject.toml").is_file()
         ):
             return (p / "data").resolve()
+    return cur / "data"
 
-    fallback = cur / "data"
-    fallback.mkdir(parents=True, exist_ok=True)
-    return fallback
+
+def _utc_midnight_ns(day: dt.date) -> int:
+    """Unix nanoseconds of ``day`` 00:00 UTC (exact integer arithmetic, no local timezone)."""
+    return (day - _EPOCH).days * _NS_PER_DAY
 
 
 class ParquetBarStore:
     """Persistent BarStore backed by Parquet files and a coverage ledger."""
 
     def __init__(self, data_dir: Path | None = None) -> None:
-        self.data_dir = (data_dir or find_data_root()).resolve()
+        """``data_dir`` defaults to :func:`find_data_root`, resolved once here.
+
+        Construction and reads never touch the filesystem; ``append`` creates the
+        catalog and ledger directories on first write.
+        """
+        self.data_dir = Path(data_dir if data_dir is not None else find_data_root()).resolve()
         self.catalog_dir = self.data_dir / "catalog"
-        self.catalog_dir.mkdir(parents=True, exist_ok=True)
         self.ledger_file = self.data_dir / "coverage_ledger.json"
 
     def _load_ledger(self) -> dict[str, list[dict[str, Any]]]:
@@ -119,7 +140,11 @@ class ParquetBarStore:
         )
 
     def read(self, instrument: InstrumentId, timeframe: str, interval: DateInterval) -> list[Bar]:
-        """Read and deduplicate bars from year-partitioned parquet files."""
+        """Read and deduplicate bars from year-partitioned parquet files.
+
+        ``interval`` is a half-open range of UTC calendar dates: the window is
+        ``[start 00:00 UTC, end 00:00 UTC)`` whatever the machine's local timezone.
+        """
         start_year = interval.start.year
         end_year = (
             (interval.end - dt.timedelta(days=1)).year
@@ -127,8 +152,8 @@ class ParquetBarStore:
             else interval.start.year
         )
 
-        start_ns = int(dt.datetime.combine(interval.start, dt.time.min).timestamp() * 1e9)
-        end_ns = int(dt.datetime.combine(interval.end, dt.time.min).timestamp() * 1e9)
+        start_ns = _utc_midnight_ns(interval.start)
+        end_ns = _utc_midnight_ns(interval.end)
 
         bars_by_ts: dict[int, Bar] = {}
 
