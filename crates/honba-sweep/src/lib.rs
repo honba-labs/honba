@@ -1,25 +1,31 @@
-use std::sync::Arc;
+#![deny(missing_docs)]
+#![deny(rustdoc::broken_intra_doc_links)]
+#![deny(unsafe_code)]
+
+//! Concurrent parameter sweeps for the Honba platform.
+//!
+//! A sweep runs many parameter sets over one shared dataset and scores each of
+//! them, which makes it the only part of the platform that needs real threads.
+//! It is deliberately boring about them: every trial builds its own engine, its
+//! own paper sink and its own strategy, and owns all three outright.
+
+pub mod error;
+pub mod fitness;
+pub mod plan;
+pub mod report;
+pub mod run;
+pub mod trial;
+
+pub use error::{Result, SweepError};
+pub use fitness::{Fitness, SharpeFitness};
 pub use honba_data::Dataset;
+pub use plan::{
+    StrategyFactory, StrategySpec, SweepPlan, TrialParams, DEFAULT_INITIAL_CASH_MINOR,
+    DEFAULT_MAX_CONCURRENCY, DEFAULT_PERIODS_PER_YEAR,
+};
+pub use report::{SweepReport, TrialMetrics, TrialOutcome, TrialReport};
+pub use run::{run, run_one};
+pub use trial::{guard_trial, run_trial, run_trial_with, TrialConfig};
 
-#[derive(Clone, Debug)]
-pub struct TrialParams {
-    pub seed: u64,
-}
-
-#[derive(Clone, Debug)]
-pub struct SweepPlan {
-    pub trials: Vec<TrialParams>,
-}
-
-#[derive(Clone, Debug)]
-pub struct SweepReport {
-    pub results: Vec<String>,
-}
-
-pub async fn run(_pool: &tokio::runtime::Handle, plan: &SweepPlan, _data: Arc<Dataset>) -> anyhow::Result<SweepReport> {
-    let mut results = Vec::with_capacity(plan.trials.len());
-    for (i, _trial) in plan.trials.iter().enumerate() {
-        results.push(format!("trial_{}", i));
-    }
-    Ok(SweepReport { results })
-}
+#[cfg(test)]
+mod tests;

@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
+description = "Concurrent, reproducible parameter sweeps for Honba"
 
 [dependencies]
 honba-messages.workspace = true
@@ -13,5 +14,10 @@ honba-engine.workspace = true
 honba-strategy.workspace = true
 honba-sim.workspace = true
 honba-data.workspace = true
+honba-analytics.workspace = true
 tokio.workspace = true
-anyhow.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+honba-testing.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
