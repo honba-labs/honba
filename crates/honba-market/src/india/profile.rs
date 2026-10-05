@@ -98,7 +98,8 @@ impl Default for IndiaMarketProfile {
             grammar: IndiaSymbolGrammar,
             expiry: LastThursdayExpiry,
             margin: IndiaMarginModel,
-            settlement: StandardRollingSettlement::t_plus_1(),
+            // Country + exchange drive the cycle: NSE/BSE equity delivery clears T+2.
+            settlement: StandardRollingSettlement::t_plus_2(),
         }
     }
 }
@@ -113,8 +114,19 @@ impl IndiaMarketProfile {
             grammar: IndiaSymbolGrammar,
             expiry: LastThursdayExpiry,
             margin: IndiaMarginModel,
-            settlement: StandardRollingSettlement::t_plus_1(),
+            settlement: StandardRollingSettlement::t_plus_2(),
         }
+    }
+
+    /// Settlement cycle for India equity delivery (T+2).
+    ///
+    /// This is the single source of truth behind `honba._honba.nse_equity_settlement_days()`
+    /// and `honba.markets.india.nse_equity_settlement_days()`; Python can still override the
+    /// cycle per strategy via `StrategyConfig.settlement_days`.
+    pub fn equity_settlement_days() -> usize {
+        Self::default()
+            .settlement_rules()
+            .settlement_days(InstrumentKind::Equity)
     }
 }
 

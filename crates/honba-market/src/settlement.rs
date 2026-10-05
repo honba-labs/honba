@@ -1,4 +1,11 @@
 //! Generic margin models and settlement rules.
+//!
+//! The clearing cycle is a country + exchange property, not a global constant: India
+//! (NSE/BSE) equity delivery settles T+2, other Indian segments and most other markets
+//! settle T+1, and same-day instruments settle T+0. [`StandardRollingSettlement`] carries
+//! the cycle chosen by the market pack (e.g. `crates/honba-market/src/india/profile.rs`),
+//! which Python surfaces via `honba._honba.nse_equity_settlement_days()` and can override
+//! per strategy through `StrategyConfig.settlement_days`.
 
 use chrono::{Duration, NaiveDate};
 use honba_entities::{InstrumentKind, PositionSide};
@@ -109,7 +116,7 @@ pub trait SettlementRules: Send + Sync {
     }
 }
 
-/// Standard T+1 rolling settlement rules.
+/// Standard T+n rolling settlement rules.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct StandardRollingSettlement {
     days: usize,
@@ -124,6 +131,11 @@ impl StandardRollingSettlement {
     /// Standard T+1 settlement.
     pub fn t_plus_1() -> Self {
         Self { days: 1 }
+    }
+
+    /// Standard T+2 settlement (India NSE/BSE equity delivery).
+    pub fn t_plus_2() -> Self {
+        Self { days: 2 }
     }
 
     /// Standard T+0 instant settlement.

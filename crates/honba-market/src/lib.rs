@@ -17,7 +17,8 @@
 //!   - [`SymbolGrammar`]: Ticker parsing, normalization, and grammar validation.
 //!   - [`ExpiryRules`]: Derivative expiration schedules and settlement dates.
 //!   - [`MarginModel`]: Initial and maintenance margin requirements.
-//!   - [`SettlementRules`]: Clearing cycles (e.g. T+1, T+0) and cash/physical delivery.
+//!   - [`SettlementRules`]: Clearing cycles (e.g. T+2 for India equities, T+1, T+0) and
+//!     cash/physical delivery.
 //!   - [`MarketProfile`]: Bundled facade exposing all market rules for a specific exchange/jurisdiction.
 //!   - [`MarketRegistry`]: Thread-safe discovery and resolution of market profiles.
 //!

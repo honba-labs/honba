@@ -3,10 +3,13 @@
 
 use chrono::{NaiveDate, NaiveTime};
 
+use honba_entities::InstrumentKind;
 use honba_market::calendar::{HolidaySource, Session, TradingCalendar};
 use honba_market::india::calendar::NseCalendar;
 use honba_market::india::costs::{CostModel, CostModelSource, Segment, SttRates};
+use honba_market::india::profile::IndiaMarketProfile;
 use honba_market::india::universes::{Nifty50, NIFTY50_SIZE};
+use honba_market::profile::MarketProfile;
 use honba_market::universes::{Universe, UniverseSource};
 use honba_market::Result;
 use honba_messages::OrderSide;
@@ -192,4 +195,28 @@ fn null_calendar_treats_every_day_as_trading() {
     assert!(cal.is_trading_day(date(2025, 1, 1)));
     assert!(cal.is_trading_day(date(2025, 1, 26)));
     assert!(!cal.is_holiday(date(2025, 1, 26)));
+}
+
+#[test]
+fn india_equity_settlement_is_t_plus_two() {
+    let profile = IndiaMarketProfile::new(
+        NseCalendar::from_holidays([date(2025, 1, 27)]),
+        test_model(),
+    );
+    let rules = profile.settlement_rules();
+    assert_eq!(rules.settlement_days(InstrumentKind::Equity), 2);
+    // Fri 24th -> weekend, holiday Mon 27th -> Tue 28th (1), Wed 29th (2).
+    assert_eq!(
+        rules.settlement_date(
+            date(2025, 1, 24),
+            InstrumentKind::Equity,
+            profile.calendar()
+        ),
+        date(2025, 1, 29)
+    );
+}
+
+#[test]
+fn india_profile_reports_equity_settlement_days() {
+    assert_eq!(IndiaMarketProfile::equity_settlement_days(), 2);
 }
