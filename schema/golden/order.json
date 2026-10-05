@@ -17,8 +17,14 @@
         "trigger_price": null,
         "status": "initialized",
         "time_in_force": "day",
-        "ts_event": 1700000060000000000,
-        "ts_init": 1700000060000000000
+        "ts_event": {
+          "iso": "2023-11-14T22:14:20.000000000Z",
+          "unix_nanos": "1700000060000000000"
+        },
+        "ts_init": {
+          "iso": "2023-11-14T22:14:20.000000000Z",
+          "unix_nanos": "1700000060000000000"
+        }
       }
     },
     {
@@ -36,8 +42,14 @@
         "trigger_price": null,
         "status": "accepted",
         "time_in_force": "gtc",
-        "ts_event": 1700000060000000000,
-        "ts_init": 1700000060000000000
+        "ts_event": {
+          "iso": "2023-11-14T22:14:20.000000000Z",
+          "unix_nanos": "1700000060000000000"
+        },
+        "ts_init": {
+          "iso": "2023-11-14T22:14:20.000000000Z",
+          "unix_nanos": "1700000060000000000"
+        }
       }
     },
     {
@@ -55,8 +67,14 @@
         "trigger_price": 21950.0,
         "status": "submitted",
         "time_in_force": "ioc",
-        "ts_event": 1700000060000000000,
-        "ts_init": 1700000060000000000
+        "ts_event": {
+          "iso": "2023-11-14T22:14:20.000000000Z",
+          "unix_nanos": "1700000060000000000"
+        },
+        "ts_init": {
+          "iso": "2023-11-14T22:14:20.000000000Z",
+          "unix_nanos": "1700000060000000000"
+        }
       }
     },
     {
@@ -74,8 +92,14 @@
         "trigger_price": 22000.0,
         "status": "partially_filled",
         "time_in_force": "fok",
-        "ts_event": 1700000060000000000,
-        "ts_init": 1700000060000000000
+        "ts_event": {
+          "iso": "2023-11-14T22:14:20.000000000Z",
+          "unix_nanos": "1700000060000000000"
+        },
+        "ts_init": {
+          "iso": "2023-11-14T22:14:20.000000000Z",
+          "unix_nanos": "1700000060000000000"
+        }
       }
     },
     {
@@ -93,8 +117,14 @@
         "trigger_price": null,
         "status": "expired",
         "time_in_force": "gtd",
-        "ts_event": 1700000060000000000,
-        "ts_init": 1700000060000000000
+        "ts_event": {
+          "iso": "2023-11-14T22:14:20.000000000Z",
+          "unix_nanos": "1700000060000000000"
+        },
+        "ts_init": {
+          "iso": "2023-11-14T22:14:20.000000000Z",
+          "unix_nanos": "1700000060000000000"
+        }
       }
     }
   ],
@@ -114,8 +144,8 @@
         "trigger_price": null,
         "status": "initialized",
         "time_in_force": "day",
-        "ts_event": 1700000060000000000,
-        "ts_init": 1700000060000000000
+        "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"},
+        "ts_init": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}
       }
     },
     {
@@ -133,8 +163,8 @@
         "trigger_price": null,
         "status": "initialized",
         "time_in_force": "day",
-        "ts_event": 1700000060000000000,
-        "ts_init": 1700000060000000000
+        "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"},
+        "ts_init": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}
       }
     },
     {
@@ -152,8 +182,8 @@
         "trigger_price": null,
         "status": "exploded",
         "time_in_force": "day",
-        "ts_event": 1700000060000000000,
-        "ts_init": 1700000060000000000
+        "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"},
+        "ts_init": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}
       }
     }
   ]

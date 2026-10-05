@@ -1,14 +1,26 @@
 //! Nanosecond-precision timestamps.
 
+use chrono::{TimeZone, Utc};
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+/// JSON representation of UnixNanos with ISO-8601 string and unix_nanos string.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+struct UnixNanosJson {
+    iso: String,
+    unix_nanos: String,
+}
 
 /// A point in time expressed as nanoseconds since the Unix epoch (1970-01-01T00:00:00Z).
 ///
 /// Every event in Honba carries two of these: `ts_event` (when the exchange
 /// observed the event) and `ts_init` (when Honba created the message).
+///
+/// Serializes as an object with both ISO-8601 and unix_nanos fields to avoid
+/// JSON number precision issues (u64 exceeds Number.MAX_SAFE_INTEGER).
 ///
 /// ```
 /// use honba_messages::UnixNanos;
@@ -27,11 +39,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
     PartialOrd,
     Ord,
     Hash,
-    Serialize,
-    Deserialize,
-    JsonSchema,
 )]
-#[schemars(transparent)]
 pub struct UnixNanos(u64);
 
 impl UnixNanos {
@@ -79,6 +87,57 @@ impl UnixNanos {
     /// Returns the timestamp as floating-point seconds since the Unix epoch.
     pub fn as_secs_f64(&self) -> f64 {
         self.0 as f64 / 1_000_000_000.0
+    }
+
+    /// Returns the ISO-8601 string representation with nanosecond precision.
+    pub fn to_iso_string(&self) -> String {
+        let secs = self.0 / 1_000_000_000;
+        let nanos = (self.0 % 1_000_000_000) as u32;
+        let dt = Utc.timestamp_opt(secs as i64, nanos).single().unwrap();
+        dt.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true)
+    }
+
+    /// Returns the unix nanoseconds as a string.
+    pub fn to_unix_nanos_string(&self) -> String {
+        self.0.to_string()
+    }
+}
+
+impl Serialize for UnixNanos {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let json = UnixNanosJson {
+            iso: self.to_iso_string(),
+            unix_nanos: self.to_unix_nanos_string(),
+        };
+        json.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for UnixNanos {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let json = UnixNanosJson::deserialize(deserializer)?;
+        let nanos = json.unix_nanos.parse::<u64>().map_err(serde::de::Error::custom)?;
+        Ok(Self(nanos))
+    }
+}
+
+impl JsonSchema for UnixNanos {
+    fn schema_name() -> String {
+        "UnixNanos".to_string()
+    }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        UnixNanosJson::json_schema(gen)
+    }
+
+    fn is_referenceable() -> bool {
+        true
     }
 }
 
