@@ -127,6 +127,18 @@ this ADR:
       hand: costs 4.5, 4.5, 2.5; cash -68.5, -9.0, -43.5. 625 bps is chosen so every product is exact in binary
       floating point.
 
+11. **Port reject/cancel path (Python).** The port contract lives in `honba.strategies.execution`
+    (`ExecutionPort` is re-exported from `honba.strategies.runner`). Beyond the required `submit` / `drain_fills`, a
+    port may implement `drain_rejections() -> list[OrderRejection]` and `cancel(order_id)`. An `OrderRejection`
+    (`order_id`, `intent` carrying the quantity that will never fill, `reason`, `ts`, `cancelled`) is drained by the
+    runner after the fills of every event (step 5 of the runner semantics) and released in the context (or passed to
+    a legacy `handle_rejected` override), so a port never needs a handle on `ctx.release`. `StrategyRunner.cancel`
+    asks the port to cancel and books what it reports at once. Both methods are optional: ports without them work
+    unchanged through the shims `drain_port_rejections` / `cancel_order`, and `BaseExecutionPort` supplies inert
+    defaults. Logged as the wire types `order_rejected` / `order_cancelled`. Every core port runs the shared contract
+    test `python/tests/integration/test_execution_port_contract.py` (fills belong to submitted orders, and once the
+    working orders are cancelled `filled + released == ordered` for every order).
+
 ## Consequences
 - Breaking (Rust): every `Strategy` hook takes `ctx: &mut dyn StrategyContext`; market-data hooks lose `ts_init`;
   `drain_intents` is removed (submit with `ctx.submit`). `StrategyAdapter` owns a `LedgerContext`. In-repo
@@ -148,5 +160,6 @@ this ADR:
 - The Rust stub `python/honba/_lib/__init__.pyi` is not mapped to the module `honba._honba`, so type checkers
   and the CI stubtest do not cover it (including `run_strategy`). Moving it would surface about 79 existing
   stubtest errors in older pyclasses; fixing them is a separate ticket. The stub was deliberately not moved here.
-- Venue-side rejections and cancellations (an order state machine) are E2-S6; until then `release` is only driven by
-  invariant rejections in Rust and by `handle_rejected` in Python.
+- Venue-side rejections and cancellations (an order state machine) are E2-S6. Python ports report them through
+  `drain_rejections` (decision 11); the Rust `ExecutionEngine` has `cancel` but no rejection queue yet, so in Rust
+  `release` is still only driven by invariant rejections.

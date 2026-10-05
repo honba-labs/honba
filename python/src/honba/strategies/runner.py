@@ -6,7 +6,9 @@ Per event ``(event, ts_init)`` (ADR 008, decision 5):
 2. a ``Bar``, ``QuoteTick`` or ``TradeTick`` is dispatched to its hook (other events reach no hook);
 3. every intent submitted since the last drain (including from ``on_start`` and from the previous
    event's ``on_fill``) is validated and sent to the execution port as order ``"{name}-{n}"``;
-4. fills drained from the port are booked in the context, then passed to ``on_fill``.
+4. fills drained from the port are booked in the context, then passed to ``on_fill``;
+5. rejections drained from the port (``honba.strategies.execution``: an order, or the unfilled
+   part of one, that will never fill) are released in the context and recorded.
 
 Intents submitted in ``on_stop`` are never executed.
 
@@ -14,8 +16,9 @@ Logged event types mirror ``honba-messages::Event`` wire types exactly so that
 ``honba.log.EventFilter`` can filter them by wire name:
 
 * ``order``          – intent submitted to the execution port
-* ``order_rejected`` – intent failed validation (WARNING level, always admitted)
+* ``order_rejected`` – intent failed validation, or the port rejected an order (WARNING level)
 * ``order_filled``   – fill received from the execution port
+* ``order_cancelled`` – the port cancelled an order (WARNING level)
 """
 
 from __future__ import annotations
@@ -23,7 +26,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any
 
 import honba.log as _honba_log  # noqa: F401 — triggers auto-init from HONBA_LOG_EVENTS
 from honba.entities.bar import Bar
@@ -32,14 +35,21 @@ from honba.entities.tick import QuoteTick, TradeTick
 from honba.entities.trade import Trade
 from honba.strategies.base import Strategy
 from honba.strategies.context import LedgerContext
+from honba.strategies.execution import (
+    ExecutionPort,
+    OrderRejection,
+    cancel_order,
+    drain_port_rejections,
+)
 
-
-class ExecutionPort(Protocol):
-    """Where orders go: a simulator in backtest, a broker adapter in live."""
-
-    def submit(self, order_id: str, intent: OrderIntent, ts: int) -> None: ...
-
-    def drain_fills(self) -> list[Trade]: ...
+__all__ = [
+    "ExecutionPort",
+    "IntentRejection",
+    "OrderRejection",
+    "RunResult",
+    "StrategyRunner",
+    "SubmittedIntent",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +76,8 @@ class RunResult:
     fills: list[Trade] = field(default_factory=list)
     rejections: list[IntentRejection] = field(default_factory=list)
     ctx: LedgerContext = field(default_factory=LedgerContext)
+    # Orders (or parts of them) the port rejected or cancelled, released in ``ctx``.
+    order_rejections: list[OrderRejection] = field(default_factory=list)
 
 
 def _overrides(strategy: Strategy, method: str) -> bool:
@@ -92,6 +104,7 @@ class StrategyRunner:
         self.intents: list[SubmittedIntent] = []
         self.fills: list[Trade] = []
         self.rejections: list[IntentRejection] = []
+        self.order_rejections: list[OrderRejection] = []
 
     def start(self) -> None:
         self.strategy.on_start()
@@ -106,6 +119,17 @@ class StrategyRunner:
             self.strategy.on_trade(event)
         self._submit_intents(ts_init)
         self._book_fills()
+        self._book_rejections()
+
+    def cancel(self, order_id: str) -> bool:
+        """Ask the port to cancel ``order_id`` and book what it reports at once.
+
+        Returns ``False`` if the port has no cancel path (nothing is released then).
+        """
+        if not cancel_order(self.execution, order_id):
+            return False
+        self._book_rejections()
+        return True
 
     def stop(self) -> None:
         self.strategy.on_stop()
@@ -124,7 +148,13 @@ class StrategyRunner:
                 observe(event, ts_init)
             self.on_event(event, ts_init)
         self.stop()
-        return RunResult(self.intents, self.fills, self.rejections, self.ctx)
+        return RunResult(
+            self.intents,
+            self.fills,
+            self.rejections,
+            self.ctx,
+            order_rejections=self.order_rejections,
+        )
 
     def _drain(self) -> list[OrderIntent]:
         if _overrides(self.strategy, "drain_intents"):
@@ -155,10 +185,7 @@ class StrategyRunner:
                         "reason": str(error),
                     },
                 )
-                if _overrides(self.strategy, "handle_rejected"):
-                    self.strategy.handle_rejected(intent)
-                else:
-                    self.ctx.release(intent)
+                self._release(intent)
                 continue
 
             order_id = f"{self.strategy.name}-{self._seq}"
@@ -216,5 +243,32 @@ class StrategyRunner:
                     "last_qty": fill.quantity,
                     "last_px": fill.price,
                     "cost": fill.costs.to_major(),
+                },
+            )
+
+    def _release(self, intent: OrderIntent) -> None:
+        if _overrides(self.strategy, "handle_rejected"):
+            self.strategy.handle_rejected(intent)  # deprecated override, honoured until 0.3
+        else:
+            self.ctx.release(intent)
+
+    def _book_rejections(self) -> None:
+        for rejection in drain_port_rejections(self.execution):
+            self._release(rejection.intent)
+            self.order_rejections.append(rejection)
+            event_type = "order_cancelled" if rejection.cancelled else "order_rejected"
+            self.logger.warning(
+                "%s: order_id=%s symbol=%s side=%s qty=%s reason=%s",
+                event_type,
+                rejection.order_id,
+                rejection.intent.instrument_id.symbol,
+                rejection.intent.side.name,
+                rejection.intent.quantity,
+                rejection.reason,
+                extra={
+                    "event_type": event_type,
+                    "order_id": rejection.order_id,
+                    "symbol": rejection.intent.instrument_id.symbol,
+                    "reason": rejection.reason,
                 },
             )
