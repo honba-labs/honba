@@ -25,6 +25,15 @@ class StrategyConfig(BaseModel):
     indicators: dict[str, dict[str, Any]] = Field(default_factory=dict)
     # None keeps the engine default from the market pack (T+2 for NSE/BSE equities);
     # set 0..5 to override the clearing cycle for this strategy only.
+    # Driving bars consumed before the first order (StrategyManifest.warmup_bars); the
+    # runner feeds them to the strategy but suppresses its orders.
+    warmup_bars: int = Field(
+        default=0,
+        ge=0,
+        le=2**32 - 1,
+        strict=True,
+        description="Bars fed to the strategy before orders are allowed (runner warm-up gate).",
+    )
     settlement_days: int | None = Field(
         default=None,
         ge=0,

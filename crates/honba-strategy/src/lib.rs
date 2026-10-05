@@ -33,7 +33,7 @@ pub use manifest::{
     ManifestError, StrategyManifest, Subscriptions, TimeframeSpec, Universe, STRATEGY_API_VERSION,
 };
 pub use rsi_reversal::RsiReversal;
-pub use runner::{IntentRejection, StrategyRunner, SubmittedIntent};
+pub use runner::{IntentRejection, StrategyRunner, SubmittedIntent, SuppressedIntent};
 pub use sma_crossover::{SmaCrossover, MAX_SMA_PERIOD};
 pub use strategy::{Strategy, StrategyAdapter};
 

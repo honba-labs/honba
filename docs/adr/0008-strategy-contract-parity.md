@@ -139,6 +139,17 @@ this ADR:
     test `python/tests/integration/test_execution_port_contract.py` (fills belong to submitted orders, and once the
     working orders are cancelled `filled + released == ordered` for every order).
 
+12. **Warm-up gate (both languages).** `StrategyManifest.warmup_bars` is enforced by the runner: Rust
+    `StrategyRunner::with_warmup_bars(n)`, Python `StrategyRunner(..., warmup_bars=n)` (default: the strategy's
+    `warmup_bars` class attribute, 0; `StrategyConfig.warmup_bars` carries it in `config.toml`). A *driving bar* is a
+    bar event whose `ts_init` differs from the previous bar event's. While at most `n` driving bars have been seen
+    (and before the first), every event still reaches the strategy, so indicators converge, but each valid intent is
+    released in the context and recorded as a `SuppressedIntent` (`suppressed()` / `RunResult.suppressed`) instead of
+    becoming an order; it consumes no order id. Invalid intents are rejected as before. The Python manifest mirror is
+    `honba.strategies.manifest.StrategyManifest` (same JSON shape and validation codes). Shared vectors:
+    `schema/conformance/warmup_gate.json` and `schema/conformance/strategy_manifest.json`, run by
+    `crates/honba-strategy/tests/warmup.rs` and `python/tests/integration/test_warmup_conformance.py`.
+
 ## Consequences
 - Breaking (Rust): every `Strategy` hook takes `ctx: &mut dyn StrategyContext`; market-data hooks lose `ts_init`;
   `drain_intents` is removed (submit with `ctx.submit`). `StrategyAdapter` owns a `LedgerContext`. In-repo

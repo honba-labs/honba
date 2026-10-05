@@ -5,6 +5,7 @@ mod dyn_strategy;
 mod intent;
 mod ledger;
 mod manifest;
+mod runner_warmup;
 
 use honba_messages::{Exchange, InstrumentId};
 

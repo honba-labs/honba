@@ -19,6 +19,15 @@ pub struct SubmittedIntent {
     pub order_id: OrderId,
 }
 
+/// A valid intent the warm-up gate released instead of submitting.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SuppressedIntent {
+    /// The `ts_init` of the event during which it was drained.
+    pub ts_init: UnixNanos,
+    /// The intent, as the strategy submitted it.
+    pub intent: OrderIntent,
+}
+
 /// An intent the runner refused to turn into an order.
 #[derive(Clone, Debug, PartialEq)]
 pub struct IntentRejection {
@@ -49,6 +58,17 @@ pub struct IntentRejection {
 /// Intents submitted in [`Strategy::on_stop`] are discarded. Submitted
 /// intents and fills are available via [`Self::submitted`] and [`Self::fills`].
 ///
+/// **Warm-up gate** ([`StrategyManifest::warmup_bars`](crate::StrategyManifest),
+/// set with [`Self::with_warmup_bars`]). A *driving bar* is a bar event whose
+/// `ts_init` differs from the previous bar event's, so bars of several
+/// instruments at one time count once. While at most `warmup_bars` driving
+/// bars have been seen (and before the first one), the strategy still receives
+/// every event, but each valid intent is released in the context and recorded
+/// as a [`SuppressedIntent`] (see [`Self::suppressed`]) instead of becoming an
+/// order; it consumes no order id. Invalid intents are rejected as usual. The
+/// Python runner follows the same rule; both run
+/// `schema/conformance/warmup_gate.json`.
+///
 /// ```
 /// use honba_engine::Engine;
 /// use honba_sim::BarFillEngine;
@@ -72,6 +92,10 @@ pub struct StrategyRunner<S: Strategy, E: ExecutionEngine> {
     submitted: Vec<SubmittedIntent>,
     fills: Vec<Trade>,
     rejections: Vec<IntentRejection>,
+    warmup_bars: u32,
+    bars_seen: u64,
+    last_bar_ts: Option<UnixNanos>,
+    suppressed: Vec<SuppressedIntent>,
 }
 
 impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
@@ -91,7 +115,33 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
             submitted: Vec::new(),
             fills: Vec::new(),
             rejections: Vec::new(),
+            warmup_bars: 0,
+            bars_seen: 0,
+            last_bar_ts: None,
+            suppressed: Vec::new(),
         }
+    }
+
+    /// Suppresses orders until `warmup_bars` driving bars have been seen.
+    #[must_use]
+    pub fn with_warmup_bars(mut self, warmup_bars: u32) -> Self {
+        self.warmup_bars = warmup_bars;
+        self
+    }
+
+    /// The number of warm-up bars this runner enforces.
+    pub fn warmup_bars(&self) -> u32 {
+        self.warmup_bars
+    }
+
+    /// True while orders are suppressed: at most `warmup_bars` driving bars seen.
+    pub fn warming_up(&self) -> bool {
+        self.warmup_bars > 0 && self.bars_seen <= u64::from(self.warmup_bars)
+    }
+
+    /// Returns every intent the warm-up gate released, in order.
+    pub fn suppressed(&self) -> &[SuppressedIntent] {
+        &self.suppressed
     }
 
     /// Returns the strategy's context (clock, positions, cash).
@@ -153,6 +203,12 @@ impl<S: Strategy, E: ExecutionEngine> Handler for StrategyRunner<S, E> {
         event: &Event,
         ts_init: UnixNanos,
     ) -> Result<honba_engine::EngineOutput> {
+        // A new driving bar advances the warm-up count.
+        if matches!(event, Event::Bar(_)) && self.last_bar_ts != Some(ts_init) {
+            self.bars_seen += 1;
+            self.last_bar_ts = Some(ts_init);
+        }
+
         // 1. Set the clock and dispatch to the strategy.
         self.adapter.on_event(event, ts_init)?;
 
@@ -168,6 +224,11 @@ impl<S: Strategy, E: ExecutionEngine> Handler for StrategyRunner<S, E> {
                     error,
                     ts_init,
                 });
+                continue;
+            }
+            if self.warming_up() {
+                self.adapter.parts_mut().1.release(&intent);
+                self.suppressed.push(SuppressedIntent { ts_init, intent });
                 continue;
             }
             let id = self.next_order_id();

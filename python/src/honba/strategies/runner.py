@@ -12,6 +12,14 @@ Per event ``(event, ts_init)`` (ADR 008, decision 5):
 
 Intents submitted in ``on_stop`` are never executed.
 
+Warm-up gate (``StrategyManifest.warmup_bars``): a *driving bar* is a ``Bar`` event whose
+``ts_init`` differs from the previous ``Bar`` event's (bars of several instruments at one
+time are one driving bar). While at most ``warmup_bars`` driving bars have been seen (and
+before the first one), the strategy still receives every event, but each valid intent is
+released in the context and recorded as a :class:`SuppressedIntent` instead of becoming an
+order; it consumes no order id. Invalid intents are rejected as usual. Vectors shared with
+Rust: ``schema/conformance/warmup_gate.json``.
+
 Logged event types mirror ``honba-messages::Event`` wire types exactly so that
 ``honba.log.EventFilter`` can filter them by wire name:
 
@@ -49,6 +57,7 @@ __all__ = [
     "RunResult",
     "StrategyRunner",
     "SubmittedIntent",
+    "SuppressedIntent",
 ]
 
 
@@ -59,6 +68,14 @@ class SubmittedIntent:
     ts_init: int
     intent: OrderIntent
     order_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class SuppressedIntent:
+    """A valid intent the warm-up gate released instead of sending, with its ``ts_init``."""
+
+    ts_init: int
+    intent: OrderIntent
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +95,8 @@ class RunResult:
     ctx: LedgerContext = field(default_factory=LedgerContext)
     # Orders (or parts of them) the port rejected or cancelled, released in ``ctx``.
     order_rejections: list[OrderRejection] = field(default_factory=list)
+    # Intents the warm-up gate released instead of sending.
+    suppressed: list[SuppressedIntent] = field(default_factory=list)
 
 
 def _overrides(strategy: Strategy, method: str) -> bool:
@@ -85,14 +104,28 @@ def _overrides(strategy: Strategy, method: str) -> bool:
 
 
 class StrategyRunner:
-    """Binds ``ctx`` (a fresh ``LedgerContext`` by default) to ``strategy`` and runs it."""
+    """Binds ``ctx`` (a fresh ``LedgerContext`` by default) to ``strategy`` and runs it.
+
+    ``warmup_bars`` defaults to the strategy's ``warmup_bars`` class attribute (0).
+    """
 
     def __init__(
         self,
         strategy: Strategy,
         execution: ExecutionPort,
         ctx: LedgerContext | None = None,
+        *,
+        warmup_bars: int | None = None,
     ) -> None:
+        if warmup_bars is None:
+            warmup_bars = getattr(strategy, "warmup_bars", 0)
+        if isinstance(warmup_bars, bool) or not isinstance(warmup_bars, int):
+            raise TypeError(f"warmup_bars must be an int, got {warmup_bars!r}")
+        if warmup_bars < 0:
+            raise ValueError(f"warmup_bars must be >= 0, got {warmup_bars}")
+        self.warmup_bars = warmup_bars
+        self._bars_seen = 0
+        self._last_bar_ts: int | None = None
         self.strategy = strategy
         self.execution = execution
         self.ctx = ctx if ctx is not None else LedgerContext()
@@ -105,12 +138,21 @@ class StrategyRunner:
         self.fills: list[Trade] = []
         self.rejections: list[IntentRejection] = []
         self.order_rejections: list[OrderRejection] = []
+        self.suppressed: list[SuppressedIntent] = []
 
     def start(self) -> None:
         self.strategy.on_start()
 
+    @property
+    def warming_up(self) -> bool:
+        """True while orders are suppressed: at most ``warmup_bars`` driving bars seen."""
+        return self.warmup_bars > 0 and self._bars_seen <= self.warmup_bars
+
     def on_event(self, event: Any, ts_init: int) -> None:
         self.ctx.set_now(ts_init)
+        if isinstance(event, Bar) and ts_init != self._last_bar_ts:
+            self._bars_seen += 1
+            self._last_bar_ts = ts_init
         if isinstance(event, Bar):
             self.strategy.on_bar(event)
         elif isinstance(event, QuoteTick):
@@ -154,6 +196,7 @@ class StrategyRunner:
             self.rejections,
             self.ctx,
             order_rejections=self.order_rejections,
+            suppressed=self.suppressed,
         )
 
     def _drain(self) -> list[OrderIntent]:
@@ -186,6 +229,17 @@ class StrategyRunner:
                     },
                 )
                 self._release(intent)
+                continue
+
+            if self.warming_up:
+                self.ctx.release(intent)
+                self.suppressed.append(SuppressedIntent(ts_init, intent))
+                self.logger.debug(
+                    "warmup: suppressed symbol=%s side=%s qty=%s",
+                    intent.instrument_id.symbol,
+                    intent.side.name,
+                    intent.quantity,
+                )
                 continue
 
             order_id = f"{self.strategy.name}-{self._seq}"
