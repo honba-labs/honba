@@ -14,12 +14,11 @@ name = "honba_codegen"
 honba-messages.workspace = true
 honba-entities.workspace = true
 honba-strategy.workspace = true
+honba-api.workspace = true
+honba-config.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 schemars = { version = "0.8", features = ["derive"] }
 anyhow = { workspace = true }
-toml = { workspace = true }
-itertools = "0.13"
-indexmap = "2"
 
 [dev-dependencies]
