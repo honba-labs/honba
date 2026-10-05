@@ -26,14 +26,16 @@ from honba.screener.ports import validate_bar
 
 logger = logging.getLogger(__name__)
 
-BAR_SCHEMA = pa.schema([
-    ("ts", pa.int64()),
-    ("open", pa.float64()),
-    ("high", pa.float64()),
-    ("low", pa.float64()),
-    ("close", pa.float64()),
-    ("volume", pa.float64()),
-])
+BAR_SCHEMA = pa.schema(
+    [
+        ("ts", pa.int64()),
+        ("open", pa.float64()),
+        ("high", pa.float64()),
+        ("low", pa.float64()),
+        ("close", pa.float64()),
+        ("volume", pa.float64()),
+    ]
+)
 
 
 def find_data_root(start_path: Path | None = None) -> Path:
@@ -46,7 +48,11 @@ def find_data_root(start_path: Path | None = None) -> Path:
         # Check if this directory is the repo root containing 'data' or 'honba/data'
         if (p / "honba" / "data").is_dir():
             return (p / "honba" / "data").resolve()
-        if (p / "data").is_dir() and ((p / "crates").is_dir() or (p / "Cargo.toml").is_file() or (p / "pyproject.toml").is_file()):
+        if (p / "data").is_dir() and (
+            (p / "crates").is_dir()
+            or (p / "Cargo.toml").is_file()
+            or (p / "pyproject.toml").is_file()
+        ):
             return (p / "data").resolve()
 
     fallback = cur / "data"
@@ -68,7 +74,7 @@ class ParquetBarStore:
             return {}
         try:
             return json.loads(self.ledger_file.read_text(encoding="utf-8"))
-        except Exception as exc:
+        except (json.JSONDecodeError, OSError) as exc:
             logger.warning("Could not read ledger %s: %s", self.ledger_file, exc)
             return {}
 
@@ -79,14 +85,14 @@ class ParquetBarStore:
         tmp_file.replace(self.ledger_file)
 
     def coverage(self, instrument: InstrumentId, timeframe: str) -> list[CoverageRecord]:
-        key = f"{instrument.exchange}:{instrument.symbol}:{timeframe.upper()}"
+        key = f"{instrument.exchange.upper()}:{instrument.symbol.upper()}:{timeframe.upper()}"
         ledger = self._load_ledger()
         raw_records = ledger.get(key, [])
         records: list[CoverageRecord] = []
         for r in raw_records:
             records.append(
                 CoverageRecord(
-                    exchange=r["exchange"],
+                    exchange=r.get("exchange"),
                     symbol=r["symbol"],
                     timeframe=r["timeframe"],
                     interval=DateInterval(
@@ -111,12 +117,14 @@ class ParquetBarStore:
             / f"{year}.parquet"
         )
 
-    def read(
-        self, instrument: InstrumentId, timeframe: str, interval: DateInterval
-    ) -> list[Bar]:
+    def read(self, instrument: InstrumentId, timeframe: str, interval: DateInterval) -> list[Bar]:
         """Read and deduplicate bars from year-partitioned parquet files."""
         start_year = interval.start.year
-        end_year = (interval.end - dt.timedelta(days=1)).year if interval.end > interval.start else interval.start.year
+        end_year = (
+            (interval.end - dt.timedelta(days=1)).year
+            if interval.end > interval.start
+            else interval.start.year
+        )
 
         start_ns = int(dt.datetime.combine(interval.start, dt.time.min).timestamp() * 1e9)
         end_ns = int(dt.datetime.combine(interval.end, dt.time.min).timestamp() * 1e9)
@@ -147,7 +155,7 @@ class ParquetBarStore:
                             close=float(cl),
                             volume=float(vo),
                         )
-            except Exception as exc:
+            except (OSError, pa.ArrowException) as exc:
                 logger.error("Error reading %s: %s", fpath, exc)
 
         return [bars_by_ts[t] for t in sorted(bars_by_ts.keys())]
@@ -190,7 +198,7 @@ class ParquetBarStore:
                             close=float(cl),
                             volume=float(vo),
                         )
-                except Exception as exc:
+                except (OSError, pa.ArrowException) as exc:
                     logger.warning("Could not read existing parquet %s: %s", fpath, exc)
 
             for b in year_bars:
@@ -214,7 +222,7 @@ class ParquetBarStore:
             tmp_path.replace(fpath)
 
         # Update ledger and merge contiguous/overlapping intervals
-        key = f"{inst.exchange}:{inst.symbol}:{tf}"
+        key = f"{inst.exchange.upper()}:{inst.symbol.upper()}:{tf}"
         ledger = self._load_ledger()
         records_list = ledger.setdefault(key, [])
         records_list.append(
@@ -257,7 +265,9 @@ class ParquetBarStore:
                 if cur_end > prev_end:
                     prev["end"] = cur["end"]
                 prev["row_count"] = prev.get("row_count", 0) + cur.get("row_count", 0)
-                prev["fetched_at_ns"] = max(prev.get("fetched_at_ns", 0), cur.get("fetched_at_ns", 0))
+                prev["fetched_at_ns"] = max(
+                    prev.get("fetched_at_ns", 0), cur.get("fetched_at_ns", 0)
+                )
             else:
                 merged.append(cur.copy())
 
