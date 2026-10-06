@@ -17,11 +17,11 @@ use axum::{
     Router,
 };
 use honba_api::{
-    ApiResponse, BacktestRequest, Capabilities, CapabilitiesResponse, ErrorCode, ErrorDetail,
-    OrdersRequest, ResponseEnvelope, StrategiesRequest, SweepRequest, VerifyStrategyRequest,
-    VerifyStrategyResponse,
+    ApiResponse, BacktestRequest, Capabilities, CapabilitiesResponse, CompiledStrategy, ErrorCode,
+    ErrorDetail, OrdersRequest, ResponseEnvelope, StrategiesResponse, SweepRequest,
+    VerifyStrategyRequest, VerifyStrategyResponse,
 };
-use std::sync::Arc;
+use std::sync::{Arc, PoisonError};
 use tower_http::{
     compression::CompressionLayer,
     cors::{AllowOrigin, CorsLayer},
@@ -189,8 +189,6 @@ pub async fn serve_with_config(
 /// Remove a row when its handler is built; `tests/capabilities.rs` probes the router and fails
 /// if this list and the real answers disagree.
 pub const NOT_IMPLEMENTED_ENDPOINTS: &[(&str, &str)] = &[
-    ("POST", "/strategies"),
-    ("GET", "/strategies"),
     ("POST", "/backtests"),
     ("GET", "/backtests/{id}"),
     ("GET", "/backtests/{id}/journal"),
@@ -266,12 +264,39 @@ fn not_implemented(what: &str) -> (StatusCode, Json<ResponseEnvelope<serde_json:
 
 type NotImplemented = (StatusCode, Json<ResponseEnvelope<serde_json::Value>>);
 
-async fn get_strategies() -> NotImplemented {
-    not_implemented("listing strategies")
+/// Lists the strategies compiled in this process, ordered by id.
+async fn get_strategies(
+    State(state): State<Arc<AppState>>,
+) -> Json<ResponseEnvelope<StrategiesResponse>> {
+    let catalog = state
+        .strategies
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+    Json(ApiResponse::success(honba_api::list_strategies(&catalog)))
 }
 
-async fn post_strategies(ApiJson(_req): ApiJson<StrategiesRequest>) -> NotImplemented {
-    not_implemented("compiling a strategy from source")
+/// Compiles a manifest (the same step as verify) and keeps it in the session catalog.
+///
+/// The body is read as raw JSON first so a `code`/`source` field gets its own 422 reason; a
+/// manifest that does not verify, or a full catalog, is a 422 carrying the reason code.
+async fn post_strategies(
+    State(state): State<Arc<AppState>>,
+    ApiJson(body): ApiJson<serde_json::Value>,
+) -> (StatusCode, Json<ResponseEnvelope<CompiledStrategy>>) {
+    let compiled = honba_api::parse_compile_request(body).and_then(|req| {
+        let mut catalog = state
+            .strategies
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        honba_api::compile_strategy(&mut catalog, req.manifest)
+    });
+    match compiled {
+        Ok(strategy) => (StatusCode::OK, Json(ApiResponse::success(strategy))),
+        Err(detail) => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(ApiResponse::error(detail)),
+        ),
+    }
 }
 
 /// Verifies a manifest and returns its IR; a manifest that does not verify is

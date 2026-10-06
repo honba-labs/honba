@@ -6,8 +6,9 @@
 
 use std::fmt;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
+use honba_api::StrategyCatalog;
 use honba_data::{DatasetReader, ReaderError};
 use honba_ports::{BarReader, DepthReader, InstrumentMaster, QuoteReader};
 
@@ -22,6 +23,12 @@ pub struct AppState {
     pub quotes: Arc<dyn QuoteReader>,
     /// Order-book depth.
     pub depth: Arc<dyn DepthReader>,
+    /// Strategies compiled by `POST /strategies` in this process.
+    ///
+    /// Session-scoped and in memory: it is a plain pure value from `honba-api`, not a port,
+    /// because it holds no external resource and nothing else implements it. Clones of the
+    /// state share it.
+    pub strategies: Arc<Mutex<StrategyCatalog>>,
 }
 
 impl AppState {
@@ -37,7 +44,14 @@ impl AppState {
             bars,
             quotes,
             depth,
+            strategies: Arc::default(),
         }
+    }
+
+    /// Replaces the strategy catalog (for a non-default capacity).
+    pub fn with_strategy_catalog(mut self, catalog: StrategyCatalog) -> Self {
+        self.strategies = Arc::new(Mutex::new(catalog));
+        self
     }
 
     /// Creates state serving every port from one [`DatasetReader`].

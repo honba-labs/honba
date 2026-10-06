@@ -101,3 +101,18 @@ async fn a_reader_state_serves_quotes_and_reports_no_depth_from_the_same_reader(
         Err(honba_ports::PortError::Unsupported(_))
     ));
 }
+
+#[test]
+fn cloned_states_share_one_strategy_catalog() {
+    let state = AppState::default();
+    let clone = state.clone();
+    assert!(std::sync::Arc::ptr_eq(&state.strategies, &clone.strategies));
+    assert!(state.strategies.lock().unwrap().is_empty());
+}
+
+#[test]
+fn the_strategy_catalog_capacity_can_be_replaced() {
+    let state =
+        AppState::default().with_strategy_catalog(honba_api::StrategyCatalog::with_limit(3));
+    assert_eq!(state.strategies.lock().unwrap().limit(), 3);
+}

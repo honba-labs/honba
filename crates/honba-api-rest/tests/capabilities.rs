@@ -67,3 +67,13 @@ async fn the_not_implemented_flags_match_what_the_router_answers() {
         .collect();
     assert_eq!(flagged, constant);
 }
+
+#[test]
+fn the_strategy_routes_are_built() {
+    for route in [("POST", "/strategies"), ("GET", "/strategies")] {
+        assert!(
+            !NOT_IMPLEMENTED_ENDPOINTS.contains(&route),
+            "{route:?} is implemented and must not be flagged"
+        );
+    }
+}
