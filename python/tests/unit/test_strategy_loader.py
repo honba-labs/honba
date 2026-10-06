@@ -254,3 +254,42 @@ def test_sibling_modules_do_not_collide_between_strategies(tmp_path: Path) -> No
     _registry(root, {"strategies": entries})
     assert load_catalog_strategy("one", root).cls.value == 1
     assert load_catalog_strategy("two", root).cls.value == 2
+
+
+def _digest(catalog: Path) -> str:
+    return load_catalog_strategy("alpha", catalog).source_sha256
+
+
+def test_the_source_hash_covers_the_whole_strategy_directory(catalog: Path) -> None:
+    d = catalog / "momentum" / "trend" / "alpha"
+    before = _digest(catalog)
+    (d / "helpers.py").write_text("X = 1\n")
+    with_helper = _digest(catalog)
+    assert with_helper != before
+    (d / "helpers.py").write_text("X = 2\n")
+    assert _digest(catalog) != with_helper
+
+
+def test_the_source_hash_ignores_pycache_and_hidden_files(catalog: Path) -> None:
+    d = catalog / "momentum" / "trend" / "alpha"
+    before = _digest(catalog)
+    (d / "__pycache__").mkdir(exist_ok=True)
+    (d / "__pycache__" / "strategy.cpython-314.pyc").write_bytes(b"\x00\x01")
+    (d / ".DS_Store").write_bytes(b"junk")
+    (d / ".cache").mkdir()
+    (d / ".cache" / "x").write_text("x")
+    assert _digest(catalog) == before
+
+
+def test_the_source_hash_is_unambiguous_about_file_boundaries(tmp_path: Path) -> None:
+    def digest(files: dict[str, str]) -> str:
+        root = tmp_path / f"c{abs(hash(tuple(files.items())))}"
+        d = root / "s"
+        _strategy(d, "alpha", "Alpha")
+        for fname, text in files.items():
+            (d / fname).write_text(text)
+        _registry(root, {"strategies": [{"name": "alpha", "path": "s"}]})
+        return load_catalog_strategy("alpha", root).source_sha256
+
+    assert digest({"a.txt": "xy", "b.txt": "z"}) != digest({"a.txt": "x", "b.txt": "yz"})
+    assert digest({"a.txt": "x", "b.txt": "y"}) == digest({"b.txt": "y", "a.txt": "x"})

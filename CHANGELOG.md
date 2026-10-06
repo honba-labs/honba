@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Catalog loader and next-open simulator fixes
+
+- Breaking for provenance: `CatalogStrategy.source_sha256` now hashes the whole strategy directory
+  (sorted relative paths, length-prefixed names and contents; hidden files and `__pycache__` ignored)
+  instead of `strategy.py` + `config.toml` concatenated. All digest values change; re-record any
+  stored ones.
+- Loader: strategy modules are registered in `sys.modules` during import (dataclasses with
+  `from __future__ import annotations` load); registry paths must stay inside the catalog; hidden and
+  vendor dirs are not scanned; malformed registries raise `CatalogError`; `sys.path` is restored and
+  sibling modules imported from the strategy dir are dropped after load.
+- `NextOpenExecution`: `SessionOpen` keys need not be timestamps; unfundable buys wait only while sale
+  proceeds are unsettled; bars with a non-finite or non-positive open never fill; plain `Bar` mode raises
+  `ValueError` on non-monotonic or duplicate bars.
+
 ### Rust order-rejection queue (ADR 0008, decision 13)
 
 Non-breaking; closes the ADR 0008 known gap. No wire change.

@@ -53,7 +53,7 @@ class CatalogStrategy:
     cls: type[Strategy]
     config: StrategyConfig
     module: ModuleType
-    source_sha256: str  # sha256 of strategy.py + config.toml
+    source_sha256: str  # sha256 of the whole strategy directory (see _directory_sha256)
 
     def instantiate(self) -> Strategy:
         """Build the strategy: ``cls(config)`` if its constructor takes one, else ``cls()``."""
@@ -190,6 +190,28 @@ def _registry_entries(catalog: Path) -> dict[str, str]:
     return entries
 
 
+def _directory_sha256(root: Path) -> str:
+    """Deterministic digest of every file under ``root`` (run provenance).
+
+    Files are visited in sorted relative-path order; each contributes its length-prefixed
+    POSIX relative path and length-prefixed bytes, so file boundaries cannot be confused.
+    Hidden files and directories and ``__pycache__`` are ignored.
+    """
+    digest = hashlib.sha256()
+    files = sorted(
+        (p.relative_to(root) for p in root.rglob("*") if p.is_file()),
+        key=lambda r: r.as_posix(),
+    )
+    for rel in files:
+        if any(part.startswith(".") or part == "__pycache__" for part in rel.parts):
+            continue
+        name = rel.as_posix().encode()
+        data = (root / rel).read_bytes()
+        digest.update(len(name).to_bytes(8, "big") + name)
+        digest.update(len(data).to_bytes(8, "big") + data)
+    return digest.hexdigest()
+
+
 def _load_module_isolated(strategy_dir: Path, catalog: Path, module_name: str) -> ModuleType:
     """Import ``strategy.py`` with its directory chain on ``sys.path``, then undo the leaks.
 
@@ -243,14 +265,11 @@ def load_catalog_strategy(name: str, catalog: str | Path) -> CatalogStrategy:
         cls = classes[0]
     else:
         raise CatalogError(f"{strategy_dir / 'strategy.py'}: expected one Strategy named {name!r}")
-    digest = hashlib.sha256()
-    for f in ("strategy.py", "config.toml"):
-        digest.update((strategy_dir / f).read_bytes())
     return CatalogStrategy(
         name=name,
         path=strategy_dir,
         cls=cls,
         config=StrategyConfig.from_toml(strategy_dir / "config.toml"),
         module=module,
-        source_sha256=digest.hexdigest(),
+        source_sha256=_directory_sha256(strategy_dir),
     )
