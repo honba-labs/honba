@@ -23,6 +23,7 @@ fn response_type_for(method: &str, path: &str) -> Option<&'static str> {
         ("GET", "/depth/{id}") => "DepthResponse",
         ("POST", "/strategies") => "StrategiesResponse",
         ("GET", "/strategies") => "StrategiesResponse",
+        ("POST", "/strategies/verify") => "StrategyIr",
         ("POST", "/backtests") => "BacktestResponse",
         ("GET", "/backtests/{id}") => "BacktestResponse",
         ("GET", "/backtests/{id}/journal") => "TradesResponse",
@@ -42,6 +43,7 @@ fn response_type_for(method: &str, path: &str) -> Option<&'static str> {
 fn request_type_for(method: &str, path: &str) -> Option<&'static str> {
     Some(match (method, path) {
         ("POST", "/strategies") => "StrategiesRequest",
+        ("POST", "/strategies/verify") => "StrategyManifest",
         ("POST", "/backtests") => "BacktestRequest",
         ("POST", "/sweeps") => "SweepRequest",
         ("POST", "/orders") => "OrdersRequest",
@@ -84,8 +86,9 @@ fn operation(set: &SchemaSet, method: &str, path: &'static str) -> Value {
             "schema": {"type": "string"},
         }));
     }
-    if let Some(query) = request_type_for(method, path) {
-        if method != HttpMethod::Delete.as_str() {
+    // Only a GET reads its DTO from the query string; a POST's DTO is the body.
+    if method == HttpMethod::Get.as_str() {
+        if let Some(query) = request_type_for(method, path) {
             params.extend(query_params(set, query));
         }
     }

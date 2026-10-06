@@ -141,6 +141,15 @@ class InstrumentsQuery:
 class InstrumentsResponse:
     instruments: list[Any]
 
+class IrSubscriptions:
+    bars: list[InstrumentId]
+    quotes: list[InstrumentId]
+    trades: list[InstrumentId]
+
+class IrUniverse:
+    instruments: list[InstrumentId]
+    named: str | None = None
+
 class Message:
     event: Event
     schema_version: int
@@ -304,6 +313,16 @@ class StrategiesRequest:
 
 class StrategiesResponse:
     strategies: list[Any]
+
+class StrategyIr:
+    driving_timeframe: TimeframeSpec
+    manifest: StrategyManifest
+    schema_version: int
+    strategy_api_version: str
+    subscriptions: IrSubscriptions
+    timeframes: list[TimeframeSpec]
+    universe: IrUniverse
+    warmup_bars: int
 
 class StrategyManifest:
     api_version: str

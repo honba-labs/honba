@@ -66,12 +66,15 @@ pub const API_TYPES: &[&str] = &[
 /// The run-configuration types (plan.md E0-S4).
 pub const CONFIG_TYPES: &[&str] = &["BacktestRunConfig"];
 
-/// The strategy manifest types (plan.md E0-S8).
+/// The strategy manifest and verified IR types (plan.md E0-S8).
 pub const MANIFEST_TYPES: &[&str] = &[
     "StrategyManifest",
     "Universe",
     "Subscriptions",
     "TimeframeSpec",
+    "StrategyIr",
+    "IrUniverse",
+    "IrSubscriptions",
 ];
 
 /// Every type name the contract publishes, in a stable order.
@@ -139,6 +142,9 @@ pub fn register_all(set: &mut SchemaSet) {
     set.add_type::<honba_strategy::Universe>("Universe");
     set.add_type::<honba_strategy::Subscriptions>("Subscriptions");
     set.add_type::<honba_strategy::TimeframeSpec>("TimeframeSpec");
+    set.add_type::<honba_strategy::StrategyIr>("StrategyIr");
+    set.add_type::<honba_strategy::IrUniverse>("IrUniverse");
+    set.add_type::<honba_strategy::IrSubscriptions>("IrSubscriptions");
 
     set.add_type::<honba_config::BacktestRunConfig>("BacktestRunConfig");
 }

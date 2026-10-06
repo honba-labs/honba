@@ -123,3 +123,11 @@ fn http_methods_serialize_uppercase_for_openapi() {
     );
     assert_eq!(HttpMethod::Delete.as_str(), "DELETE");
 }
+
+#[test]
+fn strategy_verification_is_registered_and_not_gated() {
+    // Verifying compiles a manifest and moves no money, so it must never land
+    // behind the approval queue.
+    assert!(ENDPOINTS.contains(&("POST", "/strategies/verify")));
+    assert!(!write_endpoints().contains(&"POST /strategies/verify".to_string()));
+}

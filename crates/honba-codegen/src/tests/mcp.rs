@@ -197,3 +197,20 @@ fn the_document_has_no_detached_definitions_block() {
     let rendered = render(&full());
     assert!(rendered.get("definitions").is_none());
 }
+
+#[test]
+fn verify_strategy_drives_the_dedicated_read_only_endpoint() {
+    let tool = TOOLS.iter().find(|t| t.name == "verify_strategy").unwrap();
+    assert_eq!(tool.endpoint, ("POST", "/strategies/verify"));
+    let rendered = render(&full());
+    let tools = rendered["tools"].as_array().unwrap();
+    let verify = tools
+        .iter()
+        .find(|t| t["name"] == "verify_strategy")
+        .unwrap();
+    assert_eq!(verify["annotations"]["readOnlyHint"], json!(true));
+    assert_eq!(
+        verify["inputSchema"]["required"],
+        json!(["strategy_manifest"])
+    );
+}

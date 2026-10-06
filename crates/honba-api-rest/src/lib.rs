@@ -18,7 +18,8 @@ use honba_api::{
     ApiResponse, BacktestRequest, BacktestResponse, BarsQuery, BarsResponse, Capabilities,
     CapabilitiesResponse, ErrorCode, ErrorDetail, InstrumentsQuery, InstrumentsResponse,
     OrdersRequest, OrdersResponse, QuotesQuery, QuotesResponse, ResponseEnvelope, RunStatus,
-    StrategiesRequest, StrategiesResponse, SweepRequest, SweepResponse,
+    StrategiesRequest, StrategiesResponse, SweepRequest, SweepResponse, VerifyStrategyRequest,
+    VerifyStrategyResponse,
 };
 use std::sync::Arc;
 use tower_http::{compression::CompressionLayer, cors::CorsLayer, trace::TraceLayer};
@@ -42,6 +43,7 @@ pub fn api_router() -> Router {
         .route("/bars/:id", get(get_bars))
         .route("/depth/:id", get(get_depth))
         .route("/strategies", post(post_strategies).get(get_strategies))
+        .route("/strategies/verify", post(post_verify_strategy))
         .route("/backtests", post(post_backtests))
         .route("/backtests/:id", get(get_backtest_by_id))
         .route("/backtests/:id/journal", get(get_backtest_journal))
@@ -151,6 +153,20 @@ async fn post_strategies(
     Json(ApiResponse::success(StrategiesResponse {
         strategies: vec![],
     }))
+}
+
+/// Verifies a manifest and returns its IR; a manifest that does not verify is
+/// a 422 carrying `validation_invalid_request` and the reason code.
+async fn post_verify_strategy(
+    Json(manifest): Json<VerifyStrategyRequest>,
+) -> (StatusCode, Json<ResponseEnvelope<VerifyStrategyResponse>>) {
+    match honba_api::verify_strategy(manifest) {
+        Ok(ir) => (StatusCode::OK, Json(ApiResponse::success(ir))),
+        Err(detail) => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(ApiResponse::error(detail)),
+        ),
+    }
 }
 
 async fn post_backtests(

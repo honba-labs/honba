@@ -159,3 +159,31 @@ fn query_parameters_come_from_the_dto() {
     assert!(names.contains(&"from"), "{names:?}");
     assert!(names.contains(&"to"), "{names:?}");
 }
+
+#[test]
+fn strategy_verification_takes_a_manifest_and_returns_the_ir_read_only() {
+    let paths = paths();
+    let op = &paths["/strategies/verify"]["post"];
+    assert_eq!(
+        op["requestBody"]["content"]["application/json"]["schema"]["$ref"],
+        json!("#/components/schemas/StrategyManifest")
+    );
+    assert_eq!(
+        op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+        json!("#/components/schemas/StrategyIr")
+    );
+    assert_eq!(op["x-honba-access"], json!("read_only"));
+}
+
+#[test]
+fn a_post_body_is_not_also_published_as_query_parameters() {
+    // The body DTO travels in the request body; echoing its optional fields
+    // as query parameters advertises inputs the server never reads.
+    let paths = paths();
+    for path in ["/strategies/verify", "/backtests", "/sweeps", "/orders"] {
+        assert!(
+            paths[path]["post"].get("parameters").is_none(),
+            "POST {path} lists body fields as query parameters"
+        );
+    }
+}

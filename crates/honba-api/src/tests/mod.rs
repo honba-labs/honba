@@ -81,3 +81,4 @@ fn api_error_codes_reach_callers_through_the_re_export() {
 }
 
 mod unknown_fields;
+mod verify;

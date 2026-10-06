@@ -161,6 +161,7 @@ pub const ENDPOINTS: &[(&str, &str)] = &[
     ("GET", "/depth/{id}"),
     ("POST", "/strategies"),
     ("GET", "/strategies"),
+    ("POST", "/strategies/verify"),
     ("POST", "/backtests"),
     ("GET", "/backtests/{id}"),
     ("GET", "/backtests/{id}/journal"),
@@ -187,8 +188,8 @@ pub fn write_endpoints() -> Vec<String> {
 
 /// Endpoints that mutate state and therefore require gating (plan.md §4.3).
 ///
-/// `POST /strategies` compiles rather than trades, so it is not gated; the
-/// order and position routes are.
+/// `POST /strategies` and `POST /strategies/verify` compile rather than trade,
+/// so they are not gated; the order and position routes are.
 pub const WRITE_PATHS: &[(&str, &str)] = &[
     ("POST", "/orders"),
     ("DELETE", "/orders/{id}"),

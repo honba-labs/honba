@@ -16,6 +16,7 @@
 pub mod capabilities;
 pub mod requests;
 pub mod responses;
+pub mod verify;
 
 pub use capabilities::{Capabilities, CapabilityManifest};
 pub use honba_messages::{
@@ -32,6 +33,7 @@ pub use responses::{
     QuotesResponse, RunStatus, StrategiesResponse, SweepReportResponse, SweepResponse, SweepStatus,
     TradesResponse,
 };
+pub use verify::{verify_strategy, VerifyStrategyRequest, VerifyStrategyResponse};
 
 #[cfg(test)]
 mod tests;

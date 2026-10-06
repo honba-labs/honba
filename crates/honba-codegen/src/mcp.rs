@@ -77,13 +77,13 @@ pub(crate) const TOOLS: &[Tool] = &[
     },
     Tool {
         name: "verify_strategy",
-        description: "Verify strategy source and compile it to a runnable manifest.",
-        endpoint: ("POST", "/strategies"),
+        description: "Verify a strategy manifest and compile it to the runnable StrategyIr.",
+        endpoint: ("POST", "/strategies/verify"),
         args: &[(
-            "request",
-            "StrategiesRequest",
+            "strategy_manifest",
+            "StrategyManifest",
             true,
-            "Strategy name and source to verify.",
+            "The strategy manifest to verify; the response is its compiled StrategyIr.",
         )],
     },
     Tool {

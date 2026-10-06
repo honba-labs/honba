@@ -1489,6 +1489,61 @@
       ],
       "type": "object"
     },
+    "IrSubscriptions": {
+      "description": "Subscriptions after resolution: one sorted instrument list per channel.",
+      "properties": {
+        "bars": {
+          "description": "Instruments whose bars (on the driving timeframe) are delivered.",
+          "items": {
+            "$ref": "#/$defs/InstrumentId"
+          },
+          "type": "array"
+        },
+        "quotes": {
+          "description": "Instruments whose top-of-book quotes are delivered.",
+          "items": {
+            "$ref": "#/$defs/InstrumentId"
+          },
+          "type": "array"
+        },
+        "trades": {
+          "description": "Instruments whose trade prints are delivered.",
+          "items": {
+            "$ref": "#/$defs/InstrumentId"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "bars",
+        "quotes",
+        "trades"
+      ],
+      "type": "object"
+    },
+    "IrUniverse": {
+      "description": "The universe after resolution.",
+      "properties": {
+        "instruments": {
+          "description": "The instruments it resolved to, sorted and de-duplicated.",
+          "items": {
+            "$ref": "#/$defs/InstrumentId"
+          },
+          "type": "array"
+        },
+        "named": {
+          "description": "The universe's name when the manifest named one (e.g. `NIFTY50`).",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "instruments"
+      ],
+      "type": "object"
+    },
     "Message": {
       "description": "The envelope that carries an [`Event`] plus Honba-side metadata.\n\nThis is the versioned unit of the wire contract: its JSON form is `{\"schema_version\": 3, \"event\": {...}, \"ts_init\": {...}}`, and deserializing a message with any other `schema_version` fails. Unknown fields, in the envelope or the event, are ignored (ADR 0012 rule 1): a newer producer's additive fields never break this reader, while a reshaped wire bumps the version and is rejected.\n\n``` use honba_messages::{Event, Message, UnixNanos, QuoteTick, InstrumentId, Exchange};\n\nlet quote = QuoteTick::new( InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), 22_000.0, 22_001.0, 50.0, 75.0, UnixNanos::from_u64(1), UnixNanos::from_u64(1), ); let msg = Message::new(Event::Quote(quote), UnixNanos::from_u64(2)); assert!(msg.event().is_market_data()); assert_eq!(msg.schema_version(), honba_messages::SCHEMA_VERSION); ```",
       "properties": {
@@ -2669,6 +2724,77 @@
       },
       "required": [
         "strategies"
+      ],
+      "type": "object"
+    },
+    "StrategyIr": {
+      "description": "A verified strategy, ready to run: the manifest plus everything resolved from it.",
+      "properties": {
+        "driving_timeframe": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/TimeframeSpec"
+            }
+          ],
+          "description": "The bar timeframe that drives the strategy's clock."
+        },
+        "manifest": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/StrategyManifest"
+            }
+          ],
+          "description": "The manifest exactly as verified."
+        },
+        "schema_version": {
+          "description": "Wire version of this document; readers reject any other value.",
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "strategy_api_version": {
+          "description": "Strategy contract version the manifest was compiled against.",
+          "type": "string"
+        },
+        "subscriptions": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/IrSubscriptions"
+            }
+          ],
+          "description": "What is fed to the strategy, per channel."
+        },
+        "timeframes": {
+          "description": "Every bar timeframe the run must load, driving timeframe first.",
+          "items": {
+            "$ref": "#/$defs/TimeframeSpec"
+          },
+          "type": "array"
+        },
+        "universe": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/IrUniverse"
+            }
+          ],
+          "description": "The concrete instrument set the strategy may trade."
+        },
+        "warmup_bars": {
+          "description": "Driving bars consumed before the first decision (the manifest's `warmup_bars`, same name in Rust and Python).",
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "driving_timeframe",
+        "manifest",
+        "schema_version",
+        "strategy_api_version",
+        "subscriptions",
+        "timeframes",
+        "universe",
+        "warmup_bars"
       ],
       "type": "object"
     },
