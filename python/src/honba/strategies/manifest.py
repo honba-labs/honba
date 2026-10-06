@@ -20,13 +20,13 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, model_validator
 
-from honba import _honba as _native
+from honba._native import native_attr
 from honba.entities.instrument import InstrumentId
 from honba.wire.wire import BarAggregation
 from honba.wire.wire import InstrumentId as WireInstrumentId
 
 __all__ = [
-    "STRATEGY_API_VERSION",
+    "STRATEGY_API_VERSION",  # noqa: F822 - lazy, see __getattr__
     "ManifestError",
     "StrategyManifest",
     "Subscriptions",
@@ -35,8 +35,13 @@ __all__ = [
     "WarmupBars",
 ]
 
-STRATEGY_API_VERSION: str = _native.STRATEGY_API_VERSION
-"""Strategy contract version, read from its one owner ``honba_strategy::STRATEGY_API_VERSION``."""
+
+def __getattr__(name: str) -> Any:
+    """Lazy ``STRATEGY_API_VERSION`` from its one owner ``honba_strategy::STRATEGY_API_VERSION``."""
+    if name == "STRATEGY_API_VERSION":
+        return native_attr(name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 _U32_MAX = 2**32 - 1
 
@@ -133,7 +138,7 @@ class StrategyManifest(_Strict):
     ) -> StrategyManifest:
         """Start a manifest stamped with the current contract version (Rust ``new`` + ``with_*``)."""
         return cls(
-            api_version=STRATEGY_API_VERSION,
+            api_version=native_attr("STRATEGY_API_VERSION"),
             name=name,
             source_hash=source_hash,
             universe=universe,
@@ -155,7 +160,7 @@ class StrategyManifest(_Strict):
             raise ManifestError("empty_name", "strategy name must not be empty")
         if not self.source_hash.strip():
             raise ManifestError("empty_source_hash", "source_hash must not be empty")
-        if self.api_version != STRATEGY_API_VERSION:
+        if self.api_version != native_attr("STRATEGY_API_VERSION"):
             raise ManifestError(
                 "unsupported_api_version",
                 f"unsupported strategy api_version: {self.api_version}",

@@ -24,7 +24,7 @@ from pydantic import (
     model_validator,
 )
 
-from honba import _honba as _native
+from honba._native import native_attr
 from honba.domain import instrument as _instrument
 from honba.domain import money as _money
 from honba.domain import order as _order
@@ -33,11 +33,18 @@ from honba.domain.tick import AggressorSide
 from honba.wire.base import Str, _canonical, _Command, _Wire
 from honba.wire.screener import ScreenerFilterPredicate
 
-SCHEMA_VERSION: Final[int] = _native.SCHEMA_VERSION
-"""Wire-contract version, read from its one owner ``honba_messages::SCHEMA_VERSION`` (ADR 0012)."""
 
-API_VERSION: Final[str] = _native.API_VERSION
-"""API surface version, read from its one owner ``honba_messages::API_VERSION`` (ADR 0012)."""
+def __getattr__(name: str) -> Any:
+    """Lazy ``SCHEMA_VERSION`` / ``API_VERSION``, read from their one owner in Rust (ADR 0012).
+
+    ``SCHEMA_VERSION`` is ``honba_messages::SCHEMA_VERSION`` (wire-contract version) and
+    ``API_VERSION`` is ``honba_messages::API_VERSION``. Resolved on first access so that
+    importing this module does not need the compiled extension.
+    """
+    if name in ("SCHEMA_VERSION", "API_VERSION"):
+        return native_attr(name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 _U64_MAX = 2**64 - 1
 
@@ -410,17 +417,21 @@ class Message(_Wire):
 
     @model_validator(mode="after")
     def _check_version(self) -> Message:
-        if self.schema_version != SCHEMA_VERSION:
+        if self.schema_version != native_attr("SCHEMA_VERSION"):
             raise ValueError(
                 f"unsupported schema_version {self.schema_version}; "
-                f"this build reads {SCHEMA_VERSION}"
+                f"this build reads {native_attr('SCHEMA_VERSION')}"
             )
         return self
 
     @classmethod
     def wrap(cls, event: Any, ts_init: int) -> Message:
         """Wrap an event in an envelope stamped with the current schema version."""
-        return cls(schema_version=SCHEMA_VERSION, event=event, ts_init=UnixNanos.from_ns(ts_init))
+        return cls(
+            schema_version=native_attr("SCHEMA_VERSION"),
+            event=event,
+            ts_init=UnixNanos.from_ns(ts_init),
+        )
 
 
 MODELS: Final[dict[str, Any]] = {

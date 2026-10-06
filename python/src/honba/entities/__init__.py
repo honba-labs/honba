@@ -5,6 +5,8 @@ Entities are split into:
 - honba.wire: Serialization and wire contracts (ADR 006)
 """
 
+from typing import Any
+
 from honba.domain import (
     AggressorSide,
     Bar,
@@ -33,7 +35,6 @@ from honba.domain import trade as trade
 from honba.wire import (
     ENUMS,
     MODELS,
-    SCHEMA_VERSION,
     BarAggregation,
     BarEvent,
     BarSpecification,
@@ -144,3 +145,10 @@ __all__ = [
     "trade",
     "wire",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    """Lazy native-backed constants (SCHEMA_VERSION): they need the compiled extension."""
+    if name in {"SCHEMA_VERSION"}:
+        return getattr(wire, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

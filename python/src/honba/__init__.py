@@ -5,6 +5,8 @@ Public API surface: domain entities, strategy interfaces, indicators, screener, 
 
 from __future__ import annotations
 
+from typing import Any
+
 __version__ = "0.1.0"
 
 # Public domain entities
@@ -80,7 +82,6 @@ from honba.utils.format import (
 from honba.wire import (
     ENUMS,
     MODELS,
-    SCHEMA_VERSION,
     MetricDefinition,
     MetricKeySpec,
     MetricPeriod,
@@ -164,3 +165,12 @@ __all__ = [
     "register_event",
     "setup_event_logging",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    """Lazy native-backed constants (SCHEMA_VERSION): they need the compiled extension."""
+    from honba.wire import wire as _wire_module
+
+    if name in {"SCHEMA_VERSION"}:
+        return getattr(_wire_module, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

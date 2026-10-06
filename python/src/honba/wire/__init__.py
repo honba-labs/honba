@@ -1,5 +1,8 @@
 """Wire models and serialization contracts (ADR 006)."""
 
+from typing import Any
+
+from honba.wire import wire as _wire_wire
 from honba.wire.base import Str, _canonical, _Wire
 from honba.wire.screener import (
     FilterOp,
@@ -18,10 +21,8 @@ from honba.wire.screener import (
     ValueType,
 )
 from honba.wire.wire import (
-    API_VERSION,
     ENUMS,
     MODELS,
-    SCHEMA_VERSION,
     Bar,
     BarAggregation,
     BarEvent,
@@ -107,3 +108,10 @@ __all__ = [
     "loads",
     "loads_many",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    """Lazy native-backed constants (API_VERSION, SCHEMA_VERSION): they need the compiled extension."""
+    if name in {"API_VERSION", "SCHEMA_VERSION"}:
+        return getattr(_wire_wire, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -17,12 +17,13 @@ Non-finite input and amounts outside ``i64`` are rejected with ``ValueError``.
 from __future__ import annotations
 
 import functools
-import importlib
 import math
 import warnings
 from dataclasses import dataclass
 from enum import Enum
 from typing import NamedTuple
+
+from honba._native import native_attr
 
 
 @functools.lru_cache(maxsize=1)
@@ -32,14 +33,7 @@ def _minor_units() -> dict[str, tuple[int, str, str]]:
     Loaded on first use so that importing this module (and ``import honba``) does not
     need the compiled extension.
     """
-    ext = importlib.import_module("honba._honba")
-    table = getattr(ext, "currency_minor_units", None)
-    if table is None:
-        raise RuntimeError(
-            "honba._honba has no currency_minor_units: the compiled extension is stale, "
-            "rebuild it (maturin develop)"
-        )
-    return dict(table())
+    return dict(native_attr("currency_minor_units")())
 
 
 class MinorUnit(NamedTuple):

@@ -15,12 +15,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from honba import _honba
+from honba._native import native_attr
 
 
 def export_artifact(kind: str, output_dir: Path) -> Path:
     """Write the artifact `kind` (see `_honba.codegen_artifacts()`) into `output_dir`."""
-    file_name, content = _honba.codegen_render(kind)
+    file_name, content = native_attr("codegen_render")(kind)
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / file_name
     path.write_text(content)

@@ -12,7 +12,7 @@ import json
 from collections.abc import Mapping
 from typing import Any
 
-from honba import _honba as _native
+from honba._native import native_attr
 from honba.strategies.manifest import StrategyManifest
 
 __all__ = ["VerifyError", "verify_manifest"]
@@ -36,7 +36,7 @@ def verify_manifest(manifest: StrategyManifest | Mapping[str, Any] | str) -> dic
     else:
         text = json.dumps(dict(manifest))
     try:
-        return json.loads(_native.verify_manifest(text))
+        return json.loads(native_attr("verify_manifest")(text))
     except ValueError as exc:
         code, _, message = str(exc).partition(": ")
         raise VerifyError(code, message) from None
