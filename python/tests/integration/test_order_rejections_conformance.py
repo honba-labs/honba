@@ -23,8 +23,9 @@ from honba.strategies.execution import BaseExecutionPort, OrderRejection
 from honba.strategies.runner import StrategyRunner
 
 DOC = json.loads(
-    (Path(__file__).resolve().parents[3] / "schema" / "conformance" / "order_rejections.json")
-    .read_text(encoding="utf-8")
+    (
+        Path(__file__).resolve().parents[3] / "schema" / "conformance" / "order_rejections.json"
+    ).read_text(encoding="utf-8")
 )
 PRICE = 10.0
 
@@ -85,7 +86,9 @@ class Venue(BaseExecutionPort):
         held = self.working.pop(order_id, None)
         if held is not None:
             intent, ts = held
-            self.rejections.append(OrderRejection(order_id, intent, "cancelled", ts, cancelled=True))
+            self.rejections.append(
+                OrderRejection(order_id, intent, "cancelled", ts, cancelled=True)
+            )
 
 
 @pytest.mark.parametrize("scenario", DOC["scenarios"], ids=lambda s: s["name"])
