@@ -57,6 +57,7 @@ from honba.backtest.simulated import (
     FillCostFn,
     FillModel,
     NextOpenExecution,
+    fill_costs_from_model,
     make_simulator,
     session_date,
 )
@@ -147,7 +148,7 @@ class BacktestConfig:
     cash: float = 1_000_000.0
     currency: str = "INR"
     # Named cost pack ("india.equity", "none"), a per-fill cost function
-    # (side, quantity, price) -> Money, or a CostModel applied to fills afterwards.
+    # (side, quantity, price) -> Money, or a CostModel charged per fill by the simulator.
     costs: str | FillCostFn | CostModel = "india.equity"
     # "next_open" (default): fill at the next session's open (honba.backtest.simulated).
     # "bar_close": fill at the decision bar's close (conformance simulator only).
@@ -257,7 +258,6 @@ class BacktestSession:
         data: DataProvider,
         execution: ExecutionPort,
         ctx: LedgerContext | None = None,
-        cost_model: CostModel | None = None,
         # True when the simulator's settlement cycle is the market default, so run() re-resolves
         # it as of the first session's date once the bars are known.
         settlement_from_data: bool = False,
@@ -268,7 +268,6 @@ class BacktestSession:
         self.config = config
         self.data = data
         self.execution = execution
-        self.cost_model = cost_model
         self._settlement_from_data = settlement_from_data
         self.on_bar = on_bar
         # Fresh ledger seeded with the starting cash unless the caller injects one (tests).
@@ -351,10 +350,7 @@ class BacktestSession:
             runner.cancel(submitted.order_id)
         runner.stop()
 
-        # Optional: apply a post-hoc CostModel to fills if the simulator did not.
         fills = list(runner.fills)
-        if self.cost_model is not None:
-            fills = [self.cost_model.apply(t) for t in fills]
 
         # --- 4. Metrics ---------------------------------------------------------
         metrics, equity_curve = _compute_metrics(
@@ -436,8 +432,8 @@ class Honba:
           Starting portfolio cash in account currency.
         costs:
           Named pack ("india.equity", "india.equity.intraday", "none"), a fill-cost
-          function ``(side, quantity, price) -> Money``, or a CostModel applied to
-          fills after the run.
+          function ``(side, quantity, price) -> Money``, or a CostModel whose
+          ``apply`` costs are charged by the simulator (see ``fill_costs_from_model``).
         fill:
           "next_open" (default) or "bar_close" — selects the simulated execution
           port when ``execution`` is not passed explicitly.
@@ -478,9 +474,8 @@ class Honba:
             config=config,
             data=resolved_data,
             execution=resolved_execution,
-            cost_model=None if execution is not None else cost_model,
-            # If the user supplied a custom execution port, we assume it already
-            # applies costs; otherwise Session may post-apply cost_model on fills.
+            # A custom execution port is assumed to apply its own costs; otherwise the
+            # CostModel was wired into the simulator by _default_execution.
             settlement_from_data=execution is None and settlement_days is None,
             on_bar=on_bar,
         )
@@ -554,9 +549,14 @@ def _default_execution(config: BacktestConfig, cost_model: CostModel | None) -> 
     """Build the simulated execution port for the config (``honba.backtest.simulated``).
 
     A pack name or fill-cost function is charged by the simulator itself; a post-hoc
-    CostModel is applied by the session instead, so the simulator charges nothing.
+    CostModel is adapted to a fill-cost function so the ledger, fills and metrics agree.
     """
-    fill_costs = "none" if cost_model is not None else cast("str | FillCostFn", config.costs)
+    currency = Currency(config.currency)
+    fill_costs = (
+        fill_costs_from_model(cost_model, currency=currency)
+        if cost_model is not None
+        else cast("str | FillCostFn", config.costs)
+    )
     return make_simulator(
         fill=config.fill,
         cash=Money.from_major(config.cash, Currency(config.currency)),

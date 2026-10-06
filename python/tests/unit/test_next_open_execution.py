@@ -15,6 +15,7 @@ import pytest
 from honba.backtest.simulated import (
     NextOpenExecution,
     SessionOpen,
+    fill_costs_from_model,
     group_sessions,
     make_simulator,
     resolve_fill_costs,
@@ -424,3 +425,20 @@ def test_plain_bar_mode_rejects_out_of_order_and_duplicate_bars() -> None:
     with pytest.raises(ValueError, match="duplicate"):
         _feed(p, bar(A, 5, 100.0))
     _feed(p, bar(B, 5, 100.0), bar(A, 6, 100.0))  # same ts, other instrument: legal
+
+
+def test_fill_costs_from_model_charges_the_models_cost_per_fill() -> None:
+    class PerFill:
+        def apply(self, trade):
+            import dataclasses
+
+            return dataclasses.replace(trade, costs=rupees(trade.quantity * 0.5))
+
+    fn = fill_costs_from_model(PerFill())
+    assert fn(OrderSide.BUY, 10, 100.0) == rupees(5.0)
+    p = port(cash=1_000.0, settlement_days=0, costs=fn)
+    p.open_session(1, [bar(A, 1, 100.0)])
+    p.submit("o", OrderIntent.market_buy(A, 4), 1)
+    p.open_session(2, [bar(A, 2, 100.0)])
+    assert p.cash == rupees(1_000.0 - 400.0 - 2.0)
+    assert p.fees == rupees(2.0)

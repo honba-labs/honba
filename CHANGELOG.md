@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Post-hoc CostModel reaches the ledger
+
+Bug fix: a `CostModel` passed as `costs=` to `Honba.backtest` was applied to the result's `fills` only, so
+cash, equity and metrics came from a zero-cost ledger. It is now adapted (`fill_costs_from_model`) into the
+simulator's per-fill cost function, so fills, `ctx.cash()`, `final_cash`, `final_equity` and
+`total_return_pct` agree. Only the model's returned `costs` is used (it cannot change price or quantity) and
+it sees a placeholder instrument. `BacktestSession` no longer takes `cost_model` (it was only set by `Honba.backtest`).
+
 ### Date-aware India settlement (ADR 0005 decision 4)
 
 Behavior change: the default equity settlement cycle depends on the trade date. NSE/BSE equities settle

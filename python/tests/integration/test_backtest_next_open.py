@@ -284,3 +284,46 @@ def test_intraday_backtests_need_an_explicit_settlement_cycle() -> None:
         _session(_start_at(2024, 1, 1), timeframe="5m")
     session = _session(_start_at(2024, 1, 1), timeframe="5m", settlement_days=0)
     assert session.execution.settlement_days == 0
+
+
+class FlatFeeModel:
+    """A post-hoc CostModel adding a fixed fee per fill."""
+
+    def __init__(self, fee: float) -> None:
+        self.fee = Money.from_major(fee, INR)
+
+    def apply(self, trade):
+        import dataclasses
+
+        return dataclasses.replace(trade, costs=trade.costs + self.fee)
+
+
+class RoundTrip(Strategy):
+    name = "round_trip"
+
+    def on_bar(self, bar: Bar) -> None:
+        if bar.ts == T0 and not self.ctx.busy(X):
+            self.ctx.submit(OrderIntent.market_buy(X, 10))
+        elif bar.ts == T0 + 2 * DAY and self.ctx.position(X) > 0 and not self.ctx.busy(X):
+            self.ctx.submit(OrderIntent.market_sell(X, 10))
+
+
+def test_cost_model_reaches_the_ledger_cash_equity_and_metrics() -> None:
+    session = Honba.backtest(
+        RoundTrip(),
+        symbol="XYZ",
+        start="2024-01-01",
+        end="2024-02-01",
+        cash=1_000_000.0,
+        data=Provider(_bars(X, (100.0, 100.0, 100.0, 100.0, 100.0))),
+        costs=FlatFeeModel(50.0),
+        settlement_days=0,
+    )
+    result = session.run()
+    buy, sell = result.fills
+    assert (buy.costs, sell.costs) == (Money.from_major(50.0, INR),) * 2
+    assert result.ctx.cash() == Money.from_major(999_900.0, INR)
+    assert result.metrics["final_cash"] == pytest.approx(999_900.0)
+    assert result.metrics["final_equity"] == pytest.approx(999_900.0)
+    assert result.metrics["total_return_pct"] == pytest.approx(-0.01)
+    assert session.execution.fees == Money.from_major(100.0, INR)

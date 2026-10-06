@@ -57,6 +57,7 @@ __all__ = [
     "FillModel",
     "NextOpenExecution",
     "SessionOpen",
+    "fill_costs_from_model",
     "group_sessions",
     "is_intraday",
     "make_simulator",
@@ -388,6 +389,25 @@ def is_intraday(timeframe: str) -> bool:
 def session_date(ts_ns: int) -> date:
     """Trading date (IST, the India market clock) of a unix-nanosecond timestamp."""
     return (_EPOCH + timedelta(seconds=ts_ns // 10**9) + _IST_OFFSET).date()
+
+
+def fill_costs_from_model(model: Any, *, currency: Currency = Currency.INR) -> FillCostFn:
+    """Adapt a post-hoc ``CostModel`` (``apply(trade) -> trade``) to a :data:`FillCostFn`.
+
+    The model sees a zero-cost :class:`Trade` for the fill and its returned ``costs`` is the
+    fill's cost; the simulator then charges it to cash, so fills, ledger, equity and metrics
+    agree. Only ``costs`` is read (a model cannot change price or quantity here). The trade
+    carries a placeholder instrument, so a model must not depend on the symbol; use a
+    ``FillCostFn`` for that.
+    """
+    placeholder = InstrumentId("_", "_")
+
+    def cost(side: OrderSide, quantity: float, price: float) -> Money:
+        return model.apply(
+            Trade(placeholder, side, quantity, price, costs=Money.zero(currency))
+        ).costs
+
+    return cost
 
 
 def make_simulator(
