@@ -1,11 +1,18 @@
 # Honba roadmap (single forward-looking plan)
 
-Status: v5, 2026-10-06. Supersedes `ROADMAP-borrowed-ideas.md` (v4, 2026-10-01) and merges `plan.md` (2026-10-03) phases and
-epics E10 and E11 into one numbering-preserving structure. Story IDs (E0..E11) are unchanged so old references still resolve. Nothing here
-has been filed as an issue. `honba-labs/` is not a git repo; paths are relative to it. Evidence is from the `honba/` tree and its git log
-(289 commits, last 2026-10-06), read-only; test baselines are from `honba/.claude/HANDOFF.md` (cargo ~1045, python ~2413 passed, 8 skipped).
+Status: v6, 2026-10-06. Supersedes `docs/archive/ROADMAP-borrowed-ideas.md` (v4, 2026-10-01) and merges `docs/archive/plan.md`
+(2026-10-03) phases and epics E10 and E11 into one numbering-preserving structure. Story IDs (E0..E11) are unchanged so old references
+still resolve. Nothing here has been filed as an issue. This file lives in the `honba` git repo at `docs/ROADMAP.md`; paths are relative
+to the `honba/` root unless they name a sibling repo. Evidence is from the `honba/` tree and its git log, read-only; test baselines are
+from `honba/.claude/HANDOFF.md` (cargo ~1045, python ~2413 passed, 8 skipped) and were not re-measured for v6.
 
-Story verdicts come from the 2026-10-06 audit (`ROADMAP_AUDIT.md`, model output) after a spot-check against code. The audit's table
+v6 changes: E10-S7 DONE (commits edb4921, 91bff5b, 2c10630; ADR 0015 implemented); E3-S1a chunk 1 DONE (ADR 0016, commits
+b12e5ba..1b2f6ce). Also done since v5 (see 1.1): cancel-time rule, rejection-queue hardening, IST timestamps, typed registry, SDK
+capabilities/schema, WASM hardening, ADR 0014/0015, golden vectors validated against the schema, honba-docs chunks. The two superseded
+documents are kept in `docs/archive/` for history and are not updated.
+
+Story verdicts come from the 2026-10-06 audit (a scratch file, `ROADMAP_AUDIT.md`, model output, not kept in the repo) after a spot-check
+against code. The audit's table
 had 74 story rows (its prose said 70, its summary 69) and about 20 verdicts or evidence claims were corrected; see Appendix A. Treat the audit as a lead, this file
 as the record.
 
@@ -28,9 +35,9 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | E7 Scale and ops | 0 | 0 | 5 | Pull-based; E7-S4 is superseded by `honba-sweep` (E10-S5) |
 | E8 Multi-leg | 0 | 0 | 4 | Optional; not scheduled (open decision D13) |
 | E9 Frontend and AlgoDesigner | 0 | 1 | 7 | Greenfield; generated TS types only |
-| E10 Async core | 5 | 2 | 1 | Ports, shell, engine output, Arc dataset, sweep and determinism test shipped; Python runtime bridge and connectors open |
+| E10 Async core | 6 | 1 | 1 | Ports, shell, engine output, Arc dataset, sweep, determinism test and Python runtime bridge (ADR 0015) shipped; connectors open |
 | E11 Versioned API | 3 | 2 | 3 | Read API, SDK and WASM indicators shipped; streaming, writes, auth open |
-| **Total (74)** | **18** | **18** | **38** | |
+| **Total (74)** | **19** | **17** | **38** | |
 
 ### 1.1 What is shipped (evidence)
 
@@ -51,6 +58,15 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | E10-S3 engine output | commit daf12d5 |
 | E10-S4 shared dataset (partial: Arc and columnar read only) | `honba-data` `Dataset`, `ColumnarSlice`, `DatasetFeed`, commit c7ef86b |
 | E10-S5 sweep | `crates/honba-sweep` (one engine per trial, `spawn_blocking`, results in trial order), commit fb64146 |
+| E10-S7 Python runtime bridge | ADR 0015 implemented: `honba.event_loop`, `honba.async_run`; commits edb4921, 91bff5b, 2c10630 |
+| E3-S1a chunk 1 (next-open Rust port, part 1) | ADR 0016; commits b12e5ba..1b2f6ce. Chunks 2 and 3 remain (see section 4) |
+| Cancel-time rule | ADR 0008 decision 13 addendum, commit 1c50fc7 |
+| Rejection-queue hardening | commits 2620b12, e1f6b76, 081fd12, 53a3ef7 |
+| IST timestamps | commit 31510cb |
+| SDK capabilities and schema | commit f19a301 |
+| WASM hardening | commit 101f81f |
+| ADR 0014 (schema/codegen from Rust), ADR 0015 (explicit runtime) | `docs/adr/` |
+| honba-docs chunks | documentation chunks in the `honba-docs` repo (not itemised here) |
 | E10-S6 determinism under threads | `crates/honba-sweep/tests/sweep.rs` `determinism_under_threads_{one,four,sixteen}_worker(s)` compare journal and ranking across thread counts |
 | E11-S1 envelope and registry | `crates/honba-api`, `crates/honba-messages/src/endpoints.rs` (22 routes, `WRITE_PATHS`), `GET /capabilities` (cf1366e) |
 | E11-S2 timestamps as strings | ADR 0012 rule 4, commits 4006ff1, 9530251 |
@@ -76,7 +92,7 @@ Deflated Sharpe/PBO/Monte Carlo/walk-forward (`honba-analytics/src/{monte_carlo,
    is the user, SDK, adapter and research surface. Anything user-facing added in Rust ships a Python binding and stub in the same story.
    The Python API does not change when logic moves to Rust (next-open port is the live example).
 3. **Sync kernel, async shell.** The event loop is synchronous and single-threaded; async and threads live at the edges and across runs
-   (plan.md section 1, `honba-async`, `honba-sweep`). Same seed and data give a byte-identical journal at any thread count.
+   (`docs/archive/plan.md` section 1, `honba-async`, `honba-sweep`). Same seed and data give a byte-identical journal at any thread count.
 4. **Determinism.** Fixed seeds, simulated clock, recorded fixtures, no network or wall clock in tests; shared golden vectors for
    Rust/Python parity; backtest, paper and live share one event flow and one order-state machine (E2-S6 hard requirement).
 5. **Workspace rules R1-R3 (root `CLAUDE.md`).** R1 TDD (failing test first, bug fixes start with a regression test, never weaken a test).
@@ -202,7 +218,7 @@ Done work is removed. Sizes: S (<=1 day), M (2-4 days), L (split before start). 
 |---|---|---|---|
 | R1 Safe writes | Nothing can place an order without a gate | E2-S2, E2-S1 rest, E2-S3 rest, E2-S6(a) | Risk stage with typed refusals, Reducing enforced, wall-clock lint, `OrderState` FSM in `honba-messages` |
 | R2 Runs | A backtest is a first-class server object | ADR-Run, E3-S1a (next-open Rust port), E4-S3, E4-S1, E11-S3 rest (backtests, sweeps, journals), E4-S5 | `POST /backtests` returns `run_id`; result carries `assumptions.not_modelled`; sweep over REST; journal v1 |
-| R3 Live-shaped runtime | Python and Rust share one runtime; push updates | E10-S7, E11-S4 | `honba.event_loop` owns one runtime; SSE streams run progress with resume |
+| R3 Live-shaped runtime | Python and Rust share one runtime; push updates | E11-S4 (E10-S7 done) | `honba.event_loop` owns one runtime (done); SSE streams run progress with resume |
 | R4 Trustworthy research | Results that resist self-deception | E4-S2, E4-S4, E4-S6, E4-S7, E6 batches 3-4 | Look-ahead property test; DSR/PBO/holdout/MC/cost-stress gates in result |
 | R5 Agent surfaces | Safe LLM and automation access | E5-S5, E5-S2, E5-S1 server, E5-S3, E5-S4, E5-S7, E11-S7 | MCP server from generated schemas; scope drift test; verifier; write routes gated |
 | R6 Live-ready | Broker, paper on live data | E1-S2..S6, E10-S8, E2-S7, E2-S9..S11, E3-S2..S7 | Instrument master, feed connector, reconciliation, L2 simulator, sandbox adapter |
@@ -212,7 +228,7 @@ Done work is removed. Sizes: S (<=1 day), M (2-4 days), L (split before start). 
 R6 and R7 can run in parallel with R4 once R2 exits. R5 needs R1 for write tools and R2 for runs.
 
 **Critical path:** E2-S2 -> E11-S7 (write endpoints) and E5-S4; ADR-Run -> E4-S3 -> `POST /backtests` -> E4-S5 -> E11-S4 -> E9-S7;
-E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 gates Python callers of any async Rust API; E2-S6(a) -> E2-S6(b..d) -> E2-S7 -> E3-S7.
+E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python callers of any async Rust API; E2-S6(a) -> E2-S6(b..d) -> E2-S7 -> E3-S7.
 
 ### E1 Instruments and adapters
 
@@ -244,7 +260,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 gates Python callers of an
 
 | ID | Scope | Size | Deps | Acceptance | Owner |
 |---|---|---|---|---|---|
-| E3-S1a | Rust port of the next-open simulator behind `ExecutionEngine`, Python `NextOpenExecution` API unchanged; harden L1 stop/limit (3 `#[ignore]` known-gap tests) | L -> split (port, order types, partial by volume) | ADR D1 | `next_open_fills_match_vectors` / `schema/conformance/next_open.json` run by Rust, Python and `honba._honba` and asserted equal | honba |
+| E3-S1a | Rust port of the next-open simulator behind `ExecutionEngine`, Python `NextOpenExecution` API unchanged; harden L1 stop/limit (3 `#[ignore]` known-gap tests). **Chunk 1 DONE** (ADR 0016, commits b12e5ba..1b2f6ce). Remaining per ADR 0016: chunk 2 settlement + costs + `SessionOpen`; chunk 3 PyO3 binding and Python delegation. Note: the Python reference never fills limit or stop orders (they are rejected `unsupported_order_type`), so "harden L1 stop/limit" needs a product decision before it can be scheduled | L -> split (port, order types, partial by volume) | ADR D1 | `next_open_fills_match_vectors` / `schema/conformance/next_open.json` run by Rust, Python and `honba._honba` and asserted equal | honba |
 | E3-S1b | L2 quote/tick matching: marketable orders walk top of book, resting limits, stops from ticks, IOC/FOK/day | L -> split | E2-S6, E3-S2, tick data decision | `limit_fills_on_trade_through` / L1 vs L2 conformance on same stream | honba |
 | E3-S1d | Differential oracle: naive reference matcher vs optimised sim | M | E3-S1b | `oracle_agrees_seeded_streams` / same | honba |
 | E3-S2 | `FillModel`, `LatencyModel` traits, seeded; slippage, ack delay, queue position; depth survival discount | M | E3-S1a | `seeded_slippage_reproducible` / `same_seed_byte_identical_fills` | honba |
@@ -293,11 +309,10 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 gates Python callers of an
 | E9-S8 | Generated TS client from OpenAPI (types already generated) | S | E11-S6 | `client_types_compile` / contract test against `honba serve` | honba-frontend (approved) |
 | E9-S1..S7 | StrategyGraph editor, graph to code, code to graph, verify/run, AI assistant, ops console, result views | M each | E0-S8, E4-S3, E5-S5, E11-S4 | per old roadmap section E9 | honba-frontend |
 
-### E10 Async core (remaining)
+### E10 Async core (remaining; E10-S7 done)
 
 | ID | Scope | Size | Deps | Acceptance | Owner |
 |---|---|---|---|---|---|
-| E10-S7 | `honba.event_loop`: one tokio runtime per interpreter via `pyo3-async-runtimes` (dependency present, `auto-initialize` already off); `honba.async_run` | M | ADR 0015 | `runtime_created_once`, `teardown_on_finalize` / `async_backtest_from_python` | honba |
 | E10-S8 | Rust-native connectors (NSE bhavcopy first, broker REST later) as `honba-ports` impls; decide Python-adapter bridge (D10) | L -> split | E10-S1, D10 | `bhavcopy_connector_parses_fixture` / `feed_into_engine_run` | honba |
 
 ### E11 Versioned API (remaining)
@@ -336,7 +351,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 gates Python callers of an
 | D17 | NSE settlement default and intraday cycle (counts bars, not sessions) in simulators | E3-S1a | Settle in the port ADR |
 
 Already decided: pyo3 single cdylib (ADR 0014 decision, `honba-py`), Strategy ABC with shim (ADR 0008), schema from Rust (ADR 0014),
-integer money (0011), versioning and nanosecond strings (0012), REST read ports (0013), explicit runtime (0015, implementation pending).
+integer money (0011), versioning and nanosecond strings (0012), REST read ports (0013), explicit runtime (0015, implemented in E10-S7), next-open Rust port split into three chunks (0016, chunk 1 done).
 
 ---
 
@@ -372,7 +387,7 @@ Each example ships with its own test under `honba-examples/tests/` (unit for hel
 
 ## 7. Definition of done
 
-A story is done only when all of the following hold (merges roadmap v4 DoD, plan.md section 10, root R1-R3):
+A story is done only when all of the following hold (merges roadmap v4 DoD, `docs/archive/plan.md` section 10, root R1-R3):
 
 1. Contract merged first (trait, ABC, schema, `.pyi`, ADR if `needs-adr` or breaking) with docs.
 2. Failing test seen first (R1); bug fixes start with a regression test; no test deleted, skipped or loosened without a recorded reason.
@@ -390,7 +405,7 @@ A story is done only when all of the following hold (merges roadmap v4 DoD, plan
 10. Affected consumers flagged or updated per section 6 (adapters, strategies, examples, frontend, docs); docs ticket for new public behavior.
 11. Commits: by explicit path, no trailer, one logical step each, tests committed with the code they drive.
 
-Architecture-level done (plan.md section 10), still open: (a) one strategy runs unchanged in-process, over REST and in `honba-examples`
+Architecture-level done (`docs/archive/plan.md` section 10), still open: (a) one strategy runs unchanged in-process, over REST and in `honba-examples`
 (section 6.1); (b) frontend computes indicators, screener and replay in WASM with no Python (replay and screener export open); (c) five
 codegen artifacts with blocking drift checks (met except TS check is local only); (d) every surface error carries a stable code (met for
 REST); (e) determinism at 1/4/16 threads (met for sweeps, extend to runs).
@@ -400,7 +415,7 @@ REST); (e) determinism at 1/4/16 threads (met for sweeps, extend to runs).
 ## Appendix A: Corrections to the audit (spot-check, 2026-10-06)
 
 Checked about 25 verdicts against code, git log and ls/grep (read-only). Counts: the audit's table holds 74 rows (8 DONE, 37 PARTIAL,
-29 NOT STARTED) while its prose said 70 and its summary 10/31/28 = 69. Corrected totals are in section 1 (18/18/38).
+29 NOT STARTED) while its prose said 70 and its summary 10/31/28 = 69. Corrected totals were 18/18/38 at v5; v6 moved E10-S7 to done (19/17/38, see section 1).
 
 | Story | Audit said | Code shows | Corrected |
 |---|---|---|---|
