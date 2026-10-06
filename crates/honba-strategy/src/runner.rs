@@ -96,6 +96,8 @@ pub struct StrategyRunner<S: Strategy, E: ExecutionEngine> {
     warmup_bars: u32,
     bars_seen: u64,
     last_bar_ts: Option<UnixNanos>,
+    /// `ts_init` of the latest event: the time a cancel is processed at.
+    now: UnixNanos,
     suppressed: Vec<SuppressedIntent>,
 }
 
@@ -120,6 +122,7 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
             warmup_bars: 0,
             bars_seen: 0,
             last_bar_ts: None,
+            now: UnixNanos::from_u64(0),
             suppressed: Vec::new(),
         }
     }
@@ -184,9 +187,10 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
 
     /// Asks the execution engine to cancel `order_id` and books what it
     /// reports at once (a cancelled [`OrderRejection`] for the unfilled
-    /// remainder). Cancelling an unknown or finished order does nothing.
+    /// remainder, stamped with the time of the latest event). Cancelling an
+    /// unknown or finished order does nothing.
     pub fn cancel(&mut self, order_id: &str) -> Result<()> {
-        self.execution.cancel(order_id)?;
+        self.execution.cancel(order_id, self.now)?;
         self.book_rejections()
     }
 
@@ -231,6 +235,7 @@ impl<S: Strategy, E: ExecutionEngine> Handler for StrategyRunner<S, E> {
         event: &Event,
         ts_init: UnixNanos,
     ) -> Result<honba_engine::EngineOutput> {
+        self.now = ts_init;
         // A new driving bar advances the warm-up count.
         if matches!(event, Event::Bar(_)) && self.last_bar_ts != Some(ts_init) {
             self.bars_seen += 1;

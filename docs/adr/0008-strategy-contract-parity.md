@@ -173,6 +173,18 @@ this ADR:
     cancelled). Not exposed through `honba._honba`: Python already has `OrderRejection` and
     `RunResult.order_rejections`, and the `run_strategy` reference engine never rejects.
 
+    **Addendum to decision 13 (cancel timestamp).** The statement above that a cancellation is stamped with the
+    order's original `ts_event` is superseded: a cancellation is stamped with the time of the cancel, the engine time
+    at which it is processed. This is what the Python venue (`NextOpenExecution.cancel`, the session time) always did;
+    the Rust side differed and the shared vectors missed it because both sides used scripted ports. Breaking change:
+    `ExecutionEngine::cancel(&mut self, order_id, now: UnixNanos)` gains the time. `Engine` passes its clock,
+    `StrategyRunner::cancel` passes the `ts_init` of the latest event it saw (0 before any event), and
+    `ScriptedExecution` stamps the cancelled rejection with `now`. Rejections raised by the venue at submit or fill
+    keep the order's `ts_event`. The vector `late_cancel_is_stamped_with_the_cancel_time` in
+    `schema/conformance/order_rejections.json` (submit at ts 2, cancel at ts 5, rejection ts 5) runs on both sides,
+    and the Python integration test also drives the real `NextOpenExecution` through it. Higher-fidelity venues that
+    only learn of the cancel at the venue acknowledgement (L2, live) are left to the order-state ADR (ROADMAP D2).
+
 ## Consequences
 - Breaking (Rust): every `Strategy` hook takes `ctx: &mut dyn StrategyContext`; market-data hooks lose `ts_init`;
   `drain_intents` is removed (submit with `ctx.submit`). `StrategyAdapter` owns a `LedgerContext`. In-repo

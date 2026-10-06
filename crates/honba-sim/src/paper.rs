@@ -104,7 +104,7 @@ impl ExecutionEngine for PaperExecution {
         Ok(())
     }
 
-    fn cancel(&mut self, _order_id: &str) -> Result<()> {
+    fn cancel(&mut self, _order_id: &str, _now: UnixNanos) -> Result<()> {
         // Nothing pending long enough to cancel.
         Ok(())
     }

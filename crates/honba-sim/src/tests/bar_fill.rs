@@ -137,7 +137,7 @@ fn cancel_is_a_no_op() {
     let mut exec = BarFillEngine::new();
     observe(&mut exec, 10.0, 1);
     exec.submit(market("O-1", OrderSide::Buy, 1.0, 1)).unwrap();
-    exec.cancel("O-1").unwrap();
+    exec.cancel("O-1", UnixNanos::from_u64(1)).unwrap();
     assert_eq!(exec.drain_fills().unwrap().len(), 1);
 }
 

@@ -39,9 +39,11 @@ fn check_execution_contract(engine: &mut dyn ExecutionEngine, ids: &[&str]) {
             .unwrap();
     }
     for id in ids {
-        engine.cancel(id).unwrap();
+        engine.cancel(id, UnixNanos::from_u64(100)).unwrap();
     }
-    engine.cancel("unknown-order").unwrap();
+    engine
+        .cancel("unknown-order", UnixNanos::from_u64(100))
+        .unwrap();
 
     let fills = engine.drain_fills().unwrap();
     let rejections = engine.drain_rejections().unwrap();

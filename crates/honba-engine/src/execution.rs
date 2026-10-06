@@ -78,19 +78,20 @@ pub trait ExecutionEngine: Send {
     /// Submits an order.
     fn submit(&mut self, order: Order) -> Result<()>;
 
-    /// Cancels an order by id.
+    /// Cancels an order by id, at time `now`.
     ///
     /// An engine holding the order reports the unfilled remainder through
     /// [`Self::drain_rejections`] with `cancelled == true`. Cancelling an
-    /// unknown or finished order is a no-op. The cancellation carries the
-    /// order's original `ts_event`, not the time of the call.
+    /// unknown or finished order is a no-op. The cancellation is stamped with
+    /// `now`, the engine time at which the cancel is processed, not the
+    /// order's original `ts_event` (ADR 008, decision 13 addendum).
     ///
     /// Fills the engine has produced but not yet drained are not an ordering
     /// hazard: the cancelled remainder excludes whatever already filled, and
     /// the context's pending count only ever decreases by `filled + released`,
     /// which sums to the ordered quantity whichever is booked first. The
     /// remainder must never include a quantity that is also in a fill.
-    fn cancel(&mut self, order_id: &str) -> Result<()>;
+    fn cancel(&mut self, order_id: &str, now: UnixNanos) -> Result<()>;
 
     /// Drains any fills produced since the last call.
     fn drain_fills(&mut self) -> Result<Vec<Trade>>;

@@ -99,8 +99,12 @@ impl ExecutionEngine for PricedBarFill {
         self.0.submit(order)
     }
 
-    fn cancel(&mut self, order_id: &str) -> honba_engine::Result<()> {
-        self.0.cancel(order_id)
+    fn cancel(
+        &mut self,
+        order_id: &str,
+        now: honba_messages::UnixNanos,
+    ) -> honba_engine::Result<()> {
+        self.0.cancel(order_id, now)
     }
 
     fn drain_fills(&mut self) -> honba_engine::Result<Vec<Trade>> {

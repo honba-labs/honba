@@ -286,7 +286,7 @@ impl Engine {
     fn cancel(&mut self, id: OrderId) -> Result<()> {
         let order_id = id.as_str().to_string();
         if let Some(execution) = self.execution.as_deref_mut() {
-            execution.cancel(&order_id)?;
+            execution.cancel(&order_id, self.clock.now())?;
         }
         self.audit.record(AuditKind::OrderCancelled { order_id });
         Ok(())

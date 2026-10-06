@@ -14,7 +14,7 @@ impl ExecutionEngine for Legacy {
     fn submit(&mut self, _order: honba_messages::Order) -> Result<()> {
         Ok(())
     }
-    fn cancel(&mut self, _order_id: &str) -> Result<()> {
+    fn cancel(&mut self, _order_id: &str, _now: UnixNanos) -> Result<()> {
         Ok(())
     }
     fn drain_fills(&mut self) -> Result<Vec<Trade>> {

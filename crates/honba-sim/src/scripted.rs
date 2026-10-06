@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use honba_engine::{AlgoError, ExecutionEngine, OrderRejection, Result};
 use honba_entities::{Currency, Trade};
-use honba_messages::{Order, OrderId, OrderSide};
+use honba_messages::{Order, OrderId, OrderSide, UnixNanos};
 
 /// What a [`ScriptedExecution`] does with an order it accepts.
 #[derive(Clone, Debug, PartialEq)]
@@ -46,7 +46,8 @@ impl Behavior {
 
 /// An [`ExecutionEngine`] that fills at one fixed price and does with each
 /// order what its script says (fill, reject, partly fill, or hold until
-/// cancelled). Fills and rejections are stamped with the order's `ts_event`.
+/// cancelled). Fills and rejections are stamped with the order's `ts_event`;
+/// a cancellation with the time of the cancel.
 ///
 /// It is the reference engine for the rejection queue
 /// (`ExecutionEngine::drain_rejections`) and for the shared conformance
@@ -158,7 +159,7 @@ impl ExecutionEngine for ScriptedExecution {
         Ok(())
     }
 
-    fn cancel(&mut self, order_id: &str) -> Result<()> {
+    fn cancel(&mut self, order_id: &str, now: UnixNanos) -> Result<()> {
         if let Some(i) = self
             .working
             .iter()
@@ -170,7 +171,7 @@ impl ExecutionEngine for ScriptedExecution {
                 o.instrument_id().clone(),
                 o.side(),
                 o.quantity(),
-                o.ts_event(),
+                now,
             ));
         }
         Ok(())

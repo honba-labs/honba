@@ -14,6 +14,8 @@ from typing import Any
 
 import pytest
 
+from honba.backtest.simulated import NextOpenExecution
+from honba.domain.money import Currency, Money
 from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
 from honba.entities.order import OrderIntent, OrderSide
@@ -60,6 +62,10 @@ class Venue(BaseExecutionPort):
         self.working: dict[str, tuple[OrderIntent, int]] = {}
         self.fills: list[Trade] = []
         self.rejections: list[OrderRejection] = []
+        self.now = 0
+
+    def on_event(self, event: Any, ts_init: int) -> None:
+        self.now = ts_init
 
     def submit(self, order_id: str, intent: OrderIntent, ts: int) -> None:
         spec = self.script.get(order_id, {"action": "fill"})
@@ -85,18 +91,33 @@ class Venue(BaseExecutionPort):
     def cancel(self, order_id: str) -> None:
         held = self.working.pop(order_id, None)
         if held is not None:
-            intent, ts = held
+            intent, _ = held
             self.rejections.append(
-                OrderRejection(order_id, intent, "cancelled", ts, cancelled=True)
+                OrderRejection(order_id, intent, "cancelled", self.now, cancelled=True)
             )
 
 
 @pytest.mark.parametrize("scenario", DOC["scenarios"], ids=lambda s: s["name"])
 def test_order_rejection_vectors(scenario: dict[str, Any]) -> None:
-    runner = StrategyRunner(Scripted(scenario["submit"]), Venue(scenario["venue"]))
+    _run(scenario, Venue(scenario["venue"]))
+
+
+LATE_CANCEL = next(s for s in DOC["scenarios"] if s["name"].startswith("late_cancel"))
+
+
+def test_next_open_execution_stamps_a_late_cancel_with_the_cancel_time() -> None:
+    """The real simulator agrees with the shared late-cancel vector (decision 13 addendum)."""
+    venue = NextOpenExecution(cash=Money.from_major(1000.0, Currency.INR))
+    _run(LATE_CANCEL, venue)
+
+
+def _run(scenario: dict[str, Any], venue: Any) -> None:
+    runner = StrategyRunner(Scripted(scenario["submit"]), venue)
     runner.start()
     for _, symbol, ts in scenario["events"]:
-        runner.on_event(Bar(_iid(symbol), ts, PRICE, PRICE, PRICE, PRICE, 1.0), ts)
+        bar = Bar(_iid(symbol), ts, PRICE, PRICE, PRICE, PRICE, 1.0)
+        venue.on_event(bar, ts)
+        runner.on_event(bar, ts)
         for at, order_id in scenario["cancels"]:
             if at == ts:
                 runner.cancel(order_id)

@@ -77,7 +77,7 @@ impl ExecutionEngine for FakeExecution {
         self.orders.lock().unwrap().push(order);
         Ok(())
     }
-    fn cancel(&mut self, _order_id: &str) -> Result<()> {
+    fn cancel(&mut self, _order_id: &str, _now: honba_messages::UnixNanos) -> Result<()> {
         Ok(())
     }
     fn drain_fills(&mut self) -> Result<Vec<Trade>> {
@@ -229,7 +229,7 @@ impl ExecutionEngine for FailingExecution {
     fn submit(&mut self, _order: Order) -> Result<()> {
         Err(honba_engine::AlgoError::Component("exchange down".into()))
     }
-    fn cancel(&mut self, _order_id: &str) -> Result<()> {
+    fn cancel(&mut self, _order_id: &str, _now: honba_messages::UnixNanos) -> Result<()> {
         Ok(())
     }
     fn drain_fills(&mut self) -> Result<Vec<Trade>> {

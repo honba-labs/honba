@@ -61,7 +61,8 @@ fn cancel_reports_the_working_remainder_once() {
     assert_eq!(exec.working_orders(), vec!["O-1".to_string()]);
     assert!(exec.drain_rejections().unwrap().is_empty());
 
-    exec.cancel("O-1").unwrap();
+    exec.cancel("O-1", honba_messages::UnixNanos::from_u64(5))
+        .unwrap();
     let got = exec.drain_rejections().unwrap();
     assert_eq!(
         got,
@@ -70,12 +71,13 @@ fn cancel_reports_the_working_remainder_once() {
             any_instrument(),
             OrderSide::Buy,
             7.0,
-            honba_messages::UnixNanos::from_u64(2),
+            honba_messages::UnixNanos::from_u64(5),
         )]
     );
     assert!(exec.working_orders().is_empty());
 
-    exec.cancel("O-1").unwrap();
+    exec.cancel("O-1", honba_messages::UnixNanos::from_u64(6))
+        .unwrap();
     assert!(exec.drain_rejections().unwrap().is_empty());
 }
 
@@ -83,8 +85,9 @@ fn cancel_reports_the_working_remainder_once() {
 fn cancelling_a_finished_or_unknown_order_is_a_no_op() {
     let mut exec = ScriptedExecution::new(10.0);
     exec.submit(market("O-1", OrderSide::Buy, 1.0, 1)).unwrap();
-    exec.cancel("O-1").unwrap();
-    exec.cancel("nope").unwrap();
+    let now = honba_messages::UnixNanos::from_u64(2);
+    exec.cancel("O-1", now).unwrap();
+    exec.cancel("nope", now).unwrap();
     assert!(exec.drain_rejections().unwrap().is_empty());
 }
 

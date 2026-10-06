@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Execution: cancellations are stamped with the cancel time (breaking, Rust)
+
+- Behavior change: a cancelled `OrderRejection` now carries the time of the cancel, not the order's original `ts_event`,
+  matching Python's `NextOpenExecution` (ADR 0008, decision 13 addendum). Breaking: `ExecutionEngine::cancel` gains a
+  `now: UnixNanos` parameter (`Engine` passes its clock, `StrategyRunner::cancel` the latest event time); out-of-tree
+  implementers must add it. New shared vector `late_cancel_is_stamped_with_the_cancel_time`, run by Rust and Python.
+
 ### Codegen: golden vectors validated against the generated schema
 
 - New `honba-codegen/tests/golden_vectors_conform.rs` validates 128 wire-shaped vectors (12 types) from `schema/golden` and

@@ -30,7 +30,7 @@ impl ExecutionEngine for RecordingExecution {
         Ok(())
     }
 
-    fn cancel(&mut self, _order_id: &str) -> Result<()> {
+    fn cancel(&mut self, _order_id: &str, _now: honba_messages::UnixNanos) -> Result<()> {
         Ok(())
     }
 

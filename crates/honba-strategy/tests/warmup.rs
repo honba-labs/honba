@@ -53,7 +53,7 @@ impl ExecutionEngine for NeverFills {
     fn submit(&mut self, _order: Order) -> Result<()> {
         Ok(())
     }
-    fn cancel(&mut self, _order_id: &str) -> Result<()> {
+    fn cancel(&mut self, _order_id: &str, _now: honba_messages::UnixNanos) -> Result<()> {
         Ok(())
     }
     fn drain_fills(&mut self) -> Result<Vec<Trade>> {

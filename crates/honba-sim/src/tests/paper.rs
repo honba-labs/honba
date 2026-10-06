@@ -63,7 +63,7 @@ fn never_rejects_and_cancel_is_a_no_op() {
             .submit(market(&format!("O-{i}"), OrderSide::Buy, 1.0, 1))
             .is_ok());
     }
-    assert!(exec.cancel("O-0").is_ok());
+    assert!(exec.cancel("O-0", UnixNanos::from_u64(1)).is_ok());
     assert_eq!(exec.drain_fills().unwrap().len(), 3);
 }
 

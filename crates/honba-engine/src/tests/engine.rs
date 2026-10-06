@@ -67,7 +67,7 @@ impl ExecutionEngine for StubSink {
         Ok(())
     }
 
-    fn cancel(&mut self, order_id: &str) -> Result<()> {
+    fn cancel(&mut self, order_id: &str, _now: UnixNanos) -> Result<()> {
         self.cancelled.lock().unwrap().push(order_id.to_string());
         Ok(())
     }

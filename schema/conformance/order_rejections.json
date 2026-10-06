@@ -1,7 +1,7 @@
 {
   "fixture_version": 1,
   "type": "OrderRejections",
-  "description": "Execution-port reject/cancel path shared by Python and Rust (ADR 008, decision 11). The strategy under test submits, on the first bar event of each ts in `submit`, the listed intents [side, symbol, quantity] (market orders); the runner names the orders \"{strategy_name}-{n}\" in submission order. The execution port is a scripted venue that fills at price 10.0 and stamps fills and rejections with the order's ts_init: an order id absent from `venue` fills in full; {\"action\": \"reject\", \"reason\"} refuses it whole; {\"action\": \"partial\", \"filled\", \"reason\"} fills `filled` and refuses the rest; {\"action\": \"hold\"} keeps it working until cancelled. After the bar event with ts T, every [T, order_id] in `cancels` is passed to the runner's cancel. Expected: `order_rejections` entries are [order_id, symbol, side, released quantity, reason, ts, cancelled] in drain order; `fills` are [order_id, quantity]; `busy` and `positions` are read from the strategy context at the end of the run (a rejected or cancelled remainder is released, so it no longer keeps the instrument busy).",
+  "description": "Execution-port reject/cancel path shared by Python and Rust (ADR 008, decision 11). The strategy under test submits, on the first bar event of each ts in `submit`, the listed intents [side, symbol, quantity] (market orders); the runner names the orders \"{strategy_name}-{n}\" in submission order. The execution port is a scripted venue that fills at price 10.0 and stamps fills and venue rejections with the order's ts_init, and a cancellation with the time of the cancel (the ts of the bar event the cancel follows; ADR 008, decision 13 addendum): an order id absent from `venue` fills in full; {\"action\": \"reject\", \"reason\"} refuses it whole; {\"action\": \"partial\", \"filled\", \"reason\"} fills `filled` and refuses the rest; {\"action\": \"hold\"} keeps it working until cancelled. After the bar event with ts T, every [T, order_id] in `cancels` is passed to the runner's cancel. Expected: `order_rejections` entries are [order_id, symbol, side, released quantity, reason, ts, cancelled] in drain order; `fills` are [order_id, quantity]; `busy` and `positions` are read from the strategy context at the end of the run (a rejected or cancelled remainder is released, so it no longer keeps the instrument busy).",
   "strategy_name": "rej",
   "scenarios": [
     {
@@ -212,6 +212,60 @@
         "fills": [],
         "busy": {
           "A": false
+        },
+        "positions": {}
+      }
+    },
+    {
+      "name": "late_cancel_is_stamped_with_the_cancel_time",
+      "events": [
+        [
+          "bar",
+          "A",
+          2
+        ],
+        [
+          "bar",
+          "B",
+          5
+        ]
+      ],
+      "submit": {
+        "2": [
+          [
+            "buy",
+            "A",
+            7.0
+          ]
+        ]
+      },
+      "venue": {
+        "rej-0": {
+          "action": "hold"
+        }
+      },
+      "cancels": [
+        [
+          5,
+          "rej-0"
+        ]
+      ],
+      "expect": {
+        "order_rejections": [
+          [
+            "rej-0",
+            "A",
+            "buy",
+            7.0,
+            "cancelled",
+            5,
+            true
+          ]
+        ],
+        "fills": [],
+        "busy": {
+          "A": false,
+          "B": false
         },
         "positions": {}
       }
