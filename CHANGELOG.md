@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Python SDK: capabilities and schema
+
+- `Client.capabilities()` (`GET /capabilities`) returns a typed `CapabilityManifest` (crates, market packs, endpoints,
+  the 501 `not_implemented` subset, toolsets, adapters, features); `Client.schema()` (`GET /schema`) returns the served
+  schema info record as a plain dict. Both work on `HttpTransport` and `InprocTransport` (parity-tested); no Rust change.
+
 ### REST: unknown routes return an error envelope
 
 - An unknown route is now a 404 `not_found` envelope (was an empty body, which the Python client reported as

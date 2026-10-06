@@ -14,6 +14,7 @@ from honba.wire.base import Str, _Wire
 from honba.wire.wire import Currency, Float, InstrumentId, NonNegativeFloat
 
 __all__ = [
+    "CapabilityManifest",
     "CompiledStrategy",
     "Depth",
     "DepthLevel",
@@ -27,6 +28,20 @@ class Health(_Wire):
     """``GET /health``."""
 
     status: Str
+
+
+class CapabilityManifest(_Wire):
+    """The ``capabilities`` object of ``GET /capabilities``: what this server offers."""
+
+    crates: tuple[Str, ...]
+    market_packs: tuple[Str, ...]
+    endpoints: tuple[Str, ...]
+    """Every route in the contract as ``METHOD /path``, in registry order."""
+    not_implemented: tuple[Str, ...] = ()
+    """The subset of ``endpoints`` that answers 501 ``not_implemented`` today."""
+    toolsets: tuple[Str, ...]
+    adapters: tuple[Str, ...]
+    features: dict[Str, bool]
 
 
 class InstrumentInfo(_Wire):

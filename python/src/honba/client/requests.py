@@ -28,12 +28,14 @@ __all__ = [
     "ApiRequest",
     "TimeLike",
     "bars",
+    "capabilities",
     "compile_strategy",
     "depth",
     "health",
     "instrument",
     "instruments",
     "quotes",
+    "schema",
     "screener_scan",
     "strategies",
     "verify_strategy",
@@ -77,6 +79,16 @@ def _non_empty(field: str, value: object) -> str:
 
 def health() -> ApiRequest:
     return ApiRequest("GET", "/health")
+
+
+def capabilities() -> ApiRequest:
+    """``GET /capabilities``."""
+    return ApiRequest("GET", "/capabilities")
+
+
+def schema() -> ApiRequest:
+    """``GET /schema``."""
+    return ApiRequest("GET", "/schema")
 
 
 def instruments(*, exchange: str | None = None, symbol: str | None = None) -> ApiRequest:

@@ -13,6 +13,7 @@ from honba._native import native_attr
 from honba.client import requests as rq
 from honba.client.errors import InvalidResponseError, error_from_envelope
 from honba.client.models import (
+    CapabilityManifest,
     CompiledStrategy,
     Depth,
     Health,
@@ -70,6 +71,20 @@ class Client:
     def health(self) -> Health:
         """``GET /health``."""
         return self._call(rq.health(), Health)
+
+    def capabilities(self) -> CapabilityManifest:
+        """``GET /capabilities``: the server's manifest (endpoints, 501 subset, packs, toolsets)."""
+        data = self._data(rq.capabilities())
+        inner = data.get("capabilities") if isinstance(data, Mapping) else None
+        return self._parse_model(inner, CapabilityManifest)
+
+    def schema(self) -> dict[str, Any]:
+        """``GET /schema``: the schema info record as served (JSON-shaped, currently the
+        OpenAPI version and API version)."""
+        data = self._data(rq.schema())
+        if not isinstance(data, dict):
+            raise InvalidResponseError("schema payload is not an object", status=200)
+        return data
 
     def instruments(
         self, *, exchange: str | None = None, symbol: str | None = None
@@ -203,7 +218,10 @@ class Client:
             )
 
     def _call(self, request: rq.ApiRequest, model: type[_M]) -> _M:
-        data = self._data(request)
+        return self._parse_model(self._data(request), model)
+
+    @staticmethod
+    def _parse_model(data: Any, model: type[_M]) -> _M:
         try:
             return model.model_validate(data)
         except ValidationError as exc:

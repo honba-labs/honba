@@ -319,3 +319,8 @@ def test_screener_scan_validates_tf_and_as_of_like_the_server() -> None:
     assert (err.value.field, err.value.reason) == ("as_of", "invalid_time")
     got = rq.screener_scan("TCS.NSE", as_of=datetime(2024, 1, 2, tzinfo=timezone.utc))
     assert got.query is not None and got.query["as_of"].startswith("2024-01-02")
+
+
+def test_capabilities_and_schema_requests_take_no_arguments() -> None:
+    assert rq.capabilities() == rq.ApiRequest("GET", "/capabilities")
+    assert rq.schema() == rq.ApiRequest("GET", "/schema")

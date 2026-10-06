@@ -309,3 +309,56 @@ def test_an_envelope_of_another_schema_version_is_rejected() -> None:
     )
     with pytest.raises(InvalidResponseError, match="schema_version"):
         Client(FakeTransport(other)).health()
+
+
+MANIFEST = {
+    "crates": ["honba-api"],
+    "market_packs": ["india", "null"],
+    "endpoints": ["GET /health", "GET /orders"],
+    "not_implemented": ["GET /orders"],
+    "toolsets": ["strategies"],
+    "adapters": [],
+    "features": {"x": True},
+}
+
+
+def test_capabilities_unwraps_and_types_the_manifest() -> None:
+    fake = FakeTransport(ok({"capabilities": {**MANIFEST, "future_field": 1}}))
+    got = Client(fake).capabilities()
+    assert got.endpoints == ("GET /health", "GET /orders")
+    assert got.not_implemented == ("GET /orders",)
+    assert got.market_packs == ("india", "null") and got.features == {"x": True}
+    assert fake.calls == [("GET", "/capabilities", None, None)]
+
+
+def test_capabilities_without_not_implemented_defaults_to_empty() -> None:
+    manifest = {k: v for k, v in MANIFEST.items() if k != "not_implemented"}
+    assert (
+        Client(FakeTransport(ok({"capabilities": manifest}))).capabilities().not_implemented == ()
+    )
+
+
+@pytest.mark.parametrize(
+    "payload", [{"nope": 1}, {"capabilities": {"crates": 1}}, {"capabilities": 3}]
+)
+def test_capabilities_rejects_a_payload_that_does_not_parse(payload: Any) -> None:
+    with pytest.raises(InvalidResponseError):
+        Client(FakeTransport(ok(payload))).capabilities()
+
+
+def test_schema_returns_the_json_record() -> None:
+    fake = FakeTransport(ok({"openapi": "3.1.0", "version": "1.0.0"}))
+    assert Client(fake).schema() == {"openapi": "3.1.0", "version": "1.0.0"}
+    assert fake.calls == [("GET", "/schema", None, None)]
+
+
+def test_schema_rejects_a_non_object_payload() -> None:
+    with pytest.raises(InvalidResponseError):
+        Client(FakeTransport(ok([1]))).schema()
+
+
+def test_capabilities_and_schema_map_error_envelopes() -> None:
+    with pytest.raises(ValidationApiError):
+        Client(FakeTransport(failure(422, "validation_invalid_request"))).capabilities()
+    with pytest.raises(NotFoundApiError):
+        Client(FakeTransport(failure(404, "not_found"))).schema()

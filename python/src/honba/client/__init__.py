@@ -24,9 +24,10 @@ Failures are typed (:class:`ApiError` and subclasses, built from the ``ErrorDeta
 :class:`RequestValidationError` before anything is sent. Retries exist only on
 :class:`HttpTransport`, are off by default and bounded (:class:`RetryPolicy`).
 
-Served today: ``health``, ``instruments``, ``instrument``, ``bars``, ``quotes``, ``depth``,
-``verify_strategy``, ``strategies``, ``compile_strategy`` and ``screener_scan``. Every other route
-answers 501 (``NotImplementedApiError``) and has no client method yet. Money (ADR 0011) does not appear: these endpoints carry prices as ``f64``.
+Served today: ``health``, ``capabilities``, ``schema``, ``instruments``, ``instrument``, ``bars``,
+``quotes``, ``depth``, ``verify_strategy``, ``strategies``, ``compile_strategy`` and
+``screener_scan``. Every other route answers 501 (``NotImplementedApiError``) and has no client
+method yet. Money (ADR 0011) does not appear: these endpoints carry prices as ``f64``.
 """
 
 from honba.client.client import Client
@@ -48,6 +49,7 @@ from honba.client.errors import (
     error_from_envelope,
 )
 from honba.client.models import (
+    CapabilityManifest,
     CompiledStrategy,
     Depth,
     DepthLevel,
@@ -62,6 +64,7 @@ __all__ = [
     "ApiError",
     "ApiRequest",
     "AuthApiError",
+    "CapabilityManifest",
     "Client",
     "CompiledStrategy",
     "Depth",

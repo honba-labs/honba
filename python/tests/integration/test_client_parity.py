@@ -163,6 +163,8 @@ SCENARIOS: dict[str, Callable[[Client], Any]] = {
     "compile_ok": lambda c: c.compile_strategy(MANIFEST),
     "compile_ok_again": lambda c: c.compile_strategy(MANIFEST),
     "strategies_after_compile": lambda c: c.strategies(),
+    "capabilities": lambda c: c.capabilities(),
+    "schema": lambda c: c.schema(),
     "scan_close_gt": lambda c: c.screener_scan(SCAN_UNIVERSE, CLOSE_GT_60, tf="1m"),
     "scan_no_filter": lambda c: c.screener_scan(SCAN_UNIVERSE, tf="1m"),
     "scan_sma_and_metric_ref": lambda c: c.screener_scan(
@@ -326,6 +328,19 @@ def test_inproc_unsupported_metric_is_a_422_with_its_reason_not_an_empty_result(
         inproc.screener_scan("TCS.NSE", {"key": "market_cap", "op": "gt", "value": 1}, tf="1m")
     assert err.value.status == 422
     assert err.value.context == {"field": "filters", "reason": "unsupported_metric"}
+
+
+def test_inproc_capabilities_are_typed_and_match_the_registry(inproc: Client) -> None:
+    caps = inproc.capabilities()
+    assert "GET /capabilities" in caps.endpoints and "GET /schema" in caps.endpoints
+    assert set(caps.not_implemented) <= set(caps.endpoints)
+    assert "GET /orders" in caps.not_implemented and "GET /health" not in caps.not_implemented
+    assert {"india", "null"} <= set(caps.market_packs)
+
+
+def test_inproc_schema_is_a_json_record_with_the_api_version(inproc: Client) -> None:
+    got = inproc.schema()
+    assert got["openapi"] == "3.1.0" and isinstance(got["version"], str)
 
 
 def test_inproc_501_placeholders(inproc: Client) -> None:
