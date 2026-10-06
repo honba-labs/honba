@@ -188,3 +188,56 @@ fn schema_export_without_output_writes_relative_to_cwd_not_the_source_tree() {
     assert!(cwd.join("schema/domain/domain_schema.json").is_file());
     assert_eq!(fs::read(&committed).unwrap(), before);
 }
+
+fn load_args<'a>(file: &'a Path, symbol: &'a str, extra: &[&'a str]) -> Vec<&'a str> {
+    let mut args = vec!["data", "load", file.to_str().unwrap(), symbol];
+    args.extend_from_slice(extra);
+    args
+}
+
+#[test]
+fn data_load_prints_the_qualified_instrument_defaulting_to_nse() {
+    let file = scratch("data_load_nse").join("TCS.NSE.parquet");
+    write_bars_parquet(&file);
+    let out = honba(&load_args(&file, "TCS", &[]));
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(stdout(&out).contains("(NSE:TCS)"), "{}", stdout(&out));
+}
+
+#[test]
+fn data_load_honours_the_exchange_flag_and_qualified_symbols() {
+    let file = scratch("data_load_bse").join("TCS.BSE.parquet");
+    write_bars_parquet(&file);
+    let flagged = honba(&load_args(&file, "TCS", &["--exchange", "bse"]));
+    assert!(
+        stdout(&flagged).contains("(BSE:TCS)"),
+        "{}",
+        stderr(&flagged)
+    );
+    let qualified = honba(&load_args(&file, "BSE:TCS", &[]));
+    assert!(
+        stdout(&qualified).contains("(BSE:TCS)"),
+        "{}",
+        stderr(&qualified)
+    );
+}
+
+#[test]
+fn data_load_reports_conflicting_and_unknown_exchanges() {
+    let file = scratch("data_load_bad_exchange").join("TCS.NSE.parquet");
+    write_bars_parquet(&file);
+    let conflict = honba(&load_args(&file, "NSE:TCS", &["--exchange", "BSE"]));
+    assert!(!conflict.status.success());
+    assert!(
+        stderr(&conflict).contains("conflicts"),
+        "{}",
+        stderr(&conflict)
+    );
+    let unknown = honba(&load_args(&file, "NYSE:TCS", &[]));
+    assert!(!unknown.status.success());
+    assert!(
+        stderr(&unknown).contains("NSE, BSE"),
+        "{}",
+        stderr(&unknown)
+    );
+}

@@ -50,8 +50,29 @@ fn data_load_takes_source_and_symbol() {
         .command
     {
         Commands::Data {
-            command: DataCommands::Load { source, symbol },
-        } => assert_eq!((source.as_str(), symbol.as_str()), ("bars.parquet", "TCS")),
+            command:
+                DataCommands::Load {
+                    source,
+                    symbol,
+                    exchange,
+                },
+        } => {
+            assert_eq!((source.as_str(), symbol.as_str()), ("bars.parquet", "TCS"));
+            assert_eq!(exchange, None);
+        }
+        _ => panic!("expected data load"),
+    }
+}
+
+#[test]
+fn data_load_accepts_an_exchange_flag() {
+    match parse(&["data", "load", "b.parquet", "TCS", "--exchange", "BSE"])
+        .unwrap()
+        .command
+    {
+        Commands::Data {
+            command: DataCommands::Load { exchange, .. },
+        } => assert_eq!(exchange.as_deref(), Some("BSE")),
         _ => panic!("expected data load"),
     }
 }

@@ -10,6 +10,7 @@
 pub mod calendar;
 pub mod costs;
 pub mod error;
+pub mod exchange;
 pub mod profile;
 pub mod universes;
 

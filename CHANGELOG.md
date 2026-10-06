@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### CLI exchange selection
+
+- `honba data load <file> <SYMBOL>` no longer hardcodes NSE: `SYMBOL` is bare (exchange from `--exchange NSE|BSE`,
+  default NSE) or TradingView-style `NSE:INFY` / `BSE:INFY`; a conflicting qualifier and flag, or an unknown exchange,
+  is an error. The summary prints the qualified instrument. Parsing lives in
+  `honba_market::india::exchange` (`IndiaExchange`, `resolve_instrument`).
+
 ### Python SDK client (E11-S3, part 3)
 
 - New `honba.client`: `Client` with typed methods mirroring the served routes (`health`, `instruments`, `instrument`,

@@ -1,10 +1,11 @@
 use anyhow::{bail, Context, Result};
 
 use honba_data::ParquetBarSource;
-use honba_messages::{Exchange, InstrumentId};
+use honba_market::india::exchange::resolve_instrument;
 
-pub fn load(source: &str, symbol: &str) -> Result<()> {
-    let instrument = InstrumentId::new(symbol, Exchange::new("NSE"));
+pub fn load(source: &str, symbol: &str, exchange: Option<&str>) -> Result<()> {
+    let instrument = resolve_instrument(symbol, exchange)?;
+    let qualified = format!("{}:{}", instrument.exchange(), instrument.symbol());
 
     let bars = if source.to_ascii_lowercase().ends_with(".parquet") {
         ParquetBarSource::new(source, instrument)
@@ -14,7 +15,7 @@ pub fn load(source: &str, symbol: &str) -> Result<()> {
         bail!("unsupported source extension: {source} (expected .parquet)");
     };
 
-    println!("{} bars loaded from {source}", bars.len());
+    println!("{} bars loaded from {source} ({qualified})", bars.len());
     if let (Some(first), Some(last)) = (bars.first(), bars.last()) {
         println!(
             "first: ts_event={} close={}",
