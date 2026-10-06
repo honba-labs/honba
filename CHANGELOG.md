@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### WASM: OHLC input validation
+
+- `ohlc_indicator_series` now rejects bars where `high < low` (`IndicatorError::InvertedRange(index)`); added edge-case
+  tests (flat series, minimal lengths, non-finite input) for every exposed indicator.
+
 ### Python SDK: capabilities and schema
 
 - `Client.capabilities()` (`GET /capabilities`) returns a typed `CapabilityManifest` (crates, market packs, endpoints,

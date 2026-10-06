@@ -27,6 +27,8 @@ pub enum IndicatorError {
     NonFiniteInput(usize),
     /// Finite input overflowed: the output is infinite, or `NaN` after warm-up, at this index.
     NonFiniteOutput(usize),
+    /// `high` is below `low` at this index.
+    InvertedRange(usize),
     /// The `high`, `low` and `close` series do not have the same length.
     LengthMismatch {
         /// Length of `high`.
@@ -47,6 +49,7 @@ impl fmt::Display for IndicatorError {
             Self::NonFiniteOutput(i) => {
                 write!(f, "numeric overflow: non-finite output at index {i}")
             }
+            Self::InvertedRange(i) => write!(f, "high is below low at index {i}"),
             Self::LengthMismatch { high, low, close } => write!(
                 f,
                 "series lengths differ: high={high}, low={low}, close={close}"
@@ -248,7 +251,7 @@ pub fn indicator_series(
 /// # Errors
 ///
 /// [`IndicatorError`] for an unknown (or close-only) name, bad params, unequal lengths,
-/// non-finite input, or overflow.
+/// non-finite input, `high < low` at any index ([`IndicatorError::InvertedRange`]), or overflow.
 pub fn ohlc_indicator_series(
     name: &str,
     params_json: &str,
@@ -271,6 +274,9 @@ pub fn ohlc_indicator_series(
         if let Some(i) = series.iter().position(|v| !v.is_finite()) {
             return Err(IndicatorError::NonFiniteInput(i));
         }
+    }
+    if let Some(i) = high.iter().zip(low).position(|(h, l)| h < l) {
+        return Err(IndicatorError::InvertedRange(i));
     }
     let mut atr = Atr::new(n);
     let out: Vec<f64> = high
