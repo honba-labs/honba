@@ -23,6 +23,9 @@ __all__ = [
     "initialize_runtime",
     "nse_equity_settlement_days",
     "run_strategy",
+    "runtime_info",
+    "runtime_start",
+    "runtime_stop",
     "verify_manifest",
     "wire_enum_values",
 ]
@@ -241,10 +244,26 @@ class RustSmaCrossover:
     def intents(self) -> list[tuple[str, float]]: ...
 
 def initialize_runtime() -> None:
-    """Initialize the Tokio runtime for the Python async bridge.
+    """Deprecated: use ``honba.event_loop.start()``.
 
-    Raises ``RuntimeError`` if the runtime cannot be installed.
+    Starts the async runtime if none is running (idempotent).
     """
 
 def get_runtime_handle() -> str:
-    """Name of the runtime flavour (``"tokio-multi-thread"``)."""
+    """Deprecated: use ``honba.event_loop.info()``.
+
+    The running runtime's flavour (``"tokio-multi-thread"``); ``RuntimeError`` if none is running.
+    """
+
+def runtime_start(worker_threads: int | None = None) -> tuple[str, int, int]:
+    """Start the interpreter's one async runtime: ``(flavor, worker_threads, generation)``.
+
+    ``RuntimeError`` if one is already running, ``ValueError`` for ``worker_threads=0``. Use
+    ``honba.event_loop`` instead of calling this directly.
+    """
+
+def runtime_stop() -> bool:
+    """Stop the runtime and join its threads; ``True`` if one was running. Idempotent."""
+
+def runtime_info() -> tuple[str, int, int] | None:
+    """``(flavor, worker_threads, generation)`` of the running runtime, or ``None``."""

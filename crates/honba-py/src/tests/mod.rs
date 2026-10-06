@@ -4,4 +4,5 @@ mod api;
 mod codegen;
 mod manifest;
 mod run;
+mod runtime;
 mod wire;

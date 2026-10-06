@@ -42,9 +42,6 @@ impl std::error::Error for ApiRequestError {}
 /// States by data directory: loaded once per process, like `honba serve` loads once.
 static STATES: OnceLock<Mutex<HashMap<PathBuf, AppState>>> = OnceLock::new();
 
-/// A small runtime that only drives the router; it owns no sockets and no timers.
-static RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
-
 fn state_for(data_dir: &str) -> Result<AppState, ApiRequestError> {
     let key = std::fs::canonicalize(data_dir).unwrap_or_else(|_| PathBuf::from(data_dir));
     let mut states = STATES
@@ -60,14 +57,6 @@ fn state_for(data_dir: &str) -> Result<AppState, ApiRequestError> {
     Ok(state)
 }
 
-fn runtime() -> &'static tokio::runtime::Runtime {
-    RUNTIME.get_or_init(|| {
-        tokio::runtime::Builder::new_current_thread()
-            .build()
-            .expect("a current-thread runtime always builds")
-    })
-}
-
 /// Sends one request through the REST router over `data_dir` and returns `(status, body)`.
 ///
 /// `query_json` is a flat JSON object (or `None`), `body_json` the request body (or `None`).
@@ -81,8 +70,7 @@ pub fn request(
 ) -> Result<(u16, String), ApiRequestError> {
     let target = build_target(path, query_json).map_err(ApiRequestError::Dispatch)?;
     let router = api_router_with(state_for(data_dir)?);
-    runtime()
-        .block_on(dispatch(router, method, &target, body_json))
+    crate::runtime::block_on(dispatch(router, method, &target, body_json))
         .map_err(ApiRequestError::Dispatch)
 }
 
