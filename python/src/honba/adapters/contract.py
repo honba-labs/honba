@@ -37,9 +37,9 @@ from __future__ import annotations
 import datetime as dt
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
-from honba.adapters.base import Adapter, ExecutionAdapter, MarketDataAdapter
+from honba.adapters.base import Adapter, ExecutionAdapter, MarketDataAdapter, MarketDataClient
 from honba.adapters.capabilities import AdapterCapabilities, Capability, capability_for_method
 from honba.adapters.errors import AdapterError, CapabilityError
 from honba.adapters.models import (
@@ -311,7 +311,7 @@ async def _verify_capability_refusals(adapter: Adapter, probe: _Probe) -> None:
             args, kwargs = _args_for(method, probe)
             await _refuses(
                 f"{method}() without capability {capability.value}",
-                lambda method=method, args=args, kwargs=kwargs: getattr(adapter, method)(  # type: ignore[attr-defined]
+                lambda method=method, args=args, kwargs=kwargs: getattr(adapter, method)(
                     *args, **kwargs
                 ),
                 CapabilityError,
@@ -322,14 +322,14 @@ async def _verify_market_data(adapter: Any, probe: _Probe) -> None:
     """Canonical market data, ascending history, typed errors for unknown instruments."""
     caps = adapter.capabilities()
     if caps.supports(Capability.INSTRUMENT_MASTER):
-        instruments = await _call("instruments()", adapter.instruments)  # type: ignore[attr-defined]
+        instruments = await _call("instruments()", adapter.instruments)
         _expect_kind("instruments()", instruments, Instrument)
         _expect(bool(instruments), "instruments() returned nothing; there is nothing to trade")
         ids = [i.instrument_id for i in instruments]
         _expect(len(set(ids)) == len(ids), "instruments() returned duplicate instrument ids")
         found = await _call(
             f"search_instruments({probe.instrument_id.symbol!r})",
-            adapter.search_instruments,  # type: ignore[attr-defined]
+            adapter.search_instruments,
             probe.instrument_id.symbol,
         )
         _expect_kind("search_instruments()", found, Instrument)
@@ -338,23 +338,21 @@ async def _verify_market_data(adapter: Any, probe: _Probe) -> None:
             f"search_instruments() did not find {probe.instrument_id} by its own symbol",
         )
     if caps.supports(Capability.QUOTES):
-        quote = await _call("quote()", adapter.quote, probe.instrument_id)  # type: ignore[attr-defined]
+        quote = await _call("quote()", adapter.quote, probe.instrument_id)
         _expect_kind("quote()", quote, QuoteTick)
         _expect(quote.instrument_id == probe.instrument_id, "quote() returned another instrument")
         _expect(quote.ts >= 0, "quote() must carry a unix-nanosecond timestamp")
         await _refuses(
             "quote() for an unknown instrument",
-            lambda: adapter.quote(probe.unknown_instrument),  # type: ignore[attr-defined]
+            lambda: adapter.quote(probe.unknown_instrument),
             AdapterError,
         )
     if caps.supports(Capability.DEPTH):
-        depth = await _call(  # type: ignore[attr-defined]
-            "depth()", adapter.depth, probe.instrument_id
-        )
+        depth = await _call("depth()", adapter.depth, probe.instrument_id)
         _expect_kind("depth()", depth, MarketDepth)
         _expect(depth.instrument_id == probe.instrument_id, "depth() returned another instrument")
     if caps.supports(Capability.HISTORICAL_BARS):
-        bars = await _call(  # type: ignore[attr-defined]
+        bars = await _call(
             "historical_bars()",
             adapter.historical_bars,
             probe.instrument_id,
@@ -370,7 +368,7 @@ async def _verify_market_data(adapter: Any, probe: _Probe) -> None:
         )
         await _refuses(
             "historical_bars() for an unknown instrument",
-            lambda: adapter.historical_bars(  # type: ignore[attr-defined]
+            lambda: adapter.historical_bars(
                 probe.unknown_instrument,
                 timeframe="1d",
                 start=_HISTORY_START,
@@ -389,7 +387,7 @@ async def _verify_stream(adapter: Any, probe: _Probe) -> None:
     mode = min(caps.stream_modes, key=lambda m: m.value)
     subscription = await _call(
         "subscribe()",
-        adapter.subscribe,  # type: ignore[attr-defined]
+        adapter.subscribe,
         (probe.instrument_id,),
         mode=mode,
         callback=received.append,
@@ -401,10 +399,10 @@ async def _verify_stream(adapter: Any, probe: _Probe) -> None:
     )
     _expect(subscription.mode is mode, f"subscribe() must report the mode it was given ({mode})")
     _expect(bool(subscription.id.strip()), "subscribe() must return a usable subscription id")
-    await _call("unsubscribe()", adapter.unsubscribe, subscription.id)  # type: ignore[attr-defined]
+    await _call("unsubscribe()", adapter.unsubscribe, subscription.id)
     await _refuses(
         "unsubscribe() for an unknown subscription",
-        lambda: adapter.unsubscribe(probe.unknown_subscription),  # type: ignore[attr-defined]
+        lambda: adapter.unsubscribe(probe.unknown_subscription),
         AdapterError,
     )
     # An adapter that delivers inline has its events checked for type here; one that streams
@@ -438,9 +436,9 @@ async def _place_resting_order(adapter: Any, probe: _Probe) -> OrderReport | Non
     """
     if not adapter.capabilities().supports(Capability.QUOTES):
         return None
-    quote = await _call("quote()", adapter.quote, probe.instrument_id)  # type: ignore[attr-defined]
+    quote = await _call("quote()", adapter.quote, probe.instrument_id)
     intent = OrderIntent.limit_buy(probe.instrument_id, probe.quantity, quote.bid_price / 2.0)
-    report = await _call(  # type: ignore[attr-defined]
+    report = await _call(
         "place_order() (resting limit)", adapter.place_order, intent, product=probe.product
     )
     return report if report.status in _LIVE_STATUSES else None
@@ -460,7 +458,7 @@ async def _verify_execution(adapter: Any, probe: _Probe) -> None:
         return
 
     intent = OrderIntent.market_buy(probe.instrument_id, probe.quantity)
-    report = await _call(  # type: ignore[attr-defined]
+    report = await _call(
         "place_order()",
         adapter.place_order,
         intent,
@@ -483,12 +481,12 @@ async def _verify_execution(adapter: Any, probe: _Probe) -> None:
         _expect(bool(report.reject_reason), "a rejected order must carry a reject_reason")
 
     if caps.supports(Capability.ORDER_BOOK):
-        book = await _call("orders()", adapter.orders)  # type: ignore[attr-defined]
+        book = await _call("orders()", adapter.orders)
         _expect(
             any(o.order_id == report.order_id for o in book),
             f"place_order() returned {report.order_id} but it is absent from the order book",
         )
-        current = await _call(  # type: ignore[attr-defined]
+        current = await _call(
             f"order_status({report.order_id})", adapter.order_status, report.order_id
         )
         _expect_kind("order_status()", current, OrderReport)
@@ -499,11 +497,11 @@ async def _verify_execution(adapter: Any, probe: _Probe) -> None:
         )
         await _refuses(
             "order_status() for an unknown order",
-            lambda: adapter.order_status(probe.unknown_order),  # type: ignore[attr-defined]
+            lambda: adapter.order_status(probe.unknown_order),
             AdapterError,
         )
 
-    again = await _call(  # type: ignore[attr-defined]
+    again = await _call(
         "place_order() with a repeated client_order_id",
         adapter.place_order,
         intent,
@@ -517,7 +515,7 @@ async def _verify_execution(adapter: Any, probe: _Probe) -> None:
     )
 
     if report.status is OrderStatus.FILLED and caps.supports(Capability.TRADE_BOOK):
-        fills: Sequence[Trade] = await _call("trades()", adapter.trades)  # type: ignore[attr-defined]
+        fills: Sequence[Trade] = await _call("trades()", adapter.trades)
         matching = [t for t in fills if t.order_id == report.order_id]
         _expect(
             bool(matching),
@@ -528,9 +526,7 @@ async def _verify_execution(adapter: Any, probe: _Probe) -> None:
             f"trades() disagrees with the fill quantity {report.filled_quantity}",
         )
     if report.status is OrderStatus.FILLED and caps.supports(Capability.POSITIONS):
-        positions: Sequence[Position] = await _call(  # type: ignore[attr-defined]
-            "positions()", adapter.positions
-        )
+        positions: Sequence[Position] = await _call("positions()", adapter.positions)
         held = [p for p in positions if p.instrument_id == probe.instrument_id]
         _expect(
             bool(held) and not held[0].is_flat,
@@ -540,30 +536,30 @@ async def _verify_execution(adapter: Any, probe: _Probe) -> None:
     if caps.supports(Capability.CANCEL_ORDER):
         resting = await _place_resting_order(adapter, probe)
         if resting is not None:
-            await _call("cancel_order()", adapter.cancel_order, resting.order_id)  # type: ignore[attr-defined]
-            after = await _call(  # type: ignore[attr-defined]
+            await _call("cancel_order()", adapter.cancel_order, resting.order_id)
+            after = await _call(
                 f"order_status({resting.order_id})", adapter.order_status, resting.order_id
             )
             _expect(
                 after.status is OrderStatus.CANCELLED,
                 f"cancel_order() left {resting.order_id} in {after.status}, expected cancelled",
             )
-            await _call(  # type: ignore[attr-defined]
+            await _call(
                 "cancel_order() again (a no-op, not an error)",
                 adapter.cancel_order,
                 resting.order_id,
             )
         await _refuses(
             "cancel_order() for an unknown order",
-            lambda: adapter.cancel_order(probe.unknown_order),  # type: ignore[attr-defined]
+            lambda: adapter.cancel_order(probe.unknown_order),
             AdapterError,
         )
 
     if caps.supports(Capability.CANCEL_ALL):
         resting = await _place_resting_order(adapter, probe)
         if resting is not None:
-            await _call("cancel_all()", adapter.cancel_all)  # type: ignore[attr-defined]
-            book: Sequence[OrderReport] = await _call("orders()", adapter.orders)  # type: ignore[attr-defined]
+            await _call("cancel_all()", adapter.cancel_all)
+            book: Sequence[OrderReport] = await _call("orders()", adapter.orders)
             live = [o.order_id for o in book if o.status in _LIVE_STATUSES]
             _expect(not live, f"cancel_all() left live orders behind: {live}")
 
@@ -585,7 +581,9 @@ async def verify_adapter_contract(
     try:
         caps = adapter.capabilities()
         if caps.supports(Capability.INSTRUMENT_MASTER):
-            instruments: list[Instrument] = await _call("instruments()", adapter.instruments)  # type: ignore[attr-defined]
+            instruments: list[Instrument] = await _call(
+                "instruments()", cast(MarketDataClient, adapter).instruments
+            )
         else:
             instruments = [
                 Instrument(InstrumentId("HONBA-CONTRACT", "TEST"), InstrumentKind.EQUITY, 1.0, 0.05)

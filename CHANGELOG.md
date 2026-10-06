@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Python adapters: capability-aware registry typing
+
+- `AdapterRegistry.create_market_data(name, **config) -> MarketDataClient` and `create_execution(...) -> ExecutionClient`
+  (plus `resolve_market_data_adapter` / `resolve_execution_adapter`) return adapters typed with their role methods
+  (`instruments`, `search_instruments`, `quote`, `place_order`...), checked at runtime; an adapter without the role raises
+  `AdapterError`. New `MarketDataClient` / `ExecutionClient` protocols. `create` / `resolve_adapter` are unchanged.
+  Removed the unneeded `# type: ignore[attr-defined]` workarounds in `adapters/contract.py`.
+
 ### WASM: OHLC input validation
 
 - `ohlc_indicator_series` now rejects bars where `high < low` (`IndicatorError::InvertedRange(index)`); added edge-case

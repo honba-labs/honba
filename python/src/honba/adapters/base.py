@@ -54,7 +54,13 @@ from honba.domain.position import Position
 from honba.domain.tick import QuoteTick
 from honba.domain.trade import Trade
 
-__all__ = ["Adapter", "ExecutionAdapter", "MarketDataAdapter"]
+__all__ = [
+    "Adapter",
+    "ExecutionAdapter",
+    "ExecutionClient",
+    "MarketDataAdapter",
+    "MarketDataClient",
+]
 
 
 class Adapter(ABC):
@@ -251,3 +257,30 @@ class ExecutionAdapter(Protocol):
     async def margin(self, instrument_id: InstrumentId | None = None) -> MarginReport:
         """Margin required per the broker; account level when ``instrument_id`` is ``None``."""
         ...
+
+
+@runtime_checkable
+class _Lifecycle(Protocol):
+    """The :class:`Adapter` facade as a structural type, so it can be combined with a role."""
+
+    name: str
+
+    def capabilities(self) -> AdapterCapabilities: ...
+
+    async def connect(self) -> SessionInfo: ...
+
+    async def disconnect(self) -> None: ...
+
+    def is_connected(self) -> bool: ...
+
+    async def session(self) -> SessionInfo: ...
+
+
+@runtime_checkable
+class MarketDataClient(_Lifecycle, MarketDataAdapter, Protocol):
+    """An adapter with lifecycle *and* market data; what ``create_market_data`` returns."""
+
+
+@runtime_checkable
+class ExecutionClient(_Lifecycle, ExecutionAdapter, Protocol):
+    """An adapter with lifecycle *and* execution; what ``create_execution`` returns."""

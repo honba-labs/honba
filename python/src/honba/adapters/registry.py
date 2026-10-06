@@ -21,7 +21,7 @@ from collections.abc import Callable
 from importlib.metadata import entry_points
 from typing import Any
 
-from honba.adapters.base import Adapter
+from honba.adapters.base import Adapter, ExecutionClient, MarketDataClient
 from honba.adapters.errors import AdapterError, AdapterNotFound
 
 __all__ = [
@@ -32,6 +32,8 @@ __all__ = [
     "default_registry",
     "register_adapter",
     "resolve_adapter",
+    "resolve_execution_adapter",
+    "resolve_market_data_adapter",
 ]
 
 #: Entry-point group adapter packages advertise themselves under.
@@ -135,6 +137,26 @@ class AdapterRegistry:
             )
         return adapter
 
+    def create_market_data(self, name: str, /, **config: Any) -> MarketDataClient:
+        """Like :meth:`create`, typed as an adapter with market data (``instruments``, ``quote``...).
+
+        Raises :class:`AdapterError` if the adapter does not implement market data.
+        """
+        adapter = self.create(name, **config)
+        if not isinstance(adapter, MarketDataClient):
+            raise AdapterError(f"adapter {name!r} does not implement market data")
+        return adapter
+
+    def create_execution(self, name: str, /, **config: Any) -> ExecutionClient:
+        """Like :meth:`create`, typed as an adapter with execution (``place_order``...).
+
+        Raises :class:`AdapterError` if the adapter does not implement execution.
+        """
+        adapter = self.create(name, **config)
+        if not isinstance(adapter, ExecutionClient):
+            raise AdapterError(f"adapter {name!r} does not implement execution")
+        return adapter
+
     def available(self) -> list[str]:
         """Sorted names of every registered and discoverable adapter."""
         self.discover()
@@ -157,6 +179,16 @@ def register_adapter(name: str, factory: AdapterFactory, *, replace: bool = Fals
 def resolve_adapter(name: str, /, **config: Any) -> Adapter:
     """Build a registered adapter by name; how a run config's ``adapter.name`` is honoured."""
     return _DEFAULT_REGISTRY.create(name, **config)
+
+
+def resolve_market_data_adapter(name: str, /, **config: Any) -> MarketDataClient:
+    """:func:`resolve_adapter`, typed and checked as a market-data adapter."""
+    return _DEFAULT_REGISTRY.create_market_data(name, **config)
+
+
+def resolve_execution_adapter(name: str, /, **config: Any) -> ExecutionClient:
+    """:func:`resolve_adapter`, typed and checked as an execution adapter."""
+    return _DEFAULT_REGISTRY.create_execution(name, **config)
 
 
 def available_adapters() -> list[str]:

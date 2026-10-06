@@ -14,7 +14,13 @@ Broker implementations live in the separate ``honba-adapters`` repository, insta
 packages that advertise themselves through the ``honba.adapters`` entry-point group.
 """
 
-from honba.adapters.base import Adapter, ExecutionAdapter, MarketDataAdapter
+from honba.adapters.base import (
+    Adapter,
+    ExecutionAdapter,
+    ExecutionClient,
+    MarketDataAdapter,
+    MarketDataClient,
+)
 from honba.adapters.boundary import (
     BoundaryViolation,
     find_boundary_violations,
@@ -56,6 +62,8 @@ from honba.adapters.registry import (
     default_registry,
     register_adapter,
     resolve_adapter,
+    resolve_execution_adapter,
+    resolve_market_data_adapter,
 )
 
 __all__ = [
@@ -72,10 +80,12 @@ __all__ = [
     "CapabilityError",
     "DepthLevel",
     "ExecutionAdapter",
+    "ExecutionClient",
     "Funds",
     "Holding",
     "MarginReport",
     "MarketDataAdapter",
+    "MarketDataClient",
     "MarketDepth",
     "OrderReport",
     "Product",
@@ -94,4 +104,6 @@ __all__ = [
     "format_violations",
     "register_adapter",
     "resolve_adapter",
+    "resolve_execution_adapter",
+    "resolve_market_data_adapter",
 ]
