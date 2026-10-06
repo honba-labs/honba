@@ -1,4 +1,5 @@
-//! Handlers for `GET /instruments`, `GET /instruments/{id}` and `GET /bars/{id}`.
+//! Handlers for `GET /instruments`, `GET /instruments/{id}`, `GET /bars/{id}`, `GET /quotes`
+//! and `GET /depth/{id}`.
 //!
 //! Each handler resolves its request with the pure functions in `honba-api`,
 //! calls a read port, and answers inside the standard envelope. Failures use
@@ -14,8 +15,9 @@ use axum::{
     response::{IntoResponse, Json, Response},
 };
 use honba_api::{
-    instrument_json, parse_instrument_id, ApiResponse, BarsQuery, BarsResponse, ErrorCode,
-    ErrorDetail, InstrumentsQuery, InstrumentsResponse, ResponseEnvelope,
+    instrument_json, parse_instrument_id, ApiResponse, BarsQuery, BarsResponse, DepthLevel,
+    DepthQuery, DepthResponse, ErrorCode, ErrorDetail, InstrumentsQuery, InstrumentsResponse,
+    QuotesQuery, QuotesResponse, ResponseEnvelope,
 };
 use honba_ports::{BarRequest, PortError};
 use serde::de::DeserializeOwned;
@@ -159,6 +161,101 @@ pub(crate) async fn get_bars(
     };
     match state.bars.read_bars(&request).await {
         Ok(bars) => success(BarsResponse { bars }),
+        Err(error) => port_failure(error),
+    }
+}
+
+/// `GET /quotes`: the latest (or `as_of`) quote of every instrument the symbols name.
+///
+/// Symbols expand across venues unless `venue` is set; results are in instrument-id order. A
+/// symbol that matches no instrument is a 404 `instrument_not_found`; an instrument with no quote
+/// at that time is a 404 `market_data_unavailable`, so a partial answer is never passed off as
+/// complete.
+pub(crate) async fn get_quotes(
+    State(state): State<Arc<AppState>>,
+    ApiQuery(query): ApiQuery<QuotesQuery>,
+) -> Response {
+    let resolved = match query.resolve() {
+        Ok(resolved) => resolved,
+        Err(detail) => return unprocessable(detail),
+    };
+    let mut known = match state.instruments.list_instruments().await {
+        Ok(all) => all,
+        Err(error) => return port_failure(error),
+    };
+    known.sort_by(|a, b| a.id().cmp(b.id()));
+    let mut wanted = Vec::new();
+    for symbol in &resolved.symbols {
+        let before = wanted.len();
+        wanted.extend(known.iter().map(|instrument| instrument.id()).filter(|id| {
+            id.symbol() == symbol && resolved.venue.as_ref().map_or(true, |v| id.exchange() == v)
+        }));
+        if wanted.len() == before {
+            return failure(
+                StatusCode::NOT_FOUND,
+                ErrorDetail::new(
+                    ErrorCode::InstrumentNotFound,
+                    format!("no instrument for symbol {symbol}"),
+                ),
+            );
+        }
+    }
+    wanted.sort();
+    wanted.dedup();
+    let mut quotes = Vec::with_capacity(wanted.len());
+    for id in wanted {
+        match state.quotes.read_quote(id, resolved.as_of).await {
+            Ok(Some(quote)) => quotes.push(quote),
+            Ok(None) => {
+                return failure(
+                    StatusCode::NOT_FOUND,
+                    ErrorDetail::new(
+                        ErrorCode::MarketDataUnavailable,
+                        format!("no quote for {id} at the requested time"),
+                    ),
+                )
+            }
+            Err(error) => return port_failure(error),
+        }
+    }
+    success(QuotesResponse { quotes })
+}
+
+/// `GET /depth/{id}`: the order book, or 404 `market_data_unavailable` when the source has none.
+pub(crate) async fn get_depth(
+    State(state): State<Arc<AppState>>,
+    Path(raw): Path<String>,
+    ApiQuery(query): ApiQuery<DepthQuery>,
+) -> Response {
+    let id = match parse_instrument_id(&raw) {
+        Ok(id) => id,
+        Err(detail) => return unprocessable(detail),
+    };
+    let levels = match query.levels() {
+        Ok(levels) => levels,
+        Err(detail) => return unprocessable(detail),
+    };
+    match state.instruments.get_instrument(&id).await {
+        Ok(Some(_)) => {}
+        Ok(None) => return instrument_not_found(&id),
+        Err(error) => return port_failure(error),
+    }
+    match state.depth.read_depth(&id, levels).await {
+        Ok(book) => {
+            let side = |levels: Vec<honba_ports::DepthLevel>| {
+                levels
+                    .into_iter()
+                    .map(|level| DepthLevel {
+                        price: level.price,
+                        qty: level.qty,
+                    })
+                    .collect()
+            };
+            success(DepthResponse {
+                bids: side(book.bids),
+                asks: side(book.asks),
+            })
+        }
         Err(error) => port_failure(error),
     }
 }

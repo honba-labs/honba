@@ -324,6 +324,7 @@ class QuoteTick:
     ts_init: UnixNanos
 
 class QuotesQuery:
+    as_of: str | None = None
     symbols: str | None = None
     venue: str | None = None
 

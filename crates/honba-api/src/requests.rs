@@ -26,6 +26,10 @@ pub struct QuotesQuery {
     /// Venue/exchange.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub venue: Option<String>,
+    /// Return the latest quote known at this time (RFC3339 or ISO-8601 date, inclusive);
+    /// the latest held when omitted.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub as_of: Option<String>,
 }
 
 /// Bars query parameters.

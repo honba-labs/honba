@@ -1,4 +1,5 @@
-//! Query resolution and response mapping for `GET /instruments` and `GET /bars/{id}`.
+//! Query resolution and response mapping for the market-data read endpoints
+//! (`/instruments`, `/bars/{id}`, `/quotes`, `/depth/{id}`).
 //!
 //! Everything here is pure: it turns the string-typed query DTOs into domain
 //! values and reports a bad request as an [`ErrorDetail`] that names the
@@ -12,10 +13,27 @@ use honba_messages::{
 };
 use serde_json::{json, Value};
 
-use crate::requests::{BarsQuery, InstrumentsQuery};
+use crate::requests::{BarsQuery, DepthQuery, InstrumentsQuery, QuotesQuery};
 
 /// The timeframe used when `tf` is omitted from a bars query.
 pub const DEFAULT_TIMEFRAME: &str = "1m";
+
+/// Levels per side returned by `GET /depth/{id}` when `depth` is omitted.
+pub const DEFAULT_DEPTH_LEVELS: usize = 5;
+
+/// The most levels per side `GET /depth/{id}` accepts.
+pub const MAX_DEPTH_LEVELS: u32 = 50;
+
+/// A [`QuotesQuery`] resolved into domain values.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ResolvedQuotesQuery {
+    /// Requested symbols, trimmed, de-duplicated, in request order.
+    pub symbols: Vec<String>,
+    /// Exchange the symbols are restricted to, if any.
+    pub venue: Option<Exchange>,
+    /// Inclusive point in time the quotes are known at; `None` means the latest.
+    pub as_of: Option<UnixNanos>,
+}
 
 /// A [`BarsQuery`] resolved into domain values.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -164,4 +182,49 @@ pub fn instrument_json(instrument: &Instrument) -> Value {
         "lot_size": instrument.lot_size(),
         "tick_size": instrument.tick_size(),
     })
+}
+
+impl QuotesQuery {
+    /// Resolves the query: at least one symbol, an optional venue, an optional `as_of` time.
+    pub fn resolve(&self) -> Result<ResolvedQuotesQuery, ErrorDetail> {
+        let mut symbols: Vec<String> = Vec::new();
+        for symbol in self.symbols.as_deref().unwrap_or_default().split(',') {
+            let symbol = symbol.trim();
+            if !symbol.is_empty() && !symbols.iter().any(|seen| seen == symbol) {
+                symbols.push(symbol.to_owned());
+            }
+        }
+        if symbols.is_empty() {
+            return Err(invalid(
+                "symbols",
+                "missing_symbols",
+                "`symbols` must name at least one symbol, comma-separated",
+            ));
+        }
+        let as_of = self
+            .as_of
+            .as_deref()
+            .map(|text| parse_bound("as_of", text))
+            .transpose()?;
+        Ok(ResolvedQuotesQuery {
+            symbols,
+            venue: self.venue.as_deref().map(Exchange::new),
+            as_of,
+        })
+    }
+}
+
+impl DepthQuery {
+    /// Resolves the number of levels per side: the default, or `1..=MAX_DEPTH_LEVELS`.
+    pub fn levels(&self) -> Result<usize, ErrorDetail> {
+        match self.depth {
+            None => Ok(DEFAULT_DEPTH_LEVELS),
+            Some(levels) if (1..=MAX_DEPTH_LEVELS).contains(&levels) => Ok(levels as usize),
+            Some(levels) => Err(invalid(
+                "depth",
+                "out_of_range",
+                format!("depth {levels} is not between 1 and {MAX_DEPTH_LEVELS}"),
+            )),
+        }
+    }
 }

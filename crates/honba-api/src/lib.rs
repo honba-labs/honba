@@ -25,7 +25,8 @@ pub use honba_messages::{
     ErrorDetail, HttpMethod, ParamLocation, ResponseEnvelope, API_VERSION, ENDPOINTS, WRITE_PATHS,
 };
 pub use market::{
-    instrument_json, parse_instrument_id, parse_timeframe, ResolvedBarsQuery, DEFAULT_TIMEFRAME,
+    instrument_json, parse_instrument_id, parse_timeframe, ResolvedBarsQuery, ResolvedQuotesQuery,
+    DEFAULT_DEPTH_LEVELS, DEFAULT_TIMEFRAME, MAX_DEPTH_LEVELS,
 };
 pub use requests::{
     BacktestRequest, BarsQuery, DepthQuery, InstrumentsQuery, OrdersRequest, QuotesQuery,

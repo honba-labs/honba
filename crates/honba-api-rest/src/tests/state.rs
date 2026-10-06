@@ -90,3 +90,14 @@ async fn an_unknown_query_parameter_is_a_422_envelope() {
     assert_eq!(json["error"]["code"], "validation_invalid_request");
     assert!(json["data"].is_null());
 }
+
+#[tokio::test]
+async fn a_reader_state_serves_quotes_and_reports_no_depth_from_the_same_reader() {
+    let state = AppState::from_reader(DatasetReader::from_dataset(Default::default()));
+    let id = honba_messages::InstrumentId::new("X", honba_messages::Exchange::new("NSE"));
+    assert_eq!(state.quotes.read_quote(&id, None).await.unwrap(), None);
+    assert!(matches!(
+        state.depth.read_depth(&id, 5).await,
+        Err(honba_ports::PortError::Unsupported(_))
+    ));
+}

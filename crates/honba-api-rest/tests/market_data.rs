@@ -338,3 +338,142 @@ async fn a_parquet_data_directory_serves_instruments_and_bars() {
     );
     assert_eq!(body["data"]["bars"][0]["close"], 103.0);
 }
+
+fn quote_ids(body: &Value) -> Vec<String> {
+    body["data"]["quotes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|q| {
+            format!(
+                "{}.{}",
+                q["instrument_id"]["symbol"].as_str().unwrap(),
+                q["instrument_id"]["exchange"].as_str().unwrap()
+            )
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn the_latest_quote_is_the_last_close_with_zero_sizes_and_both_timestamp_forms() {
+    let (status, body) = get(app(), "/quotes?symbols=TCS&venue=NSE").await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(quote_ids(&body), vec!["TCS.NSE"]);
+    let quote = &body["data"]["quotes"][0];
+    assert_eq!(quote["bid_price"], json!(105.0));
+    assert_eq!(quote["ask_price"], json!(105.0));
+    assert_eq!(quote["bid_size"], json!(0.0));
+    assert_eq!(quote["ask_size"], json!(0.0));
+    assert_eq!(quote["ts_event"]["iso"], "2024-01-01T00:04:00.000000000Z");
+    assert_eq!(
+        quote["ts_event"]["unix_nanos"],
+        json!((T0 + 4 * MINUTE).to_string())
+    );
+    assert_eq!(quote["ts_init"], quote["ts_event"]);
+}
+
+#[tokio::test]
+async fn symbols_expand_across_venues_in_id_order_and_keep_each_symbol_once() {
+    let (status, body) = get(app(), "/quotes?symbols=TCS,INFY,TCS").await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(quote_ids(&body), vec!["INFY.NSE", "TCS.BSE", "TCS.NSE"]);
+}
+
+#[tokio::test]
+async fn as_of_returns_the_quote_known_at_that_time_and_never_a_later_one() {
+    let (status, body) = get(
+        app(),
+        "/quotes?symbols=TCS&venue=NSE&as_of=2024-01-01T00:02:30Z",
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["data"]["quotes"][0]["bid_price"], json!(103.0));
+    let (_, exact) = get(
+        app(),
+        "/quotes?symbols=TCS&venue=NSE&as_of=2024-01-01T00:02:00Z",
+    )
+    .await;
+    assert_eq!(exact["data"]["quotes"][0]["bid_price"], json!(103.0));
+}
+
+#[tokio::test]
+async fn a_quote_before_the_first_bar_is_a_404_market_data_unavailable() {
+    let (status, body) = get(app(), "/quotes?symbols=TCS&venue=NSE&as_of=2023-12-31").await;
+    assert_error(
+        status,
+        &body,
+        StatusCode::NOT_FOUND,
+        "market_data_unavailable",
+    );
+}
+
+#[tokio::test]
+async fn quotes_are_deterministic() {
+    let (_, first) = get(app(), "/quotes?symbols=TCS,INFY").await;
+    let (_, second) = get(app(), "/quotes?symbols=TCS,INFY").await;
+    assert_eq!(first["data"], second["data"]);
+}
+
+#[tokio::test]
+async fn quote_requests_that_cannot_be_served_use_the_error_envelope() {
+    let (status, body) = get(app(), "/quotes?symbols=NOPE").await;
+    assert_error(status, &body, StatusCode::NOT_FOUND, "instrument_not_found");
+    let (status, body) = get(app(), "/quotes?symbols=TCS&venue=MCX").await;
+    assert_error(status, &body, StatusCode::NOT_FOUND, "instrument_not_found");
+    for uri in [
+        "/quotes",
+        "/quotes?symbols=",
+        "/quotes?symbols=TCS&as_of=soon",
+        "/quotes?symbol=TCS",
+    ] {
+        let (status, body) = get(app(), uri).await;
+        assert_error(
+            status,
+            &body,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "validation_invalid_request",
+        );
+    }
+}
+
+#[tokio::test]
+async fn depth_is_a_404_market_data_unavailable_because_the_dataset_has_bars_only() {
+    let (status, body) = get(app(), "/depth/TCS.NSE").await;
+    assert_error(
+        status,
+        &body,
+        StatusCode::NOT_FOUND,
+        "market_data_unavailable",
+    );
+    assert!(body["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("order book"));
+    let (status, body) = get(app(), "/depth/TCS.NSE?depth=10").await;
+    assert_error(
+        status,
+        &body,
+        StatusCode::NOT_FOUND,
+        "market_data_unavailable",
+    );
+}
+
+#[tokio::test]
+async fn depth_requests_are_validated_before_the_port_is_asked() {
+    let (status, body) = get(app(), "/depth/NOPE.NSE").await;
+    assert_error(status, &body, StatusCode::NOT_FOUND, "instrument_not_found");
+    for uri in [
+        "/depth/TCS",
+        "/depth/TCS.NSE?depth=0",
+        "/depth/TCS.NSE?depth=51",
+        "/depth/TCS.NSE?levels=3",
+    ] {
+        let (status, body) = get(app(), uri).await;
+        assert_error(
+            status,
+            &body,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "validation_invalid_request",
+        );
+    }
+}

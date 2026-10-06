@@ -2323,6 +2323,13 @@
         "additionalProperties": false,
         "description": "Quotes query parameters.",
         "properties": {
+          "as_of": {
+            "description": "Return the latest quote known at this time (RFC3339 or ISO-8601 date, inclusive); the latest held when omitted.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "symbols": {
             "description": "Comma-separated symbols.",
             "type": [
@@ -3946,6 +3953,18 @@
       "get": {
         "operationId": "get_quotes",
         "parameters": [
+          {
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "description": "Return the latest quote known at this time (RFC3339 or ISO-8601 date, inclusive); the latest held when omitted.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
           {
             "in": "query",
             "name": "symbols",

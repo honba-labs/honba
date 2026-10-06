@@ -9,7 +9,7 @@
 
 use axum::{
     async_trait,
-    extract::{rejection::JsonRejection, FromRequest, Path, Query, Request, State},
+    extract::{rejection::JsonRejection, FromRequest, Path, Request, State},
     http::StatusCode,
     response::{IntoResponse, Json, Response},
     routing::{delete, get, post},
@@ -17,8 +17,8 @@ use axum::{
 };
 use honba_api::{
     ApiResponse, BacktestRequest, Capabilities, CapabilitiesResponse, ErrorCode, ErrorDetail,
-    OrdersRequest, QuotesQuery, QuotesResponse, ResponseEnvelope, StrategiesRequest, SweepRequest,
-    VerifyStrategyRequest, VerifyStrategyResponse,
+    OrdersRequest, ResponseEnvelope, StrategiesRequest, SweepRequest, VerifyStrategyRequest,
+    VerifyStrategyResponse,
 };
 use std::sync::Arc;
 use tower_http::{compression::CompressionLayer, cors::CorsLayer, trace::TraceLayer};
@@ -80,9 +80,9 @@ pub fn api_router_with(state: AppState) -> Router {
         .route("/schema", get(get_schema))
         .route("/instruments", get(market::get_instruments))
         .route("/instruments/:id", get(market::get_instrument_by_id))
-        .route("/quotes", get(get_quotes))
+        .route("/quotes", get(market::get_quotes))
         .route("/bars/:id", get(market::get_bars))
-        .route("/depth/:id", get(get_depth))
+        .route("/depth/:id", get(market::get_depth))
         .route("/strategies", post(post_strategies).get(get_strategies))
         .route("/strategies/verify", post(post_verify_strategy))
         .route("/backtests", post(post_backtests))
@@ -144,17 +144,6 @@ async fn get_schema() -> Json<ResponseEnvelope<serde_json::Value>> {
         "openapi": "3.1.0",
         "version": honba_api::API_VERSION
     })))
-}
-
-async fn get_quotes(
-    State(_state): State<Arc<AppState>>,
-    Query(_query): Query<QuotesQuery>,
-) -> Json<ResponseEnvelope<QuotesResponse>> {
-    Json(ApiResponse::success(QuotesResponse { quotes: vec![] }))
-}
-
-async fn get_depth(Path(_id): Path<String>) -> Json<ResponseEnvelope<serde_json::Value>> {
-    Json(ApiResponse::success(serde_json::json!({})))
 }
 
 /// The 501 answer of a route that is in the contract but not built yet.
