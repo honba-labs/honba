@@ -45,6 +45,7 @@
   non-retryable `TransportApiError`, so `except ApiError` behaves the same on both transports.
 - Request builders reject times past the server's `i64` nanosecond range (after 2262-04-11T23:47:16.854775807Z) client-side
   with `RequestValidationError(field, 'invalid_time')`, like the server, before any round trip.
+- Datetime subclasses exposing `.nanosecond` (e.g. `pandas.Timestamp`) keep their sub-microsecond part in request bounds.
 
 ### WASM indicator surface (E11-S5, part 1)
 

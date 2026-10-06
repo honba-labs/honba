@@ -174,3 +174,24 @@ def test_times_beyond_the_server_nanosecond_range_are_rejected_client_side(value
 def test_the_last_representable_nanosecond_is_accepted() -> None:
     assert rq.bars("T.N", to="2262-04-11T23:47:16.854775807Z").query["to"].endswith("807Z")
     assert rq.bars("T.N", to=UnixNanos.from_ns(I64_MAX)).query
+
+
+class _NanoStamp(datetime):
+    """Stand-in for pandas.Timestamp: a datetime subclass with a ``nanosecond`` part."""
+
+    nanosecond = 0
+
+
+def _stamp(nanosecond: int) -> _NanoStamp:
+    stamp = _NanoStamp(2024, 1, 1, 0, 0, 0, 123456, tzinfo=timezone.utc)
+    stamp.nanosecond = nanosecond
+    return stamp
+
+
+def test_datetime_subclasses_keep_their_sub_microsecond_nanoseconds() -> None:
+    got = rq.bars("T.N", to=_stamp(789))
+    assert got.query == {"to": "2024-01-01T00:00:00.123456789Z"}
+
+
+def test_a_nanosecond_attribute_of_zero_changes_nothing() -> None:
+    assert rq.bars("T.N", to=_stamp(0)).query == {"to": "2024-01-01T00:00:00.123456000Z"}

@@ -131,6 +131,10 @@ def _to_ns_unbounded(field: str, value: object) -> tuple[str, int]:
         except OverflowError:
             raise bad("invalid_time", f"{field} {value!r} is out of range") from None
         ns = (delta.days * 86_400 + delta.seconds) * 1_000_000_000 + delta.microseconds * 1000
+        # Duck-typed (no pandas import): pandas.Timestamp keeps its 0-999 ns remainder here.
+        sub = getattr(value, "nanosecond", 0)
+        if isinstance(sub, int) and 0 <= sub < 1000:
+            ns += sub
         if ns < 0:
             raise bad("before_epoch", f"{field} {value!r} is before 1970-01-01")
         return UnixNanos.from_ns(ns).iso, ns
