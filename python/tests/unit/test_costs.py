@@ -11,6 +11,8 @@ Or standalone (this file imports the local costs module):
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 from honba.entities.order import OrderSide
@@ -152,5 +154,5 @@ class TestBreakdownDataclass:
 
     def test_frozen(self) -> None:
         b = nse_equity_delivery_breakdown(OrderSide.BUY, 1, 100)
-        with pytest.raises(Exception):
+        with pytest.raises(dataclasses.FrozenInstanceError):
             b.brokerage = 99  # type: ignore[misc]
