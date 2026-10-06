@@ -101,6 +101,21 @@ pub fn api_router_with(state: AppState) -> Router {
         .layer(TraceLayer::new_for_http())
 }
 
+/// Serves [`api_router_with`]`(state)` on `listener` until `shutdown` completes.
+///
+/// In-flight requests finish before this returns. The caller owns the listener, so a test can
+/// bind `127.0.0.1:0` and read the chosen port; the future owns the stop signal (ctrl-c in the
+/// CLI, a channel in tests). Handlers read no wall clock.
+pub async fn serve(
+    listener: tokio::net::TcpListener,
+    state: AppState,
+    shutdown: impl std::future::Future<Output = ()> + Send + 'static,
+) -> std::io::Result<()> {
+    axum::serve(listener, api_router_with(state))
+        .with_graceful_shutdown(shutdown)
+        .await
+}
+
 /// Get API capabilities.
 async fn get_capabilities(
     State(_state): State<Arc<AppState>>,

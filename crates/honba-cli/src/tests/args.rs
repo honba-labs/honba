@@ -67,3 +67,23 @@ fn clap_definition_is_consistent() {
     use clap::CommandFactory;
     Cli::command().debug_assert();
 }
+
+#[test]
+fn serve_defaults_to_loopback_and_needs_a_data_dir() {
+    match parse(&["serve", "--data-dir", "bars"]).unwrap().command {
+        Commands::Serve { data_dir, addr } => {
+            assert_eq!(data_dir, PathBuf::from("bars"));
+            assert_eq!(addr, "127.0.0.1:8080".parse().unwrap());
+        }
+        _ => panic!("expected serve"),
+    }
+    match parse(&["serve", "--data-dir", "d", "--addr", "127.0.0.1:0"])
+        .unwrap()
+        .command
+    {
+        Commands::Serve { addr, .. } => assert_eq!(addr.port(), 0),
+        _ => panic!("expected serve"),
+    }
+    assert!(parse(&["serve"]).is_err());
+    assert!(parse(&["serve", "--data-dir", "d", "--addr", "not-an-addr"]).is_err());
+}

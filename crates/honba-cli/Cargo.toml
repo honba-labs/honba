@@ -30,3 +30,9 @@ honba-strategy        = { path = "../honba-strategy" }
 honba-testing         = { path = "../honba-testing" }
 honba-sim             = { path = "../honba-sim" }
 honba-codegen         = { path = "../honba-codegen" }
+honba-api-rest        = { path = "../honba-api-rest" }
+tokio                 = { version = "1", features = ["rt-multi-thread", "net", "signal"] }
+
+[dev-dependencies]
+arrow   = "53"
+parquet = { version = "53", features = ["arrow"] }

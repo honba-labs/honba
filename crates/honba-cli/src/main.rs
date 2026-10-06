@@ -2,12 +2,14 @@ mod backtest;
 mod calendars;
 mod data;
 mod schema;
+mod serve;
 #[cfg(test)]
 mod tests;
 mod verify;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use std::net::SocketAddr;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -52,6 +54,15 @@ enum Commands {
         pyi: Option<PathBuf>,
         #[arg(long)]
         mcp: Option<PathBuf>,
+    },
+    /// Serve the read-only REST API over a directory of SYMBOL.EXCHANGE.parquet bar files
+    Serve {
+        /// Directory holding the Parquet bar files
+        #[arg(long)]
+        data_dir: PathBuf,
+        /// Address to listen on
+        #[arg(long, default_value = "127.0.0.1:8080")]
+        addr: SocketAddr,
     },
     /// Verify a strategy manifest and print its compiled IR as JSON
     Verify {
@@ -122,6 +133,7 @@ fn main() -> Result<()> {
             pyi,
             mcp,
         } => schema::export_all(&schema_dir, &typescript, &openapi, &pyi, &mcp),
+        Commands::Serve { data_dir, addr } => serve::run(&data_dir, addr),
         Commands::Verify { manifest } => verify::run(&manifest),
     }
 }

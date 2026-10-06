@@ -96,6 +96,7 @@ ALLOWED_PROD = {
         "honba-sim",
         "honba-codegen",
         "honba-api",
+        "honba-api-rest",
     },
     "honba-api-rest": {
         "honba-api",
