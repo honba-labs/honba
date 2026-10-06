@@ -4,5 +4,6 @@ mod bar_cap;
 mod capabilities;
 mod cors;
 mod dispatch;
+mod fallback;
 mod health;
 mod state;

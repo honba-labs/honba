@@ -69,8 +69,12 @@ async fn errors_keep_their_status_and_envelope() {
     let (status, body) = call("GET", "/orders", None).await;
     assert_eq!(status, 501);
     assert_eq!(body["error"]["code"], "not_implemented");
-    let (status, _) = call("GET", "/no/such/route", None).await;
+    let (status, body) = call("GET", "/no/such/route", None).await;
     assert_eq!(status, 404);
+    assert_eq!(body["error"]["code"], "not_found");
+    let (status, body) = call("PUT", "/health", None).await;
+    assert_eq!(status, 405);
+    assert_eq!(body["error"]["code"], "unsupported");
 }
 
 #[tokio::test]

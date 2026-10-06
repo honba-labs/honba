@@ -79,7 +79,8 @@ async fn every_registry_endpoint_is_routed() {
 async fn an_unregistered_path_is_not_routed() {
     let (status, body) = call("GET", "/definitely/not/a/route").await;
     assert_eq!(status, StatusCode::NOT_FOUND);
-    assert!(body.is_empty());
+    let json: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["error"]["code"], "not_found");
 }
 
 #[tokio::test]

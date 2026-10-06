@@ -143,10 +143,34 @@ pub fn api_router_with_config(state: AppState, config: &ApiConfig) -> Router {
         .route("/positions/close", post(post_close_positions))
         .route("/screener/scan", get(screener::get_screener_scan))
         .route("/journals/:id", get(get_journal_by_id))
+        .fallback(unknown_route)
+        .method_not_allowed_fallback(unsupported_method)
         .with_state(state)
         .layer(CompressionLayer::new())
         .layer(cors_layer(config))
         .layer(TraceLayer::new_for_http())
+}
+
+/// An unknown route is a 404 `not_found` envelope, never an empty body.
+async fn unknown_route(uri: axum::http::Uri) -> Response {
+    market::failure(
+        StatusCode::NOT_FOUND,
+        ErrorDetail::new(
+            ErrorCode::NotFound,
+            format!("no such route: {}", uri.path()),
+        ),
+    )
+}
+
+/// A known path with a method it does not serve is a 405 `unsupported` envelope.
+async fn unsupported_method(method: Method, uri: axum::http::Uri) -> Response {
+    market::failure(
+        StatusCode::METHOD_NOT_ALLOWED,
+        ErrorDetail::new(
+            ErrorCode::Unsupported,
+            format!("{method} is not supported on {}", uri.path()),
+        ),
+    )
 }
 
 /// No CORS headers unless origins are listed; then only for those, read methods only.

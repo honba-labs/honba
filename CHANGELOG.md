@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### REST: unknown routes return an error envelope
+
+- An unknown route is now a 404 `not_found` envelope (was an empty body, which the Python client reported as
+  `InvalidResponseError`); a known path with an unsupported method is a 405 `unsupported` envelope (was empty).
+
 ### REST: screener scan (E11-S3 part 4)
 
 - `GET /screener/scan` is built (no longer 501). Query: `universe` (JSON array of `SYMBOL.EXCHANGE`, required),

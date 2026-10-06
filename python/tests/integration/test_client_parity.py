@@ -24,12 +24,10 @@ import pytest
 from honba.client import (
     ApiError,
     Client,
-    InvalidResponseError,
     MarketDataUnavailableApiError,
     NotFoundApiError,
     NotImplementedApiError,
     RequestValidationError,
-    Response,
     TransportApiError,
     ValidationApiError,
 )
@@ -343,12 +341,14 @@ def test_inproc_501_placeholders(inproc: Client) -> None:
     assert err.retryable is False
 
 
-def test_inproc_unknown_route_has_no_envelope(inproc: Client) -> None:
+def test_inproc_unknown_route_is_a_not_found_envelope(inproc: Client) -> None:
     resp = inproc.transport.request("GET", "/no/such/route")
-    assert resp == Response(404, None)
+    assert resp.status == 404
     from honba.client.errors import error_from_envelope
 
-    assert isinstance(error_from_envelope(resp.status, resp.json), InvalidResponseError)
+    err = error_from_envelope(resp.status, resp.json)
+    assert isinstance(err, NotFoundApiError)
+    assert err.code == "not_found"
 
 
 def test_inproc_unreadable_data_dir_is_a_transport_error(tmp_path: Path) -> None:
@@ -409,7 +409,7 @@ RAW_REQUESTS: list[tuple[str, str, dict[str, Any] | None, Any]] = [
     ("GET", "/screener/scan", {"universe": '["TCS.NSE"]', "filters": "{"}, None),  # 422
     ("GET", "/screener/scan", {"universe": '["TCS.NSE"]', "bogus": "1"}, None),  # 422
     ("GET", "/journals/abc", None, None),  # 501
-    ("GET", "/no/such/route", None, None),  # 404, no body
+    ("GET", "/no/such/route", None, None),  # 404 not_found envelope
 ]
 
 
