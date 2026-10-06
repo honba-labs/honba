@@ -202,7 +202,7 @@ impl Position {
     /// pos.apply_fill(PositionSide::Long, 100.0, 10.0);
     /// pos.apply_fill(PositionSide::Short, 40.0, 12.0);
     /// assert_eq!(pos.quantity(), 60.0);
-    /// assert_eq!(pos.realized_pnl().minor(), 8000);   // 40 * (12 - 10), in paise
+    /// assert_eq!(pos.realized_pnl().minor(), 8000);   // 40 * (12 - 10), in minor units
     /// ```
     pub fn apply_fill(&mut self, fill_side: PositionSide, qty: f64, px: f64) {
         debug_assert!(qty > 0.0, "fill quantity must be positive");
@@ -210,13 +210,16 @@ impl Position {
         if self.is_flat() {
             self.side = fill_side;
             self.quantity = qty;
-            self.avg_price = round_to_minor(px);
+            self.avg_price = round_to_minor(px, self.currency);
             return;
         }
 
         if fill_side == self.side {
             let new_qty = self.quantity + qty;
-            self.avg_price = round_to_minor((self.avg_price * self.quantity + px * qty) / new_qty);
+            self.avg_price = round_to_minor(
+                (self.avg_price * self.quantity + px * qty) / new_qty,
+                self.currency,
+            );
             self.quantity = new_qty;
             return;
         }
@@ -243,7 +246,7 @@ impl Position {
             // Reverse.
             self.side = fill_side;
             self.quantity = qty - self.quantity;
-            self.avg_price = round_to_minor(px);
+            self.avg_price = round_to_minor(px, self.currency);
         }
     }
 
@@ -260,7 +263,8 @@ impl Position {
     }
 }
 
-/// Rounds a price to the nearest minor unit, half away from zero (ADR 0011).
-fn round_to_minor(price: f64) -> f64 {
-    (price * 100.0).round() / 100.0
+/// Rounds a price to the nearest minor unit of `currency`, half away from zero
+/// (ADR 0011).
+fn round_to_minor(price: f64, currency: Currency) -> f64 {
+    crate::instrument::round_to_minor_price(price, currency.minor_exponent())
 }

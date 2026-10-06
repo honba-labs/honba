@@ -1,0 +1,22 @@
+{
+  "schema_version": 3,
+  "type": "Currency",
+  "cases": [
+    {"name": "inr", "value": {"currency": "INR", "minor_exponent": 2, "singular": "paisa", "plural": "paise"}},
+    {"name": "usd", "value": {"currency": "USD", "minor_exponent": 2, "singular": "cent", "plural": "cents"}},
+    {"name": "eur", "value": {"currency": "EUR", "minor_exponent": 2, "singular": "cent", "plural": "cents"}},
+    {"name": "gbp", "value": {"currency": "GBP", "minor_exponent": 2, "singular": "penny", "plural": "pence"}}
+  ],
+  "format_minor": [
+    {"name": "inr_plural", "currency": "INR", "amount": 1250, "text": "1,250 paise"},
+    {"name": "inr_singular", "currency": "INR", "amount": 1, "text": "1 paisa"},
+    {"name": "inr_zero", "currency": "INR", "amount": 0, "text": "0 paise"},
+    {"name": "inr_negative", "currency": "INR", "amount": -1250, "text": "-1,250 paise"},
+    {"name": "usd_singular", "currency": "USD", "amount": 1, "text": "1 cent"},
+    {"name": "usd_large", "currency": "USD", "amount": 100000000, "text": "100,000,000 cents"},
+    {"name": "eur_plural", "currency": "EUR", "amount": 2, "text": "2 cents"},
+    {"name": "gbp_plural", "currency": "GBP", "amount": 300, "text": "300 pence"},
+    {"name": "gbp_singular", "currency": "GBP", "amount": 1, "text": "1 penny"},
+    {"name": "gbp_negative_singular", "currency": "GBP", "amount": -1, "text": "-1 penny"}
+  ]
+}

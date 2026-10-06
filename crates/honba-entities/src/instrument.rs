@@ -40,6 +40,55 @@ impl Currency {
             Currency::Gbp => "GBP",
         }
     }
+
+    /// Returns the minor-unit exponent: one major unit is `10^exponent` minor
+    /// units (2 for every current currency).
+    ///
+    /// ```
+    /// use honba_entities::Currency;
+    ///
+    /// assert_eq!(Currency::Inr.minor_exponent(), 2);
+    /// ```
+    pub const fn minor_exponent(&self) -> u8 {
+        match self {
+            Currency::Inr | Currency::Usd | Currency::Eur | Currency::Gbp => 2,
+        }
+    }
+
+    /// Returns the names of the minor unit (paisa/paise, cent/cents, ...).
+    ///
+    /// Generic code says "minor"; these names are for display only.
+    ///
+    /// ```
+    /// use honba_entities::Currency;
+    ///
+    /// assert_eq!(Currency::Gbp.minor_unit().plural, "pence");
+    /// ```
+    pub const fn minor_unit(&self) -> MinorUnit {
+        match self {
+            Currency::Inr => MinorUnit {
+                singular: "paisa",
+                plural: "paise",
+            },
+            Currency::Usd | Currency::Eur => MinorUnit {
+                singular: "cent",
+                plural: "cents",
+            },
+            Currency::Gbp => MinorUnit {
+                singular: "penny",
+                plural: "pence",
+            },
+        }
+    }
+}
+
+/// The display names of a currency's minor unit.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MinorUnit {
+    /// Name for exactly one unit ("paisa").
+    pub singular: &'static str,
+    /// Name for any other count ("paise").
+    pub plural: &'static str,
 }
 
 impl fmt::Display for Currency {
@@ -50,9 +99,10 @@ impl fmt::Display for Currency {
 
 /// A monetary amount in a specific currency, in integer minor units.
 ///
-/// Amounts are `i64` minor units — paise for INR, cents for the rest — so the
-/// ledger is exact: `0.1 + 0.2` is 30 paise, not a float that is off by a
-/// fraction that compounds across a run. Construction from major units rounds
+/// Amounts are `i64` minor units (see [`Currency::minor_unit`]; `10^exponent`
+/// per major unit, [`Currency::minor_exponent`]) so the ledger is exact:
+/// `0.1 + 0.2` is 30 minor units, not a float that is off by a fraction that
+/// compounds across a run. Construction from major units rounds
 /// half away from zero and rejects non-finite input; serialization emits the
 /// integer, never a JSON float.
 ///
@@ -118,7 +168,13 @@ impl<'de> Deserialize<'de> for MoneyAmount {
 
 impl std::fmt::Display for Money {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {:.2}", self.currency, self.to_major_f64())
+        write!(
+            f,
+            "{} {:.prec$}",
+            self.currency,
+            self.to_major_f64(),
+            prec = usize::from(self.currency.minor_exponent())
+        )
     }
 }
 
@@ -189,7 +245,8 @@ impl JsonSchema for Money {
             metadata: Some(
                 schemars::schema::Metadata {
                     description: Some(
-                        "Monetary amount in integer minor units (paise/cents).".to_string(),
+                        "Monetary amount in integer minor units (see Currency minor_exponent)."
+                            .to_string(),
                     ),
                     ..Default::default()
                 }
@@ -200,50 +257,94 @@ impl JsonSchema for Money {
     }
 }
 
-/// Minor units per major unit. Fixed at 100: paise for INR, cents for
-/// USD/EUR/GBP. A currency that needs finer granularity is a new `Money`
-/// representation, not a field, because rounding would change everywhere.
-const MINOR_PER_MAJOR: f64 = 100.0;
+/// `10^exponent`: minor units per major unit.
+fn minor_scale(exponent: u8) -> f64 {
+    10f64.powi(i32::from(exponent))
+}
 
-/// Rounds a major-unit value to integer minor units, half away from zero.
-///
-/// Rejects NaN, infinities, and anything that cannot be represented exactly.
-fn round_major_to_minor(value: f64, currency: Currency) -> Result<Money, MoneyError> {
+/// Scales a major-unit value to (fractional) minor units at `exponent`,
+/// rejecting NaN, infinities and overflow.
+fn scale_to_minor(value: f64, exponent: u8) -> Result<f64, MoneyError> {
     if !value.is_finite() {
         return Err(MoneyError::NonFinite);
     }
-    let scaled = value * MINOR_PER_MAJOR;
+    let scaled = value * minor_scale(exponent);
     if scaled.abs() > i64::MAX as f64 {
         return Err(MoneyError::Overflow);
     }
+    Ok(scaled)
+}
+
+/// Rounds a major-unit value to integer minor units at `exponent`, half away
+/// from zero. Rejects NaN, infinities and overflow.
+pub(crate) fn round_major_to_minor_exp(value: f64, exponent: u8) -> Result<i64, MoneyError> {
+    Ok(scale_to_minor(value, exponent)?.round() as i64)
+}
+
+fn round_major_to_minor(value: f64, currency: Currency) -> Result<Money, MoneyError> {
     Ok(Money {
-        amount: scaled.round() as i64,
+        amount: round_major_to_minor_exp(value, currency.minor_exponent())?,
         currency,
     })
 }
 
 /// Float noise below this many minor units is treated as an exact amount
 /// before a directional (floor or ceiling) rounding, so `0.1 * 3` is a stake of
-/// 30 paise rather than 31. Far below one minor unit, far above f64 noise at
-/// ledger magnitudes.
+/// 30 minor units rather than 31. Far below one minor unit, far above f64
+/// noise at ledger magnitudes.
 const DIRECTIONAL_NOISE_MINOR: f64 = 1e-6;
 
-/// Scales a major-unit value to minor units, rejecting NaN, infinities and
-/// overflow, and snaps sub-[`DIRECTIONAL_NOISE_MINOR`] noise to the integer.
-fn scaled_minor(value: f64) -> Result<f64, MoneyError> {
-    if !value.is_finite() {
-        return Err(MoneyError::NonFinite);
-    }
-    let scaled = value * MINOR_PER_MAJOR;
-    if scaled.abs() > i64::MAX as f64 {
-        return Err(MoneyError::Overflow);
-    }
+/// Scales to minor units and snaps sub-[`DIRECTIONAL_NOISE_MINOR`] noise to
+/// the integer.
+fn scaled_minor(value: f64, exponent: u8) -> Result<f64, MoneyError> {
+    let scaled = scale_to_minor(value, exponent)?;
     let nearest = scaled.round();
     Ok(if (scaled - nearest).abs() < DIRECTIONAL_NOISE_MINOR {
         nearest
     } else {
         scaled
     })
+}
+
+/// Floors a major-unit value to minor units at `exponent` (payouts).
+pub(crate) fn floor_major_to_minor(value: f64, exponent: u8) -> Result<i64, MoneyError> {
+    Ok(scaled_minor(value, exponent)?.floor() as i64)
+}
+
+/// Ceils a major-unit value to minor units at `exponent` (stakes).
+pub(crate) fn ceil_major_to_minor(value: f64, exponent: u8) -> Result<i64, MoneyError> {
+    Ok(scaled_minor(value, exponent)?.ceil() as i64)
+}
+
+/// Minor units to major units, as a division by `10^exponent`.
+pub(crate) fn minor_to_major(amount: i64, exponent: u8) -> f64 {
+    amount as f64 / minor_scale(exponent)
+}
+
+/// Rounds a price to the nearest minor unit at `exponent`, half away from zero.
+pub(crate) fn round_to_minor_price(price: f64, exponent: u8) -> f64 {
+    let scale = minor_scale(exponent);
+    (price * scale).round() / scale
+}
+
+/// Renders `amount` with thousands separators and the unit name
+/// (`singular` only for exactly one).
+pub(crate) fn format_minor_amount(amount: i64, singular: &str, plural: &str) -> String {
+    let digits = amount.unsigned_abs().to_string();
+    let mut grouped = String::with_capacity(digits.len() + digits.len() / 3);
+    for (i, ch) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i) % 3 == 0 {
+            grouped.push(',');
+        }
+        grouped.push(ch);
+    }
+    let sign = if amount < 0 { "-" } else { "" };
+    let name = if amount == 1 || amount == -1 {
+        singular
+    } else {
+        plural
+    };
+    format!("{sign}{grouped} {name}")
 }
 
 /// Why a money value was rejected.
@@ -344,7 +445,21 @@ impl Money {
 
     /// Returns the amount in major units, as an exact division.
     pub fn to_major_f64(&self) -> f64 {
-        self.amount as f64 / MINOR_PER_MAJOR
+        minor_to_major(self.amount, self.currency.minor_exponent())
+    }
+
+    /// Renders the amount in minor units with the currency's unit name:
+    /// `1,250 paise`, `1 cent`, `300 pence`.
+    ///
+    /// ```
+    /// use honba_entities::{Currency, Money};
+    ///
+    /// assert_eq!(Money::new(1250, Currency::Inr).format_minor(), "1,250 paise");
+    /// assert_eq!(Money::new(1, Currency::Usd).format_minor(), "1 cent");
+    /// ```
+    pub fn format_minor(&self) -> String {
+        let unit = self.currency.minor_unit();
+        format_minor_amount(self.amount, unit.singular, unit.plural)
     }
 
     /// Returns the currency.
@@ -375,7 +490,7 @@ impl Money {
     /// ```
     pub fn payout_from_major_f64(major: f64, currency: Currency) -> Result<Self, MoneyError> {
         Ok(Self {
-            amount: scaled_minor(major)?.floor() as i64,
+            amount: floor_major_to_minor(major, currency.minor_exponent())?,
             currency,
         })
     }
@@ -395,14 +510,14 @@ impl Money {
     /// ```
     pub fn stake_from_major_f64(major: f64, currency: Currency) -> Result<Self, MoneyError> {
         Ok(Self {
-            amount: scaled_minor(major)?.ceil() as i64,
+            amount: ceil_major_to_minor(major, currency.minor_exponent())?,
             currency,
         })
     }
 
     /// Multiplies a quantity by a price and rounds to minor units.
     ///
-    /// The product of two floats is rounded once, to the nearest paise, which
+    /// The product of two floats is rounded once, to the nearest minor unit, which
     /// is the value that settles. Negative quantities (sell notionals) round
     /// symmetrically with positive ones.
     pub fn mul_qty(quantity: f64, price: f64, currency: Currency) -> Result<Self, MoneyError> {

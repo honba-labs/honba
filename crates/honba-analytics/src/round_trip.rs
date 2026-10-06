@@ -1,6 +1,6 @@
 //! A completed round-trip trade: entry and exit paired.
 
-use honba_entities::{PositionSide, Trade};
+use honba_entities::{Money, PositionSide, Trade};
 use honba_messages::{InstrumentId, OrderSide, UnixNanos};
 use serde::{Deserialize, Serialize};
 
@@ -82,7 +82,11 @@ impl RoundTrip {
         };
         // Fees are ledger Money; gross and net stay f64 statistics, so the
         // sum converts once, at the boundary, rounded to minor units.
-        let fees_major = (entry.costs().minor() + exit.costs().minor()) as f64 / 100.0;
+        let fees_minor = Money::new(
+            entry.costs().minor() + exit.costs().minor(),
+            entry.costs().currency(),
+        );
+        let fees_major = fees_minor.to_major_f64();
         let fees = fees_major;
         let net_pnl = gross_pnl - fees;
         let entry_notional = entry_price * quantity;

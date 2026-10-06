@@ -1807,7 +1807,7 @@
         "description": "Dynamic value of a metric in a screener row or symbol fact table."
       },
       "Money": {
-        "description": "Monetary amount in integer minor units (paise/cents).",
+        "description": "Monetary amount in integer minor units (see Currency minor_exponent).",
         "properties": {
           "amount": {
             "format": "int64",
