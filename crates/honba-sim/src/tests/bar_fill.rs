@@ -191,7 +191,7 @@ fn flat_and_proportional_costs_add_up_per_fill() {
         .unwrap();
     let fills = exec.drain_fills().unwrap();
     // Costs are an amount, never signed by side: the ledger applies the sign.
-    // 20.00 flat + 10 bps of 1,000.00 = 1.00, each leg rounded once: 2100 paise.
+    // 20.00 flat + 10 bps of 1,000.00 = 1.00, each leg rounded once: 2100 minor units.
     assert_eq!(fills[0].costs().minor(), 2100);
     assert_eq!(fills[1].costs().minor(), 2100);
     assert_eq!(fills[0].price(), 100.0);
@@ -207,7 +207,7 @@ fn flat_only_and_bps_only_costs() {
     let mut bps = costed(0.0, 625.0);
     observe(&mut bps, 64.0, 1);
     bps.submit(market("O-1", OrderSide::Sell, 1.0, 1)).unwrap();
-    // 625 bps of 64.00 = 4.00: 400 paise.
+    // 625 bps of 64.00 = 4.00: 400 minor units.
     assert_eq!(bps.drain_fills().unwrap()[0].costs().minor(), 400);
 }
 
@@ -248,9 +248,9 @@ fn fill_costs_reject_invalid_values_with_typed_errors() {
 
 #[test]
 fn each_cost_leg_rounds_once_before_the_legs_are_summed() {
-    // ADR 0011: flat 0.005 rounds to 1 paisa and 1 bps of 50.00 (0.005) rounds
-    // to 1 paisa: 2 paise. Summing first (0.01) and rounding once would charge
-    // 1 paisa, a total the broker's per-leg ledger cannot reproduce.
+    // ADR 0011: flat 0.005 rounds to 1 minor unit and 1 bps of 50.00 (0.005) rounds
+    // to 1 minor unit: 2 minor units. Summing first (0.01) and rounding once would charge
+    // 1 minor unit, a total the broker's per-leg ledger cannot reproduce.
     let mut exec = costed(0.005, 1.0);
     observe(&mut exec, 50.0, 1);
     exec.submit(market("O-1", OrderSide::Buy, 1.0, 1)).unwrap();
@@ -259,7 +259,7 @@ fn each_cost_leg_rounds_once_before_the_legs_are_summed() {
 
 #[test]
 fn a_cost_that_cannot_be_represented_fails_the_fill_instead_of_charging_zero() {
-    // A notional so large its bps leg overflows i64 paise must not settle as a
+    // A notional so large its bps leg overflows i64 minor units must not settle as a
     // free fill: zero costs would round in the reporter's favour.
     let mut exec = costed(0.0, MAX_COST_BPS);
     observe(&mut exec, 1e10, 1);

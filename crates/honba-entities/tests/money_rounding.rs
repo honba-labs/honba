@@ -32,7 +32,7 @@ fn a_sized_trade_debits_a_lot_rounded_stake_and_credits_a_floored_payout() {
     acct.debit(stake).unwrap();
     assert_eq!(acct.cash().minor(), 1_000_000_000 - 330_000_750);
 
-    // A payout with a sub-paisa tail (say, a pro-rata dividend) floors.
+    // A payout with a sub-minor-unit tail (say, a pro-rata dividend) floors.
     let payout = Money::payout_from_major_f64(150.0 * 0.333_333, Currency::Inr).unwrap();
     assert_eq!(payout.minor(), 4999, "49.99995 floors to 49.99");
     acct.credit(payout).unwrap();
@@ -53,8 +53,8 @@ fn an_off_tick_price_cannot_settle_into_the_account() {
 
 #[test]
 fn per_fill_rounding_keeps_account_and_position_in_lockstep() {
-    // Every fill settles notional in integer paise; realized PnL is booked per
-    // fill in integer paise; the account's cash change equals the realized PnL
+    // Every fill settles notional in integer minor units; realized PnL is booked per
+    // fill in integer minor units; the account's cash change equals the realized PnL
     // exactly once the position is flat again.
     let inst = nifty_future();
     let start = Money::new(100_000_000, Currency::Inr);

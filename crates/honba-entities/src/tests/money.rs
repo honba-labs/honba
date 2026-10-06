@@ -44,7 +44,7 @@ fn from_major_rejects_non_finite_values() {
 
 #[test]
 fn from_major_rejects_overflow() {
-    // i64::MAX paise is roughly 9.2e16 INR; anything above cannot be exact.
+    // i64::MAX minor units is roughly 9.2e16 INR; anything above cannot be exact.
     assert!(Money::from_major_f64(1e18, Currency::Inr).is_err());
 }
 
@@ -65,7 +65,7 @@ fn addition_is_exact_in_minor_units() {
 
 #[test]
 fn repeated_addition_does_not_drift() {
-    // 10,000 fills of 95 paise must be exactly 950,000 paise, not a float
+    // 10,000 fills of 95 minor units must be exactly 950,000 minor units, not a float
     // that is off by a fraction that compounds.
     let leg = Money::from_major_f64(0.95, Currency::Inr).unwrap();
     let mut total = Money::zero(Currency::Inr);
@@ -77,7 +77,7 @@ fn repeated_addition_does_not_drift() {
 
 #[test]
 fn quantity_times_price_rounds_to_the_nearest_minor_unit() {
-    // 75 lots at 22,000.25 rounds to the paise it settles at.
+    // 75 lots at 22,000.25 rounds to the minor unit it settles at.
     let notional = Money::mul_qty(75.0, 22_000.25, Currency::Inr).unwrap();
     assert_eq!(notional.minor(), 165_001_875);
 }
@@ -156,10 +156,10 @@ fn display_reads_in_major_units() {
 
 #[test]
 fn a_payout_floors_to_the_minor_unit() {
-    // 10.019 is 1001.9 paise: a payout never rounds up in the portfolio's favour.
+    // 10.019 is 1001.9 minor units: a payout never rounds up in the portfolio's favour.
     let p = Money::payout_from_major_f64(10.019, Currency::Inr).unwrap();
     assert_eq!(p.minor(), 1001);
-    // Half a paisa still floors (nearest would round it up).
+    // Half a minor unit still floors (nearest would round it up).
     assert_eq!(
         Money::payout_from_major_f64(10.005, Currency::Inr)
             .unwrap()
@@ -197,8 +197,8 @@ fn a_stake_rounds_up_to_the_minor_unit() {
 
 #[test]
 fn float_noise_on_an_exact_amount_is_not_rounded_against_anyone() {
-    // 0.1 * 3 is 0.30000000000000004 in f64: a stake of 30 paise, not 31,
-    // and a payout of 30, not 29 when the noise is below the paisa.
+    // 0.1 * 3 is 0.30000000000000004 in f64: a stake of 30 minor units, not 31,
+    // and a payout of 30, not 29 when the noise is below the minor unit.
     let noisy_up = 0.1 * 3.0;
     let noisy_down = 0.7 * 3.0; // 2.0999999999999996
     assert_eq!(

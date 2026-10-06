@@ -27,7 +27,7 @@ fn instrument_metadata() {
 #[test]
 fn money_arithmetic() {
     // ADR 0011 / E0-S6: Money is integer minor units now. 100.00 INR is 10,000
-    // paise; the contract under test is unchanged (exact addition) but the
+    // minor units; the contract under test is unchanged (exact addition) but the
     // constructor takes minor units.
     let a = Money::new(10_000, Currency::Inr);
     let b = Money::new(4_000, Currency::Inr);
@@ -65,7 +65,7 @@ fn position_realizes_pnl_on_reduce() {
     pos.apply_fill(PositionSide::Long, 100.0, 10.0);
     pos.apply_fill(PositionSide::Short, 40.0, 12.0);
     assert_eq!(pos.quantity(), 60.0);
-    assert_eq!(pos.realized_pnl().minor(), 8_000); // 40 * (12 - 10), in paise
+    assert_eq!(pos.realized_pnl().minor(), 8_000); // 40 * (12 - 10), in minor units
     assert_eq!(pos.side(), PositionSide::Long);
 }
 
@@ -77,7 +77,7 @@ fn position_reverses_on_large_opposite_fill() {
     assert_eq!(pos.side(), PositionSide::Short);
     assert_eq!(pos.quantity(), 30.0);
     assert_eq!(pos.avg_price(), 12.0);
-    assert_eq!(pos.realized_pnl().minor(), 10_000); // 50 * (12 - 10), in paise
+    assert_eq!(pos.realized_pnl().minor(), 10_000); // 50 * (12 - 10), in minor units
 }
 
 #[test]

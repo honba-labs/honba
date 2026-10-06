@@ -75,7 +75,11 @@ fn avg_price_rounds_to_the_minor_unit_on_every_fill() {
     p.apply_fill(PositionSide::Long, 1.0, 10.01); // exact average 10.0025
     assert_eq!(p.avg_price(), 10.00);
     p.apply_fill(PositionSide::Short, 4.0, 10.01);
-    assert_eq!(p.realized_pnl().minor(), 4, "4 * (10.01 - 10.00), in paise");
+    assert_eq!(
+        p.realized_pnl().minor(),
+        4,
+        "4 * (10.01 - 10.00), in minor units"
+    );
 }
 
 #[test]
@@ -91,7 +95,7 @@ fn opening_and_reversing_fills_also_round_avg_price() {
 #[test]
 fn realized_pnl_accumulates_exactly_over_many_fills() {
     // 1000 round trips of 1 share bought at 0.10 and sold at 0.1 + 0.2: exactly
-    // 20 paise each. Summing the f64 legs would drift away from 20_000.
+    // 20 minor units each. Summing the f64 legs would drift away from 20_000.
     let mut p = Position::flat(any_instrument(), Currency::Inr);
     for _ in 0..1000 {
         p.apply_fill(PositionSide::Long, 1.0, 0.1);

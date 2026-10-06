@@ -47,7 +47,7 @@ use crate::fitness::Fitness;
 /// starts from the number of trials, capped here.
 pub const DEFAULT_MAX_CONCURRENCY: usize = 8;
 
-/// Default starting cash in minor units (1,000,000 INR = 100,000,000 paise).
+/// Default starting cash in minor units (for INR: 1,000,000 rupees = 100,000,000 paise).
 pub const DEFAULT_INITIAL_CASH_MINOR: i64 = 100_000_000;
 
 /// The `periods_per_year` a trial's return series is annualized with: 252

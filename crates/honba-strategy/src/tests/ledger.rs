@@ -177,7 +177,7 @@ fn a_fill_whose_notional_cannot_be_represented_is_refused_whole() {
 
 #[test]
 fn notional_rounds_once_per_fill_to_minor_units() {
-    // 3 * 33.333 = 99.999: one rounding per fill to 10000 paise, debited once.
+    // 3 * 33.333 = 99.999: one rounding per fill to 10000 minor units, debited once.
     let nifty = id("NIFTY50", "NSE");
     let mut ctx = LedgerContext::with_cash(Money::new(100_000, Currency::Inr));
     ctx.apply_fill(&fill(&nifty, OrderSide::Buy, 3.0, 33.333, 0.0))
