@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### Currency-aware minor units (ADR 0011)
+
+Non-breaking. No wire change (`SCHEMA_VERSION` stays 3; amounts are unchanged for
+INR/USD/EUR/GBP, which all have exponent 2; only the `Money` JSON-Schema description text
+changed).
+
+- Rust: `Currency::minor_exponent()`, `Currency::minor_unit()` (`MinorUnit { singular, plural }`,
+  re-exported from `honba_entities`) and `Money::format_minor()` (`1,250 paise`, `1 cent`,
+  `300 pence`). `Money` conversions, `Money` display, position average-price rounding and
+  round-trip fees now scale by `10^minor_exponent` of the currency instead of a fixed 100.
+- Python: `honba._honba.currency_minor_units()`; `Currency.minor_exponent`,
+  `Currency.minor_per_major`, `Currency.minor_unit` and `Money.format_minor()`.
+  `honba.domain.money.MINOR_PER_MAJOR` is **deprecated** (still importable, emits
+  `DeprecationWarning`, returns 100); use `Currency.minor_per_major`. The private helpers
+  `_scaled`, `_snapped`, `_round_major_to_minor` and `position._round_to_minor` now take the
+  exponent/currency.
+- Shared conformance vector `schema/conformance/currency_minor_units.json`, read by Rust and
+  Python tests.
+- Internal renames: generic code, tests and docs say "minor unit" instead of "paise"
+  (`honba-entities`, `honba-sim`, `honba-sweep`, `honba-strategy`, `wire.py`, `adapters/models.py`,
+  `domain/money.py`). India cost code keeps paise. No public identifier was renamed.
+
 ### Wire contract v3: integer money and timestamp objects (E0-S6, E11-S2, ADR 0011)
 
 `SCHEMA_VERSION` is now **3** (single owner `honba_messages::SCHEMA_VERSION`; mirrored by

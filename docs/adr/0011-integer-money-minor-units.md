@@ -14,7 +14,7 @@ that is settled, summed, or compared must be exact.
 
 ## Decision
 
-**Amounts are `i64` minor units (paise for INR, cents for USD/EUR/GBP).**
+**Amounts are `i64` minor units of the money's currency.**
 `Money` stores a signed integer and a currency; fractional input is rejected at
 construction. Serialization emits the integer — never a JSON float — so the
 wire is exact.
@@ -45,6 +45,34 @@ unrealized PnL, not to settle — so it rounds to the nearest minor unit on ever
 fill and never accumulates in f64. `realized_pnl` and `Trade.costs` are ledger
 entries and are exact `i64`.
 
+## Minor units per currency
+
+One major unit is `10^exponent` minor units, where the exponent is a property
+of the currency, not a global constant. Rust owns the table
+(`Currency::minor_exponent`, `Currency::minor_unit`); Python reads it through
+`honba._honba.currency_minor_units` (`Currency.minor_exponent`,
+`Currency.minor_unit`) and never keeps a second copy. The shared vector
+`schema/conformance/currency_minor_units.json` is read by both test suites.
+
+| Currency | Minor unit (singular / plural) | Exponent |
+|---|---|---|
+| INR | paisa / paise | 2 |
+| USD | cent / cents | 2 |
+| EUR | cent / cents | 2 |
+| GBP | penny / pence | 2 |
+
+Every conversion (`from_major*`, `to_major`, payout floor, stake ceil, display,
+position price rounding, notional) scales by `10^exponent` of the currency in
+play. The exponent logic is proven at exponents 0 and 3 through crate-internal
+generic functions, so adding a currency with another exponent is a table row
+(and a wire variant), not a rewrite. `Money::format_minor` renders an amount
+with the unit name (`1,250 paise`, `1 cent`, `300 pence`).
+
+**Naming rule.** Generic code, tests and docs say "minor" / "minor unit". The
+words paise and paisa appear only in `python/src/honba/markets/india/**`
+(India cost code), in the table above and `Currency::minor_unit`, and where a
+document deliberately names the INR minor unit.
+
 ## Scope
 
 - `honba-entities`: `Money`, and the money-typed fields of `Account`,
@@ -57,7 +85,7 @@ entries and are exact `i64`.
   class, with the same rounding helpers; strategies display floats, settle ints.
 
 Alternatives rejected: `rust_decimal` adds a dependency and a non-JSON-native
-wire form for no gain over `i64` paise (Indian equities need 2 decimals;
+wire form for no gain over `i64` minor units (Indian equities need 2 decimals;
 2-decimal FX needs 2); keeping `f64` keeps the per-fill drift the audit found.
 
 ## Consequences
