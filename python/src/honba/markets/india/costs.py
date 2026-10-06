@@ -17,6 +17,7 @@ References
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING
@@ -127,30 +128,37 @@ def nse_equity_delivery_breakdown(
     quantity: float,
     price: float,
 ) -> CostBreakdown:
-    """Itemised NSE equity delivery costs."""
+    """Itemised NSE equity delivery costs (each leg shown to 4 decimals)."""
+    return _rounded(_delivery_legs(side, quantity, price))
+
+
+def _is_buy(side: OrderSide) -> bool:
+    return side is OrderSide.BUY or str(side).upper().endswith("BUY")
+
+
+def _delivery_legs(side: OrderSide, quantity: float, price: float) -> CostBreakdown:
+    """Unrounded delivery legs; GST is on the unrounded taxable legs."""
     notional = abs(quantity * price)
     if notional <= 0:
         return CostBreakdown(0, 0, 0, 0, 0, 0, 0)
-
-    is_buy = side is OrderSide.BUY or str(side).upper().endswith("BUY")
-
+    is_buy = _is_buy(side)
     brokerage = min(_EQ_DEL_BROKERAGE_PCT * notional, _EQ_DEL_BROKERAGE_CAP)
-    stt = 0.0 if is_buy else _EQ_DEL_STT_SELL * notional
-    stamp = _EQ_DEL_STAMP_BUY * notional if is_buy else 0.0
     exchange = _EQ_DEL_EXCH * notional
     sebi = _EQ_DEL_SEBI * notional
     ipft = _EQ_DEL_IPFT * notional
-    gst = _GST_RATE * (brokerage + exchange + sebi + ipft)
-
     return CostBreakdown(
-        brokerage=round(brokerage, 4),
-        stt=round(stt, 4),
-        exchange=round(exchange, 4),
-        sebi=round(sebi, 4),
-        ipft=round(ipft, 4),
-        stamp_duty=round(stamp, 4),
-        gst=round(gst, 4),
+        brokerage=brokerage,
+        stt=0.0 if is_buy else _EQ_DEL_STT_SELL * notional,
+        exchange=exchange,
+        sebi=sebi,
+        ipft=ipft,
+        stamp_duty=_EQ_DEL_STAMP_BUY * notional if is_buy else 0.0,
+        gst=_GST_RATE * (brokerage + exchange + sebi + ipft),
     )
+
+
+def _rounded(legs: CostBreakdown) -> CostBreakdown:
+    return CostBreakdown(*(round(getattr(legs, f.name), 4) for f in dataclasses.fields(legs)))
 
 
 def nse_equity_intraday_cost(
@@ -167,28 +175,28 @@ def nse_equity_intraday_breakdown(
     quantity: float,
     price: float,
 ) -> CostBreakdown:
+    """Itemised NSE equity intraday costs (each leg shown to 4 decimals)."""
+    return _rounded(_intraday_legs(side, quantity, price))
+
+
+def _intraday_legs(side: OrderSide, quantity: float, price: float) -> CostBreakdown:
+    """Unrounded intraday legs; GST is on the unrounded taxable legs."""
     notional = abs(quantity * price)
     if notional <= 0:
         return CostBreakdown(0, 0, 0, 0, 0, 0, 0)
-
-    is_buy = side is OrderSide.BUY or str(side).upper().endswith("BUY")
-
+    is_buy = _is_buy(side)
     brokerage = min(_EQ_INT_BROKERAGE_PCT * notional, _EQ_INT_BROKERAGE_CAP)
-    stt = 0.0 if is_buy else _EQ_INT_STT_SELL * notional
-    stamp = _EQ_INT_STAMP_BUY * notional if is_buy else 0.0
     exchange = _EQ_INT_EXCH * notional
     sebi = _EQ_INT_SEBI * notional
     ipft = _EQ_INT_IPFT * notional
-    gst = _GST_RATE * (brokerage + exchange + sebi + ipft)
-
     return CostBreakdown(
-        brokerage=round(brokerage, 4),
-        stt=round(stt, 4),
-        exchange=round(exchange, 4),
-        sebi=round(sebi, 4),
-        ipft=round(ipft, 4),
-        stamp_duty=round(stamp, 4),
-        gst=round(gst, 4),
+        brokerage=brokerage,
+        stt=0.0 if is_buy else _EQ_INT_STT_SELL * notional,
+        exchange=exchange,
+        sebi=sebi,
+        ipft=ipft,
+        stamp_duty=_EQ_INT_STAMP_BUY * notional if is_buy else 0.0,
+        gst=_GST_RATE * (brokerage + exchange + sebi + ipft),
     )
 
 
@@ -208,7 +216,7 @@ def cost_for_segment(
 
 
 def _fill_cost_money(legs: CostBreakdown) -> Money:
-    # Each leg is rounded to paise once, then summed (ADR 0011): a total a contract note can show.
+    # Unrounded legs; each is rounded to paise once here, then summed (ADR 0011): a total a contract note can show.
     total = Money.zero(Currency.INR)
     for leg in (
         legs.brokerage,
@@ -229,9 +237,9 @@ def nse_equity_delivery_fill_cost(side: OrderSide, quantity: float, price: float
     The ``(side, quantity, price) -> Money`` shape is the simulator's fill-cost function
     (``honba.backtest.simulated.FillCostFn``).
     """
-    return _fill_cost_money(nse_equity_delivery_breakdown(side, quantity, price))
+    return _fill_cost_money(_delivery_legs(side, quantity, price))
 
 
 def nse_equity_intraday_fill_cost(side: OrderSide, quantity: float, price: float) -> Money:
     """NSE equity intraday (MIS) cost of one fill as INR ``Money``, each leg rounded once."""
-    return _fill_cost_money(nse_equity_intraday_breakdown(side, quantity, price))
+    return _fill_cost_money(_intraday_legs(side, quantity, price))

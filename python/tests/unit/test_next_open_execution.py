@@ -442,3 +442,66 @@ def test_fill_costs_from_model_charges_the_models_cost_per_fill() -> None:
     p.open_session(2, [bar(A, 2, 100.0)])
     assert p.cash == rupees(1_000.0 - 400.0 - 2.0)
     assert p.fees == rupees(2.0)
+
+
+def test_a_funding_cut_floors_to_the_instrument_lot_size() -> None:
+    p = port(cash=9_999.0, settlement_days=0, lot_sizes={A: 75.0})
+    p.open_session(1, [bar(A, 1, 10.0)])
+    p.submit("b", OrderIntent.market_buy(A, 1_000), 1)
+    p.open_session(2, [bar(A, 2, 10.0)])
+    (fill,) = p.drain_fills()
+    (rej,) = p.drain_rejections()
+    assert fill.quantity == 975.0  # 13 lots of 75; 9_999 / 10 = 999.9 units is 13.3 lots
+    assert (rej.intent.quantity, rej.reason) == (25.0, "insufficient_funds")
+
+
+def test_set_lot_size_applies_before_the_first_session() -> None:
+    p = port(cash=9_999.0, settlement_days=0)
+    p.set_lot_size(A, 75.0)
+    p.open_session(1, [bar(A, 1, 10.0)])
+    p.submit("b", OrderIntent.market_buy(A, 1_000), 1)
+    p.open_session(2, [bar(A, 2, 10.0)])
+    assert [f.quantity for f in p.drain_fills()] == [975.0]
+    with pytest.raises(ValueError):
+        p.set_lot_size(A, 0.0)
+
+
+def test_affordable_quantity_does_not_walk_down_unit_by_unit() -> None:
+    calls = 0
+
+    def huge_flat_cost(side, quantity, price):
+        nonlocal calls
+        calls += 1
+        return rupees(9_000.0)
+
+    p = port(cash=10_000.0, settlement_days=0, costs=huge_flat_cost)
+    p.open_session(1, [bar(A, 1, 0.01)])
+    p.submit("b", OrderIntent.market_buy(A, 10_000_000), 1)
+    p.open_session(2, [bar(A, 2, 0.01)])
+    (fill,) = p.drain_fills()
+    # 10_000 - 9_000 flat cost leaves 1_000 for notional: 100_000 units at 0.01.
+    assert fill.quantity == 100_000.0
+    assert calls < 100
+
+
+def test_float_residue_does_not_leave_a_phantom_position_or_reject_the_sale() -> None:
+    p = port(cash=1_000.0, settlement_days=0)
+    for i in range(3):
+        p.open_session(2 * i + 1, [bar(A, 2 * i + 1, 10.0)])
+        p.submit(f"b{i}", OrderIntent.market_buy(A, 0.1), 2 * i + 1)
+    p.open_session(7, [bar(A, 7, 10.0)])
+    assert p.positions[A] == pytest.approx(0.3)
+    p.submit("s", OrderIntent.market_sell(A, 0.3), 7)
+    p.open_session(8, [bar(A, 8, 10.0)])
+    assert p.positions == {}
+    assert p.drain_rejections() == []
+
+
+def test_selling_a_hair_more_than_held_fills_the_whole_position() -> None:
+    p = port(cash=1_000.0, settlement_days=0)
+    p.positions[A] = 0.3
+    p.open_session(1, [bar(A, 1, 10.0)])
+    p.submit("s", OrderIntent.market_sell(A, 0.1 + 0.1 + 0.1), 1)
+    p.open_session(2, [bar(A, 2, 10.0)])
+    assert p.positions == {}
+    assert p.drain_rejections() == []

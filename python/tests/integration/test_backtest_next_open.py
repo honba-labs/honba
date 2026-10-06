@@ -327,3 +327,34 @@ def test_cost_model_reaches_the_ledger_cash_equity_and_metrics() -> None:
     assert result.metrics["final_equity"] == pytest.approx(999_900.0)
     assert result.metrics["total_return_pct"] == pytest.approx(-0.01)
     assert session.execution.fees == Money.from_major(100.0, INR)
+
+
+class LotProvider(Provider):
+    def instrument(self, instrument_id) -> Instrument:
+        return Instrument(instrument_id, InstrumentKind.EQUITY, 75.0, 0.05)
+
+
+class BuyThousand(Strategy):
+    name = "buy_thousand"
+
+    def on_bar(self, bar: Bar) -> None:
+        if bar.ts == T0:
+            self.ctx.submit(OrderIntent.market_buy(X, 1_000))
+
+
+def test_funding_cut_floors_to_the_instruments_lot_size_from_the_data_provider() -> None:
+    result = Honba.backtest(
+        BuyThousand(),
+        symbol="XYZ",
+        start="2024-01-01",
+        end="2024-02-01",
+        cash=9_999.0,
+        data=LotProvider(_bars(X, (10.0, 10.0, 10.0))),
+        costs="none",
+        settlement_days=0,
+    ).run()
+    (fill,) = result.fills
+    assert fill.quantity == 975.0
+    assert [(r.intent.quantity, r.reason) for r in result.order_rejections] == [
+        (25.0, "insufficient_funds")
+    ]

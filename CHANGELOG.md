@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Simulator and cost nits
+
+- India fill costs (`nse_equity_*_fill_cost`) now round each leg to paise once from unrounded legs (before: 4 dp
+  first, then paise, which could add a paisa; e.g. sell 215 @ 1611.93 STT 346.56495 gave 346.57). The itemised
+  `*_breakdown` still shows 4 dp. Rust cost code already rounds once (`honba-sim` `BarFillCosts`); nothing to change there.
+- `NextOpenExecution`: a funding cut floors to the instrument's lot size (`lot_sizes=` / `set_lot_size`; the session
+  passes the provider's `Instrument.lot_size`) and bisects instead of stepping down one unit at a time; positions or
+  sells within 1e-9 of each other count as equal, so `0.1 + 0.1 + 0.1` bought then `0.3` sold leaves no phantom position
+  and no `no_position` rejection.
+
 ### Post-hoc CostModel reaches the ledger
 
 Bug fix: a `CostModel` passed as `costs=` to `Honba.backtest` was applied to the result's `fills` only, so

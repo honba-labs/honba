@@ -40,7 +40,7 @@ from __future__ import annotations
 import dataclasses
 import math
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any, Literal
@@ -107,6 +107,7 @@ class NextOpenExecution(BaseExecutionPort):
         settlement_days: int = 0,
         costs: FillCostFn = zero_costs,
         long_only: bool = True,
+        lot_sizes: Mapping[InstrumentId, float] | None = None,
     ) -> None:
         if settlement_days < 0:
             raise ValueError("settlement_days must be >= 0")
@@ -119,6 +120,9 @@ class NextOpenExecution(BaseExecutionPort):
         self.positions: dict[InstrumentId, float] = {}
         self._currency = cash.currency
         self._cost_fn = costs
+        self._lot_sizes: dict[InstrumentId, float] = {}
+        for iid, lot in (lot_sizes or {}).items():
+            self.set_lot_size(iid, lot)
         self._long_only = long_only
         self._session = -1
         self._session_ts: int | None = None
@@ -220,6 +224,12 @@ class NextOpenExecution(BaseExecutionPort):
             raise RuntimeError("settlement_days can only change before the first session")
         self.settlement_days = settlement_days
 
+    def set_lot_size(self, instrument_id: InstrumentId, lot_size: float) -> None:
+        """Quantity step a funding cut floors to for ``instrument_id`` (default 1)."""
+        if not (math.isfinite(lot_size) and lot_size > 0):
+            raise ValueError(f"lot_size must be positive, got {lot_size}")
+        self._lot_sizes[instrument_id] = lot_size
+
     def _costs(self, side: OrderSide, qty: float, px: float) -> Money:
         cost = self._cost_fn(side, qty, px)
         if cost.amount == 0:
@@ -253,7 +263,10 @@ class NextOpenExecution(BaseExecutionPort):
         want = w.intent.quantity
         qty = want
         if self._long_only:
-            qty = max(0.0, min(want, self.positions.get(w.intent.instrument_id, 0.0)))
+            held = self.positions.get(w.intent.instrument_id, 0.0)
+            qty = max(0.0, min(want, held))
+            if 0 < qty < want and want - qty <= _QTY_EPS:
+                want = qty  # a hair over the position is float residue: sell it all, no reject
         if qty > 0:  # compute before dequeuing: a failure leaves the order working
             notional = Money.mul_qty(qty, bar.open, self._currency)
             cost = self._costs(OrderSide.SELL, qty, bar.open)
@@ -277,7 +290,9 @@ class NextOpenExecution(BaseExecutionPort):
         elif self.unsettled.amount > 0 and self._session - w.first_try < self.settlement_days:
             return  # wait for pending sale proceeds to settle
         else:
-            qty = self._affordable(want, px, available)
+            qty = self._affordable(
+                want, px, available, self._lot_sizes.get(w.intent.instrument_id, 1.0)
+            )
         if qty > 0:  # compute before dequeuing: a failure leaves the order working
             notional = Money.mul_qty(qty, px, self._currency)
             cost = self._costs(OrderSide.BUY, qty, px)
@@ -292,19 +307,32 @@ class NextOpenExecution(BaseExecutionPort):
     def _buy_cost(self, qty: float, px: float) -> Money:
         return Money.mul_qty(qty, px, self._currency) + self._costs(OrderSide.BUY, qty, px)
 
-    def _affordable(self, want: float, px: float, available: Money) -> float:
+    def _affordable(self, want: float, px: float, available: Money, lot: float = 1.0) -> float:
+        """Largest whole number of lots (<= ``want``) whose notional plus cost fits ``available``.
+
+        Costs are assumed non-decreasing in quantity, so the answer is found by bisection
+        between zero and the cost-free bound instead of stepping down one lot at a time.
+        """
         if px <= 0 or available.amount <= 0:
             return 0.0
-        qty = float(min(math.floor(want), math.floor(available.to_major() / px)))
-        while qty > 0 and self._buy_cost(qty, px).amount > available.amount:
-            qty -= 1
-        return qty
+        hi = min(
+            math.floor(want / lot + _QTY_EPS),
+            math.floor(available.to_major() / px / lot + _QTY_EPS),
+        )
+        lo = 0
+        while lo < hi:  # invariant: lo lots are affordable (0 trivially), hi + 1 are not
+            mid = (lo + hi + 1) // 2
+            if self._buy_cost(mid * lot, px).amount <= available.amount:
+                lo = mid
+            else:
+                hi = mid - 1
+        return lo * lot
 
     def _book(self, w: _Working, bar: Bar, qty: float, notional: Money, cost: Money) -> None:
         iid = w.intent.instrument_id
         signed = qty if w.intent.side is OrderSide.BUY else -qty
         held = self.positions.get(iid, 0.0) + signed
-        if held == 0:
+        if abs(held) <= _QTY_EPS:
             self.positions.pop(iid, None)
         else:
             self.positions[iid] = held
@@ -317,6 +345,9 @@ class NextOpenExecution(BaseExecutionPort):
 
     def _reject(self, order_id: str, intent: OrderIntent, reason: str, ts: int) -> None:
         self._rejections.append(OrderRejection(order_id, intent, reason, ts))
+
+
+_QTY_EPS = 1e-9  # quantities closer than this are equal (float residue from fractional fills)
 
 
 def _usable_open(price: float) -> bool:
@@ -420,6 +451,7 @@ def make_simulator(
     long_only: bool = True,
     timeframe: str = "1d",
     as_of: date | None = None,
+    lot_sizes: Mapping[InstrumentId, float] | None = None,
 ) -> ExecutionPort:
     """Build the simulated port for ``fill``.
 
@@ -443,7 +475,11 @@ def make_simulator(
             settlement_days = settlement_days_for(exchange, as_of=as_of)
         cost_fn = resolve_fill_costs(costs) if isinstance(costs, str) else costs
         return NextOpenExecution(
-            cash=cash, settlement_days=settlement_days, costs=cost_fn, long_only=long_only
+            cash=cash,
+            settlement_days=settlement_days,
+            costs=cost_fn,
+            long_only=long_only,
+            lot_sizes=lot_sizes,
         )
     if fill == "bar_close":
         from honba.strategies.testing import BarCloseFills

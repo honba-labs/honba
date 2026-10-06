@@ -325,6 +325,8 @@ class BacktestSession:
                 notes=["no bars returned for the requested range"],
             )
 
+        if isinstance(self.execution, NextOpenExecution):
+            self.execution.set_lot_size(instrument_id, instrument.lot_size)
         if self._settlement_from_data and isinstance(self.execution, NextOpenExecution):
             from honba.markets.india.settlement import settlement_days_for
 

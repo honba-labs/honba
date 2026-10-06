@@ -156,3 +156,38 @@ class TestBreakdownDataclass:
         b = nse_equity_delivery_breakdown(OrderSide.BUY, 1, 100)
         with pytest.raises(dataclasses.FrozenInstanceError):
             b.brokerage = 99  # type: ignore[misc]
+
+
+def _expected_paise_cost(side_is_buy: bool, qty: int, px: str, *, intraday: bool = False) -> int:
+    """Independent Decimal model: each leg unrounded, rounded once to paise, then summed."""
+    from decimal import ROUND_HALF_UP, Decimal
+
+    d = Decimal
+    n = d(qty) * d(px)
+    rates = (
+        (d("0.00025"), d("0.00003"), d("0.0000297"), d("0.000001"), d("0.000001"))
+        if intraday
+        else (d("0.001"), d("0.00015"), d("0.0000297"), d("0.000001"), d("0.000001"))
+    )
+    stt_r, stamp_r, exch_r, sebi_r, ipft_r = rates
+    brokerage = min(d("0.0003") * n, d("20"))
+    stt = d(0) if side_is_buy else stt_r * n
+    stamp = stamp_r * n if side_is_buy else d(0)
+    exch, sebi, ipft = exch_r * n, sebi_r * n, ipft_r * n
+    gst = d("0.18") * (brokerage + exch + sebi + ipft)
+    legs = (brokerage, stt, exch, sebi, ipft, stamp, gst)
+    return sum(int((x * 100).quantize(d(1), rounding=ROUND_HALF_UP)) for x in legs)
+
+
+def test_fill_cost_rounds_each_leg_once_to_paise() -> None:
+    # STT = 346.56495 exactly in the schedule: one rounding gives 346.56, rounding to 4 dp
+    # first (346.5650) and then to paise would give 346.57.
+    from honba.markets.india.costs import (
+        nse_equity_delivery_fill_cost,
+        nse_equity_intraday_fill_cost,
+    )
+
+    got = nse_equity_delivery_fill_cost(OrderSide.SELL, 215, 1611.93)
+    assert got.amount == _expected_paise_cost(False, 215, "1611.93")
+    got = nse_equity_intraday_fill_cost(OrderSide.SELL, 215, 1611.93)
+    assert got.amount == _expected_paise_cost(False, 215, "1611.93", intraday=True)
