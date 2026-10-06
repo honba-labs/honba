@@ -483,7 +483,7 @@
             "type": "array"
           },
           "endpoints": {
-            "description": "Endpoints available.",
+            "description": "Endpoints in the contract, as `METHOD /path` in registry order.",
             "items": {
               "type": "string"
             },
@@ -498,6 +498,14 @@
           },
           "market_packs": {
             "description": "Market packs available.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "not_implemented": {
+            "default": [],
+            "description": "The subset of `endpoints` that currently answer 501 `not_implemented`.",
             "items": {
               "type": "string"
             },

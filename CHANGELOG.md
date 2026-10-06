@@ -9,6 +9,9 @@
   No pagination (ADR 0013).
 - CORS is no longer permissive: no CORS headers by default; `honba serve --cors-origin <origin>` (repeatable, via
   `ApiConfig`) allow-lists explicit origins. `honba serve` warns on stderr when `--addr` is not loopback (no auth/TLS).
+- `GET /capabilities` derives `endpoints` from the endpoint registry (all 22 rows as `METHOD /path`, e.g. `GET /bars/{id}`)
+  and adds `not_implemented` (additive, defaults to empty) listing the routes that answer 501. OpenAPI, `.pyi`, MCP
+  and domain schemas regenerated.
 
 ### CLI exchange selection
 

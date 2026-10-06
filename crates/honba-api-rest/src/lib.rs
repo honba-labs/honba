@@ -184,11 +184,33 @@ pub async fn serve_with_config(
         .await
 }
 
-/// Get API capabilities.
-async fn get_capabilities(
-    State(_state): State<Arc<AppState>>,
-) -> Json<ResponseEnvelope<CapabilitiesResponse>> {
-    let manifest = honba_api::CapabilityManifest {
+/// Registry endpoints whose handlers answer 501 `not_implemented`.
+///
+/// Remove a row when its handler is built; `tests/capabilities.rs` probes the router and fails
+/// if this list and the real answers disagree.
+pub const NOT_IMPLEMENTED_ENDPOINTS: &[(&str, &str)] = &[
+    ("POST", "/strategies"),
+    ("GET", "/strategies"),
+    ("POST", "/backtests"),
+    ("GET", "/backtests/{id}"),
+    ("GET", "/backtests/{id}/journal"),
+    ("POST", "/sweeps"),
+    ("GET", "/sweeps/{id}"),
+    ("POST", "/orders"),
+    ("GET", "/orders"),
+    ("DELETE", "/orders/{id}"),
+    ("POST", "/positions/close"),
+    ("GET", "/screener/scan"),
+    ("GET", "/journals/{id}"),
+];
+
+fn endpoint_key((method, path): &(&str, &str)) -> String {
+    format!("{method} {path}")
+}
+
+/// The capability manifest: endpoints come from the registry, never a hand-kept list.
+pub(crate) fn capability_manifest() -> honba_api::CapabilityManifest {
+    honba_api::CapabilityManifest {
         crates: vec![
             "honba-api".to_string(),
             "honba-api-rest".to_string(),
@@ -196,23 +218,21 @@ async fn get_capabilities(
             "honba-entities".to_string(),
         ],
         market_packs: vec!["india".to_string(), "null".to_string()],
-        endpoints: vec![
-            "GET /capabilities".to_string(),
-            "GET /health".to_string(),
-            "GET /schema".to_string(),
-            "GET /instruments".to_string(),
-            "GET /quotes".to_string(),
-            "GET /bars".to_string(),
-            "GET /depth".to_string(),
-        ],
+        endpoints: honba_api::ENDPOINTS.iter().map(endpoint_key).collect(),
+        not_implemented: NOT_IMPLEMENTED_ENDPOINTS.iter().map(endpoint_key).collect(),
         toolsets: vec!["strategies".to_string(), "indicators".to_string()],
         adapters: vec![],
         features: std::collections::BTreeMap::new(),
-    };
-    let caps = Capabilities {
-        capabilities: manifest,
-    };
-    Json(ApiResponse::success(caps))
+    }
+}
+
+/// Get API capabilities.
+async fn get_capabilities(
+    State(_state): State<Arc<AppState>>,
+) -> Json<ResponseEnvelope<CapabilitiesResponse>> {
+    Json(ApiResponse::success(Capabilities {
+        capabilities: capability_manifest(),
+    }))
 }
 
 /// Get health status.

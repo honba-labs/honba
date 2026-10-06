@@ -10,8 +10,11 @@ pub struct CapabilityManifest {
     pub crates: Vec<String>,
     /// Market packs available.
     pub market_packs: Vec<String>,
-    /// Endpoints available.
+    /// Endpoints in the contract, as `METHOD /path` in registry order.
     pub endpoints: Vec<String>,
+    /// The subset of `endpoints` that currently answer 501 `not_implemented`.
+    #[serde(default)]
+    pub not_implemented: Vec<String>,
     /// Toolsets available (strategies, indicators, etc.).
     pub toolsets: Vec<String>,
     /// Registered adapters.

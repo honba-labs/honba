@@ -87,6 +87,7 @@ class CapabilityManifest:
     endpoints: list[str]
     features: dict[str, bool]
     market_packs: list[str]
+    not_implemented: list[str] | None = None
     toolsets: list[str]
 
 Currency = Literal["INR", "USD", "EUR", "GBP"]

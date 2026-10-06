@@ -47,6 +47,11 @@ crate its own idea of what an instrument or a bar query is.
 - **Placeholders are honest**: a route in the contract whose behaviour is not built answers 501 with
   `ErrorCode::NotImplemented` (`not_implemented`, category `unsupported`) inside the envelope. A request
   body that does not parse is still 422 first.
+- **`/capabilities` is derived, not hand-kept**: `endpoints` is every `ENDPOINTS` row as `METHOD /path` in registry
+  order (so `/bars/{id}`, not `/bars`); the additive `not_implemented` list (serde default) names the rows that answer
+  501. `NOT_IMPLEMENTED_ENDPOINTS` in `honba-api-rest` is that list, and an integration test probes the router to keep it
+  honest. `/schema` stays a stub: the OpenAPI generator lives in `honba-codegen`, which `honba-api-rest` must not
+  depend on (layering), so serving the document needs a different seam (a follow-up).
 - Instrument id in paths is `SYMBOL.EXCHANGE` (the `InstrumentId` display form),
   split on the last dot.
 
