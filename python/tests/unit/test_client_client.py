@@ -168,6 +168,50 @@ def test_strategies_lists_compiled_strategies_in_server_order() -> None:
     assert fake.calls[0] == ("GET", "/strategies", None, None)
 
 
+def test_screener_scan_returns_typed_rows_and_sends_the_encoded_query() -> None:
+    row = {
+        "instrument_id": TCS,
+        "metrics": {"close": 119.0, "SMA50": None},
+        "a_future_field": 1,
+    }
+    fake = FakeTransport(ok({"rows": [row]}), ok({"rows": []}))
+    client = Client(fake)
+    [got] = client.screener_scan(
+        ["TCS.NSE"], {"operator": "AND", "items": []}, tf="1d", as_of="2024-01-02"
+    )
+    assert got.instrument_id.symbol == "TCS" and got.instrument_id.exchange == "NSE"
+    assert got.metrics == {"close": 119.0, "SMA50": None}
+    method, path, query, body = fake.calls[0]
+    assert (method, path, body) == ("GET", "/screener/scan", None)
+    assert query is not None and query["tf"] == "1d" and query["as_of"] == "2024-01-02"
+    assert query["universe"] == '["TCS.NSE"]'
+    assert client.screener_scan("TCS.NSE") == []
+
+
+def test_screener_scan_maps_unsupported_metric_and_unknown_instrument() -> None:
+    reason = {"context": {"field": "filters", "reason": "unsupported_metric"}}
+    fake = FakeTransport(failure(422, "validation_invalid_request", **reason))
+    with pytest.raises(ValidationApiError) as err:
+        Client(fake).screener_scan("TCS.NSE", {"operator": "AND", "items": []})
+    assert err.value.context == reason["context"]
+    with pytest.raises(NotFoundApiError):
+        Client(FakeTransport(failure(404, "instrument_not_found"))).screener_scan("NOPE.NSE")
+
+
+def test_screener_scan_rejects_a_payload_that_does_not_parse() -> None:
+    with pytest.raises(InvalidResponseError):
+        Client(FakeTransport(ok({"rows": [{"instrument_id": 1}]}))).screener_scan("TCS.NSE")
+    with pytest.raises(InvalidResponseError):
+        Client(FakeTransport(ok({"nope": []}))).screener_scan("TCS.NSE")
+
+
+def test_screener_scan_bad_input_never_reaches_the_transport() -> None:
+    fake = FakeTransport()
+    with pytest.raises(RequestValidationError):
+        Client(fake).screener_scan([])
+    assert fake.calls == []
+
+
 def test_strategies_rejects_a_payload_that_does_not_parse() -> None:
     with pytest.raises(InvalidResponseError):
         Client(FakeTransport(ok({"strategies": [{"id": 1}]}))).strategies()

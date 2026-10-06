@@ -165,7 +165,31 @@ SCENARIOS: dict[str, Callable[[Client], Any]] = {
     "compile_ok": lambda c: c.compile_strategy(MANIFEST),
     "compile_ok_again": lambda c: c.compile_strategy(MANIFEST),
     "strategies_after_compile": lambda c: c.strategies(),
+    "scan_close_gt": lambda c: c.screener_scan(SCAN_UNIVERSE, CLOSE_GT_60, tf="1m"),
+    "scan_no_filter": lambda c: c.screener_scan(SCAN_UNIVERSE, tf="1m"),
+    "scan_sma_and_metric_ref": lambda c: c.screener_scan(
+        "TCS.NSE",
+        {
+            "operator": "AND",
+            "items": [{"key": "close", "op": "gt", "value": {"key": "SMA3"}}],
+        },
+        tf="1m",
+    ),
+    "scan_as_of": lambda c: c.screener_scan(
+        "TCS.NSE", CLOSE_GT_60, tf="1m", as_of="2024-01-01T00:01:00Z"
+    ),
+    "scan_nothing_matches": lambda c: c.screener_scan(
+        SCAN_UNIVERSE, CLOSE_GT_60, as_of="2023-01-01", tf="1m"
+    ),
+    "scan_unsupported_metric": lambda c: c.screener_scan(
+        "TCS.NSE", {"key": "price_earnings_ttm", "op": "lt", "value": 20}, tf="1m"
+    ),
+    "scan_unknown_instrument": lambda c: c.screener_scan(["TCS.NSE", "NOPE.NSE"], tf="1m"),
+    "scan_default_timeframe_has_no_bars": lambda c: c.screener_scan("TCS.NSE"),
 }
+
+SCAN_UNIVERSE = ["TCS.NSE", "INFY.NSE", "M&M.NSE"]
+CLOSE_GT_60 = {"operator": "AND", "items": [{"key": "close", "op": "gt", "value": 60}]}
 
 MANIFEST = {
     "api_version": "1.0.0",
@@ -287,8 +311,27 @@ def test_inproc_server_side_422_names_the_field_when_the_client_check_is_bypasse
         inproc.bars("TCS.NSE", tf="banana")
 
 
+def test_inproc_screener_scan_is_typed_and_evaluated_in_rust(inproc: Client) -> None:
+    rows = inproc.screener_scan(SCAN_UNIVERSE, CLOSE_GT_60, tf="1m")
+    assert [f"{r.instrument_id.symbol}.{r.instrument_id.exchange}" for r in rows] == ["TCS.NSE"]
+    assert rows[0].metrics == {"close": 105.0}
+    [sma] = inproc.screener_scan("TCS.NSE", {"key": "SMA3", "op": "gt", "value": 100}, tf="1m")
+    assert sma.metrics == {"SMA3": 104.0}
+    both = inproc.screener_scan(SCAN_UNIVERSE, tf="1m")
+    assert [r.instrument_id.symbol for r in both] == ["INFY", "M&M", "TCS"]
+
+
+def test_inproc_unsupported_metric_is_a_422_with_its_reason_not_an_empty_result(
+    inproc: Client,
+) -> None:
+    with pytest.raises(ValidationApiError) as err:
+        inproc.screener_scan("TCS.NSE", {"key": "market_cap", "op": "gt", "value": 1}, tf="1m")
+    assert err.value.status == 422
+    assert err.value.context == {"field": "filters", "reason": "unsupported_metric"}
+
+
 def test_inproc_501_placeholders(inproc: Client) -> None:
-    for method, path in [("GET", "/orders"), ("GET", "/screener/scan"), ("GET", "/backtests/x")]:
+    for method, path in [("GET", "/orders"), ("GET", "/journals/x"), ("GET", "/backtests/x")]:
         resp = inproc.transport.request(method, path)
         assert resp.status == 501
         assert resp.json["error"]["code"] == "not_implemented"
@@ -361,7 +404,10 @@ RAW_REQUESTS: list[tuple[str, str, dict[str, Any] | None, Any]] = [
     ("POST", "/orders", None, {}),  # 501
     ("DELETE", "/orders/abc", None, None),  # 501
     ("POST", "/positions/close", None, None),  # 501
-    ("GET", "/screener/scan", None, None),  # 501
+    ("GET", "/screener/scan", None, None),  # 422: no universe
+    ("GET", "/screener/scan", {"universe": '["TCS.NSE"]', "tf": "1m"}, None),
+    ("GET", "/screener/scan", {"universe": '["TCS.NSE"]', "filters": "{"}, None),  # 422
+    ("GET", "/screener/scan", {"universe": '["TCS.NSE"]', "bogus": "1"}, None),  # 422
     ("GET", "/journals/abc", None, None),  # 501
     ("GET", "/no/such/route", None, None),  # 404, no body
 ]

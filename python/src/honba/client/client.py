@@ -12,7 +12,13 @@ from typing_extensions import Self
 from honba._native import native_attr
 from honba.client import requests as rq
 from honba.client.errors import InvalidResponseError, error_from_envelope
-from honba.client.models import CompiledStrategy, Depth, Health, InstrumentInfo
+from honba.client.models import (
+    CompiledStrategy,
+    Depth,
+    Health,
+    InstrumentInfo,
+    ScreenerResultRow,
+)
 from honba.client.transport import HttpTransport, InprocTransport, Transport
 from honba.wire.wire import Bar, InstrumentId, QuoteTick
 
@@ -134,6 +140,29 @@ class Client:
         verify, ``source_unsupported``, or ``catalog_full`` (the server's catalog is at capacity).
         """
         return self._call(rq.compile_strategy(manifest), CompiledStrategy)
+
+    def screener_scan(
+        self,
+        universe: str | InstrumentId | Sequence[str | InstrumentId],
+        filters: Any = None,
+        *,
+        tf: str | None = None,
+        as_of: rq.TimeLike | None = None,
+    ) -> list[ScreenerResultRow]:
+        """``GET /screener/scan``: the ``universe`` instruments passing ``filters``, in id order.
+
+        ``filters`` is a ``ScreenerFilterGroup``, a ``ScreenerFilterPredicate`` (one-item ``AND``)
+        or the equivalent dict; none matches every instrument. Predicates are evaluated by the
+        Rust engine over the dataset's bars at ``tf`` (default ``1d``; a Parquet data directory
+        holds ``1m`` bars) on the bars known at ``as_of`` (inclusive). Metrics computable from bars
+        are ``open``, ``high``, ``low``, ``close``, ``volume``, ``price_52_week_high``/``_low``,
+        ``SMA<N>`` and ``RSI``; any other metric (fundamentals, a ``period``) is a
+        ``ValidationApiError`` with ``context["reason"] == "unsupported_metric"``, never an empty
+        result. ``NotFoundApiError`` for an unknown instrument, ``ValidationApiError`` with
+        ``too_many_rows`` over the universe/row/bar limits.
+        """
+        data = self._data(rq.screener_scan(universe, filters, tf=tf, as_of=as_of))
+        return self._parse_list(data, "rows", ScreenerResultRow)
 
     # -- plumbing ----------------------------------------------------------------------------
 

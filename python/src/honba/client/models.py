@@ -13,7 +13,14 @@ from typing import Any
 from honba.wire.base import Str, _Wire
 from honba.wire.wire import Currency, Float, InstrumentId, NonNegativeFloat
 
-__all__ = ["CompiledStrategy", "Depth", "DepthLevel", "Health", "InstrumentInfo"]
+__all__ = [
+    "CompiledStrategy",
+    "Depth",
+    "DepthLevel",
+    "Health",
+    "InstrumentInfo",
+    "ScreenerResultRow",
+]
 
 
 class Health(_Wire):
@@ -54,3 +61,11 @@ class CompiledStrategy(_Wire):
     """Content id: ``sha256:`` plus the digest of the canonical manifest JSON (deterministic)."""
     ir: dict[str, Any]
     """The verified IR, a JSON-shaped record exactly as :meth:`Client.verify_strategy` returns it."""
+
+
+class ScreenerResultRow(_Wire):
+    """One instrument that passed ``GET /screener/scan``."""
+
+    instrument_id: InstrumentId
+    metrics: dict[str, float | None]
+    """Latest value of every metric the filter reads, by key as written; ``None`` while warming up."""

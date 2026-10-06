@@ -11,6 +11,7 @@ string you pass is validated and sent verbatim).
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -23,6 +24,7 @@ from honba.wire.wire import InstrumentId, UnixNanos
 
 __all__ = [
     "MAX_DEPTH_LEVELS",
+    "MAX_SCREENER_UNIVERSE",
     "ApiRequest",
     "TimeLike",
     "bars",
@@ -32,12 +34,16 @@ __all__ = [
     "instrument",
     "instruments",
     "quotes",
+    "screener_scan",
     "strategies",
     "verify_strategy",
 ]
 
 MAX_DEPTH_LEVELS = 50
 """The most levels per side ``GET /depth/{id}`` accepts."""
+
+MAX_SCREENER_UNIVERSE = 1_000
+"""The most instruments one ``GET /screener/scan`` may name."""
 
 TimeLike = str | date | datetime | UnixNanos
 """A point in time: RFC 3339 text, ``YYYY-MM-DD``, an aware ``datetime``, a ``date`` or a
@@ -82,8 +88,8 @@ def instruments(*, exchange: str | None = None, symbol: str | None = None) -> Ap
     return ApiRequest("GET", "/instruments", query or None)
 
 
-def _id_path_segment(value: object) -> str:
-    """``SYMBOL.EXCHANGE`` (split on the last dot), percent-encoded for a path segment."""
+def _id_text(value: object, field: str = "id") -> str:
+    """A validated ``SYMBOL.EXCHANGE`` (split on the last dot)."""
     if isinstance(value, str):
         text = value
     elif hasattr(value, "symbol") and hasattr(value, "exchange"):
@@ -93,9 +99,14 @@ def _id_path_segment(value: object) -> str:
     symbol, dot, exchange = text.rpartition(".")
     if not dot or not symbol or not exchange or text != text.strip():
         raise RequestValidationError(
-            "id", "invalid_instrument_id", f"instrument id {value!r} is not SYMBOL.EXCHANGE"
+            field, "invalid_instrument_id", f"instrument id {value!r} is not SYMBOL.EXCHANGE"
         )
-    return quote(text, safe=".")
+    return text
+
+
+def _id_path_segment(value: object) -> str:
+    """``SYMBOL.EXCHANGE``, percent-encoded for a path segment."""
+    return quote(_id_text(value), safe=".")
 
 
 def instrument(instrument_id: str | InstrumentId) -> ApiRequest:
@@ -267,3 +278,92 @@ def strategies() -> ApiRequest:
 def compile_strategy(manifest: Any) -> ApiRequest:
     """``POST /strategies``: the manifest goes under a ``manifest`` key (no source)."""
     return ApiRequest("POST", "/strategies", body={"manifest": _manifest_body(manifest)})
+
+
+def _compact_json(value: Any) -> str:
+    return json.dumps(value, separators=(",", ":"), sort_keys=True, allow_nan=False)
+
+
+def _filter_body(filters: Any) -> dict[str, Any]:
+    """A filter group as a JSON-shaped dict; a bare predicate becomes a one-item ``AND`` group.
+
+    Accepts a ``ScreenerFilterGroup`` / ``ScreenerFilterPredicate`` model or a mapping, validated
+    (recursively) with the same per-operator value contract the server applies.
+    """
+    from pydantic import BaseModel, ValidationError
+
+    from honba.wire.screener import ScreenerFilterGroup, ScreenerFilterPredicate
+
+    def bad(message: str) -> RequestValidationError:
+        return RequestValidationError("filters", "invalid_filter", message)
+
+    def plain(value: Any) -> Any:
+        if isinstance(value, BaseModel):
+            return value.model_dump(mode="json", by_alias=True)
+        return value
+
+    def group(raw: Any) -> dict[str, Any]:
+        raw = plain(raw)
+        if not isinstance(raw, Mapping):
+            raise bad("a filter must be a group, a predicate or a dict")
+        if "operator" not in raw:
+            return group({"operator": "AND", "items": [raw]})
+        try:
+            ScreenerFilterGroup.model_validate(raw)
+        except ValidationError as exc:
+            raise bad(f"filter group does not validate: {exc.errors()[0]['msg']}") from exc
+        items = []
+        for item in raw["items"]:
+            item = plain(item)
+            if not isinstance(item, Mapping):
+                raise bad(f"filter item {item!r} is not a predicate or a group")
+            if "operator" in item:
+                items.append(group(item))
+                continue
+            try:
+                ScreenerFilterPredicate.model_validate(item)
+            except ValidationError as exc:
+                raise bad(f"predicate does not validate: {exc.errors()[0]['msg']}") from exc
+            items.append(dict(item))
+        return {"operator": raw["operator"], "items": items}
+
+    if isinstance(filters, ScreenerFilterPredicate):
+        return group({"operator": "AND", "items": [filters]})
+    return group(filters)
+
+
+def screener_scan(
+    universe: str | InstrumentId | Sequence[str | InstrumentId],
+    filters: Any = None,
+    *,
+    tf: str | None = None,
+    as_of: TimeLike | None = None,
+) -> ApiRequest:
+    """``GET /screener/scan``: ``universe`` and ``filters`` travel as JSON text in the query."""
+    items = (
+        [universe] if isinstance(universe, str) or hasattr(universe, "symbol") else list(universe)  # type: ignore[arg-type]
+    )
+    if not items:
+        raise RequestValidationError(
+            "universe", "missing_universe", "universe must name at least one instrument"
+        )
+    if len(items) > MAX_SCREENER_UNIVERSE:
+        raise RequestValidationError(
+            "universe",
+            "too_many_rows",
+            f"universe has {len(items)} instruments, over the limit of {MAX_SCREENER_UNIVERSE}",
+        )
+    query: dict[str, Any] = {"universe": _compact_json([_id_text(i, "universe") for i in items])}
+    if filters is not None:
+        query["filters"] = _compact_json(_filter_body(filters))
+    if tf is not None:
+        if not isinstance(tf, str) or _TIMEFRAME.fullmatch(tf) is None:
+            raise RequestValidationError(
+                "tf",
+                "invalid_timeframe",
+                f"timeframe {tf!r} is not <n><s|m|h|d|w|mo>, e.g. 1m or 1d",
+            )
+        query["tf"] = tf
+    if as_of is not None:
+        query["as_of"] = _to_ns("as_of", as_of)[0]
+    return ApiRequest("GET", "/screener/scan", query)

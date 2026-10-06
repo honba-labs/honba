@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
@@ -223,3 +224,98 @@ def test_datetime_subclasses_keep_their_sub_microsecond_nanoseconds() -> None:
 
 def test_a_nanosecond_attribute_of_zero_changes_nothing() -> None:
     assert rq.bars("T.N", to=_stamp(0)).query == {"to": "2024-01-01T00:00:00.123456000Z"}
+
+
+# --- screener_scan -----------------------------------------------------------------------
+
+AND_CLOSE_GT_100 = {"operator": "AND", "items": [{"key": "close", "op": "gt", "value": 100}]}
+
+
+def test_screener_scan_sends_json_encoded_universe_and_filters() -> None:
+    got = rq.screener_scan(["TCS.NSE", "INFY.NSE"], AND_CLOSE_GT_100, tf="1m", as_of="2024-01-02")
+    assert got.method == "GET" and got.path == "/screener/scan" and got.body is None
+    assert got.query is not None
+    assert json.loads(got.query["universe"]) == ["TCS.NSE", "INFY.NSE"]
+    assert json.loads(got.query["filters"]) == AND_CLOSE_GT_100
+    assert got.query["tf"] == "1m" and got.query["as_of"] == "2024-01-02"
+
+
+def test_screener_scan_defaults_send_only_the_universe() -> None:
+    got = rq.screener_scan("TCS.NSE")
+    assert got.query is not None and set(got.query) == {"universe"}
+    assert json.loads(got.query["universe"]) == ["TCS.NSE"]
+
+
+def test_screener_scan_accepts_domain_and_wire_ids() -> None:
+    got = rq.screener_scan([DomainId("TCS", "NSE"), InstrumentId(symbol="INFY", exchange="NSE")])
+    assert got.query is not None
+    assert json.loads(got.query["universe"]) == ["TCS.NSE", "INFY.NSE"]
+
+
+def test_screener_scan_accepts_filter_models_and_a_bare_predicate() -> None:
+    from honba.wire.screener import FilterOp, ScreenerFilterGroup, ScreenerFilterPredicate
+
+    pred = ScreenerFilterPredicate(key="close", op=FilterOp.GT, value=100)
+    group = ScreenerFilterGroup(operator="AND", items=[pred])
+    for filters in (group, pred):
+        got = rq.screener_scan("TCS.NSE", filters)
+        assert got.query is not None
+        assert json.loads(got.query["filters"]) == AND_CLOSE_GT_100
+
+
+def test_screener_scan_sends_metric_references() -> None:
+    from honba.wire.screener import FilterOp, MetricRef, ScreenerFilterPredicate
+
+    pred = ScreenerFilterPredicate(
+        key="SMA50", op=FilterOp.CROSSES_ABOVE, value=MetricRef(key="SMA200")
+    )
+    got = rq.screener_scan("TCS.NSE", pred)
+    assert got.query is not None
+    assert json.loads(got.query["filters"])["items"] == [
+        {"key": "SMA50", "op": "crosses_above", "value": {"key": "SMA200"}}
+    ]
+
+
+@pytest.mark.parametrize(
+    ("universe", "reason"),
+    [
+        ([], "missing_universe"),
+        ("", "invalid_instrument_id"),
+        (["TCS"], "invalid_instrument_id"),
+        ([1], "invalid_instrument_id"),
+        ([f"S{i}.NSE" for i in range(rq.MAX_SCREENER_UNIVERSE + 1)], "too_many_rows"),
+    ],
+)
+def test_screener_scan_rejects_a_bad_universe_naming_the_field(
+    universe: object, reason: str
+) -> None:
+    with pytest.raises(RequestValidationError) as err:
+        rq.screener_scan(universe)  # type: ignore[arg-type]
+    assert (err.value.field, err.value.reason) == ("universe", reason)
+
+
+@pytest.mark.parametrize(
+    "filters",
+    [
+        {"operator": "XOR", "items": []},
+        {"operator": "AND", "items": [{"key": "close", "op": "between", "value": 1}]},
+        {"operator": "AND"},
+        "close > 100",
+        42,
+    ],
+)
+def test_screener_scan_rejects_malformed_filters(filters: object) -> None:
+    with pytest.raises(RequestValidationError) as err:
+        rq.screener_scan("TCS.NSE", filters)  # type: ignore[arg-type]
+    assert (err.value.field, err.value.reason) == ("filters", "invalid_filter")
+
+
+def test_screener_scan_validates_tf_and_as_of_like_the_server() -> None:
+    with pytest.raises(RequestValidationError) as err:
+        rq.screener_scan("TCS.NSE", tf="banana")
+    assert (err.value.field, err.value.reason) == ("tf", "invalid_timeframe")
+    with pytest.raises(RequestValidationError) as err:
+        rq.screener_scan("TCS.NSE", as_of="soon")
+    assert (err.value.field, err.value.reason) == ("as_of", "invalid_time")
+    got = rq.screener_scan("TCS.NSE", as_of=datetime(2024, 1, 2, tzinfo=timezone.utc))
+    assert got.query is not None and got.query["as_of"].startswith("2024-01-02")
