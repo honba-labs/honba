@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### REST: compile and list strategies (E11-S3 part 3)
+
+- `POST /strategies` and `GET /strategies` are built (no longer 501). "Compile" is the same step as
+  `POST /strategies/verify`: a manifest in, its `StrategyIr` out. `POST` takes `{"manifest": ...}`, stores the result in a
+  session-scoped in-memory catalog and returns `CompiledStrategy {id, ir}`; `GET` lists the catalog ordered by `id`.
+- `id` is `sha256:` plus the digest of the canonical manifest JSON: deterministic, and the same manifest is stored once.
+- Breaking wire change: `StrategiesRequest` is now `{manifest}` (was `{name?, code?}`) and `StrategiesResponse.strategies`
+  is `[CompiledStrategy]` (was untyped values). Source code is refused: a body with `code` or `source` is a 422 with
+  `context.reason = source_unsupported`. A manifest that does not verify gives verify's 422 and reason code.
+- The catalog holds at most 1,000 strategies (`MAX_COMPILED_STRATEGIES`); a new strategy past that is a 422 with
+  `reason = catalog_full` and `limit`, never an eviction. Re-submitting a held manifest still succeeds.
+- New `honba_api::strategies` (`compile_strategy`, `list_strategies`, `parse_compile_request`, `StrategyCatalog`), held in
+  `AppState.strategies`; new `honba-api -> sha2` dependency. Two new MCP tools, `compile_strategy` and `list_strategies`.
+  OpenAPI, `.pyi`, MCP and JSON Schema regenerated (`CompiledStrategy` added).
+- Python: `Client.strategies()` and `Client.compile_strategy(manifest)` returning the new `CompiledStrategy` model, on both
+  transports. `/capabilities` `not_implemented` no longer lists the two routes. The catalog is lost on restart.
+
 ### NSE bhavcopy timestamps
 
 - Bhavcopy bar timestamps are now built as 09:15 IST explicitly (`honba.markets.india.calendar.IST`) instead of via the
@@ -63,8 +80,7 @@
   (cached per directory) and drives it with tower's `oneshot`; no handler is reimplemented in Python. New layering edge
   `honba-py -> honba-api-rest` (both L7; `honba-cli` already has it).
 - Parity tests run every scenario, and the 404/422/501 envelopes, through both transports against a real `honba serve`
-  and require identical results. Not in the client yet: the routes that answer 501 (`/strategies` list and compile,
-  `/backtests`, `/sweeps`, `/orders`, `/positions/close`, `/screener/scan`, `/journals`) plus `/capabilities` and `/schema`.
+  and require identical results. Not in the client yet: the routes that answer 501 (`/backtests`, `/sweeps`, `/orders`, `/positions/close`, `/screener/scan`, `/journals`) plus `/capabilities` and `/schema`.
 - `InprocTransport` wraps native `OSError`/`ValueError` (e.g. data directory removed after construction) into a
   non-retryable `TransportApiError`, so `except ApiError` behaves the same on both transports.
 - Request builders reject times past the server's `i64` nanosecond range (after 2262-04-11T23:47:16.854775807Z) client-side

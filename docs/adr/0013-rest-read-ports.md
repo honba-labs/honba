@@ -52,6 +52,22 @@ crate its own idea of what an instrument or a bar query is.
   501. `NOT_IMPLEMENTED_ENDPOINTS` in `honba-api-rest` is that list, and an integration test probes the router to keep it
   honest. `/schema` stays a stub: the OpenAPI generator lives in `honba-codegen`, which `honba-api-rest` must not
   depend on (layering), so serving the document needs a different seam (a follow-up).
+- **Strategies are compiled into a session catalog, not behind a port.** `POST /strategies` takes `{manifest}` and runs
+  the same `verify_strategy` as `/strategies/verify`; the result is stored and returned as `CompiledStrategy {id, ir}`,
+  and `GET /strategies` lists them ordered by `id`. The logic is pure and lives in `honba_api::strategies`
+  (`compile_strategy`, `list_strategies`, `parse_compile_request`); the store is a plain `StrategyCatalog` value held in
+  `AppState.strategies` behind a `Mutex` (a poisoned lock is recovered, never unwrapped). It is *not* a `honba-ports`
+  trait: ports are L2 and cannot name `StrategyIr` (L4), and an in-memory map holds no external resource. A durable
+  catalog would need a port over a manifest type owned lower in the stack. No new crate edge (`honba-api` gains only the
+  `sha2` crate; `scripts/dependency_graph.py` is unchanged).
+  - The id is the SHA-256 of the canonical manifest JSON (not just `source_hash`, which two different declarations may
+    share), so it is deterministic across processes and the same manifest is stored once.
+  - Capacity is bounded: `MAX_COMPILED_STRATEGIES` = 1,000. A new strategy past the limit is a 422
+    (`reason = catalog_full`, `context.limit`) rather than an eviction, so an id already handed out stays valid. A manifest
+    already held is not new and succeeds.
+  - Source code is unsupported: a body with `code` or `source` is a 422 with `reason = source_unsupported`.
+  - The catalog is per process and lost on restart; the in-process Python transport has its own router, so its catalog
+    is separate from a `honba serve` instance.
 - Instrument id in paths is `SYMBOL.EXCHANGE` (the `InstrumentId` display form),
   split on the last dot.
 
@@ -84,9 +100,9 @@ existing `{iso, unix_nanos}` form. ADR 0011 is not engaged by these endpoints.
   `from`/`to`. The check runs after the read port answers, so it bounds the response, not the port's memory.
 - A quote request is all-or-nothing: if one matched instrument has no quote at that time the whole request is
   404, rather than a silently shorter list.
-- Not built, answering 501: `GET/POST /strategies`, `POST /backtests`, `GET /backtests/{id}[/journal]`,
+- Not built, answering 501: `POST /backtests`, `GET /backtests/{id}[/journal]`,
   `POST /sweeps`, `GET /sweeps/{id}`, `GET/POST /orders`, `DELETE /orders/{id}`, `POST /positions/close`,
-  `GET /screener/scan`, `GET /journals/{id}`. `POST /strategies/verify` is real (ADR 0012).
+  `GET /screener/scan`, `GET /journals/{id}`. `POST /strategies/verify` is real (ADR 0012), and so are `GET/POST /strategies` (below).
 - No auth, TLS or rate limiting on `honba serve`; it is a loopback read API by default, and `honba serve` prints a
   warning on stderr when `--addr` is not loopback.
 - **CORS is off by default** (no CORS headers). `ApiConfig::with_cors_origins` / `honba serve --cors-origin <origin>`
