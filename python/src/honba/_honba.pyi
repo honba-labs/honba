@@ -8,6 +8,13 @@ STRATEGY_API_VERSION: Final[str]
 
 def canonical_json(kind: str, payload: str) -> str: ...
 def wire_enum_values() -> dict[str, list[str]]: ...
+def verify_manifest(manifest_json: str) -> str:
+    """Compile a ``StrategyManifest`` (JSON) into its ``StrategyIr`` (JSON).
+
+    Raises ``ValueError("<code>: <message>")`` where ``code`` is ``deserialize`` or the
+    Rust ``IrError::code()``; wrapped by ``honba.strategies.verify.verify_manifest``.
+    """
+
 def codegen_artifacts() -> list[str]:
     """Names accepted by ``codegen_render``: json_schema, openapi, typescript, pyi, mcp."""
 

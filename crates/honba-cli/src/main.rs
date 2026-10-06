@@ -53,7 +53,7 @@ enum Commands {
         #[arg(long)]
         mcp: Option<PathBuf>,
     },
-    /// Verify a strategy manifest
+    /// Verify a strategy manifest and print its compiled IR as JSON
     Verify {
         /// Path to the manifest file (JSON)
         manifest: PathBuf,

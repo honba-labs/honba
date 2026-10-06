@@ -3,6 +3,7 @@
 mod context;
 mod dyn_strategy;
 mod intent;
+mod ir;
 mod ledger;
 mod manifest;
 mod runner_warmup;

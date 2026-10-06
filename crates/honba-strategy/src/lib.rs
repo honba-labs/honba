@@ -18,6 +18,7 @@ pub mod context;
 pub mod contract_probe;
 pub mod dyn_strategy;
 pub mod intent;
+pub mod ir;
 pub mod manifest;
 pub mod rsi_reversal;
 pub mod runner;
@@ -29,6 +30,7 @@ pub use context::{LedgerContext, StrategyContext};
 pub use contract_probe::{ContractProbe, Observation};
 pub use dyn_strategy::DynStrategy;
 pub use intent::{IntentError, OrderIntent};
+pub use ir::{IrError, IrSubscriptions, IrUniverse, StrategyIr};
 pub use manifest::{
     ManifestError, StrategyManifest, Subscriptions, TimeframeSpec, Universe, STRATEGY_API_VERSION,
 };
