@@ -1,6 +1,6 @@
 //! Golden-vector contract for the currency minor-unit table (ADR 0011).
 //!
-//! Reads `schema/golden/currency.json`; the Python tests read the same file
+//! Reads `schema/conformance/currency_minor_units.json`; the Python tests read the same file
 //! and also pin `honba._honba` to it.
 
 use std::path::PathBuf;
@@ -10,10 +10,11 @@ use honba_messages::SCHEMA_VERSION;
 use serde_json::Value;
 
 fn load() -> Value {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../schema/golden/currency.json");
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../schema/conformance/currency_minor_units.json");
     let doc: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
     assert_eq!(doc["schema_version"], u64::from(SCHEMA_VERSION));
-    assert_eq!(doc["type"], "Currency");
+    assert_eq!(doc["type"], "CurrencyMinorUnits");
     doc
 }
 

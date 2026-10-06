@@ -125,10 +125,34 @@ pub fn wire_enum_values() -> BTreeMap<&'static str, Vec<String>> {
     enum_values()
 }
 
+/// The currency minor-unit table, keyed by currency code: `(exponent, singular, plural)`.
+///
+/// Generated from `Currency::ALL`, so Python reads the one Rust table (ADR 0011).
+pub fn currency_minor_units() -> BTreeMap<String, (u8, &'static str, &'static str)> {
+    Currency::ALL
+        .iter()
+        .map(|c| {
+            let unit = c.minor_unit();
+            (
+                c.code().to_owned(),
+                (c.minor_exponent(), unit.singular, unit.plural),
+            )
+        })
+        .collect()
+}
+
+/// Minor-unit table per currency code: `(exponent, singular name, plural name)`.
+#[pyfunction]
+#[pyo3(name = "currency_minor_units")]
+pub fn py_currency_minor_units() -> BTreeMap<String, (u8, &'static str, &'static str)> {
+    currency_minor_units()
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("SCHEMA_VERSION", SCHEMA_VERSION)?;
     m.add("API_VERSION", API_VERSION)?;
     m.add_function(wrap_pyfunction!(canonical_json, m)?)?;
     m.add_function(wrap_pyfunction!(wire_enum_values, m)?)?;
+    m.add_function(wrap_pyfunction!(py_currency_minor_units, m)?)?;
     Ok(())
 }

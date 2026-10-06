@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from honba.domain.instrument import InstrumentId
-from honba.domain.money import MINOR_PER_MAJOR, Currency, Money, _round_half_away
+from honba.domain.money import Currency, Money, _round_half_away
 
 
 class PositionSide(Enum):
@@ -63,13 +63,14 @@ class Position:
         if self.is_flat:
             self.side = fill_side
             self.quantity = fill_qty
-            self.avg_price = _round_to_minor(fill_px)
+            self.avg_price = _round_to_minor(fill_px, self.currency)
             return
 
         if self.side == fill_side:
             new_qty = self.quantity + fill_qty
             self.avg_price = _round_to_minor(
-                ((self.quantity * self.avg_price) + (fill_qty * fill_px)) / new_qty
+                ((self.quantity * self.avg_price) + (fill_qty * fill_px)) / new_qty,
+                self.currency,
             )
             self.quantity = new_qty
         else:
@@ -91,9 +92,10 @@ class Position:
                 remainder = fill_qty - self.quantity
                 self.side = fill_side
                 self.quantity = remainder
-                self.avg_price = _round_to_minor(fill_px)
+                self.avg_price = _round_to_minor(fill_px, self.currency)
 
 
-def _round_to_minor(price: float) -> float:
-    """Nearest minor unit, half away from zero (``f64::round``, as in Rust)."""
-    return _round_half_away(price * MINOR_PER_MAJOR) / MINOR_PER_MAJOR
+def _round_to_minor(price: float, currency: Currency) -> float:
+    """Nearest minor unit of ``currency``, half away from zero (``f64::round``, as in Rust)."""
+    scale = currency.minor_per_major
+    return _round_half_away(price * scale) / scale

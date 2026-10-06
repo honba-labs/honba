@@ -8,6 +8,11 @@ STRATEGY_API_VERSION: Final[str]
 
 def canonical_json(kind: str, payload: str) -> str: ...
 def wire_enum_values() -> dict[str, list[str]]: ...
+def currency_minor_units() -> dict[str, tuple[int, str, str]]:
+    """Minor-unit table per currency code: ``(exponent, singular name, plural name)``.
+
+    One major unit is ``10**exponent`` minor units. Rust owns the table (ADR 0011).
+    """
 def verify_manifest(manifest_json: str) -> str:
     """Compile a ``StrategyManifest`` (JSON) into its ``StrategyIr`` (JSON).
 

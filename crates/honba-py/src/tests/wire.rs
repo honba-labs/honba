@@ -1,5 +1,7 @@
 //! Unit tests for `crate::pyclasses::wire`.
 
+use honba_entities::Currency;
+
 use crate::pyclasses::wire::*;
 
 #[test]
@@ -25,4 +27,14 @@ fn canonical_roundtrips_and_rejects() {
         .unwrap_err()
         .contains("unknown kind"));
     assert!(canonical("Order", "{}").is_err());
+}
+
+#[test]
+fn currency_minor_units_table_covers_every_currency() {
+    let table = currency_minor_units();
+    assert_eq!(table.len(), Currency::ALL.len());
+    assert_eq!(table["INR"], (2, "paisa", "paise"));
+    assert_eq!(table["USD"], (2, "cent", "cents"));
+    assert_eq!(table["EUR"], (2, "cent", "cents"));
+    assert_eq!(table["GBP"], (2, "penny", "pence"));
 }
