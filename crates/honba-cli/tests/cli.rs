@@ -111,6 +111,54 @@ fn data_load_rejects_unsupported_sources() {
     );
 }
 
+/// Writes a two-bar Parquet file in the canonical bar layout.
+fn write_bars_parquet(path: &Path) {
+    use arrow::array::{ArrayRef, Float64Array, Int64Array};
+    use arrow::record_batch::RecordBatch;
+    use honba_data::import::parquet_source::bar_schema;
+    use parquet::arrow::ArrowWriter;
+    use std::sync::Arc;
+
+    let schema = Arc::new(bar_schema());
+    let col = |v: f64| -> ArrayRef { Arc::new(Float64Array::from(vec![v; 2])) };
+    let columns: Vec<ArrayRef> = vec![
+        Arc::new(Int64Array::from(vec![60_000_000_000_i64, 120_000_000_000])),
+        col(10.0),
+        col(12.0),
+        col(9.0),
+        col(11.0),
+        col(100.0),
+    ];
+    let batch = RecordBatch::try_new(schema.clone(), columns).unwrap();
+    let mut writer = ArrowWriter::try_new(fs::File::create(path).unwrap(), schema, None).unwrap();
+    writer.write(&batch).unwrap();
+    writer.close().unwrap();
+}
+
+#[test]
+fn data_load_summarises_a_parquet_file() {
+    let dir = scratch("data_load");
+    let file = dir.join("TCS.NSE.parquet");
+    write_bars_parquet(&file);
+    let out = honba(&["data", "load", file.to_str().unwrap(), "TCS"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    let text = stdout(&out);
+    assert!(text.contains("2 bars loaded from"), "{text}");
+    assert!(
+        text.contains("first: ts_event=") && text.contains("close=11"),
+        "{text}"
+    );
+}
+
+#[test]
+fn data_load_reports_the_missing_file_by_name() {
+    let dir = scratch("data_load_missing");
+    let file = dir.join("absent.parquet");
+    let out = honba(&["data", "load", file.to_str().unwrap(), "TCS"]);
+    assert!(!out.status.success());
+    assert!(stderr(&out).contains("absent.parquet"), "{}", stderr(&out));
+}
+
 #[test]
 fn calendars_show_echoes_the_year() {
     let out = honba(&["calendars", "show", "--year", "2025"]);
