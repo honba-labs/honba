@@ -59,3 +59,17 @@ fn cancel_books_the_remainder_at_once() {
     assert_eq!(got.reason, "cancelled");
     assert_eq!(got.quantity, 1.0);
 }
+
+#[test]
+fn cancelling_twice_releases_once_and_a_later_bar_does_not_resurrect_pending() {
+    let id = first_order_id();
+    let exec = ScriptedExecution::new(10.0).with(id.clone(), Behavior::Hold);
+    let mut r = StrategyRunner::new(BuyAndHold::new(any_instrument(), 1.0), exec);
+    bar(&mut r, 1);
+    r.cancel(&id).unwrap();
+    r.cancel(&id).unwrap();
+    bar(&mut r, 2);
+    assert_eq!(r.order_rejections().len(), 1);
+    assert!(!r.context().busy(&any_instrument()));
+    assert!(r.fills().is_empty());
+}

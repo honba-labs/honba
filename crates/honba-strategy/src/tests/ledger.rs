@@ -197,3 +197,15 @@ fn notional_rounds_once_per_fill_to_minor_units() {
         .unwrap();
     assert_eq!(ctx.cash().minor(), 100_000 - 10_000);
 }
+
+#[test]
+fn releasing_one_order_leaves_a_second_order_on_the_instrument_pending() {
+    let nifty = id("NIFTY50", "NSE");
+    let mut ctx = LedgerContext::new();
+    ctx.submit(OrderIntent::market_buy(nifty.clone(), 3.0));
+    ctx.submit(OrderIntent::market_buy(nifty.clone(), 2.0));
+    ctx.release_remainder(&nifty, OrderSide::Buy, 3.0);
+    assert!(ctx.busy(&nifty), "2 still pending");
+    ctx.release_remainder(&nifty, OrderSide::Buy, 2.0);
+    assert!(!ctx.busy(&nifty));
+}
