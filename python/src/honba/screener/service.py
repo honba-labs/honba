@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum
@@ -17,6 +18,8 @@ from honba.screener.coverage import (
     plan_gaps,
 )
 from honba.screener.ports import BarStore, MarketDataProvider, validate_bar
+
+logger = logging.getLogger(__name__)
 
 
 class MissingDataPolicy(Enum):
@@ -134,7 +137,8 @@ class DataService:
                         fetched_bars = bars
                         fetched = True
                         break
-                    except Exception:
+                    except Exception as exc:  # noqa: BLE001 - provider fallback loop: any failure moves to the next provider
+                        logger.debug("Provider %s failed for %s: %s", provider.name, inst, exc)
                         continue
 
                 if fetched:
@@ -146,7 +150,7 @@ class DataService:
                         status=CoverageStatus.FINAL if fetched_bars else CoverageStatus.EMPTY,
                         source=source_used,
                         row_count=len(fetched_bars),
-                        fetched_at_ns=int(dt.datetime.now().timestamp() * 1e9),
+                        fetched_at_ns=int(dt.datetime.now(dt.timezone.utc).timestamp() * 1e9),
                     )
                     self.store.append(record, fetched_bars)
                 else:

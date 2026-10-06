@@ -411,7 +411,7 @@ class YFinanceProvider:
                         interval=interval,
                     )
                 return []
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - retry loop around third-party yfinance, whose failures are untyped
                 last_error = exc
                 logger.debug(
                     "Attempt %d/%d failed for %s [%s, %s]: %s",
@@ -458,7 +458,7 @@ class YFinanceProvider:
         end_date = (
             dt.date.fromisoformat(end)
             if isinstance(end, str)
-            else (end or dt.date.today() + dt.timedelta(days=1))
+            else (end or dt.date.today() + dt.timedelta(days=1))  # noqa: DTZ011 - default end is the local calendar date
         )
 
         ticker_sym = to_yfinance_symbol(inst, custom_map=self.symbol_map)

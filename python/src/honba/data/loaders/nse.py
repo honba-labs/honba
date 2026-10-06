@@ -96,7 +96,7 @@ def parse_bhavcopy_csv(csv_content: str, exchange: str = "NSE") -> dict[str, Bar
             vol = 0.0
 
         raw_date_str = (row.get(date_col) or "").strip() if date_col else ""
-        bar_date = _parse_date(raw_date_str) or dt.date.today()
+        bar_date = _parse_date(raw_date_str) or dt.date.today()  # noqa: DTZ011 - fallback bar date is the local calendar date, as the ts below is local
 
         ts = int(dt.datetime.combine(bar_date, dt.time(9, 15)).timestamp() * 1e9)
         inst_id = InstrumentId(symbol=raw_sym, exchange=exchange)
@@ -120,7 +120,7 @@ def _parse_date(raw: str) -> dt.date | None:
         return None
     for fmt in ("%Y-%m-%d", "%d-%b-%Y", "%d-%m-%Y", "%Y%m%d"):
         try:
-            return dt.datetime.strptime(raw, fmt).date()
+            return dt.datetime.strptime(raw, fmt).date()  # noqa: DTZ007 - date-only parse, no instant involved
         except ValueError:
             pass
     return None
@@ -197,7 +197,14 @@ class NseBhavcopyProvider:
             try:
                 with lzma.open(xz_cache_file, mode="rt", encoding="utf-8") as f:
                     return parse_bhavcopy_csv(f.read())
-            except Exception as exc:
+            except (
+                OSError,
+                lzma.LZMAError,
+                EOFError,
+                UnicodeDecodeError,
+                ValueError,
+                KeyError,
+            ) as exc:
                 logger.warning("Error reading xz cache %s: %s", xz_cache_file, exc)
 
         # 2. Fallback to uncompressed cache (.csv) and compress to .xz for future lookup
@@ -210,10 +217,10 @@ class NseBhavcopyProvider:
                         with lzma.open(xz_cache_file, mode="wt", encoding="utf-8") as f:
                             f.write(content_str)
                         csv_cache_file.unlink(missing_ok=True)
-                    except Exception as e:
+                    except (OSError, lzma.LZMAError) as e:
                         logger.debug("Failed auto-compression of %s: %s", csv_cache_file, e)
                 return parse_bhavcopy_csv(content_str)
-            except Exception as exc:
+            except (OSError, UnicodeDecodeError, ValueError, KeyError) as exc:
                 logger.warning("Error reading csv cache %s: %s", csv_cache_file, exc)
 
         http_client = client or self._get_client()
@@ -251,10 +258,10 @@ class NseBhavcopyProvider:
                             try:
                                 with lzma.open(xz_cache_file, mode="wt", encoding="utf-8") as f:
                                     f.write(csv_text)
-                            except Exception as e:
+                            except (OSError, lzma.LZMAError) as e:
                                 logger.warning("Could not write xz cache %s: %s", xz_cache_file, e)
                         return parsed
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - provider fallback loop: any failure on one URL must try the next
                 logger.debug("Failed to fetch %s: %s", url, exc)
 
         return {}
@@ -283,7 +290,7 @@ class NseBhavcopyProvider:
                 total_comp += len(comp_bytes)
                 csv_path.unlink()
                 migrated += 1
-            except Exception as exc:
+            except (OSError, lzma.LZMAError) as exc:
                 logger.warning("Failed to compress %s: %s", csv_path, exc)
 
         return migrated, total_orig, total_comp

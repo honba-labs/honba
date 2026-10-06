@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any
 
 CURRENCY_SYMBOLS = {
@@ -21,7 +22,7 @@ def format_currency(amount: Any, currency: str = "INR") -> str:
     """Format currency amount based on currency code."""
     try:
         f = float(amount)
-    except Exception:
+    except (TypeError, ValueError):
         return str(amount)
     c = currency.upper()
     sym = CURRENCY_SYMBOLS.get(c, c + " ")
@@ -78,12 +79,10 @@ def format_date_indian(dt: Any) -> str:
             return dt.strftime("%d-%m-%Y")
         if isinstance(dt, str):
             for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y", "%d/%m/%Y"):
-                try:
-                    return datetime.strptime(dt, fmt).strftime("%d-%m-%Y")
-                except Exception:
-                    pass
+                with contextlib.suppress(ValueError):
+                    return datetime.strptime(dt, fmt).strftime("%d-%m-%Y")  # noqa: DTZ007 - date-only formatting, no instant involved
         return str(dt)
-    except Exception:
+    except Exception:  # noqa: BLE001 - best-effort formatting must never raise; falls back to str()
         return str(dt)
 
 
@@ -98,12 +97,10 @@ def format_date_us(dt: Any) -> str:
             return dt.strftime("%m-%d-%Y")
         if isinstance(dt, str):
             for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y", "%d/%m/%Y"):
-                try:
-                    return datetime.strptime(dt, fmt).strftime("%m-%d-%Y")
-                except Exception:
-                    pass
+                with contextlib.suppress(ValueError):
+                    return datetime.strptime(dt, fmt).strftime("%m-%d-%Y")  # noqa: DTZ007 - date-only formatting, no instant involved
         return str(dt)
-    except Exception:
+    except Exception:  # noqa: BLE001 - best-effort formatting must never raise; falls back to str()
         return str(dt)
 
 
@@ -114,5 +111,5 @@ def format_date_iso(dt: Any) -> str:
         if isinstance(dt, (datetime, date)):
             return dt.strftime("%Y-%m-%d")
         return str(dt)
-    except Exception:
+    except Exception:  # noqa: BLE001 - best-effort formatting must never raise; falls back to str()
         return str(dt)

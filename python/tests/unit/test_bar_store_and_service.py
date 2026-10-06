@@ -43,7 +43,7 @@ def test_in_memory_bar_store_roundtrip():
     # Create dummy bars for 2025-01-06 and 2025-01-07
     b1 = Bar(
         inst,
-        int(dt.datetime(2025, 1, 6, 9, 15).timestamp() * 1e9),
+        int(dt.datetime(2025, 1, 6, 9, 15, tzinfo=dt.timezone.utc).timestamp() * 1e9),
         100.0,
         105.0,
         95.0,
@@ -52,7 +52,7 @@ def test_in_memory_bar_store_roundtrip():
     )
     b2 = Bar(
         inst,
-        int(dt.datetime(2025, 1, 7, 9, 15).timestamp() * 1e9),
+        int(dt.datetime(2025, 1, 7, 9, 15, tzinfo=dt.timezone.utc).timestamp() * 1e9),
         102.0,
         108.0,
         101.0,
@@ -89,7 +89,7 @@ def test_data_service_ensure_fills_gap():
     # Pre-populate provider with data for 2025-01-06 to 2025-01-10
     bars = []
     for d in range(6, 11):
-        ts = int(dt.datetime(2025, 1, d, 9, 15).timestamp() * 1e9)
+        ts = int(dt.datetime(2025, 1, d, 9, 15, tzinfo=dt.timezone.utc).timestamp() * 1e9)
         bars.append(Bar(inst, ts, 100.0 + d, 105.0 + d, 95.0 + d, 102.0 + d, 1000.0))
     provider.add_bars(inst, timeframe, bars)
 
@@ -114,3 +114,45 @@ def test_data_service_ensure_fills_gap():
     # Second call is idempotent and should require 0 provider fetches
     plan2 = service.plan([inst], timeframe, req)
     assert plan2.total_gaps == 0
+
+
+def test_data_service_records_fetched_at_ns_as_current_unix_ns():
+    """Characterization: fetched_at_ns is the current instant in unix ns (tz-independent)."""
+    import time
+
+    inst = InstrumentId("RELIANCE", "NSE")
+    provider = InMemoryMarketDataProvider()
+    ts = int(dt.datetime(2025, 1, 6, 9, 15, tzinfo=dt.timezone.utc).timestamp() * 1e9)
+    provider.add_bars(inst, "1D", [Bar(inst, ts, 100.0, 105.0, 95.0, 102.0, 1000.0)])
+    store = InMemoryBarStore()
+    service = DataService(store=store, providers=[provider])
+    req = DateInterval(dt.date(2025, 1, 6), dt.date(2025, 1, 7))
+
+    before = time.time_ns()
+    service.ensure(service.plan([inst], "1D", req))
+    after = time.time_ns()
+
+    (record,) = store.coverage(inst, "1D")
+    assert before - 10**6 <= record.fetched_at_ns <= after + 10**6
+
+
+class _RaisingProvider:
+    name = "boom"
+
+    def fetch(self, *args, **kwargs):
+        raise RuntimeError("provider down")
+
+
+def test_data_service_falls_back_when_a_provider_raises():
+    """A failing provider is skipped (and logged); the next provider is used."""
+    inst = InstrumentId("RELIANCE", "NSE")
+    good = InMemoryMarketDataProvider()
+    ts = int(dt.datetime(2025, 1, 6, 9, 15, tzinfo=dt.timezone.utc).timestamp() * 1e9)
+    good.add_bars(inst, "1D", [Bar(inst, ts, 100.0, 105.0, 95.0, 102.0, 1000.0)])
+    service = DataService(store=InMemoryBarStore(), providers=[_RaisingProvider(), good])
+    req = DateInterval(dt.date(2025, 1, 6), dt.date(2025, 1, 7))
+
+    result = service.ensure(service.plan([inst], "1D", req))
+
+    assert result.success is True
+    assert len(result.bars[inst]) == 1
