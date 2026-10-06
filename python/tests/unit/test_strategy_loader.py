@@ -125,3 +125,48 @@ def test_the_source_hash_tracks_strategy_and_config(catalog: Path) -> None:
     cfg = catalog / "momentum" / "trend" / "alpha" / "config.toml"
     cfg.write_text(cfg.read_text() + "exchange = 'BSE'\n")
     assert load_catalog_strategy("alpha", catalog).source_sha256 != before
+
+
+DATACLASS_SRC = """
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from honba.strategies.base import Strategy
+
+
+@dataclass
+class Params:
+    fast: int = 5
+
+
+class {cls}(Strategy):
+    name = "{name}"
+    params = Params()
+"""
+
+
+def test_a_strategy_file_with_a_dataclass_and_future_annotations_loads(tmp_path: Path) -> None:
+    path = tmp_path / "dc.py"
+    path.write_text(DATACLASS_SRC.format(cls="Dc", name="dc"))
+    assert load_strategy(path).params.fast == 5
+
+
+def test_a_catalog_strategy_with_a_dataclass_and_future_annotations_loads(catalog: Path) -> None:
+    d = catalog / "swing" / "dc"
+    d.mkdir()
+    (d / "strategy.py").write_text(DATACLASS_SRC.format(cls="Dc", name="dc"))
+    (d / "config.toml").write_text(CONFIG.format(name="dc"))
+    (d / "registry.json").write_text(json.dumps({"name": "dc"}))
+    assert load_catalog_strategy("dc", catalog).cls.params.fast == 5
+
+
+def test_a_failed_import_leaves_nothing_in_sys_modules(tmp_path: Path) -> None:
+    import sys
+
+    path = tmp_path / "boom.py"
+    path.write_text("raise RuntimeError('boom')\n")
+    before = set(sys.modules)
+    with pytest.raises(RuntimeError, match="boom"):
+        load_strategy(path)
+    assert set(sys.modules) == before

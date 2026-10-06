@@ -76,7 +76,14 @@ def _import_file(path: Path, module_name: str) -> ModuleType:
     if spec is None or spec.loader is None:
         raise CatalogError(f"cannot import {path}")
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    # Registered before exec so decorators (``@dataclass`` with postponed annotations)
+    # can look the module up; removed again if the import fails.
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+    except BaseException:
+        sys.modules.pop(module_name, None)
+        raise
     return module
 
 
