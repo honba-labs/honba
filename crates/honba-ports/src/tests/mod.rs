@@ -3,3 +3,4 @@
 mod bars;
 mod error;
 mod ports;
+mod snapshot;

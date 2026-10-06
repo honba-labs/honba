@@ -6,7 +6,7 @@
 //!
 //! The Honba event loop is synchronous and single-threaded. `honba-engine` owns the queue, the
 //! clock and the audit trail, and every surface — backtest, paper, live — drives that same kernel
-//! the same way. I/O is the exception, so it lives at the edges, behind the seven traits in this
+//! the same way. I/O is the exception, so it lives at the edges, behind the traits in this
 //! crate, and nowhere else.
 //!
 //! # Ports
@@ -18,6 +18,8 @@
 //! | [`ExecutionGateway`] | route an order, cancel, modify, next fill |
 //! | [`BarReader`] | the stored bars of one instrument over a range |
 //! | [`InstrumentMaster`] | what is this instrument, and what else is there |
+//! | [`QuoteReader`] | the latest top-of-book quote of one instrument |
+//! | [`DepthReader`] | the order book of one instrument, to N levels |
 //! | [`Sink`] | append to the audit trail |
 //! | [`SecretStore`] | the credential stored under this key |
 //!
@@ -30,7 +32,7 @@
 //!
 //! A port that owns mutable state — the methods take `&mut self` — is `Send` and not `Sync`: one
 //! owner, one writer, driven by one task. A port that only reads its state — the methods take
-//! `&self` — is `Send + Sync`, so it can be shared behind an `Arc`. All six are object-safe, so a
+//! `&self` — is `Send + Sync`, so it can be shared behind an `Arc`. All of them are object-safe, so a
 //! registry can hold them as trait objects.
 //!
 //! # Errors
@@ -55,6 +57,7 @@ pub mod feed;
 pub mod master;
 pub mod secret;
 pub mod sink;
+pub mod snapshot;
 
 pub use bars::{BarReader, BarRequest};
 pub use clock::Clock;
@@ -64,6 +67,7 @@ pub use feed::MarketDataFeed;
 pub use master::InstrumentMaster;
 pub use secret::SecretStore;
 pub use sink::Sink;
+pub use snapshot::{DepthLevel, DepthReader, DepthSnapshot, QuoteReader};
 
 #[cfg(test)]
 mod tests;
