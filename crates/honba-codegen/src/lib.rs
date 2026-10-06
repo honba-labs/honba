@@ -29,12 +29,14 @@ use anyhow::{Context, Result};
 use serde_json::{json, Value};
 
 pub mod endpoints;
+pub mod instance;
 pub mod mcp;
 pub mod registry;
 pub mod schemas;
 pub mod typescript;
 pub mod typings;
 
+pub use instance::validate_instance;
 pub use registry::{
     published_names, request_type_names, API_TYPES, CONFIG_TYPES, MANIFEST_TYPES, SCREENER_TYPES,
     WIRE_ENUMS, WIRE_TYPES,

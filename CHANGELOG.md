@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Codegen: golden vectors validated against the generated schema
+
+- New `honba-codegen/tests/golden_vectors_conform.rs` validates 128 wire-shaped vectors (12 types) from `schema/golden` and
+  `schema/conformance` against `schema/domain/domain_schema.json`, with a small dependency-free validator
+  (`honba_codegen::validate_instance`). Closes the ADR 0014 known limit.
+
 ### Python adapters: capability-aware registry typing
 
 - `AdapterRegistry.create_market_data(name, **config) -> MarketDataClient` and `create_execution(...) -> ExecutionClient`

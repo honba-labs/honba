@@ -53,16 +53,19 @@ TypeScript (`typescript.rs`), `.pyi` stubs (`typings.rs`) and MCP tool schemas (
   pydantic model is the bug.
 - ADR 0006 decision 3 (representation rules) is enforced by serde; the schema has to describe the serde form
   faithfully. Today that is guarded only by the drift checks and the renderer goldens (`honba-codegen/tests`), which
-  pin the generated output; nothing yet validates the golden wire vectors against the generated schema (see Known
-  limits).
+  pin the generated output; `honba-codegen/tests/golden_vectors_conform.rs` also validates the golden wire vectors
+  against the generated schema (see Known limits).
 
 ## Known limits
 
 - The frontend TypeScript drift check is local only, because it needs the `honba-frontend` sibling checkout. CI does not
   guard that artifact.
-- No test validates the golden wire vectors (`schema/golden`, `schema/conformance`) against `domain_schema.json`, so a
-  schema that drifts from the serde form in a way the snapshots accept would go unnoticed. Adding that test is the
-  follow-up that closes the gap.
+- `honba-codegen/tests/golden_vectors_conform.rs` validates the wire-shaped golden vectors (`schema/golden` cases and
+  tolerated inputs, accepted `strategy_manifest` cases, screener predicates and groups) against `domain_schema.json`,
+  using a small in-crate validator (`honba_codegen::instance`) because no JSON Schema crate is in the dependency tree.
+  The validator covers only the keywords `schemars` emits and fails on any other validating keyword. Not checked:
+  `invalid*` vectors (rejected by Rust invariants the schema cannot express, such as `low <= high`), engine scenario
+  scripts and indicator series (not wire instances), and string formats (`format` is treated as an annotation).
 - The Python wire models are still hand-maintained mirrors. Generating them (plan.md §4.1 "Python types are generated,
   then hand-extended") is not done; `python/src/honba/wire/generated` holds `.pyi` stubs only. This ADR does not
   decide that step.

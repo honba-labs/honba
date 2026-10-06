@@ -2,6 +2,7 @@
 
 mod codegen;
 mod endpoints;
+mod instance;
 mod mcp;
 mod registry;
 mod schemas;
