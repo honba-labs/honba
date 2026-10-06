@@ -148,3 +148,29 @@ def test_verify_strategy_accepts_a_manifest_model() -> None:
         subscriptions=Subscriptions.of([Id("TCS", "NSE")]),
     )
     assert rq.verify_strategy(manifest).body == manifest.to_json_dict()
+
+
+I64_MAX = 2**63 - 1
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "2300-01-01",
+        "2262-04-12",
+        "2262-04-11T23:47:16.854775808Z",
+        datetime(2300, 1, 1, tzinfo=timezone.utc),
+        date(2300, 1, 1),
+        datetime(9999, 12, 31, 23, tzinfo=timezone(-timedelta(hours=5))),
+        UnixNanos.from_ns(I64_MAX + 1),
+    ],
+)
+def test_times_beyond_the_server_nanosecond_range_are_rejected_client_side(value: object) -> None:
+    with pytest.raises(RequestValidationError) as err:
+        rq.bars("TCS.NSE", to=value)  # type: ignore[arg-type]
+    assert (err.value.field, err.value.reason) == ("to", "invalid_time")
+
+
+def test_the_last_representable_nanosecond_is_accepted() -> None:
+    assert rq.bars("T.N", to="2262-04-11T23:47:16.854775807Z").query["to"].endswith("807Z")
+    assert rq.bars("T.N", to=UnixNanos.from_ns(I64_MAX)).query

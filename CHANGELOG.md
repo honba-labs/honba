@@ -43,6 +43,8 @@
   `/backtests`, `/sweeps`, `/orders`, `/positions/close`, `/screener/scan`, `/journals`) plus `/capabilities` and `/schema`.
 - `InprocTransport` wraps native `OSError`/`ValueError` (e.g. data directory removed after construction) into a
   non-retryable `TransportApiError`, so `except ApiError` behaves the same on both transports.
+- Request builders reject times past the server's `i64` nanosecond range (after 2262-04-11T23:47:16.854775807Z) client-side
+  with `RequestValidationError(field, 'invalid_time')`, like the server, before any round trip.
 
 ### WASM indicator surface (E11-S5, part 1)
 

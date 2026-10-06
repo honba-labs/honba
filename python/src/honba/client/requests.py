@@ -100,9 +100,24 @@ def instrument(instrument_id: str | InstrumentId) -> ApiRequest:
     return ApiRequest("GET", f"/instruments/{_id_path_segment(instrument_id)}")
 
 
+_MAX_NS = 2**63 - 1
+"""Latest instant the server accepts: chrono's ``timestamp_nanos_opt`` is an ``i64``
+(2262-04-11T23:47:16.854775807Z); anything later is ``invalid_time``."""
+
+
 def _to_ns(field: str, value: object) -> tuple[str, int]:
     """Validate a time and return ``(text to send, nanoseconds since the epoch)``."""
+    text, ns = _to_ns_unbounded(field, value)
+    if ns > _MAX_NS:
+        raise RequestValidationError(
+            field,
+            "invalid_time",
+            f"{field} {value!r} is beyond the representable range (before 2262-04-12)",
+        )
+    return text, ns
 
+
+def _to_ns_unbounded(field: str, value: object) -> tuple[str, int]:
     def bad(reason: str, message: str) -> RequestValidationError:
         return RequestValidationError(field, reason, message)
 
@@ -111,7 +126,10 @@ def _to_ns(field: str, value: object) -> tuple[str, int]:
     if isinstance(value, datetime):
         if value.tzinfo is None or value.utcoffset() is None:
             raise bad("naive_datetime", f"{field} must be timezone-aware")
-        delta = value.astimezone(timezone.utc) - _EPOCH
+        try:
+            delta = value.astimezone(timezone.utc) - _EPOCH
+        except OverflowError:
+            raise bad("invalid_time", f"{field} {value!r} is out of range") from None
         ns = (delta.days * 86_400 + delta.seconds) * 1_000_000_000 + delta.microseconds * 1000
         if ns < 0:
             raise bad("before_epoch", f"{field} {value!r} is before 1970-01-01")
@@ -144,7 +162,10 @@ def _to_ns(field: str, value: object) -> tuple[str, int]:
             "invalid_time",
             f"{field} {value!r} is not an RFC3339 time or a YYYY-MM-DD date",
         ) from None
-    delta = moment.astimezone(timezone.utc) - _EPOCH
+    try:
+        delta = moment.astimezone(timezone.utc) - _EPOCH
+    except OverflowError:
+        raise bad("invalid_time", f"{field} {value!r} is out of range") from None
     ns = (delta.days * 86_400 + delta.seconds) * 1_000_000_000 + nanos
     if ns < 0:
         raise bad("before_epoch", f"{field} {value!r} is before 1970-01-01")
