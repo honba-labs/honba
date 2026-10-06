@@ -1,0 +1,150 @@
+"""Request builders: bad input is rejected before anything is sent."""
+
+from __future__ import annotations
+
+from datetime import date, datetime, timedelta, timezone
+
+import pytest
+
+from honba.client import RequestValidationError
+from honba.client import requests as rq
+from honba.entities.instrument import InstrumentId as DomainId
+from honba.wire.wire import InstrumentId, UnixNanos
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def test_health_and_instruments_requests() -> None:
+    assert rq.health() == rq.ApiRequest("GET", "/health")
+    assert rq.instruments() == rq.ApiRequest("GET", "/instruments")
+    got = rq.instruments(exchange="NSE", symbol="TCS")
+    assert got.query == {"exchange": "NSE", "symbol": "TCS"}
+
+
+@pytest.mark.parametrize("bad", ["", "  ", 5])
+def test_instrument_filters_must_be_non_empty_strings(bad: object) -> None:
+    with pytest.raises(RequestValidationError) as err:
+        rq.instruments(exchange=bad)  # type: ignore[arg-type]
+    assert err.value.field == "exchange"
+
+
+def test_instrument_ids_accept_text_wire_and_domain_forms_and_are_path_encoded() -> None:
+    assert rq.instrument("TCS.NSE").path == "/instruments/TCS.NSE"
+    assert rq.instrument(InstrumentId(symbol="TCS", exchange="NSE")).path == "/instruments/TCS.NSE"
+    assert rq.instrument(DomainId("TCS", "NSE")).path == "/instruments/TCS.NSE"
+    # The symbol itself may hold a dot or characters that are special in a URL.
+    assert rq.instrument("M&M.NSE").path == "/instruments/M%26M.NSE"
+    assert rq.instrument("A/B.NSE").path == "/instruments/A%2FB.NSE"
+    assert rq.instrument("BRK.B.NYSE").path == "/instruments/BRK.B.NYSE"
+
+
+@pytest.mark.parametrize("bad", ["TCS", ".NSE", "TCS.", "", " TCS.NSE", None, 3])
+def test_malformed_instrument_ids_are_rejected(bad: object) -> None:
+    with pytest.raises(RequestValidationError) as err:
+        rq.instrument(bad)  # type: ignore[arg-type]
+    assert (err.value.field, err.value.reason) == ("id", "invalid_instrument_id")
+
+
+def test_bars_defaults_send_no_query() -> None:
+    assert rq.bars("TCS.NSE") == rq.ApiRequest("GET", "/bars/TCS.NSE")
+
+
+def test_bars_timeframe_grammar_matches_the_server() -> None:
+    for ok in ("30s", "1m", "4h", "1d", "2w", "1mo", "15m"):
+        assert rq.bars("TCS.NSE", tf=ok).query == {"tf": ok}
+    for bad in ("", "m", "0m", "1M", "1x", "-1m", "1.5m", "1 m", 1):
+        with pytest.raises(RequestValidationError) as err:
+            rq.bars("TCS.NSE", tf=bad)  # type: ignore[arg-type]
+        assert (err.value.field, err.value.reason) == ("tf", "invalid_timeframe")
+
+
+def test_bar_bounds_accept_text_dates_datetimes_and_unix_nanos() -> None:
+    got = rq.bars(
+        "TCS.NSE",
+        from_="2024-01-01",
+        to=datetime(2024, 1, 2, 5, 30, tzinfo=IST),
+    )
+    assert got.query == {"from": "2024-01-01", "to": "2024-01-02T00:00:00.000000000Z"}
+    assert rq.bars("T.N", from_=date(2024, 1, 1)).query == {"from": "2024-01-01"}
+    stamp = UnixNanos.from_ns(1_704_067_200_000_000_000)
+    assert rq.bars("T.N", from_=stamp).query == {"from": stamp.iso}
+    assert rq.bars("T.N", to="2024-01-01T00:00:00Z").query == {"to": "2024-01-01T00:00:00Z"}
+    assert rq.bars("T.N", to="2024-01-01T09:15:00.5+05:30").query["to"].endswith("+05:30")
+
+
+@pytest.mark.parametrize(
+    ("value", "reason"),
+    [
+        ("yesterday", "invalid_time"),
+        ("2024-13-01", "invalid_time"),
+        ("2024-02-30", "invalid_time"),
+        ("2024-01-01T25:00:00Z", "invalid_time"),
+        ("2024-01-01T00:00:00", "invalid_time"),  # no offset
+        (datetime(2024, 1, 1), "naive_datetime"),  # noqa: DTZ001
+        ("1969-12-31", "before_epoch"),
+        (12345, "invalid_time"),
+    ],
+)
+def test_bad_bounds_are_rejected_naming_the_field(value: object, reason: str) -> None:
+    with pytest.raises(RequestValidationError) as err:
+        rq.bars("TCS.NSE", from_=value)  # type: ignore[arg-type]
+    assert (err.value.field, err.value.reason) == ("from", reason)
+
+
+def test_an_empty_or_inverted_range_is_rejected() -> None:
+    for from_, to in [("2024-01-02", "2024-01-01"), ("2024-01-01", "2024-01-01")]:
+        with pytest.raises(RequestValidationError) as err:
+            rq.bars("TCS.NSE", from_=from_, to=to)
+        assert (err.value.field, err.value.reason) == ("to", "empty_range")
+    # One day vs the same instant written differently is still empty.
+    with pytest.raises(RequestValidationError):
+        rq.bars("T.N", from_="2024-01-01", to="2024-01-01T00:00:00Z")
+
+
+def test_quotes_join_symbols_and_carry_venue_and_as_of() -> None:
+    got = rq.quotes(["TCS", "INFY"], venue="NSE", as_of="2024-01-01")
+    assert got == rq.ApiRequest(
+        "GET", "/quotes", {"symbols": "TCS,INFY", "venue": "NSE", "as_of": "2024-01-01"}
+    )
+    assert rq.quotes("TCS").query == {"symbols": "TCS"}
+    assert rq.quotes(("TCS",)).query == {"symbols": "TCS"}
+
+
+@pytest.mark.parametrize("bad", [[], "", [""], ["TCS", " "], ["A,B"], "A,B", [1]])
+def test_bad_symbol_lists_are_rejected(bad: object) -> None:
+    with pytest.raises(RequestValidationError) as err:
+        rq.quotes(bad)  # type: ignore[arg-type]
+    assert err.value.field == "symbols"
+
+
+def test_depth_levels_are_1_to_50() -> None:
+    assert rq.depth("TCS.NSE") == rq.ApiRequest("GET", "/depth/TCS.NSE")
+    assert rq.depth("TCS.NSE", levels=50).query == {"depth": 50}
+    for bad in (0, 51, -1, 2.5, True, "5"):
+        with pytest.raises(RequestValidationError) as err:
+            rq.depth("TCS.NSE", levels=bad)  # type: ignore[arg-type]
+        assert err.value.field == "depth"
+
+
+def test_verify_strategy_posts_a_json_object() -> None:
+    got = rq.verify_strategy({"name": "x"})
+    assert got == rq.ApiRequest("POST", "/strategies/verify", body={"name": "x"})
+    for bad in ({}, [], "text", None):
+        with pytest.raises(RequestValidationError) as err:
+            rq.verify_strategy(bad)  # type: ignore[arg-type]
+        assert err.value.field == "manifest"
+
+
+def test_verify_strategy_accepts_a_manifest_model() -> None:
+    from honba.entities.instrument import InstrumentId as Id
+    from honba.strategies.manifest import StrategyManifest, Subscriptions, TimeframeSpec, Universe
+    from honba.wire.wire import BarAggregation
+
+    manifest = StrategyManifest.build(
+        "s",
+        "sha256:1",
+        Universe.of_explicit([Id("TCS", "NSE")]),
+        TimeframeSpec(interval=1, aggregation=BarAggregation.DAY),
+        subscriptions=Subscriptions.of([Id("TCS", "NSE")]),
+    )
+    assert rq.verify_strategy(manifest).body == manifest.to_json_dict()
