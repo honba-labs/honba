@@ -84,3 +84,12 @@ def test_frontend_dir_env_var_enables_typescript_step(tmp_path):
     root = _checkout(tmp_path)
     result = _run(root, env_extra={"HONBA_FRONTEND_DIR": str(tmp_path / "ts_env")})
     assert result.returncode == 0, result.stderr + result.stdout
+
+
+def test_export_never_writes_outside_the_checkout(tmp_path):
+    before = COMMITTED.read_bytes()
+    root = _checkout(tmp_path)
+    result = _run(root)
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert (root / "schema" / "domain" / "domain_schema.json").is_file()
+    assert COMMITTED.read_bytes() == before

@@ -11,7 +11,7 @@ pub(crate) fn export(
     let codegen = honba_codegen::Codegen::new();
     let schema_dir = output
         .clone()
-        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../schema/domain"));
+        .unwrap_or_else(|| PathBuf::from("schema/domain"));
     let p = codegen.write_json_schema(&schema_dir)?;
     println!("domain_schema.json written to {}", p.display());
 

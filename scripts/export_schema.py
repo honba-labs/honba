@@ -58,7 +58,13 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     binp = honba_binary()
-    cmd = [str(binp), "schema", "export"]
+    cmd = [
+        str(binp),
+        "schema",
+        "export",
+        "--output",
+        str(honba_root / "schema" / "domain"),
+    ]
     if args.frontend_dir is not None:
         cmd += ["--typescript", str(Path(args.frontend_dir))]
     if args.openapi_dir is not None:

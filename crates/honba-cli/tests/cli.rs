@@ -124,3 +124,19 @@ fn missing_subcommand_is_a_usage_error() {
     assert_eq!(out.status.code(), Some(2));
     assert!(stderr(&out).contains("Usage"), "{}", stderr(&out));
 }
+
+#[test]
+fn schema_export_without_output_writes_relative_to_cwd_not_the_source_tree() {
+    let committed =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../schema/domain/domain_schema.json");
+    let before = fs::read(&committed).unwrap();
+    let cwd = scratch("schema_default_dir");
+    let out = Command::new(env!("CARGO_BIN_EXE_honba"))
+        .args(["schema", "export"])
+        .current_dir(&cwd)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(cwd.join("schema/domain/domain_schema.json").is_file());
+    assert_eq!(fs::read(&committed).unwrap(), before);
+}

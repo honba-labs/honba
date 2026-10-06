@@ -78,7 +78,7 @@ enum DataCommands {
 enum SchemaCommands {
     /// Emit domain_schema.json, and optionally the derived artifacts
     Export {
-        /// Domain schema output dir (default: crate/schema/domain)
+        /// Domain schema output dir (default: ./schema/domain, relative to the working directory)
         #[arg(long)]
         output: Option<PathBuf>,
         /// Also render TypeScript into DIR (frontend)
