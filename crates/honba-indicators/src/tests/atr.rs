@@ -30,3 +30,19 @@ fn reset_clears_the_previous_close() {
     // Without a previous close the gap to 9.5 is ignored: TR = 1.
     assert_close(a.update(&hlc(20.0, 19.0, 19.5)).unwrap(), 1.0);
 }
+
+#[test]
+fn update_hlc_matches_update_with_a_bar() {
+    let bars = [
+        (10.0, 8.0, 9.0),
+        (12.0, 9.0, 11.0),
+        (11.0, 10.0, 10.5),
+        (13.0, 10.0, 12.0),
+    ];
+    let mut by_bar = Atr::new(2);
+    let mut by_hlc = Atr::new(2);
+    for (h, l, c) in bars {
+        assert_eq!(by_hlc.update_hlc(h, l, c), by_bar.update(&hlc(h, l, c)));
+    }
+    assert_eq!(by_hlc.value(), by_bar.value());
+}

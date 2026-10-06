@@ -59,6 +59,35 @@ impl Atr {
         self.period
     }
 
+    /// Feeds one bar given as raw `high`, `low`, `close` and returns the ATR once warmed up.
+    ///
+    /// Identical to [`Indicator::update`] on a bar with those fields; it exists so callers that
+    /// only hold price arrays (e.g. the WASM surface) need not build a `Bar`.
+    pub fn update_hlc(&mut self, high: f64, low: f64, close: f64) -> Option<f64> {
+        let tr = Self::true_range(high, low, self.prev_close);
+        self.prev_close = Some(close);
+        self.push_tr(tr)
+    }
+
+    fn push_tr(&mut self, tr: f64) -> Option<f64> {
+        if self.atr.is_none() {
+            self.seed_trs.push(tr);
+            if self.seed_trs.len() == self.period {
+                let n = self.period as f64;
+                let seed = self.seed_trs.iter().sum::<f64>() / n;
+                self.atr = Some(seed);
+                return Some(seed);
+            }
+            return None;
+        }
+
+        let n = self.period as f64;
+        let prev = self.atr.unwrap();
+        let next = (prev * (n - 1.0) + tr) / n;
+        self.atr = Some(next);
+        Some(next)
+    }
+
     fn true_range(high: f64, low: f64, prev_close: Option<f64>) -> f64 {
         let hl = high - low;
         match prev_close {
@@ -77,25 +106,7 @@ impl Indicator for Atr {
     type Output = f64;
 
     fn update(&mut self, bar: &Bar) -> Option<f64> {
-        let tr = Self::true_range(bar.high(), bar.low(), self.prev_close);
-        self.prev_close = Some(bar.close());
-
-        if self.atr.is_none() {
-            self.seed_trs.push(tr);
-            if self.seed_trs.len() == self.period {
-                let n = self.period as f64;
-                let seed = self.seed_trs.iter().sum::<f64>() / n;
-                self.atr = Some(seed);
-                return Some(seed);
-            }
-            return None;
-        }
-
-        let n = self.period as f64;
-        let prev = self.atr.unwrap();
-        let next = (prev * (n - 1.0) + tr) / n;
-        self.atr = Some(next);
-        Some(next)
+        self.update_hlc(bar.high(), bar.low(), bar.close())
     }
 
     fn value(&self) -> Option<f64> {
