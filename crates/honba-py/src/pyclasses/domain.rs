@@ -469,15 +469,28 @@ impl ROrderIntent {
     }
 }
 
-/// India (NSE/BSE) equity delivery settlement cycle in days (T+2).
+/// India (NSE/BSE) equity delivery settlement cycle in days.
 ///
+/// With no `as_of` this is the cycle in force today (T+1); with an ISO date
+/// (`"YYYY-MM-DD"`) it is the cycle on that date (T+2 before 2023-01-27, T+1 from then).
 /// Source of truth is the India market pack in `honba-market`
-/// (`IndiaMarketProfile::equity_settlement_days`); Python wraps this in
-/// `honba.markets.india.settlement_days_for` and can override per strategy with
-/// `StrategyConfig.settlement_days`.
+/// (`IndiaMarketProfile::equity_settlement_days_as_of`); Python wraps this in
+/// `honba.markets.india.settlement_days_for` and can override per run with
+/// `settlement_days`.
 #[pyfunction]
-pub fn nse_equity_settlement_days() -> usize {
-    IndiaMarketProfile::equity_settlement_days()
+#[pyo3(signature = (as_of=None))]
+pub fn nse_equity_settlement_days(as_of: Option<&str>) -> PyResult<usize> {
+    match as_of {
+        None => Ok(IndiaMarketProfile::equity_settlement_days()),
+        Some(text) => {
+            let date = chrono::NaiveDate::parse_from_str(text, "%Y-%m-%d").map_err(|e| {
+                pyo3::exceptions::PyValueError::new_err(format!(
+                    "as_of must be an ISO date (YYYY-MM-DD), got {text:?}: {e}"
+                ))
+            })?;
+            Ok(IndiaMarketProfile::equity_settlement_days_as_of(date))
+        }
+    }
 }
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {

@@ -238,3 +238,49 @@ class _Noop(Strategy):
 
     def on_bar(self, bar: Bar) -> None:
         return None
+
+
+def _start_at(year: int, month: int, day: int, opens=(100.0, 110.0, 120.0)) -> list[Bar]:
+    t0 = int(dt.datetime(year, month, day, tzinfo=dt.timezone.utc).timestamp()) * 10**9
+    return [Bar(X, t0 + i * DAY, o, o + 6, o - 1, o + 5, 1_000.0) for i, o in enumerate(opens)]
+
+
+def _session(bars: list[Bar], **kw):
+    return Honba.backtest(
+        BuyOnce(),
+        symbol="XYZ",
+        start="2022-01-01",
+        end="2024-02-01",
+        cash=100_000.0,
+        data=Provider(bars),
+        costs="none",
+        **kw,
+    )
+
+
+@pytest.mark.parametrize(
+    ("first_day", "days"),
+    [
+        ((2022, 6, 1), 2),  # before the T+1 move
+        ((2023, 1, 26), 2),  # last T+2 session
+        ((2023, 1, 27), 1),  # first T+1 session
+        ((2024, 1, 1), 1),
+    ],
+)
+def test_settlement_cycle_defaults_from_the_first_session_date(first_day, days) -> None:
+    session = _session(_start_at(*first_day))
+    session.run()
+    assert session.execution.settlement_days == days
+
+
+def test_explicit_settlement_days_wins_over_the_dated_default() -> None:
+    session = _session(_start_at(2022, 6, 1), settlement_days=0)
+    session.run()
+    assert session.execution.settlement_days == 0
+
+
+def test_intraday_backtests_need_an_explicit_settlement_cycle() -> None:
+    with pytest.raises(ValueError, match="settlement_days"):
+        _session(_start_at(2024, 1, 1), timeframe="5m")
+    session = _session(_start_at(2024, 1, 1), timeframe="5m", settlement_days=0)
+    assert session.execution.settlement_days == 0

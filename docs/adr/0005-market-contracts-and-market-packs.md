@@ -27,6 +27,11 @@ Per [ROADMAP-borrowed-ideas.md](../../ROADMAP-borrowed-ideas.md) Section 2b & E0
    - Provide a fully standalone `null` market pack (`NullCalendar`, `NullCostSchedule`, `NullInstrumentRules`, `NullMarketProfile`) compiled unconditionally so `cargo check -p honba-market --no-default-features` compiles cleanly and passes all contract tests.
 3. **Contract Test Suite:**
    - Provide a shared, generic contract verification suite that exercises any `MarketProfile` / `MarketCalendar` / `CostSchedule` implementation across both `india` and `null` packs.
+4. **Date-aware settlement (amendment):**
+   - A settlement cycle is a function of the trade date, not a constant. `SettlementRules` gains `settlement_days_as_of(kind, date)` (default: the fixed cycle) and `settlement_date` uses the cycle in force on the trade date. `SettlementSchedule` carries dated phases.
+   - India (NSE and BSE, all equities): T+2 until 2023-01-26, T+1 from 2023-01-27. `settlement_days(kind)` without a date reports the latest phase (T+1). BSE follows NSE.
+   - Python asks through `honba._honba.nse_equity_settlement_days(as_of)` / `honba.markets.india.settlement_days_for(exchange, as_of=...)`. An explicit `settlement_days` (`Honba.backtest`, `make_simulator`, `StrategyConfig`) always wins. A backtest resolves the default as of its first session date and keeps it for the run (a run spanning 2023-01-27 does not switch mid-run).
+   - The next-open simulator counts one session per bar, which equals trading days only for daily-or-longer bars; intraday timeframes must pass `settlement_days` explicitly (an error otherwise).
 
 ## Consequences
 - Core engine, simulation, and risk layers can consume generic market models without any compile-time dependency on Indian market specifics.

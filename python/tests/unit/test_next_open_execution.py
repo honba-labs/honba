@@ -8,6 +8,8 @@ the reject/cancel path. The runner-level flow is in
 
 from __future__ import annotations
 
+import datetime as dt
+
 import pytest
 
 from honba.backtest.simulated import (
@@ -240,9 +242,36 @@ def test_resolve_fill_costs_names() -> None:
         resolve_fill_costs("mars.equity")
 
 
+def test_make_simulator_settlement_follows_the_as_of_date() -> None:
+    def days(**kw) -> int:
+        return make_simulator(fill="next_open", cash=rupees(1.0), **kw).settlement_days
+
+    assert days(as_of=dt.date(2023, 1, 26)) == 2
+    assert days(as_of=dt.date(2023, 1, 27)) == 1
+    assert days(as_of=dt.date(2023, 1, 26), exchange="BSE") == 2
+    assert days(as_of=dt.date(2019, 1, 1), exchange="NYSE") == 1
+    # An explicit override always wins over the dated default.
+    assert days(as_of=dt.date(2019, 1, 1), settlement_days=0) == 0
+    assert days(as_of=dt.date(2025, 1, 1), settlement_days=3) == 3
+
+
+@pytest.mark.parametrize("timeframe", ["1m", "5m", "15min", "1h", "60s", "30m"])
+def test_make_simulator_requires_explicit_settlement_for_intraday(timeframe: str) -> None:
+    with pytest.raises(ValueError, match="settlement_days"):
+        make_simulator(fill="next_open", cash=rupees(1.0), timeframe=timeframe)
+    sim = make_simulator(fill="next_open", cash=rupees(1.0), timeframe=timeframe, settlement_days=0)
+    assert sim.settlement_days == 0
+
+
+@pytest.mark.parametrize("timeframe", ["1d", "1D", "d", "1w", "day", "daily"])
+def test_make_simulator_daily_timeframes_use_the_market_default(timeframe: str) -> None:
+    sim = make_simulator(fill="next_open", cash=rupees(1.0), timeframe=timeframe)
+    assert sim.settlement_days == 1
+
+
 def test_make_simulator_selects_by_fill_model_and_india_settlement() -> None:
     sim = make_simulator(fill="next_open", cash=rupees(1.0), exchange="NSE")
-    assert isinstance(sim, NextOpenExecution) and sim.settlement_days == 2
+    assert isinstance(sim, NextOpenExecution) and sim.settlement_days == 1  # T+1 today
     assert (
         make_simulator(fill="next_open", cash=rupees(1.0), settlement_days=0).settlement_days == 0
     )

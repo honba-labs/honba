@@ -53,7 +53,13 @@ from typing import Protocol, cast
 # These are the stable contracts. Session depends on them; they must not
 # depend on Session (no circular imports).
 # ---------------------------------------------------------------------------
-from honba.backtest.simulated import FillCostFn, FillModel, make_simulator
+from honba.backtest.simulated import (
+    FillCostFn,
+    FillModel,
+    NextOpenExecution,
+    make_simulator,
+    session_date,
+)
 from honba.domain.money import Currency, Money
 from honba.entities.bar import Bar
 from honba.entities.instrument import Instrument, InstrumentId
@@ -151,8 +157,9 @@ class BacktestConfig:
     # Driving bars fed to the strategy before orders are allowed; None uses the
     # strategy's own ``warmup_bars`` (or its catalog config's).
     warmup_bars: int | None = None
-    # Sale-proceeds settlement cycle in sessions; None uses the market pack
-    # (honba.markets.india.settlement_days_for(exchange): T+2 for NSE/BSE equity).
+    # Sale-proceeds settlement cycle in sessions; None uses the market pack as of the
+    # run's first session date (honba.markets.india.settlement_days_for: NSE/BSE equity
+    # T+2 before 2023-01-27, T+1 from then). Intraday timeframes require it explicitly.
     settlement_days: int | None = None
 
     def __post_init__(self) -> None:
@@ -251,6 +258,9 @@ class BacktestSession:
         execution: ExecutionPort,
         ctx: LedgerContext | None = None,
         cost_model: CostModel | None = None,
+        # True when the simulator's settlement cycle is the market default, so run() re-resolves
+        # it as of the first session's date once the bars are known.
+        settlement_from_data: bool = False,
         # Optional hook: (bar_index, bar) -> None for progress / research
         on_bar: Callable[[int, Bar], None] | None = None,
     ) -> None:
@@ -259,6 +269,7 @@ class BacktestSession:
         self.data = data
         self.execution = execution
         self.cost_model = cost_model
+        self._settlement_from_data = settlement_from_data
         self.on_bar = on_bar
         # Fresh ledger seeded with the starting cash unless the caller injects one (tests).
         self.ctx = (
@@ -313,6 +324,13 @@ class BacktestSession:
                 strategy_name=self.strategy.name,
                 config=self.config,
                 notes=["no bars returned for the requested range"],
+            )
+
+        if self._settlement_from_data and isinstance(self.execution, NextOpenExecution):
+            from honba.markets.india.settlement import settlement_days_for
+
+            self.execution.set_settlement_days(
+                settlement_days_for(self.config.exchange, as_of=session_date(_bar_ts(bars[0])))
             )
 
         # --- 3. Drive -----------------------------------------------------------
@@ -426,7 +444,10 @@ class Honba:
         warmup_bars:
           Driving bars before orders are allowed; None uses the strategy's.
         settlement_days:
-          Settlement cycle override; None uses the market pack (T+2 for NSE/BSE).
+          Settlement cycle override; None uses the market pack as of the first session's
+          date (NSE/BSE equity: T+2 before 2023-01-27, T+1 from then; a run that spans
+          the change keeps the cycle of its first session). Required for intraday
+          timeframes, where a session is a bar rather than a trading day.
         data / execution:
           Optional overrides for tests or custom infrastructure.
         """
@@ -460,6 +481,7 @@ class Honba:
             cost_model=None if execution is not None else cost_model,
             # If the user supplied a custom execution port, we assume it already
             # applies costs; otherwise Session may post-apply cost_model on fills.
+            settlement_from_data=execution is None and settlement_days is None,
             on_bar=on_bar,
         )
 
@@ -541,6 +563,8 @@ def _default_execution(config: BacktestConfig, cost_model: CostModel | None) -> 
         costs=fill_costs,
         exchange=config.exchange,
         settlement_days=config.settlement_days,
+        timeframe=config.timeframe,
+        as_of=_parse_time(config.start).date(),
     )
 
 

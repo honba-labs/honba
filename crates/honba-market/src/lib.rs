@@ -51,7 +51,8 @@ pub use null::{
 pub use profile::{MarketProfile, MarketRegistry};
 pub use rules::{InstrumentRules, InstrumentRulesProvider, PriceBand, SymbolGrammar};
 pub use settlement::{
-    MarginModel, MarginRequirement, SettlementRules, SettlementType, StandardRollingSettlement,
+    MarginModel, MarginRequirement, SettlementRules, SettlementSchedule, SettlementType,
+    StandardRollingSettlement,
 };
 pub use universes::{StaticUniverse, Universe, UniverseSource};
 

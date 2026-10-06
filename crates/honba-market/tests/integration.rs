@@ -198,25 +198,44 @@ fn null_calendar_treats_every_day_as_trading() {
 }
 
 #[test]
-fn india_equity_settlement_is_t_plus_two() {
+fn india_equity_settlement_is_t_plus_one_from_2023_01_27() {
     let profile = IndiaMarketProfile::new(
         NseCalendar::from_holidays([date(2025, 1, 27)]),
         test_model(),
     );
     let rules = profile.settlement_rules();
-    assert_eq!(rules.settlement_days(InstrumentKind::Equity), 2);
-    // Fri 24th -> weekend, holiday Mon 27th -> Tue 28th (1), Wed 29th (2).
+    assert_eq!(rules.settlement_days(InstrumentKind::Equity), 1);
+    // Fri 24th -> weekend, holiday Mon 27th -> Tue 28th (1).
     assert_eq!(
         rules.settlement_date(
             date(2025, 1, 24),
             InstrumentKind::Equity,
             profile.calendar()
         ),
-        date(2025, 1, 29)
+        date(2025, 1, 28)
+    );
+}
+
+#[test]
+fn india_equity_settlement_is_t_plus_two_before_2023_01_27() {
+    let profile = IndiaMarketProfile::new(NseCalendar::from_holidays([]), test_model());
+    let rules = profile.settlement_rules();
+    // Thu 26 Jan 2023 -> Fri 27th (1), Mon 30th (2).
+    assert_eq!(
+        rules.settlement_date(
+            date(2023, 1, 26),
+            InstrumentKind::Equity,
+            profile.calendar()
+        ),
+        date(2023, 1, 30)
+    );
+    assert_eq!(
+        rules.settlement_days_as_of(InstrumentKind::Equity, date(2019, 5, 1)),
+        2
     );
 }
 
 #[test]
 fn india_profile_reports_equity_settlement_days() {
-    assert_eq!(IndiaMarketProfile::equity_settlement_days(), 2);
+    assert_eq!(IndiaMarketProfile::equity_settlement_days(), 1);
 }

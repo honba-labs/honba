@@ -55,10 +55,12 @@ def codegen_render(kind: str) -> tuple[str, str]:
     for an unknown ``kind``.
     """
 
-def nse_equity_settlement_days() -> int:
-    """India (NSE/BSE) equity delivery settlement cycle in days (T+2).
+def nse_equity_settlement_days(as_of: str | None = None) -> int:
+    """India (NSE/BSE) equity delivery settlement cycle in days.
 
-    Mirrors ``IndiaMarketProfile::equity_settlement_days`` in
+    ``as_of`` is an ISO date (``"YYYY-MM-DD"``): T+2 before 2023-01-27, T+1 from then.
+    ``None`` is the cycle in force today (T+1). Raises ``ValueError`` for a malformed date.
+    Mirrors ``IndiaMarketProfile::equity_settlement_days_as_of`` in
     ``crates/honba-market/src/india/profile.rs``; wrap it with
     ``honba.markets.india.settlement_days_for``.
     """

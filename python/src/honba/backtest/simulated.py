@@ -27,16 +27,22 @@ Rules:
 * **Cancel.** ``cancel(order_id)`` drops a working order and reports it cancelled.
 
 The settlement cycle and the cost schedule are market rules and are injected:
-:func:`make_simulator` takes them from ``honba.markets.india`` (T+2 for NSE/BSE
-equity delivery via ``settlement_days_for``). Pure: no I/O and no wall clock.
+:func:`make_simulator` takes them from ``honba.markets.india``
+(``settlement_days_for(exchange, as_of=...)``: NSE/BSE equities settle T+2 before
+2023-01-27 and T+1 from then; an explicit ``settlement_days`` always wins). A session is
+one bar, so the cycle counts bars: that equals trading days only for daily-or-longer
+timeframes, and :func:`make_simulator` therefore requires an explicit ``settlement_days``
+for intraday timeframes. Pure: no I/O and no wall clock.
 """
 
 from __future__ import annotations
 
 import dataclasses
 import math
+import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from datetime import date, datetime, timedelta
 from typing import Any, Literal
 
 from honba.domain.money import Currency, Money
@@ -52,8 +58,10 @@ __all__ = [
     "NextOpenExecution",
     "SessionOpen",
     "group_sessions",
+    "is_intraday",
     "make_simulator",
     "resolve_fill_costs",
+    "session_date",
     "zero_costs",
 ]
 
@@ -203,6 +211,14 @@ class NextOpenExecution(BaseExecutionPort):
         self._fill_at(bars)
 
     # -- internals -----------------------------------------------------------------
+    def set_settlement_days(self, settlement_days: int) -> None:
+        """Change the settlement cycle before the first session opens."""
+        if settlement_days < 0:
+            raise ValueError("settlement_days must be >= 0")
+        if self._session_ts is not None:
+            raise RuntimeError("settlement_days can only change before the first session")
+        self.settlement_days = settlement_days
+
     def _costs(self, side: OrderSide, qty: float, px: float) -> Money:
         cost = self._cost_fn(side, qty, px)
         if cost.amount == 0:
@@ -357,6 +373,23 @@ def resolve_fill_costs(name: str) -> FillCostFn:
     return nse_equity_delivery_fill_cost if kind == "delivery" else nse_equity_intraday_fill_cost
 
 
+_INTRADAY = re.compile(
+    r"^\s*\d*\s*(s|sec|second|seconds|m|min|mins|minute|minutes|h|hr|hour|hours)\s*$", re.IGNORECASE
+)
+_IST_OFFSET = timedelta(hours=5, minutes=30)
+_EPOCH = datetime(1970, 1, 1)  # noqa: DTZ001 - naive UTC arithmetic, shifted to IST above
+
+
+def is_intraday(timeframe: str) -> bool:
+    """True for sub-daily bar sizes ("1m", "5min", "1h", ...); "1d"/"1w" and unknowns are not."""
+    return _INTRADAY.match(timeframe) is not None
+
+
+def session_date(ts_ns: int) -> date:
+    """Trading date (IST, the India market clock) of a unix-nanosecond timestamp."""
+    return (_EPOCH + timedelta(seconds=ts_ns // 10**9) + _IST_OFFSET).date()
+
+
 def make_simulator(
     *,
     fill: FillModel,
@@ -365,20 +398,29 @@ def make_simulator(
     exchange: str = "NSE",
     settlement_days: int | None = None,
     long_only: bool = True,
+    timeframe: str = "1d",
+    as_of: date | None = None,
 ) -> ExecutionPort:
     """Build the simulated port for ``fill``.
 
     * ``"next_open"``: :class:`NextOpenExecution`; ``settlement_days`` defaults to the
-      market pack's cycle for ``exchange`` (``honba.markets.india.settlement_days_for``).
+      market pack's cycle for ``exchange`` on ``as_of`` (today's cycle when None;
+      ``honba.markets.india.settlement_days_for``). Intraday ``timeframe`` values need an
+      explicit ``settlement_days`` because the port counts bars, not trading days.
     * ``"bar_close"``: the single-price conformance simulator
       ``honba.strategies.testing.BarCloseFills`` (fills at the decision bar's close; costs
       and cash rules do not apply). Kept for the cross-language conformance suite.
     """
     if fill == "next_open":
         if settlement_days is None:
+            if is_intraday(timeframe):
+                raise ValueError(
+                    f"timeframe {timeframe!r} is intraday: the simulator counts one session per "
+                    "bar, not per trading day, so pass an explicit settlement_days"
+                )
             from honba.markets.india.settlement import settlement_days_for
 
-            settlement_days = settlement_days_for(exchange)
+            settlement_days = settlement_days_for(exchange, as_of=as_of)
         cost_fn = resolve_fill_costs(costs) if isinstance(costs, str) else costs
         return NextOpenExecution(
             cash=cash, settlement_days=settlement_days, costs=cost_fn, long_only=long_only

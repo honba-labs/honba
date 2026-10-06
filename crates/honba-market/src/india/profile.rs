@@ -8,9 +8,7 @@ use crate::costs::CostSchedule;
 use crate::expiry::{ExpiryRules, LastThursdayExpiry};
 use crate::profile::MarketProfile;
 use crate::rules::{InstrumentRules, InstrumentRulesProvider, SymbolGrammar};
-use crate::settlement::{
-    MarginModel, MarginRequirement, SettlementRules, StandardRollingSettlement,
-};
+use crate::settlement::{MarginModel, MarginRequirement, SettlementRules, SettlementSchedule};
 
 use super::calendar::NseCalendar;
 use super::costs::{CostModel, SttRates};
@@ -70,6 +68,12 @@ impl MarginModel for IndiaMarginModel {
     }
 }
 
+/// First date on which every NSE/BSE equity settles T+1 (T+2 before).
+fn india_equity_settlement() -> SettlementSchedule {
+    let t_plus_1_from = NaiveDate::from_ymd_opt(2023, 1, 27).expect("valid date");
+    SettlementSchedule::new(2).from(t_plus_1_from, 1)
+}
+
 /// Comprehensive India market profile (NSE/BSE).
 #[derive(Debug, Clone)]
 pub struct IndiaMarketProfile {
@@ -79,7 +83,7 @@ pub struct IndiaMarketProfile {
     grammar: IndiaSymbolGrammar,
     expiry: LastThursdayExpiry,
     margin: IndiaMarginModel,
-    settlement: StandardRollingSettlement,
+    settlement: SettlementSchedule,
 }
 
 impl Default for IndiaMarketProfile {
@@ -98,8 +102,7 @@ impl Default for IndiaMarketProfile {
             grammar: IndiaSymbolGrammar,
             expiry: LastThursdayExpiry,
             margin: IndiaMarginModel,
-            // Country + exchange drive the cycle: NSE/BSE equity delivery clears T+2.
-            settlement: StandardRollingSettlement::t_plus_2(),
+            settlement: india_equity_settlement(),
         }
     }
 }
@@ -114,19 +117,27 @@ impl IndiaMarketProfile {
             grammar: IndiaSymbolGrammar,
             expiry: LastThursdayExpiry,
             margin: IndiaMarginModel,
-            settlement: StandardRollingSettlement::t_plus_2(),
+            settlement: india_equity_settlement(),
         }
     }
 
-    /// Settlement cycle for India equity delivery (T+2).
+    /// Settlement cycle for India equity delivery today (T+1).
     ///
-    /// This is the single source of truth behind `honba._honba.nse_equity_settlement_days()`
-    /// and `honba.markets.india.nse_equity_settlement_days()`; Python can still override the
-    /// cycle per strategy via `StrategyConfig.settlement_days`.
+    /// Use [`Self::equity_settlement_days_as_of`] for a historical date. Single source of
+    /// truth behind `honba._honba.nse_equity_settlement_days()`; Python can still override
+    /// the cycle per run or strategy via `settlement_days`.
     pub fn equity_settlement_days() -> usize {
         Self::default()
             .settlement_rules()
             .settlement_days(InstrumentKind::Equity)
+    }
+
+    /// Settlement cycle for India equity delivery on `as_of`: T+2 before 2023-01-27,
+    /// T+1 from that date (SEBI's phased T+1 move completed for all equities then).
+    pub fn equity_settlement_days_as_of(as_of: NaiveDate) -> usize {
+        Self::default()
+            .settlement_rules()
+            .settlement_days_as_of(InstrumentKind::Equity, as_of)
     }
 }
 

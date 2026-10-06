@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Date-aware India settlement (ADR 0005 decision 4)
+
+Behavior change: the default equity settlement cycle depends on the trade date. NSE/BSE equities settle
+T+2 until 2023-01-26 and T+1 from 2023-01-27, so backtests over data from 2023-01-27 now settle T+1
+(previously T+2 for every date). Explicit `settlement_days` still wins everywhere.
+
+- Rust: `SettlementRules::settlement_days_as_of`, `SettlementSchedule`, `IndiaMarketProfile::equity_settlement_days_as_of`;
+  `IndiaMarketProfile::equity_settlement_days()` and `settlement_rules().settlement_days()` now report T+1 (today).
+- Python: `honba._honba.nse_equity_settlement_days(as_of=None)`; `settlement_days_for(exchange, as_of=...)`;
+  `make_simulator(..., as_of=, timeframe=)`; `Honba.backtest` resolves the default from the first session's date.
+- Intraday timeframes (`5m`, `1h`, ...) now raise `ValueError` unless `settlement_days` is passed, because the simulator
+  counts bars, not trading days.
+
 ### Catalog loader and next-open simulator fixes
 
 - Breaking for provenance: `CatalogStrategy.source_sha256` now hashes the whole strategy directory

@@ -1,11 +1,13 @@
 //! Generic margin models and settlement rules.
 //!
-//! The clearing cycle is a country + exchange property, not a global constant: India
-//! (NSE/BSE) equity delivery settles T+2, other Indian segments and most other markets
-//! settle T+1, and same-day instruments settle T+0. [`StandardRollingSettlement`] carries
-//! the cycle chosen by the market pack (e.g. `crates/honba-market/src/india/profile.rs`),
-//! which Python surfaces via `honba._honba.nse_equity_settlement_days()` and can override
-//! per strategy through `StrategyConfig.settlement_days`.
+//! The clearing cycle is a country + exchange property, and it changes over time: India
+//! (NSE/BSE) equities settled T+2 until 2023-01-26 and settle T+1 from 2023-01-27, other
+//! markets settle T+1, and same-day instruments settle T+0. [`StandardRollingSettlement`]
+//! carries one fixed cycle; [`SettlementSchedule`] carries dated phases and answers
+//! [`SettlementRules::settlement_days_as_of`]. The India pack
+//! (`crates/honba-market/src/india/profile.rs`) is surfaced to Python via
+//! `honba._honba.nse_equity_settlement_days(as_of)`, and Python can override the cycle
+//! per run or strategy through `settlement_days`.
 
 use chrono::{Duration, NaiveDate};
 use honba_entities::{InstrumentKind, PositionSide};
@@ -91,7 +93,14 @@ pub enum SettlementType {
 /// Settlement rules governing clearing cycle (e.g. T+1, T+0) and mechanism.
 pub trait SettlementRules: Send + Sync {
     /// Returns the settlement cycle duration in business/settlement days (e.g. 1 for T+1, 0 for T+0).
+    ///
+    /// For a dated schedule this is the cycle currently in force (the latest phase).
     fn settlement_days(&self, kind: InstrumentKind) -> usize;
+
+    /// Returns the settlement cycle in force on `as_of`. Fixed rules ignore the date.
+    fn settlement_days_as_of(&self, kind: InstrumentKind, _as_of: NaiveDate) -> usize {
+        self.settlement_days(kind)
+    }
 
     /// Returns the delivery or settlement mechanism.
     fn settlement_type(&self, kind: InstrumentKind) -> SettlementType;
@@ -103,7 +112,7 @@ pub trait SettlementRules: Send + Sync {
         kind: InstrumentKind,
         calendar: &dyn MarketCalendar,
     ) -> NaiveDate {
-        let days = self.settlement_days(kind);
+        let days = self.settlement_days_as_of(kind, trade_date);
         let mut d = trade_date;
         let mut remaining = days;
         while remaining > 0 {
@@ -147,6 +156,58 @@ impl StandardRollingSettlement {
 impl SettlementRules for StandardRollingSettlement {
     fn settlement_days(&self, _kind: InstrumentKind) -> usize {
         self.days
+    }
+
+    fn settlement_type(&self, _kind: InstrumentKind) -> SettlementType {
+        SettlementType::Cash
+    }
+}
+
+/// Settlement cycle that changes over time: an initial cycle plus dated phases.
+///
+/// `SettlementSchedule::new(2).from(2023-01-27, 1)` settles T+2 before 2023-01-27 and T+1
+/// from that date on.
+#[derive(Clone, Debug)]
+pub struct SettlementSchedule {
+    initial: usize,
+    /// `(effective_from, days)`, sorted by date.
+    phases: Vec<(NaiveDate, usize)>,
+}
+
+impl SettlementSchedule {
+    /// A schedule that settles in `initial_days` until a later phase is added.
+    pub fn new(initial_days: usize) -> Self {
+        Self {
+            initial: initial_days,
+            phases: Vec::new(),
+        }
+    }
+
+    /// Adds a phase: from `effective` (inclusive) trades settle in `days`. Phases may be
+    /// added in any order; a second phase for the same date replaces the first.
+    pub fn from(mut self, effective: NaiveDate, days: usize) -> Self {
+        self.phases.retain(|(d, _)| *d != effective);
+        self.phases.push((effective, days));
+        self.phases.sort_by_key(|(d, _)| *d);
+        self
+    }
+
+    fn days_as_of(&self, as_of: NaiveDate) -> usize {
+        self.phases
+            .iter()
+            .rev()
+            .find(|(d, _)| *d <= as_of)
+            .map_or(self.initial, |(_, days)| *days)
+    }
+}
+
+impl SettlementRules for SettlementSchedule {
+    fn settlement_days(&self, _kind: InstrumentKind) -> usize {
+        self.phases.last().map_or(self.initial, |(_, days)| *days)
+    }
+
+    fn settlement_days_as_of(&self, _kind: InstrumentKind, as_of: NaiveDate) -> usize {
+        self.days_as_of(as_of)
     }
 
     fn settlement_type(&self, _kind: InstrumentKind) -> SettlementType {

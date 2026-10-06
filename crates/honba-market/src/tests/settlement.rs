@@ -4,8 +4,8 @@ use honba_entities::{InstrumentKind, PositionSide};
 
 use super::{date, Holidays};
 use crate::settlement::PercentageMarginModel;
-use crate::StandardRollingSettlement;
 use crate::{MarginModel, MarginRequirement, MarketProfile, SettlementRules, SettlementType};
+use crate::{SettlementSchedule, StandardRollingSettlement};
 
 #[test]
 fn t_plus_one_skips_weekends_and_holidays() {
@@ -56,17 +56,96 @@ fn t_plus_two_reports_two_days() {
     assert_eq!(s.settlement_days(InstrumentKind::Equity), 2);
 }
 
-#[cfg(feature = "india")]
 #[test]
-fn india_equity_settles_t_plus_two_by_default() {
-    let profile = crate::IndiaMarketProfile::default();
+fn schedule_picks_the_cycle_in_force_on_a_date() {
+    let s = SettlementSchedule::new(2).from(date(2023, 1, 27), 1);
     assert_eq!(
-        profile
-            .settlement_rules()
-            .settlement_days(InstrumentKind::Equity),
+        s.settlement_days_as_of(InstrumentKind::Equity, date(2023, 1, 26)),
         2
     );
-    assert_eq!(crate::IndiaMarketProfile::equity_settlement_days(), 2);
+    assert_eq!(
+        s.settlement_days_as_of(InstrumentKind::Equity, date(2023, 1, 27)),
+        1
+    );
+    assert_eq!(
+        s.settlement_days_as_of(InstrumentKind::Equity, date(2020, 1, 1)),
+        2
+    );
+    // Without a date the latest cycle applies.
+    assert_eq!(s.settlement_days(InstrumentKind::Equity), 1);
+}
+
+#[test]
+fn schedule_phases_may_be_added_out_of_order() {
+    let s = SettlementSchedule::new(3)
+        .from(date(2024, 1, 1), 0)
+        .from(date(2020, 1, 1), 2);
+    assert_eq!(
+        s.settlement_days_as_of(InstrumentKind::Equity, date(2021, 1, 1)),
+        2
+    );
+    assert_eq!(
+        s.settlement_days_as_of(InstrumentKind::Equity, date(2024, 6, 1)),
+        0
+    );
+    assert_eq!(
+        s.settlement_days_as_of(InstrumentKind::Equity, date(2019, 1, 1)),
+        3
+    );
+}
+
+#[test]
+fn settlement_date_uses_the_cycle_of_the_trade_date() {
+    let cal = Holidays(vec![]);
+    let s = SettlementSchedule::new(2).from(date(2023, 1, 27), 1);
+    // Thu 26 Jan 2023 trades settle T+2 (Mon 30th); Fri 27th trades T+1 (Mon 30th).
+    assert_eq!(
+        s.settlement_date(date(2023, 1, 26), InstrumentKind::Equity, &cal),
+        date(2023, 1, 30)
+    );
+    assert_eq!(
+        s.settlement_date(date(2023, 1, 27), InstrumentKind::Equity, &cal),
+        date(2023, 1, 30)
+    );
+    // Wed 25th trades settle T+2 = Fri 27th.
+    assert_eq!(
+        s.settlement_date(date(2023, 1, 25), InstrumentKind::Equity, &cal),
+        date(2023, 1, 27)
+    );
+}
+
+#[test]
+fn fixed_rules_ignore_the_as_of_date() {
+    let s = StandardRollingSettlement::t_plus_2();
+    assert_eq!(
+        s.settlement_days_as_of(InstrumentKind::Equity, date(2030, 1, 1)),
+        2
+    );
+}
+
+#[cfg(feature = "india")]
+#[test]
+fn india_equity_settles_t_plus_one_now_and_t_plus_two_before_2023_01_27() {
+    let profile = crate::IndiaMarketProfile::default();
+    let rules = profile.settlement_rules();
+    assert_eq!(rules.settlement_days(InstrumentKind::Equity), 1);
+    assert_eq!(crate::IndiaMarketProfile::equity_settlement_days(), 1);
+    assert_eq!(
+        rules.settlement_days_as_of(InstrumentKind::Equity, date(2023, 1, 26)),
+        2
+    );
+    assert_eq!(
+        rules.settlement_days_as_of(InstrumentKind::Equity, date(2023, 1, 27)),
+        1
+    );
+    assert_eq!(
+        crate::IndiaMarketProfile::equity_settlement_days_as_of(date(2022, 6, 1)),
+        2
+    );
+    assert_eq!(
+        crate::IndiaMarketProfile::equity_settlement_days_as_of(date(2024, 6, 1)),
+        1
+    );
 }
 
 #[test]

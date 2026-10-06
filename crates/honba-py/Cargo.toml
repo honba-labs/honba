@@ -18,6 +18,7 @@ tokio.workspace = true
 honba-messages.workspace = true
 honba-entities.workspace = true
 honba-market = { workspace = true, features = ["india"] }
+chrono.workspace = true
 honba-engine.workspace = true
 honba-strategy.workspace = true
 honba-sim.workspace = true
