@@ -95,3 +95,9 @@ wire form for no gain over `i64` minor units (Indian equities need 2 decimals;
 - `Money::new` takes `i64`. Call sites that held floats use
   `from_major_f64` (round half away, reject non-finite) at the boundary.
 - Golden vectors `trade.json` / `position.json` record the integer form.
+
+## Known limits
+
+- The directional-rounding snap constant (1e-6 minor units) is below one f64 ulp
+  beyond roughly 1e10 minor units, so at those magnitudes it no longer snaps
+  float noise to the integer before a floor or ceiling.
