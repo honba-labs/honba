@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### WASM indicator surface (E11-S5, part 1)
+
+- `honba-api-wasm` now exports `indicator_series(name, params_json, closes: Float64Array) -> Float64Array`
+  (full series, input length, `NaN` warm-up) and `list_indicators() -> JSON` for `sma`, `ema`, `rsi`, `macd` and
+  `bollinger`, computed by the existing `honba-indicators` types. The logic is a pure native module
+  (`honba_api_wasm::indicators`); the wasm-bindgen layer only forwards to it. Bad params, unknown names and
+  non-finite input are errors (no panics).
+- Removed the demo `sma(values, period)` export (it returned only the last-window mean and had no importers).
+  Breaking for anything that called it; use `indicator_series("sma", ...)`.
+- Golden vectors `schema/conformance/indicator_series.json` run natively in Rust, in Python against the Python
+  indicators, and in the real wasm build under node (`make test-wasm`). `make check-wasm` and CI check the
+  `wasm32-unknown-unknown` build.
+
 ### REST read API, part 2 (E11-S3, ADR 0013)
 
 - `GET /quotes?symbols=A,B[&venue=NSE][&as_of=<time>]` and `GET /depth/{id}[?depth=N]` are served through two new
