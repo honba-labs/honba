@@ -4,7 +4,7 @@ use honba_entities::{Currency, Instrument, InstrumentKind};
 use honba_messages::{
     BarAggregation, BarSpecification, Exchange, InstrumentId, PriceType, UnixNanos,
 };
-use honba_ports::{BarReader, BarRequest, InstrumentMaster, PortError};
+use honba_ports::{BarReader, BarRequest, DepthReader, InstrumentMaster, PortError, QuoteReader};
 
 use crate::{ColumnarSliceBuilder, Dataset, DatasetReader};
 
@@ -129,4 +129,41 @@ async fn reads_are_repeatable() {
     let first = r.read_bars(&request("TCS", None, None)).await.unwrap();
     let second = r.read_bars(&request("TCS", None, None)).await.unwrap();
     assert_eq!(first, second);
+}
+
+#[tokio::test]
+async fn the_latest_quote_is_the_last_close_with_no_size() {
+    let quote = reader()
+        .read_quote(&id("TCS"), None)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(quote.bid_price(), 103.0);
+    assert_eq!(quote.ask_price(), 103.0);
+    assert_eq!((quote.bid_size(), quote.ask_size()), (0.0, 0.0));
+    assert_eq!(quote.ts_event(), ts(40));
+    assert_eq!(quote.ts_init(), ts(40));
+}
+
+#[tokio::test]
+async fn an_as_of_quote_is_inclusive_and_never_sees_later_bars() {
+    let r = reader();
+    let tcs = id("TCS");
+    let at = |t| r.read_quote(&tcs, Some(ts(t)));
+    assert_eq!(at(20).await.unwrap().unwrap().bid_price(), 101.0);
+    assert_eq!(at(29).await.unwrap().unwrap().bid_price(), 101.0);
+    assert_eq!(at(999).await.unwrap().unwrap().bid_price(), 103.0);
+}
+
+#[tokio::test]
+async fn no_quote_before_the_first_bar_or_for_an_unknown_instrument() {
+    let r = reader();
+    assert_eq!(r.read_quote(&id("TCS"), Some(ts(9))).await.unwrap(), None);
+    assert_eq!(r.read_quote(&id("NOPE"), None).await.unwrap(), None);
+}
+
+#[tokio::test]
+async fn a_bar_store_has_no_depth_and_says_so() {
+    let err = reader().read_depth(&id("TCS"), 5).await.unwrap_err();
+    assert!(matches!(err, PortError::Unsupported(_)), "{err:?}");
 }

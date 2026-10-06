@@ -2,7 +2,8 @@
 //!
 //! [`DatasetReader`] is the infrastructure adapter for two ports owned by
 //! `honba-ports`: [`InstrumentMaster`] (what instruments exist) and
-//! [`BarReader`] (their stored bars over a range). The REST and MCP surfaces
+//! [`BarReader`] (their stored bars over a range); it also derives last-price quotes
+//! ([`QuoteReader`]) and states that it holds no order book ([`DepthReader`]). The REST and MCP surfaces
 //! depend on the ports, never on this type, so the data source can change
 //! without touching them.
 //!
@@ -15,8 +16,11 @@ use std::path::Path;
 
 use async_trait::async_trait;
 use honba_entities::{Currency, Instrument, InstrumentKind};
-use honba_messages::{Bar, Exchange, InstrumentId};
-use honba_ports::{BarReader, BarRequest, InstrumentMaster, PortError, PortResult};
+use honba_messages::{Bar, Exchange, InstrumentId, QuoteTick, UnixNanos};
+use honba_ports::{
+    BarReader, BarRequest, DepthReader, DepthSnapshot, InstrumentMaster, PortError, PortResult,
+    QuoteReader,
+};
 use thiserror::Error;
 
 use crate::dataset::{Dataset, DatasetBuildError};
@@ -167,5 +171,49 @@ impl BarReader for DatasetReader {
         Ok((start..end.max(start))
             .filter_map(|index| slice.bar(index))
             .collect())
+    }
+}
+
+/// A bar store has no bid or ask, so a quote is derived: bid and ask are both the close of the
+/// latest bar stamped at or before the query time, with zero size on each side. The zero sizes
+/// mark "last price, no book" so a consumer cannot mistake it for tradable liquidity. Both
+/// timestamps are the bar's column timestamp, so the answer depends only on the data.
+#[async_trait]
+impl QuoteReader for DatasetReader {
+    async fn read_quote(
+        &self,
+        id: &InstrumentId,
+        as_of: Option<UnixNanos>,
+    ) -> PortResult<Option<QuoteTick>> {
+        let Some(slice) = self.dataset.slice(id) else {
+            return Ok(None);
+        };
+        let stamps = slice.timestamps();
+        let end = as_of.map_or(stamps.len(), |at| stamps.partition_point(|ts| *ts <= at));
+        Ok(end
+            .checked_sub(1)
+            .and_then(|index| slice.bar(index))
+            .map(|bar| {
+                let close = bar.close();
+                QuoteTick::new(
+                    id.clone(),
+                    close,
+                    close,
+                    0.0,
+                    0.0,
+                    bar.ts_event(),
+                    bar.ts_event(),
+                )
+            }))
+    }
+}
+
+/// A dataset of bars carries no order book, so depth is never available from it.
+#[async_trait]
+impl DepthReader for DatasetReader {
+    async fn read_depth(&self, id: &InstrumentId, _levels: usize) -> PortResult<DepthSnapshot> {
+        Err(PortError::Unsupported(format!(
+            "{id} has bars only; the dataset holds no order book"
+        )))
     }
 }

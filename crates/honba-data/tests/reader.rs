@@ -13,7 +13,7 @@ use honba_data::{DatasetReader, ReaderError};
 use honba_messages::{
     BarAggregation, BarSpecification, Exchange, InstrumentId, PriceType, UnixNanos,
 };
-use honba_ports::{BarReader, BarRequest, InstrumentMaster};
+use honba_ports::{BarReader, BarRequest, DepthReader, InstrumentMaster, PortError, QuoteReader};
 use parquet::arrow::ArrowWriter;
 
 struct TempDir(PathBuf);
@@ -120,4 +120,24 @@ fn a_corrupt_file_is_a_dataset_error() {
     std::fs::write(dir.0.join("TCS.NSE.parquet"), b"not parquet").unwrap();
     let err = DatasetReader::from_parquet_dir(&dir.0).unwrap_err();
     assert!(matches!(err, ReaderError::Dataset(_)), "{err:?}");
+}
+
+#[tokio::test]
+async fn quotes_and_depth_are_served_from_a_parquet_directory() {
+    let dir = fixture("quotes");
+    let reader = DatasetReader::from_parquet_dir(&dir.0).unwrap();
+    let id = InstrumentId::new("TCS", Exchange::new("NSE"));
+    let quote = reader.read_quote(&id, None).await.unwrap().unwrap();
+    assert_eq!(quote.bid_price(), 102.0);
+    assert_eq!(quote.ts_event(), UnixNanos::from_u64(30));
+    let early = reader
+        .read_quote(&id, Some(UnixNanos::from_u64(10)))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(early.bid_price(), 100.0);
+    assert!(matches!(
+        reader.read_depth(&id, 5).await,
+        Err(PortError::Unsupported(_))
+    ));
 }
