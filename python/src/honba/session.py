@@ -42,7 +42,7 @@ Python::
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
@@ -64,6 +64,7 @@ from honba.backtest.simulated import (
 from honba.domain.money import Currency, Money
 from honba.entities.bar import Bar
 from honba.entities.instrument import Instrument, InstrumentId
+from honba.entities.order import OrderSide
 from honba.entities.trade import Trade
 from honba.strategies.base import Strategy
 from honba.strategies.context import LedgerContext, StrategyContext
@@ -598,6 +599,9 @@ def _bar_ts(bar: Bar) -> int:
     raise AttributeError(f"Bar {bar!r} has no known timestamp field (ts_init / ts_event / ts)")
 
 
+_QTY_EPS = 1e-9  # quantities closer than this are equal (float residue from fractional fills)
+
+
 def _compute_metrics(
     *,
     fills: Sequence[Trade],
@@ -605,42 +609,100 @@ def _compute_metrics(
     initial_cash: float,
     ctx: StrategyContext,
 ) -> tuple[dict[str, float], list[tuple[int, float]]]:
-    """Compute basic performance metrics and a coarse equity curve.
+    """Compute basic performance metrics and the per-session equity curve.
 
-    This is intentionally simple so Session works before a full analytics
-    crate exists. Replace with honba-analytics / Rust metrics when ready;
-    keep the return shape stable (dict + list of (ts, equity)).
+    The curve has one ``(ts, equity)`` point per distinct bar ``ts``: cash plus every
+    position marked at its last known close (fills at ``ts`` are applied first, so a
+    session's point is its close). Cash and positions are replayed from ``fills`` in
+    integer ``Money``; ``final_cash`` and ``final_equity`` come from the ledger ``ctx``
+    and marked at the last known close, so the curve ends on ``final_equity``.
+
+    Metrics:
+
+    * ``n_fills``: fills. ``n_trades``: round trips, i.e. times an instrument's position
+      returned to flat; a trade still open at the end is not counted.
+    * ``max_drawdown_pct``: largest peak-to-trough fall of the curve as a percent of the
+      peak (a positive number); ``0.0`` for curves with fewer than two points or no fall.
+
+    Intentionally simple so Session works before a full analytics crate exists; keep
+    the return shape stable (dict + list of (ts, equity)).
     """
+    ledger_cash = ctx.cash()
+    currency = ledger_cash.currency if isinstance(ledger_cash, Money) else Currency.INR
+    ordered_fills = sorted(fills, key=lambda f: f.ts)  # stable: submission order within a ts
+
     metrics: dict[str, float] = {
         "initial_cash": float(initial_cash),
         "n_fills": float(len(fills)),
-        "n_trades": float(len(fills)),  # refine when round-trips are defined
+        "n_trades": float(_round_trips(ordered_fills)),
     }
 
-    # Final cash / equity from context if available
-    cash = ctx.cash()
-    final_cash = cash.to_major() if isinstance(cash, Money) else float(cash)
-    metrics["final_cash"] = final_cash
+    # Replay cash and positions per session; mark every held instrument at its last close.
+    cash = Money.from_major(initial_cash, currency)
+    positions: dict[InstrumentId, float] = {}
+    last_close: dict[InstrumentId, float] = {}
+    equity_curve: list[tuple[int, float]] = []
+    pending = iter(ordered_fills)
+    fill = next(pending, None)
+    ordered_bars = sorted(bars, key=_bar_ts)
+    i = 0
+    while i < len(ordered_bars):
+        ts = _bar_ts(ordered_bars[i])
+        while i < len(ordered_bars) and _bar_ts(ordered_bars[i]) == ts:
+            last_close[ordered_bars[i].instrument_id] = float(ordered_bars[i].close)
+            i += 1
+        while fill is not None and fill.ts <= ts:
+            cash = cash + _fill_cash_flow(fill, currency)
+            signed = fill.quantity if fill.side is OrderSide.BUY else -fill.quantity
+            positions[fill.instrument_id] = positions.get(fill.instrument_id, 0.0) + signed
+            last_close.setdefault(fill.instrument_id, fill.price)
+            fill = next(pending, None)
+        equity_curve.append((ts, cash.to_major() + _marked(positions, last_close)))
 
-    # Mark-to-market: last bar close * net position if we can read position
-    final_equity = final_cash
-    if bars:
-        last = bars[-1]
-        iid = getattr(last, "instrument_id", None)
-        if iid is not None:
-            final_equity = final_cash + float(ctx.position(iid)) * float(last.close)
+    final_cash = ledger_cash.to_major() if isinstance(ledger_cash, Money) else float(ledger_cash)
+    metrics["final_cash"] = final_cash
+    final_positions = ctx.positions()
+    for f in ordered_fills:  # a held instrument with no bar is marked at its last fill
+        last_close.setdefault(f.instrument_id, f.price)
+    final_equity = final_cash + _marked(final_positions, last_close)
     metrics["final_equity"] = final_equity
     metrics["total_return_pct"] = (
         (final_equity - initial_cash) / initial_cash * 100.0 if initial_cash else 0.0
     )
-
-    # Placeholder drawdown until a proper equity curve is built from fills
-    metrics["max_drawdown_pct"] = float("nan")
-
-    # Coarse curve: start and end only (analytics package should expand this)
-    equity_curve: list[tuple[int, float]] = []
-    if bars:
-        equity_curve.append((_bar_ts(bars[0]), float(initial_cash)))
-        equity_curve.append((_bar_ts(bars[-1]), float(final_equity)))
-
+    metrics["max_drawdown_pct"] = _max_drawdown_pct([eq for _, eq in equity_curve])
     return metrics, equity_curve
+
+
+def _fill_cash_flow(fill: Trade, currency: Currency) -> Money:
+    notional = Money.mul_qty(fill.quantity, fill.price, currency)
+    costs = fill.costs if fill.costs.amount else Money.zero(currency)  # zero is currency-neutral
+    if fill.side is OrderSide.BUY:
+        return Money.zero(currency) - (notional + costs)
+    return notional - costs
+
+
+def _marked(positions: Mapping[InstrumentId, float], prices: Mapping[InstrumentId, float]) -> float:
+    return sum(qty * prices.get(iid, 0.0) for iid, qty in positions.items() if abs(qty) > _QTY_EPS)
+
+
+def _round_trips(fills: Sequence[Trade]) -> int:
+    held: dict[InstrumentId, float] = {}
+    trips = 0
+    for f in fills:
+        before = held.get(f.instrument_id, 0.0)
+        after = before + (f.quantity if f.side is OrderSide.BUY else -f.quantity)
+        if abs(after) <= _QTY_EPS:
+            after = 0.0
+            if abs(before) > _QTY_EPS:
+                trips += 1
+        held[f.instrument_id] = after
+    return trips
+
+
+def _max_drawdown_pct(equity: Sequence[float]) -> float:
+    peak, worst = float("-inf"), 0.0
+    for value in equity:
+        peak = max(peak, value)
+        if peak > 0:
+            worst = max(worst, (peak - value) / peak * 100.0)
+    return worst

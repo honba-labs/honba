@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Backtest metrics
+
+- `BacktestResult.equity_curve` now has one `(ts, equity)` point per bar session, marking every instrument at its last
+  known close (was two points, last bar's instrument only). It ends on `final_equity`.
+- `max_drawdown_pct` is the peak-to-trough fall as a positive percent of the peak; `0.0` (not NaN) when the curve has fewer
+  than two points or never falls.
+- `n_trades` is now the number of round trips (position returned to flat; an open trade is not counted); `n_fills` is
+  unchanged. Before, `n_trades == n_fills`.
+
 ### Simulator and cost nits
 
 - India fill costs (`nse_equity_*_fill_cost`) now round each leg to paise once from unrounded legs (before: 4 dp

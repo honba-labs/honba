@@ -358,3 +358,23 @@ def test_funding_cut_floors_to_the_instruments_lot_size_from_the_data_provider()
     assert [(r.intent.quantity, r.reason) for r in result.order_rejections] == [
         (25.0, "insufficient_funds")
     ]
+
+
+def test_equity_curve_and_drawdown_come_from_every_session_of_the_run() -> None:
+    # BuyOnce decides at bar 0 and fills at bar 1's open (110); closes are open + 5.
+    result = _run(BuyOnce(), opens=(100.0, 110.0, 120.0, 90.0), costs="none")
+    assert [ts for ts, _ in result.equity_curve] == [T0 + i * DAY for i in range(4)]
+    cash = 100_000.0 - 1_100.0
+    assert [eq for _, eq in result.equity_curve] == pytest.approx(
+        [100_000.0, cash + 10 * 115.0, cash + 10 * 125.0, cash + 10 * 95.0]
+    )
+    assert result.metrics["final_equity"] == pytest.approx(result.equity_curve[-1][1])
+    peak, trough = cash + 1_250.0, cash + 950.0
+    assert result.metrics["max_drawdown_pct"] == pytest.approx((peak - trough) / peak * 100)
+    assert result.metrics["n_fills"] == 1.0 and result.metrics["n_trades"] == 0.0
+
+
+def test_a_one_bar_run_reports_zero_drawdown() -> None:
+    result = _run(BuyOnce(), opens=(100.0,), costs="none")
+    assert result.metrics["max_drawdown_pct"] == 0.0
+    assert len(result.equity_curve) == 1
