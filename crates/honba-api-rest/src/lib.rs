@@ -8,9 +8,10 @@
 //! All responses are wrapped in the versioned envelope from `honba-api`.
 
 use axum::{
-    extract::{Path, Query, State},
+    async_trait,
+    extract::{rejection::JsonRejection, FromRequest, Path, Query, Request, State},
     http::StatusCode,
-    response::Json,
+    response::{IntoResponse, Json, Response},
     routing::{delete, get, post},
     Router,
 };
@@ -28,6 +29,43 @@ use tower_http::{compression::CompressionLayer, cors::CorsLayer, trace::TraceLay
 #[derive(Clone, Debug, Default)]
 pub struct AppState {
     // Placeholder state - will be wired to actual engine/data in later phases
+}
+
+/// JSON body extractor whose rejections are the standard error envelope
+/// (`validation_invalid_request`) rather than axum's plain-text message.
+#[derive(Debug)]
+pub struct ApiJson<T>(pub T);
+
+/// Rejection of [`ApiJson`]: keeps axum's status, wraps its message in an envelope.
+#[derive(Debug)]
+pub struct ApiJsonRejection(JsonRejection);
+
+impl IntoResponse for ApiJsonRejection {
+    fn into_response(self) -> Response {
+        let status = self.0.status();
+        let detail = ErrorDetail::new(ErrorCode::ValidationInvalidRequest, self.0.body_text());
+        (
+            status,
+            Json(ResponseEnvelope::<serde_json::Value>::error(detail)),
+        )
+            .into_response()
+    }
+}
+
+#[async_trait]
+impl<S, T> FromRequest<S> for ApiJson<T>
+where
+    Json<T>: FromRequest<S, Rejection = JsonRejection>,
+    S: Send + Sync,
+{
+    type Rejection = ApiJsonRejection;
+
+    async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
+        Json::<T>::from_request(req, state)
+            .await
+            .map(|Json(v)| Self(v))
+            .map_err(ApiJsonRejection)
+    }
 }
 
 /// Create the API router.
@@ -148,7 +186,7 @@ async fn get_strategies() -> Json<ResponseEnvelope<StrategiesResponse>> {
 }
 
 async fn post_strategies(
-    Json(_req): Json<StrategiesRequest>,
+    ApiJson(_req): ApiJson<StrategiesRequest>,
 ) -> Json<ResponseEnvelope<StrategiesResponse>> {
     Json(ApiResponse::success(StrategiesResponse {
         strategies: vec![],
@@ -158,7 +196,7 @@ async fn post_strategies(
 /// Verifies a manifest and returns its IR; a manifest that does not verify is
 /// a 422 carrying `validation_invalid_request` and the reason code.
 async fn post_verify_strategy(
-    Json(manifest): Json<VerifyStrategyRequest>,
+    ApiJson(manifest): ApiJson<VerifyStrategyRequest>,
 ) -> (StatusCode, Json<ResponseEnvelope<VerifyStrategyResponse>>) {
     match honba_api::verify_strategy(manifest) {
         Ok(ir) => (StatusCode::OK, Json(ApiResponse::success(ir))),
@@ -170,7 +208,7 @@ async fn post_verify_strategy(
 }
 
 async fn post_backtests(
-    Json(_req): Json<BacktestRequest>,
+    ApiJson(_req): ApiJson<BacktestRequest>,
 ) -> Json<ResponseEnvelope<BacktestResponse>> {
     Json(ApiResponse::success(BacktestResponse {
         run_id: "test-run-001".to_string(),
@@ -197,7 +235,9 @@ async fn get_backtest_journal(Path(_id): Path<String>) -> (StatusCode, String) {
     )
 }
 
-async fn post_sweeps(Json(_req): Json<SweepRequest>) -> Json<ResponseEnvelope<SweepResponse>> {
+async fn post_sweeps(
+    ApiJson(_req): ApiJson<SweepRequest>,
+) -> Json<ResponseEnvelope<SweepResponse>> {
     Json(ApiResponse::success(SweepResponse {
         job_id: "sweep-001".to_string(),
         status: RunStatus::Pending,
@@ -217,7 +257,9 @@ async fn get_orders() -> Json<ResponseEnvelope<OrdersResponse>> {
     Json(ApiResponse::success(OrdersResponse { orders: vec![] }))
 }
 
-async fn post_orders(Json(_req): Json<OrdersRequest>) -> Json<ResponseEnvelope<serde_json::Value>> {
+async fn post_orders(
+    ApiJson(_req): ApiJson<OrdersRequest>,
+) -> Json<ResponseEnvelope<serde_json::Value>> {
     Json(ApiResponse::success(
         serde_json::json!({"order_id": "ord-001"}),
     ))
