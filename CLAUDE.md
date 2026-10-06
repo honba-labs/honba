@@ -56,6 +56,8 @@ cd python && pytest tests/unit/test_x.py::test_name
 ruff check .                              # line-length 100
 ```
 
+`import honba` does not need the extension: native access is lazy (`honba._native.native()` / `native_attr(name)`). The first native-backed use raises `ImportError` (extension missing) or `RuntimeError` naming the symbol (extension stale; rebuild). Still needing it at first use: `honba.SCHEMA_VERSION` / `honba.wire.API_VERSION` / `STRATEGY_API_VERSION`, `Currency` minor-unit accessors and `Money` conversions, `WireEnvelope` build/validate, `strategies.verify.verify_manifest`, and `honba schema export`.
+
 Optional extras: `ai` (openai, anthropic, litellm, mcp), `rl` (torch, gymnasium). CLI entry point: `honba` → `honba.cli.main:app` (typer; subcommands in `python/honba/cli/`: backtest, data, optimize, research, strategy, ai).
 
 CI (`.github/workflows/ci.yml`), all blocking: Rust job (fmt, check, check `honba-market` without default features, clippy `--workspace --all-targets -D warnings`, test, doctest, codegen drift via `make check-codegen-ci`, doc with `-D warnings`; cargo cache via `Swatinem/rust-cache`), dependency-graph check, and Python job (deps, maturin develop, stubtest, pytest, ruff lint: `ruff check python` and `ruff format --check python`). The frontend TypeScript drift check is not in CI.
