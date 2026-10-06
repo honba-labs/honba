@@ -30,7 +30,7 @@ async fn call(method: &str, uri: &str, body: Option<&str>) -> (StatusCode, Value
 
 #[tokio::test]
 async fn unbuilt_routes_answer_501_not_implemented_envelopes() {
-    let routes: [(&str, &str, Option<&str>); 11] = [
+    let routes: [(&str, &str, Option<&str>); 10] = [
         ("POST", "/backtests", Some("{}")),
         ("GET", "/backtests/r1", None),
         ("GET", "/backtests/r1/journal", None),
@@ -40,7 +40,6 @@ async fn unbuilt_routes_answer_501_not_implemented_envelopes() {
         ("GET", "/orders", None),
         ("DELETE", "/orders/o1", None),
         ("POST", "/positions/close", None),
-        ("GET", "/screener/scan", None),
         ("GET", "/journals/j1", None),
     ];
     for (method, uri, body) in routes {

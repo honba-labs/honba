@@ -30,6 +30,7 @@ use tower_http::{
 
 mod dispatch;
 mod market;
+mod screener;
 mod state;
 
 pub use dispatch::{build_target, dispatch, DispatchError};
@@ -140,7 +141,7 @@ pub fn api_router_with_config(state: AppState, config: &ApiConfig) -> Router {
         .route("/orders", post(post_orders).get(get_orders))
         .route("/orders/:id", delete(delete_order))
         .route("/positions/close", post(post_close_positions))
-        .route("/screener/scan", get(get_screener_scan))
+        .route("/screener/scan", get(screener::get_screener_scan))
         .route("/journals/:id", get(get_journal_by_id))
         .with_state(state)
         .layer(CompressionLayer::new())
@@ -198,7 +199,6 @@ pub const NOT_IMPLEMENTED_ENDPOINTS: &[(&str, &str)] = &[
     ("GET", "/orders"),
     ("DELETE", "/orders/{id}"),
     ("POST", "/positions/close"),
-    ("GET", "/screener/scan"),
     ("GET", "/journals/{id}"),
 ];
 
@@ -347,10 +347,6 @@ async fn delete_order(Path(_id): Path<String>) -> NotImplemented {
 
 async fn post_close_positions() -> NotImplemented {
     not_implemented("closing positions")
-}
-
-async fn get_screener_scan() -> NotImplemented {
-    not_implemented("the screener")
 }
 
 async fn get_journal_by_id(Path(_id): Path<String>) -> NotImplemented {

@@ -82,21 +82,21 @@ pub(crate) fn check_row_cap(rows: usize, limit: usize) -> Result<(), ErrorDetail
     })))
 }
 
-fn failure(status: StatusCode, detail: ErrorDetail) -> Response {
+pub(crate) fn failure(status: StatusCode, detail: ErrorDetail) -> Response {
     let body: ResponseEnvelope<serde_json::Value> = ApiResponse::error(detail);
     (status, Json(body)).into_response()
 }
 
-fn success<T: serde::Serialize>(data: T) -> Response {
+pub(crate) fn success<T: serde::Serialize>(data: T) -> Response {
     let body: ResponseEnvelope<T> = ApiResponse::success(data);
     (StatusCode::OK, Json(body)).into_response()
 }
 
-fn unprocessable(detail: ErrorDetail) -> Response {
+pub(crate) fn unprocessable(detail: ErrorDetail) -> Response {
     failure(StatusCode::UNPROCESSABLE_ENTITY, detail)
 }
 
-fn instrument_not_found(id: &honba_messages::InstrumentId) -> Response {
+pub(crate) fn instrument_not_found(id: &honba_messages::InstrumentId) -> Response {
     failure(
         StatusCode::NOT_FOUND,
         ErrorDetail::new(
@@ -107,7 +107,7 @@ fn instrument_not_found(id: &honba_messages::InstrumentId) -> Response {
 }
 
 /// Maps a port failure to a status and an envelope code.
-fn port_failure(error: PortError) -> Response {
+pub(crate) fn port_failure(error: PortError) -> Response {
     let (status, code) = match &error {
         PortError::Unsupported(_) => (StatusCode::NOT_FOUND, ErrorCode::MarketDataUnavailable),
         PortError::InvalidRequest(_) => (
