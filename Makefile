@@ -1,11 +1,21 @@
 .PHONY: build test lint fmt python schema check-schema check-schema-ts openapi check-openapi \
-	pyi check-pyi mcp check-mcp codegen check-codegen check-codegen-ci
+	pyi check-pyi mcp check-mcp codegen check-codegen check-codegen-ci check-wasm test-wasm
 
 build:
 	cargo build --workspace
 
 test:
 	cargo test --workspace
+
+# wasm32 build of the pure WASM surface (needs `rustup target add wasm32-unknown-unknown`).
+check-wasm:
+	cargo check -p honba-api-wasm --target wasm32-unknown-unknown
+
+# Runs the golden vectors through the real wasm build under node (needs wasm-pack and node).
+WASM_PKG = target/wasm-pkg
+test-wasm:
+	wasm-pack build crates/honba-api-wasm --target nodejs --dev --out-dir ../../$(WASM_PKG)
+	node crates/honba-api-wasm/tests/js/indicator_conformance.mjs $(WASM_PKG)
 
 lint:
 	cargo clippy --workspace --all-targets -- -D warnings

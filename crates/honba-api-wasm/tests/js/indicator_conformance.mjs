@@ -1,0 +1,37 @@
+// Runs schema/conformance/indicator_series.json through the real wasm `indicator_series` export.
+// Usage: node indicator_conformance.mjs <wasm-pack --target nodejs pkg dir>   (see `make test-wasm`)
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const wasm = createRequire(import.meta.url)(resolve(process.argv[2] ?? "pkg"));
+const fx = JSON.parse(
+  readFileSync(resolve(here, "../../../../schema/conformance/indicator_series.json"), "utf8"),
+);
+const rel = fx.tolerance.relative;
+
+const ok = (a, e) =>
+  e === null
+    ? Number.isNaN(a)
+    : Number.isInteger(e)
+      ? a === e
+      : Math.abs(a - e) <= rel * Math.max(1, Math.abs(e));
+
+let failures = 0;
+for (const c of fx.cases) {
+  const out = wasm.indicator_series(c.indicator, JSON.stringify(c.params), Float64Array.from(fx.inputs[c.input]));
+  const bad = out.length !== c.expected.length || [...out].findIndex((a, i) => !ok(a, c.expected[i]));
+  if (bad !== false && bad !== -1) {
+    failures++;
+    console.error(`FAIL ${c.name} (first mismatch at ${bad})`);
+  }
+}
+const names = JSON.parse(wasm.list_indicators()).indicators.map((i) => i.name);
+if (names.join() !== "sma,ema,rsi,macd,bollinger") { failures++; console.error("FAIL catalog", names); }
+let threw = false;
+try { wasm.indicator_series("sma", '{"period":0}', new Float64Array([1])); } catch { threw = true; }
+if (!threw) { failures++; console.error("FAIL bad params must throw"); }
+if (failures) process.exit(1);
+console.log(`wasm conformance: ${fx.cases.length} vectors ok`);
