@@ -6,6 +6,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
+pub mod codegen;
 pub mod domain;
 pub mod manifest;
 pub mod run;
@@ -13,6 +14,7 @@ pub mod strategy;
 pub mod wire;
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    codegen::register(m)?;
     domain::register(m)?;
     manifest::register(m)?;
     run::register(m)?;

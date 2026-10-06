@@ -8,6 +8,16 @@ STRATEGY_API_VERSION: Final[str]
 
 def canonical_json(kind: str, payload: str) -> str: ...
 def wire_enum_values() -> dict[str, list[str]]: ...
+def codegen_artifacts() -> list[str]:
+    """Names accepted by ``codegen_render``: json_schema, openapi, typescript, pyi, mcp."""
+
+def codegen_render(kind: str) -> tuple[str, str]:
+    """Render one honba-codegen artifact as ``(file_name, content)``.
+
+    Byte-for-byte what the Rust ``honba schema export`` writes; raises ``ValueError``
+    for an unknown ``kind``.
+    """
+
 def nse_equity_settlement_days() -> int:
     """India (NSE/BSE) equity delivery settlement cycle in days (T+2).
 

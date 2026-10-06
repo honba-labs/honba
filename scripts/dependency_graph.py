@@ -49,7 +49,7 @@ ALLOWED_PROD = {
     },
     "honba-py": {
         "honba-messages", "honba-entities", "honba-market", "honba-engine",
-        "honba-strategy", "honba-sim",
+        "honba-strategy", "honba-sim", "honba-codegen",
     },
     "honba-cli": {
         "honba-messages", "honba-entities", "honba-market", "honba-engine",

@@ -21,5 +21,6 @@ honba-market = { workspace = true, features = ["india"] }
 honba-engine.workspace = true
 honba-strategy.workspace = true
 honba-sim.workspace = true
+honba-codegen.workspace = true
 serde.workspace = true
 serde_json.workspace = true

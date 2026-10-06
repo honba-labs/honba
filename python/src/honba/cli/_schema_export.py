@@ -1,100 +1,37 @@
-"""Export the canonical JSON Schema and generate TypeScript contracts (Pillar P2 / ADR 006).
+"""Write the generated contract artifacts (Pillar P2 / ADR 006).
 
-Single source of truth pipeline:
-Rust serde domain types (L0/L1/L4) -> Python pydantic models (honba.entities.wire)
-  -> JSON Schema export (schema/domain/)
-  -> TypeScript interface definitions (honba-frontend/src/core/types/generated/)
+Rust (`honba-codegen`) is the single owner of every generated artifact: the JSON Schema bundle
+(`schema/domain/`), OpenAPI (`schema/openapi/`), MCP tool schemas (`schema/mcp/`), the frontend
+TypeScript and the Python stubs (`honba/wire/generated/`). This module only writes what the
+compiled extension renders (`honba._honba.codegen_render`), so the output is byte-for-byte what
+the Rust `honba schema export` binary writes, and it needs neither cargo nor npx: it works from an
+installed wheel.
 
-Lives in the installed package so `honba schema export` works from a wheel;
-`scripts/export_schema.py` is a thin repo-checkout wrapper around it.
+Lives in the installed package so `honba schema export` works outside a repo checkout;
+`scripts/export_schema.py` is the repo-checkout wrapper around the Rust binary.
 """
 
 from __future__ import annotations
 
-import json
-import subprocess
 from pathlib import Path
 
-from pydantic import TypeAdapter
+from honba import _honba
 
-from honba.entities import screener, wire
+
+def export_artifact(kind: str, output_dir: Path) -> Path:
+    """Write the artifact `kind` (see `_honba.codegen_artifacts()`) into `output_dir`."""
+    file_name, content = _honba.codegen_render(kind)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    path = output_dir / file_name
+    path.write_text(content)
+    return path
 
 
 def export_json_schema(output_dir: Path) -> Path:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    bundle_path = output_dir / "domain_schema.json"
-
-    schema = {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "title": "HonbaDomainEnvelope",
-        "description": "Honba canonical wire models generated from Rust single source of truth contracts",
-        "type": "object",
-        "properties": {
-            "message": {"$ref": "#/$defs/Message"},
-            "event": {"$ref": "#/$defs/Event"},
-            "order": {"$ref": "#/$defs/Order"},
-            "order_intent": {"$ref": "#/$defs/OrderIntent"},
-            "trade": {"$ref": "#/$defs/Trade"},
-            "position": {"$ref": "#/$defs/Position"},
-            "bar": {"$ref": "#/$defs/Bar"},
-            "instrument_id": {"$ref": "#/$defs/InstrumentId"},
-            "metric_key_spec": {"$ref": "#/$defs/MetricKeySpec"},
-            "metric_ref": {"$ref": "#/$defs/MetricRef"},
-            "metric_definition": {"$ref": "#/$defs/MetricDefinition"},
-            "screener_filter_predicate": {"$ref": "#/$defs/ScreenerFilterPredicate"},
-            "screener_filter_group": {"$ref": "#/$defs/ScreenerFilterGroup"},
-            "screener_sort_spec": {"$ref": "#/$defs/ScreenerSortSpec"},
-            "screener_scan_request": {"$ref": "#/$defs/ScreenerScanRequest"},
-            "screener_row": {"$ref": "#/$defs/ScreenerRow"},
-            "screener_scan_response": {"$ref": "#/$defs/ScreenerScanResponse"},
-        },
-        "$defs": {},
-    }
-
-    all_adapters = dict(wire._ADAPTERS)
-    screener_adapters = {
-        "MetricKeySpec": TypeAdapter(screener.MetricKeySpec),
-        "MetricRef": TypeAdapter(screener.MetricRef),
-        "MetricDefinition": TypeAdapter(screener.MetricDefinition),
-        "ScreenerFilterPredicate": TypeAdapter(screener.ScreenerFilterPredicate),
-        "ScreenerFilterGroup": TypeAdapter(screener.ScreenerFilterGroup),
-        "ScreenerSortSpec": TypeAdapter(screener.ScreenerSortSpec),
-        "ScreenerScanRequest": TypeAdapter(screener.ScreenerScanRequest),
-        "ScreenerRow": TypeAdapter(screener.ScreenerRow),
-        "ScreenerScanResponse": TypeAdapter(screener.ScreenerScanResponse),
-    }
-    all_adapters.update(screener_adapters)
-
-    for name, adapter in all_adapters.items():
-        s = adapter.json_schema()
-        if "$defs" in s:
-            for def_name, def_schema in s["$defs"].items():
-                schema["$defs"][def_name] = def_schema
-            s_copy = dict(s)
-            del s_copy["$defs"]
-            schema["$defs"][name] = s_copy
-        else:
-            schema["$defs"][name] = s
-
-    bundle_path.write_text(json.dumps(schema, indent=2) + "\n")
-    print(f"Exported JSON Schema: {bundle_path} ({len(schema['$defs'])} definitions)")
-    return bundle_path
+    """Write `domain_schema.json`, the JSON Schema conformance bundle."""
+    return export_artifact("json_schema", output_dir)
 
 
-def generate_typescript(schema_file: Path, ts_output_dir: Path, cwd: Path | None = None) -> None:
-    ts_output_dir.mkdir(parents=True, exist_ok=True)
-    out_file = ts_output_dir / "domain.ts"
-
-    cmd = [
-        "npx",
-        "--yes",
-        "json-schema-to-typescript",
-        "-i",
-        str(schema_file),
-        "-o",
-        str(out_file),
-    ]
-
-    print(f"Generating TypeScript contracts via: {' '.join(cmd)}")
-    subprocess.run(cmd, check=True, cwd=str(cwd or Path.cwd()))
-    print(f"Generated TypeScript definitions: {out_file}")
+def generate_typescript(ts_output_dir: Path) -> Path:
+    """Write `domain.ts`, the TypeScript declarations for honba-frontend."""
+    return export_artifact("typescript", ts_output_dir)

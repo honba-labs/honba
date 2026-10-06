@@ -151,3 +151,36 @@ fn the_bundle_carries_both_version_axes() {
 fn the_core_version_is_reported() {
     assert!(!CORE_VERSION.is_empty());
 }
+
+#[test]
+fn every_artifact_kind_round_trips_through_its_name() {
+    for artifact in Artifact::ALL {
+        assert_eq!(Artifact::from_name(artifact.name()), Some(*artifact));
+    }
+    assert_eq!(Artifact::from_name("nope"), None);
+}
+
+#[test]
+fn rendered_text_is_exactly_what_the_writer_writes() {
+    // `honba schema export` in Python writes `render` output; it must be the
+    // same bytes the Rust CLI writes, or the two paths drift.
+    let codegen = Codegen::new();
+    let dir = std::env::temp_dir().join(format!("honba-codegen-unit-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let written = codegen.write_all(&dir).expect("write_all");
+    for (artifact, path) in Artifact::ALL.iter().zip(&written) {
+        assert_eq!(
+            path.file_name().and_then(|n| n.to_str()),
+            Some(artifact.file_name())
+        );
+        let on_disk = std::fs::read_to_string(path).expect("read");
+        assert_eq!(codegen.render(*artifact), on_disk, "{}", artifact.name());
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn rendered_json_ends_with_a_newline() {
+    let text = Codegen::new().render(Artifact::JsonSchema);
+    assert!(text.ends_with("}\n"));
+}

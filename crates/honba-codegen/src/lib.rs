@@ -54,6 +54,63 @@ pub const API_VERSION: &str = honba_messages::API_VERSION;
 /// Crate version, surfaced to clients so they can report what they are running.
 pub const CORE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// One generated artifact: what it is called and where it is written.
+///
+/// This is the single list both CLIs (the Rust `honba schema export` and the
+/// Python one, through `honba._honba.codegen_render`) iterate, so they cannot
+/// disagree about file names or content.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Artifact {
+    /// The JSON Schema conformance bundle, `domain_schema.json`.
+    JsonSchema,
+    /// The OpenAPI 3.1 document, `openapi.json`.
+    OpenApi,
+    /// TypeScript declarations for `honba-frontend`, `domain.ts`.
+    TypeScript,
+    /// Python type stubs, `__init__.pyi`.
+    Pyi,
+    /// MCP tool schemas, `mcp_tools.json`.
+    Mcp,
+}
+
+impl Artifact {
+    /// Every artifact, in [`Codegen::write_all`] order.
+    pub const ALL: &'static [Artifact] = &[
+        Artifact::JsonSchema,
+        Artifact::OpenApi,
+        Artifact::TypeScript,
+        Artifact::Pyi,
+        Artifact::Mcp,
+    ];
+
+    /// The stable name used across the FFI boundary and on the command line.
+    pub fn name(self) -> &'static str {
+        match self {
+            Artifact::JsonSchema => "json_schema",
+            Artifact::OpenApi => "openapi",
+            Artifact::TypeScript => "typescript",
+            Artifact::Pyi => "pyi",
+            Artifact::Mcp => "mcp",
+        }
+    }
+
+    /// Parses [`Artifact::name`].
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.iter().copied().find(|a| a.name() == name)
+    }
+
+    /// The file the artifact is written to inside its output directory.
+    pub fn file_name(self) -> &'static str {
+        match self {
+            Artifact::JsonSchema => "domain_schema.json",
+            Artifact::OpenApi => "openapi.json",
+            Artifact::TypeScript => "domain.ts",
+            Artifact::Pyi => "__init__.pyi",
+            Artifact::Mcp => "mcp_tools.json",
+        }
+    }
+}
+
 /// The generator: builds every artifact from the shared registry.
 #[derive(Default)]
 pub struct Codegen {
@@ -71,6 +128,26 @@ impl Codegen {
     /// The registry every artifact is rendered from.
     pub fn schemas(&self) -> &SchemaSet {
         &self.set
+    }
+
+    /// The exact file content of `artifact`, as the writers write it.
+    pub fn render(&self, artifact: Artifact) -> String {
+        match artifact {
+            Artifact::JsonSchema => to_pretty_json(&self.json_schema()),
+            Artifact::OpenApi => to_pretty_json(&self.openapi()),
+            Artifact::TypeScript => self.typescript(),
+            Artifact::Pyi => self.pyi(),
+            Artifact::Mcp => to_pretty_json(&self.mcp()),
+        }
+    }
+
+    /// Writes `artifact` into `output_dir/<file_name>`.
+    pub fn write(&self, artifact: Artifact, output_dir: &Path) -> Result<PathBuf> {
+        std::fs::create_dir_all(output_dir).context("creating output directory")?;
+        let path = output_dir.join(artifact.file_name());
+        std::fs::write(&path, self.render(artifact))
+            .with_context(|| format!("writing {}", path.display()))?;
+        Ok(path)
     }
 
     /// The JSON Schema conformance bundle.
@@ -94,9 +171,7 @@ impl Codegen {
 
     /// Writes [`Codegen::json_schema`] into `output_dir/domain_schema.json`.
     pub fn write_json_schema(&self, output_dir: &Path) -> Result<PathBuf> {
-        std::fs::create_dir_all(output_dir).context("creating output directory")?;
-        let path = output_dir.join("domain_schema.json");
-        write_json_pretty(&path, &self.json_schema())?;
+        let path = self.write(Artifact::JsonSchema, output_dir)?;
         println!(
             "Exported JSON Schema: {} ({} definitions)",
             path.display(),
@@ -124,9 +199,7 @@ impl Codegen {
 
     /// Writes [`Codegen::openapi`] into `output_dir/openapi.json`.
     pub fn write_openapi(&self, output_dir: &Path) -> Result<PathBuf> {
-        std::fs::create_dir_all(output_dir).context("creating output directory")?;
-        let path = output_dir.join("openapi.json");
-        write_json_pretty(&path, &self.openapi())?;
+        let path = self.write(Artifact::OpenApi, output_dir)?;
         println!("Exported OpenAPI: {}", path.display());
         Ok(path)
     }
@@ -138,9 +211,7 @@ impl Codegen {
 
     /// Writes [`Codegen::typescript`] into `output_dir/domain.ts`.
     pub fn write_typescript(&self, output_dir: &Path) -> Result<PathBuf> {
-        std::fs::create_dir_all(output_dir).context("creating output directory")?;
-        let path = output_dir.join("domain.ts");
-        std::fs::write(&path, self.typescript()).context("writing TypeScript")?;
+        let path = self.write(Artifact::TypeScript, output_dir)?;
         println!("Generated TypeScript definitions: {}", path.display());
         Ok(path)
     }
@@ -156,9 +227,7 @@ impl Codegen {
     /// (`make pyi`): generated and never edited, with the hand-written wire
     /// models (`honba.wire`) living beside it.
     pub fn write_pyi(&self, output_dir: &Path) -> Result<PathBuf> {
-        std::fs::create_dir_all(output_dir).context("creating output directory")?;
-        let path = output_dir.join("__init__.pyi");
-        std::fs::write(&path, self.pyi()).context("writing .pyi")?;
+        let path = self.write(Artifact::Pyi, output_dir)?;
         println!("Generated Python stubs: {}", path.display());
         Ok(path)
     }
@@ -170,9 +239,7 @@ impl Codegen {
 
     /// Writes [`Codegen::mcp`] into `output_dir/mcp_tools.json`.
     pub fn write_mcp(&self, output_dir: &Path) -> Result<PathBuf> {
-        std::fs::create_dir_all(output_dir).context("creating output directory")?;
-        let path = output_dir.join("mcp_tools.json");
-        write_json_pretty(&path, &self.mcp())?;
+        let path = self.write(Artifact::Mcp, output_dir)?;
         println!("Exported MCP tool schemas: {}", path.display());
         Ok(path)
     }
@@ -192,11 +259,18 @@ impl Codegen {
     }
 }
 
-/// Writes pretty JSON with a trailing newline, so the file is diff-friendly.
-pub fn write_json_pretty(path: &Path, value: &Value) -> Result<()> {
-    let mut text = serde_json::to_string_pretty(value).context("serializing JSON")?;
+/// Pretty JSON with a trailing newline, so the file is diff-friendly.
+pub fn to_pretty_json(value: &Value) -> String {
+    // Serializing a `Value` cannot fail: every key is already a string.
+    let mut text = serde_json::to_string_pretty(value).unwrap_or_default();
     text.push('\n');
-    std::fs::write(path, text).with_context(|| format!("writing {}", path.display()))
+    text
+}
+
+/// Writes [`to_pretty_json`] of `value` to `path`.
+pub fn write_json_pretty(path: &Path, value: &Value) -> Result<()> {
+    std::fs::write(path, to_pretty_json(value))
+        .with_context(|| format!("writing {}", path.display()))
 }
 
 #[cfg(test)]
