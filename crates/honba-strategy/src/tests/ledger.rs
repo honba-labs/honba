@@ -89,6 +89,19 @@ fn release_clears_pending_for_a_rejected_intent() {
 }
 
 #[test]
+fn release_remainder_frees_only_the_unfilled_part() {
+    let nifty = id("NIFTY50", "NSE");
+    let mut ctx = LedgerContext::new();
+    ctx.submit(OrderIntent::market_buy(nifty.clone(), 10.0));
+    ctx.release_remainder(&nifty, OrderSide::Buy, 4.0);
+    assert!(ctx.busy(&nifty), "6 still pending");
+    ctx.release_remainder(&nifty, OrderSide::Buy, 6.0);
+    assert!(!ctx.busy(&nifty));
+    ctx.release_remainder(&nifty, OrderSide::Buy, f64::NAN);
+    ctx.release_remainder(&nifty, OrderSide::Buy, -1.0);
+}
+
+#[test]
 fn fills_move_position_and_cash_including_costs() {
     let nifty = id("NIFTY50", "NSE");
     let mut ctx = LedgerContext::with_cash(Money::from_major_f64(1_000.0, Currency::Inr).unwrap());

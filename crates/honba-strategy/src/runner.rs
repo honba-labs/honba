@@ -1,6 +1,6 @@
 //! The `StrategyRunner`: glues a strategy to an execution engine.
 
-use honba_engine::{AlgoError, ExecutionEngine, Handler, Result};
+use honba_engine::{AlgoError, ExecutionEngine, Handler, OrderRejection, Result};
 use honba_entities::Trade;
 use honba_messages::{Event, OrderId, UnixNanos};
 
@@ -92,6 +92,7 @@ pub struct StrategyRunner<S: Strategy, E: ExecutionEngine> {
     submitted: Vec<SubmittedIntent>,
     fills: Vec<Trade>,
     rejections: Vec<IntentRejection>,
+    order_rejections: Vec<OrderRejection>,
     warmup_bars: u32,
     bars_seen: u64,
     last_bar_ts: Option<UnixNanos>,
@@ -115,6 +116,7 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
             submitted: Vec::new(),
             fills: Vec::new(),
             rejections: Vec::new(),
+            order_rejections: Vec::new(),
             warmup_bars: 0,
             bars_seen: 0,
             last_bar_ts: None,
@@ -172,6 +174,32 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
     /// Returns every intent rejected during the run, in emission order.
     pub fn rejections(&self) -> &[IntentRejection] {
         &self.rejections
+    }
+
+    /// Returns every order (or part of one) the execution engine rejected or
+    /// cancelled, in drain order. Each was released in the context.
+    pub fn order_rejections(&self) -> &[OrderRejection] {
+        &self.order_rejections
+    }
+
+    /// Asks the execution engine to cancel `order_id` and books what it
+    /// reports at once (a cancelled [`OrderRejection`] for the unfilled
+    /// remainder). Cancelling an unknown or finished order does nothing.
+    pub fn cancel(&mut self, order_id: &str) -> Result<()> {
+        self.execution.cancel(order_id)?;
+        self.book_rejections()
+    }
+
+    /// Releases and records what the engine reports as never filling.
+    fn book_rejections(&mut self) -> Result<()> {
+        for r in self.execution.drain_rejections()? {
+            self.adapter
+                .parts_mut()
+                .1
+                .release_remainder(&r.instrument_id, r.side, r.quantity);
+            self.order_rejections.push(r);
+        }
+        Ok(())
     }
 
     /// Consumes the runner, returning the strategy, execution engine, and fills.
@@ -254,6 +282,9 @@ impl<S: Strategy, E: ExecutionEngine> Handler for StrategyRunner<S, E> {
             strategy.on_fill(ctx, fill)?;
         }
         self.fills.extend(new_fills);
+
+        // 5. Drain rejections and release them in the context.
+        self.book_rejections()?;
 
         Ok(honba_engine::EngineOutput::None)
     }

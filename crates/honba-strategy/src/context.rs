@@ -171,6 +171,21 @@ impl LedgerContext {
         self.reduce_pending(&intent.instrument_id, intent.side, intent.quantity);
     }
 
+    /// Releases `quantity` of the pending `side` quantity of `instrument_id`:
+    /// the unfilled remainder of an order the execution port rejected or
+    /// cancelled (see `honba_engine::OrderRejection`). A non-positive or
+    /// non-finite quantity is a no-op.
+    pub fn release_remainder(
+        &mut self,
+        instrument_id: &InstrumentId,
+        side: OrderSide,
+        quantity: f64,
+    ) {
+        if quantity.is_finite() && quantity > 0.0 {
+            self.reduce_pending(instrument_id, side, quantity);
+        }
+    }
+
     fn reduce_pending(&mut self, instrument_id: &InstrumentId, side: OrderSide, qty: f64) {
         let Some(p) = self.pending.get_mut(instrument_id) else {
             return;
