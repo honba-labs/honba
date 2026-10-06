@@ -16,7 +16,7 @@ from honba.screener.evaluator import (
 def make_sample_bars(n=10, start_price=100.0, trend=1.0):
     inst = InstrumentId("RELIANCE", "NSE")
     bars = []
-    base_ts = int(dt.datetime(2025, 1, 1, 9, 15).timestamp() * 1e9)
+    base_ts = int(dt.datetime(2025, 1, 1, 9, 15, tzinfo=dt.timezone.utc).timestamp() * 1e9)
     for i in range(n):
         price = start_price + i * trend
         b = Bar(
@@ -49,7 +49,7 @@ def test_evaluate_moving_averages():
     # 25 bars: first 20 at 100.0, next 5 at 200.0
     inst = InstrumentId("RELIANCE", "NSE")
     bars = []
-    base_ts = int(dt.datetime(2025, 1, 1, 9, 15).timestamp() * 1e9)
+    base_ts = int(dt.datetime(2025, 1, 1, 9, 15, tzinfo=dt.timezone.utc).timestamp() * 1e9)
     for i in range(20):
         bars.append(
             Bar(inst, base_ts + i * 86400 * 1_000_000_000, 100.0, 100.0, 100.0, 100.0, 1000.0)
@@ -67,7 +67,7 @@ def test_evaluate_moving_averages():
 def test_evaluate_crossover():
     # 3 bars where metric crosses above threshold or another metric
     inst = InstrumentId("RELIANCE", "NSE")
-    base_ts = int(dt.datetime(2025, 1, 1, 9, 15).timestamp() * 1e9)
+    base_ts = int(dt.datetime(2025, 1, 1, 9, 15, tzinfo=dt.timezone.utc).timestamp() * 1e9)
     b1 = Bar(inst, base_ts, 90.0, 90.0, 90.0, 90.0, 100.0)
     b2 = Bar(inst, base_ts + 86400 * 1_000_000_000, 110.0, 110.0, 110.0, 110.0, 100.0)
 

@@ -20,7 +20,7 @@ def test_screener_source_scan():
     inst2 = InstrumentId("TCS", "NSE")
 
     provider = InMemoryMarketDataProvider()
-    today = dt.date.today()
+    today = dt.date.today()  # noqa: DTZ011 - test data relative to now; asserts are date-agnostic
     bars1 = []
     bars2 = []
     for d in range(10):

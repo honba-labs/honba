@@ -109,7 +109,7 @@ def gaps_cmd(
     """Show missing ranges that a request would fetch."""
     inst = InstrumentId(symbol, exchange)
     start_date = dt.date.fromisoformat(start)
-    end_date = dt.date.fromisoformat(end) if end else dt.date.today() + dt.timedelta(days=1)
+    end_date = dt.date.fromisoformat(end) if end else dt.date.today() + dt.timedelta(days=1)  # noqa: DTZ011 - CLI default 'today' is the user's local calendar date
     req_interval = DateInterval(start_date, end_date)
 
     plan = _DATA_SERVICE.plan([inst], timeframe, req_interval)
@@ -154,7 +154,7 @@ def fetch_cmd(
     """Fetch missing data and fill gaps without running a scan."""
     inst = InstrumentId(symbol, exchange)
     start_date = dt.date.fromisoformat(start)
-    end_date = dt.date.fromisoformat(end) if end else dt.date.today() + dt.timedelta(days=1)
+    end_date = dt.date.fromisoformat(end) if end else dt.date.today() + dt.timedelta(days=1)  # noqa: DTZ011 - CLI default 'today' is the user's local calendar date
     req_interval = DateInterval(start_date, end_date)
 
     p_clean = provider.lower().strip()

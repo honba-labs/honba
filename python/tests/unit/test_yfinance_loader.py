@@ -226,7 +226,7 @@ def test_live_yfinance_fetch() -> None:
     provider = YFinanceProvider()
     inst = InstrumentId("RELIANCE", "NSE")
     # Fetch last 3 days
-    today = dt.date.today()
+    today = dt.date.today()  # noqa: DTZ011 - live smoke test of a real window ending now
     interval = DateInterval(today - dt.timedelta(days=7), today)
     bars = provider.fetch(inst, "1D", interval)
     # If network/yfinance works, bars will be non-empty

@@ -81,7 +81,7 @@ class LocalScreenerSource:
 
         # 3. Determine required date interval
         # For historical or latest scans, default asof to today
-        eval_asof = asof or dt.date.today()
+        eval_asof = asof or dt.date.today()  # noqa: DTZ011 - default as-of is the local calendar date
         # Find session start date for max_lookback sessions before asof
         sessions = self.calendar.sessions_before(eval_asof, max_lookback + 5)
         start_date = sessions[0] if sessions else eval_asof - dt.timedelta(days=max_lookback * 2)

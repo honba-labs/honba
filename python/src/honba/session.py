@@ -549,12 +549,12 @@ def _parse_time(value: str | date | datetime) -> datetime:
     if isinstance(value, datetime):
         return value
     if isinstance(value, date):
-        return datetime(value.year, value.month, value.day)
+        return datetime(value.year, value.month, value.day)  # noqa: DTZ001 - naive by contract; DataProvider receives naive midnight
     # ISO date or datetime string
     text = value.strip()
     if len(text) == 10:
         d = date.fromisoformat(text)
-        return datetime(d.year, d.month, d.day)
+        return datetime(d.year, d.month, d.day)  # noqa: DTZ001 - naive by contract; DataProvider receives naive midnight
     return datetime.fromisoformat(text)
 
 
