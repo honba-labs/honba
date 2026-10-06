@@ -82,10 +82,8 @@ impl RoundTrip {
         };
         // Fees are ledger Money; gross and net stay f64 statistics, so the
         // sum converts once, at the boundary, rounded to minor units.
-        let fees_minor = Money::new(
-            entry.costs().minor() + exit.costs().minor(),
-            entry.costs().currency(),
-        );
+        let fees_minor = (entry.costs() + exit.costs())
+            .map_err(|e| AnalyticsError::TradeMismatch(format!("cannot sum fees: {e}")))?;
         let fees_major = fees_minor.to_major_f64();
         let fees = fees_major;
         let net_pnl = gross_pnl - fees;

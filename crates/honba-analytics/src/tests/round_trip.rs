@@ -75,6 +75,36 @@ fn from_fills_sums_fees_and_takes_entry_metadata() {
 }
 
 #[test]
+fn from_fills_rejects_fees_in_different_currencies() {
+    let entry = fill_with_costs(OrderSide::Buy, 1.0, 100.0, 1, 1.0);
+    let exit = Trade::new(
+        OrderId::new("O-2"),
+        any_instrument(),
+        OrderSide::Sell,
+        1.0,
+        101.0,
+        Currency::Usd,
+        UnixNanos::from_u64(2),
+        UnixNanos::from_u64(2),
+    )
+    .with_costs(Money::from_major_f64(1.0, Currency::Usd).unwrap());
+    assert!(matches!(
+        RoundTrip::from_fills(&entry, &exit),
+        Err(AnalyticsError::TradeMismatch(_))
+    ));
+}
+
+#[test]
+fn from_fills_rejects_fee_overflow() {
+    let entry = fill(OrderSide::Buy, 1.0, 100.0, 1).with_costs(Money::new(i64::MAX, Currency::Inr));
+    let exit = fill(OrderSide::Sell, 1.0, 101.0, 2).with_costs(Money::new(1, Currency::Inr));
+    assert!(matches!(
+        RoundTrip::from_fills(&entry, &exit),
+        Err(AnalyticsError::TradeMismatch(_))
+    ));
+}
+
+#[test]
 fn from_fills_rejects_same_side_pairs() {
     let a = fill(OrderSide::Buy, 1.0, 100.0, 1);
     let b = fill(OrderSide::Buy, 1.0, 101.0, 2);
