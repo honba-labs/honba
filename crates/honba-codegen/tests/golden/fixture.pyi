@@ -38,4 +38,3 @@ Tick = dict[str, Any]
 Venue = Literal["NSE", "BSE"]
 
 Wrapper = Side
-

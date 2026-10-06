@@ -367,4 +367,3 @@ class UnixNanos:
     unix_nanos: str
 
 ValueType = Literal["NUMBER", "STRING", "ENUM", "BOOL", "DATE", "MONEY"]
-

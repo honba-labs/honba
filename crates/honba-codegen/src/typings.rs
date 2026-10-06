@@ -25,10 +25,12 @@ pub fn render_pyi(set: &SchemaSet, schema_version: u32, api_version: &str) -> St
     out.push_str(&format!("API_VERSION: str = \"{api_version}\"\n"));
     out.push_str(&format!("CORE_VERSION: str = \"{CORE_VERSION}\"\n\n"));
 
-    for (name, schema) in set.iter() {
-        out.push_str(&alias(name, schema));
-        out.push('\n');
-    }
+    // Declarations are separated by one blank line; the file ends with one newline.
+    let declarations: Vec<String> = set
+        .iter()
+        .map(|(name, schema)| alias(name, schema))
+        .collect();
+    out.push_str(&declarations.join("\n"));
     out
 }
 

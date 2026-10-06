@@ -26,10 +26,12 @@ pub fn render(set: &SchemaSet, schema_version: u32, api_version: &str) -> String
         "export const API_VERSION: string = \"{api_version}\";\n\n"
     ));
 
-    for (name, schema) in set.iter() {
-        out.push_str(&declaration(name, schema));
-        out.push('\n');
-    }
+    // Declarations are separated by one blank line; the file ends with one newline.
+    let declarations: Vec<String> = set
+        .iter()
+        .map(|(name, schema)| declaration(name, schema))
+        .collect();
+    out.push_str(&declarations.join("\n"));
     out
 }
 

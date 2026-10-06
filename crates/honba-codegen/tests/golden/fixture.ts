@@ -31,4 +31,3 @@ export type Tick = { bid?: number; type: "quote" } | { px?: number; type: "trade
 export type Venue = "NSE" | "BSE";
 
 export type Wrapper = Side;
-

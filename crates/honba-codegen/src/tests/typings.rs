@@ -177,3 +177,14 @@ fn an_optional_any_field_is_not_widened_with_none() {
     );
     assert_eq!(out, "class Holder:\n    extra: Any = None\n");
 }
+
+#[test]
+fn the_stub_ends_with_exactly_one_newline() {
+    let mut set = SchemaSet::new();
+    set.insert("Bar", json!({"type": "string"}));
+    let pyi = render_pyi(&set, 3, "1.0.0");
+    assert!(
+        pyi.ends_with("Bar = str\n") && !pyi.ends_with("\n\n"),
+        "{pyi:?}"
+    );
+}

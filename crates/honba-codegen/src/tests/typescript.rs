@@ -167,3 +167,14 @@ fn duplicate_union_members_are_rendered_once() {
     let schema = json!({"anyOf": [{"type": "string"}, {"type": "string"}, {"type": "null"}]});
     assert_eq!(ts_type(&schema), "string | null");
 }
+
+#[test]
+fn the_module_ends_with_exactly_one_newline() {
+    let mut set = SchemaSet::new();
+    set.insert("Bar", json!({"type": "string"}));
+    let ts = render(&set, 3, "1.0.0");
+    assert!(
+        ts.ends_with("export type Bar = string;\n") && !ts.ends_with("\n\n"),
+        "{ts:?}"
+    );
+}
