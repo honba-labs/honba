@@ -30,6 +30,7 @@ from honba.client import (
     NotImplementedApiError,
     RequestValidationError,
     Response,
+    TransportApiError,
     ValidationApiError,
 )
 from honba.wire.wire import Bar, QuoteTick, UnixNanos
@@ -289,10 +290,12 @@ def test_inproc_unknown_route_has_no_envelope(inproc: Client) -> None:
     assert isinstance(error_from_envelope(resp.status, resp.json), InvalidResponseError)
 
 
-def test_inproc_unreadable_data_dir_is_an_os_error(tmp_path: Path) -> None:
+def test_inproc_unreadable_data_dir_is_a_transport_error(tmp_path: Path) -> None:
     (tmp_path / "not-an-instrument.parquet").write_bytes(b"junk")
-    with pytest.raises(OSError, match="SYMBOL.EXCHANGE"):
+    with pytest.raises(TransportApiError, match="SYMBOL.EXCHANGE") as err:
         Client.inproc(tmp_path).health()
+    assert err.value.retryable is False
+    assert isinstance(err.value.__cause__, OSError)
 
 
 # --- parity ------------------------------------------------------------------------------
