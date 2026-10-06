@@ -3,6 +3,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use honba_messages::InstrumentId;
+use honba_strategy::StrategyManifest;
 
 /// Instruments query parameters.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -56,16 +57,16 @@ pub struct DepthQuery {
     pub depth: Option<u32>,
 }
 
-/// Strategies request: submit source or a manifest to verify and compile.
+/// `POST /strategies` request: the manifest to verify, compile and keep.
+///
+/// Source code is not accepted (`code` or `source` is a 422 with
+/// `reason = source_unsupported`); a manifest is the only input a server can
+/// verify without running author code.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StrategiesRequest {
-    /// Strategy name.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    /// Strategy source code to verify and compile to a manifest.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub code: Option<String>,
+    /// The strategy manifest, as accepted by `POST /strategies/verify`.
+    pub manifest: StrategyManifest,
 }
 
 /// Backtest request.

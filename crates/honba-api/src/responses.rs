@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use honba_entities::{Position, Trade};
 use honba_messages::{Bar, Order, QuoteTick};
+use honba_strategy::StrategyIr;
 
 use crate::capabilities::Capabilities;
 
@@ -51,11 +52,21 @@ pub struct DepthResponse {
     pub asks: Vec<DepthLevel>,
 }
 
-/// Strategies response: verified manifests.
+/// A strategy that verified, with the id the server keeps it under.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct CompiledStrategy {
+    /// Content id: `sha256:` plus the hex digest of the canonical manifest JSON.
+    /// The same manifest always has the same id; a backtest names it as `strategy`.
+    pub id: String,
+    /// The verified IR the manifest compiled to.
+    pub ir: StrategyIr,
+}
+
+/// Strategies response: the compiled strategies of this process, ordered by id.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct StrategiesResponse {
-    /// Compiled manifests.
-    pub strategies: Vec<serde_json::Value>,
+    /// Compiled strategies.
+    pub strategies: Vec<CompiledStrategy>,
 }
 
 /// Lifecycle of an asynchronous job.

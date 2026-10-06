@@ -17,6 +17,7 @@ pub mod capabilities;
 pub mod market;
 pub mod requests;
 pub mod responses;
+pub mod strategies;
 pub mod verify;
 
 pub use capabilities::{Capabilities, CapabilityManifest};
@@ -34,9 +35,13 @@ pub use requests::{
 };
 pub use responses::{
     BacktestMetrics, BacktestResponse, BacktestStatus, BarsResponse, CapabilitiesResponse,
-    DepthLevel, DepthResponse, InstrumentsResponse, OrdersResponse, PositionsResponse,
-    QuotesResponse, RunStatus, StrategiesResponse, SweepReportResponse, SweepResponse, SweepStatus,
-    TradesResponse,
+    CompiledStrategy, DepthLevel, DepthResponse, InstrumentsResponse, OrdersResponse,
+    PositionsResponse, QuotesResponse, RunStatus, StrategiesResponse, SweepReportResponse,
+    SweepResponse, SweepStatus, TradesResponse,
+};
+pub use strategies::{
+    compile_strategy, list_strategies, parse_compile_request, StrategyCatalog,
+    MAX_COMPILED_STRATEGIES,
 };
 pub use verify::{verify_strategy, VerifyStrategyRequest, VerifyStrategyResponse};
 

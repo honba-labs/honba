@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 
 use crate::{
     BacktestMetrics, BacktestRequest, BacktestResponse, BarsQuery, BarsResponse, Capabilities,
-    CapabilityManifest, DepthLevel, DepthQuery, DepthResponse, InstrumentsQuery,
+    CapabilityManifest, CompiledStrategy, DepthLevel, DepthQuery, DepthResponse, InstrumentsQuery,
     InstrumentsResponse, OrdersRequest, OrdersResponse, PositionsResponse, QuotesQuery,
     QuotesResponse, StrategiesRequest, StrategiesResponse, SweepReportResponse, SweepRequest,
     SweepResponse, TradesResponse,
@@ -40,6 +40,24 @@ fn rejects_extra<T: DeserializeOwned + std::fmt::Debug>(sample: Value) {
     );
 }
 
+fn strategy_manifest() -> Value {
+    json!({
+        "api_version": "1.0.0",
+        "name": "sma",
+        "source_hash": "sha256:abc",
+        "universe": {"explicit": [{"symbol": "TCS", "exchange": "NSE"}]},
+        "subscriptions": {"instruments": [{"symbol": "TCS", "exchange": "NSE"}]},
+        "driving_timeframe": {"interval": 1, "aggregation": "day"},
+        "warmup_bars": 20
+    })
+}
+
+fn compiled() -> Value {
+    let manifest = serde_json::from_value(strategy_manifest()).unwrap();
+    let mut catalog = crate::StrategyCatalog::default();
+    serde_json::to_value(crate::compile_strategy(&mut catalog, manifest).unwrap()).unwrap()
+}
+
 fn manifest() -> Value {
     json!({
         "crates": [], "market_packs": [], "endpoints": [], "toolsets": [],
@@ -57,6 +75,8 @@ fn every_response_type_ignores_unknown_fields() {
     tolerates_extra::<DepthLevel>(json!({"price": 1.0, "qty": 2.0}));
     tolerates_extra::<DepthResponse>(json!({"bids": [], "asks": []}));
     tolerates_extra::<StrategiesResponse>(json!({"strategies": []}));
+    tolerates_extra::<StrategiesResponse>(json!({"strategies": [compiled()]}));
+    tolerates_extra::<CompiledStrategy>(compiled());
     tolerates_extra::<BacktestMetrics>(json!({
         "trades": 1, "net_pnl": 0.0, "sharpe": 0.0, "max_drawdown": 0.0, "total_return": 0.0
     }));
@@ -74,7 +94,7 @@ fn every_request_type_rejects_unknown_fields() {
     rejects_extra::<QuotesQuery>(json!({}));
     rejects_extra::<BarsQuery>(json!({}));
     rejects_extra::<DepthQuery>(json!({}));
-    rejects_extra::<StrategiesRequest>(json!({}));
+    rejects_extra::<StrategiesRequest>(json!({"manifest": strategy_manifest()}));
     rejects_extra::<BacktestRequest>(json!({}));
     rejects_extra::<SweepRequest>(json!({}));
     rejects_extra::<OrdersRequest>(json!({}));
