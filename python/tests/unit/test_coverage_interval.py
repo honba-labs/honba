@@ -81,10 +81,6 @@ def test_merge_close_intervals():
 
 
 def test_plan_gaps():
-    from honba.markets.india.calendar import NseCalendar
-
-    cal = NseCalendar()
-
     # Suppose instrument requires 5 trading sessions ending on 2025-01-10
     # Covered range is [2025-01-08, 2025-01-11)
     # The required interval is [2025-01-06, 2025-01-11)

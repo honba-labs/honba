@@ -13,8 +13,10 @@ plain hierarchy:
   (plan.md section 4.4).
 """
 
-import sys, tomllib
+import sys
 from pathlib import Path
+
+import tomllib
 
 # L0: honba-messages
 # L1: honba-entities
@@ -34,34 +36,83 @@ ALLOWED_PROD = {
     "honba-indicators": {"honba-messages", "honba-entities"},
     "honba-async": {"honba-messages", "honba-engine", "honba-ports"},
     "honba-sim": {"honba-messages", "honba-entities", "honba-engine"},
-    "honba-strategy": {"honba-engine", "honba-indicators", "honba-messages", "honba-entities"},
+    "honba-strategy": {
+        "honba-engine",
+        "honba-indicators",
+        "honba-messages",
+        "honba-entities",
+    },
     "honba-analytics": {"honba-messages", "honba-entities"},
-    "honba-data": {"honba-messages", "honba-entities", "honba-engine", "honba-analytics"},
+    "honba-data": {
+        "honba-messages",
+        "honba-entities",
+        "honba-engine",
+        "honba-analytics",
+    },
     "honba-sweep": {
-        "honba-messages", "honba-entities", "honba-engine", "honba-strategy",
-        "honba-sim", "honba-data", "honba-analytics",
+        "honba-messages",
+        "honba-entities",
+        "honba-engine",
+        "honba-strategy",
+        "honba-sim",
+        "honba-data",
+        "honba-analytics",
     },
     "honba-config": {"honba-messages", "honba-strategy"},
-    "honba-codegen": {"honba-messages", "honba-entities", "honba-strategy", "honba-config", "honba-api"},
+    "honba-codegen": {
+        "honba-messages",
+        "honba-entities",
+        "honba-strategy",
+        "honba-config",
+        "honba-api",
+    },
     "honba-api": {"honba-messages", "honba-entities", "honba-strategy"},
     "honba-testing": {
-        "honba-engine", "honba-messages", "honba-entities", "honba-ports", "honba-sim",
+        "honba-engine",
+        "honba-messages",
+        "honba-entities",
+        "honba-ports",
+        "honba-sim",
     },
     "honba-py": {
-        "honba-messages", "honba-entities", "honba-market", "honba-engine",
-        "honba-strategy", "honba-sim", "honba-codegen",
+        "honba-messages",
+        "honba-entities",
+        "honba-market",
+        "honba-engine",
+        "honba-strategy",
+        "honba-sim",
+        "honba-codegen",
     },
     "honba-cli": {
-        "honba-messages", "honba-entities", "honba-market", "honba-engine",
-        "honba-analytics", "honba-data", "honba-strategy", "honba-testing", "honba-sim",
-        "honba-codegen", "honba-api",
+        "honba-messages",
+        "honba-entities",
+        "honba-market",
+        "honba-engine",
+        "honba-analytics",
+        "honba-data",
+        "honba-strategy",
+        "honba-testing",
+        "honba-sim",
+        "honba-codegen",
+        "honba-api",
     },
-    "honba-api-rest": {"honba-api", "honba-messages", "honba-entities", "honba-data", "honba-market"},
+    "honba-api-rest": {
+        "honba-api",
+        "honba-messages",
+        "honba-entities",
+        "honba-data",
+        "honba-market",
+    },
     # Plan 4.4: pure L0-L4 only. The wasm surface computes indicators, screener
     # predicates, and replay; it has no filesystem and must stay replay-only.
     "honba-api-wasm": {
-        "honba-messages", "honba-entities", "honba-market",
-        "honba-indicators", "honba-engine", "honba-strategy", "honba-sim",
+        "honba-messages",
+        "honba-entities",
+        "honba-market",
+        "honba-indicators",
+        "honba-engine",
+        "honba-strategy",
+        "honba-sim",
     },
 }
 
@@ -91,22 +142,40 @@ ALLOWED_DEV = {
 
 # Core crates that must NEVER enable market-specific packs (like the `india` feature of honba-market)
 CORE_CRATES = {
-    "honba-messages", "honba-entities", "honba-engine", "honba-indicators",
-    "honba-sim", "honba-strategy", "honba-analytics", "honba-data", "honba-testing",
+    "honba-messages",
+    "honba-entities",
+    "honba-engine",
+    "honba-indicators",
+    "honba-sim",
+    "honba-strategy",
+    "honba-analytics",
+    "honba-data",
+    "honba-testing",
 }
 
 # Sync kernel crates that must NOT depend on any async/runtime crates (async isolation + sync kernel purity)
 # These are the "pure" crates that must stay synchronous and tokio-free.
 SYNC_KERNEL_CRATES = {
-    "honba-messages", "honba-entities", "honba-engine", "honba-indicators",
-    "honba-sim", "honba-strategy", "honba-market", "honba-analytics",
+    "honba-messages",
+    "honba-entities",
+    "honba-engine",
+    "honba-indicators",
+    "honba-sim",
+    "honba-strategy",
+    "honba-market",
+    "honba-analytics",
 }
 
 # Crates allowed to depend on tokio in PRODUCTION. The event kernel is absent
 # on purpose: plan.md 1 keeps the loop synchronous and single-threaded.
 ASYNC_BOUNDARY_CRATES = {
-    "honba-async", "honba-sweep", "honba-data", "honba-testing", "honba-py",
-    "honba-cli", "honba-api-rest",
+    "honba-async",
+    "honba-sweep",
+    "honba-data",
+    "honba-testing",
+    "honba-py",
+    "honba-cli",
+    "honba-api-rest",
 }
 
 # Crates that target wasm32-unknown-unknown and therefore must not pull tokio
@@ -115,8 +184,17 @@ WASM_CRATES = {"honba-api-wasm"}
 
 # External crates that a wasm32 target cannot satisfy.
 WASM_FORBIDDEN_DEPS = {
-    "tokio", "reqwest", "hyper", "axum", "ureq", "sqlx",
-    "std::fs", "fs", "tempfile", "pyo3", "openssl",
+    "tokio",
+    "reqwest",
+    "hyper",
+    "axum",
+    "ureq",
+    "sqlx",
+    "std::fs",
+    "fs",
+    "tempfile",
+    "pyo3",
+    "openssl",
 }
 
 
@@ -138,21 +216,29 @@ def check_crate(d) -> int:
     prod_deps = {k for k in data.get("dependencies", {}) if k.startswith("honba-")}
     bad_prod = prod_deps - ALLOWED_PROD[name]
     if bad_prod:
-        print(f"VIOLATION: {name} -> {sorted(bad_prod)} (production dependency not allowed)")
+        print(
+            f"VIOLATION: {name} -> {sorted(bad_prod)} (production dependency not allowed)"
+        )
         errs += 1
 
     # 2. Dev-dependencies must not reach upward (no honba-sim -> honba-testing).
     dev_deps = {k for k in data.get("dev-dependencies", {}) if k.startswith("honba-")}
     bad_dev = dev_deps - ALLOWED_DEV[name]
     if bad_dev:
-        print(f"VIOLATION: {name} -> {sorted(bad_dev)} (dev-dependency not allowed / upward edge)")
+        print(
+            f"VIOLATION: {name} -> {sorted(bad_dev)} (dev-dependency not allowed / upward edge)"
+        )
         errs += 1
 
-    all_dep_names = set(data.get("dependencies", {})) | set(data.get("dev-dependencies", {}))
+    all_dep_names = set(data.get("dependencies", {})) | set(
+        data.get("dev-dependencies", {})
+    )
 
     # 3. pyo3 is contained in honba-py.
     if "pyo3" in all_dep_names and name != "honba-py":
-        print(f"VIOLATION: {name} depends on pyo3 (pyo3 is restricted to honba-py only)")
+        print(
+            f"VIOLATION: {name} depends on pyo3 (pyo3 is restricted to honba-py only)"
+        )
         errs += 1
 
     # 4. Core crates never enable a market-specific pack.
@@ -161,11 +247,16 @@ def check_crate(d) -> int:
         if "honba-market" in section and name in CORE_CRATES:
             dep_info = section["honba-market"]
             if isinstance(dep_info, dict) and "india" in dep_info.get("features", []):
-                print(f"VIOLATION: core crate {name} enables 'india' feature of honba-market")
+                print(
+                    f"VIOLATION: core crate {name} enables 'india' feature of honba-market"
+                )
                 errs += 1
 
     # 5. Async isolation: only the boundary may depend on tokio in production.
-    if "tokio" in set(data.get("dependencies", {})) and name not in ASYNC_BOUNDARY_CRATES:
+    if (
+        "tokio" in set(data.get("dependencies", {}))
+        and name not in ASYNC_BOUNDARY_CRATES
+    ):
         print(
             f"VIOLATION: {name} depends on tokio in production "
             f"(async-isolation rule: only {sorted(ASYNC_BOUNDARY_CRATES)} may)"
@@ -175,7 +266,7 @@ def check_crate(d) -> int:
     # 6. Sync kernel purity: these crates must stay free of async/runtime crates.
     if name in SYNC_KERNEL_CRATES:
         for dep in all_dep_names:
-            if dep.endswith("-async") or dep.endswith("-rest"):
+            if dep.endswith(("-async", "-rest")):
                 print(
                     f"VIOLATION: {name} depends on {dep} "
                     "(sync kernel crates may not depend on async/runtime crates)"

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 from collections.abc import Sequence
+from typing import Any
 
 from honba.entities.instrument import InstrumentId
 from honba.entities.screener import (

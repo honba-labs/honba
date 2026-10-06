@@ -30,7 +30,6 @@ class QueryTranslationError(Exception):
     """Raised when the LLM output cannot be parsed or validated within repair limit."""
 
 
-
 def build_system_prompt(knowledge: KnowledgePack) -> str:
     """Build compact system prompt containing grammar, metric keys, presets, and units."""
     sample_metrics = ", ".join(m["key"] for m in knowledge.metrics[:25])
@@ -75,7 +74,6 @@ def translate_query(
         raw_responses.append(raw_output)
 
         filter_sentence = raw_output.strip().strip('"').strip("'")
-        words = filter_sentence.split()
 
         try:
             filter_group = parse_filters(filter_sentence, catalog)

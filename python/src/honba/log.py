@@ -109,12 +109,6 @@ def register_event(name: str, description: str = "") -> None:
     STRATEGY_EVENT_TYPES[name] = description
 
 
-@property  # type: ignore[misc]
-def KNOWN_EVENTS() -> dict[str, str]:
-    """Full event catalogue (wire + strategy). Read-only view."""
-    return {**_WIRE_EVENT_DESCRIPTIONS, **STRATEGY_EVENT_TYPES}
-
-
 # Make KNOWN_EVENTS usable as a plain dict at module level
 class _KnownEventsProxy:
     """Lazy dict-like proxy merging wire + strategy event catalogues."""

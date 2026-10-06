@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import math
 from collections.abc import Sequence
-from typing import Protocol
+from typing import Any, Protocol
 
 from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId

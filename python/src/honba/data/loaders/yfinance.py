@@ -135,7 +135,7 @@ def to_yfinance_symbol(
         return DEFAULT_INDEX_MAP[sym_upper]
 
     # Already formatted tickers
-    if sym.startswith("^") or sym.endswith(".NS") or sym.endswith(".BO"):
+    if sym.startswith("^") or sym.endswith((".NS", ".BO")):
         return sym
 
     if v == "NSE":

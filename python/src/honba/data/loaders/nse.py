@@ -9,6 +9,7 @@ import logging
 import lzma
 import zipfile
 from pathlib import Path
+from typing import Any
 
 import httpx
 
@@ -45,9 +46,6 @@ def parse_bhavcopy_csv(csv_content: str, exchange: str = "NSE") -> dict[str, Bar
     # 1. UDiFF format: TradDt, TckrSymb, SctySrs, OpnPric, HghPric, LwPric, ClsPric, TtlTradQty
     # 2. Sec Bhavdata: DATE1, SYMBOL, SERIES, OPEN_PRICE, HIGH_PRICE, LOW_PRICE, CLOSE_PRICE, TTL_TRD_QNTY
     # 3. Old Bhavcopy: TIMESTAMP, SYMBOL, SERIES, OPEN, HIGH, LOW, CLOSE, TOTTRDQTY
-
-    is_udiff = "TCKRSYMB" in field_map
-    is_sec = "SYMBOL" in field_map and "OPEN_PRICE" in field_map
 
     sym_col = field_map.get("TCKRSYMB") or field_map.get("SYMBOL")
     series_col = field_map.get("SCTYSRS") or field_map.get("SERIES")

@@ -6,6 +6,7 @@ import datetime as dt
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
