@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### REST: screener scan (E11-S3 part 4)
+
+- `GET /screener/scan` is built (no longer 501). Query: `universe` (JSON array of `SYMBOL.EXCHANGE`, required),
+  `filters` (JSON filter group), `tf` (default `1d`), `as_of` (inclusive). Response `ScreenerResponse
+  {rows: [{instrument_id, metrics}]}`, matches in instrument-id order. Evaluated in Rust over the bar dataset.
+- New pure module `honba_indicators::screener` (`evaluate_predicate`, `evaluate_group`, `latest_metrics`, `validate_group`):
+  all 13 operators, metrics `open/high/low/close/volume`, `price_52_week_high/low`, `SMA<N>`, `RSI`. Pinned to the Python
+  evaluator by `schema/conformance/screener_scan.json` (65 predicate, 7 group, 5 unsupported, 2 divergence vectors), run by
+  Rust and Python. `honba-indicators` now depends on `honba-entities`; `honba-api` now depends on `honba-indicators`
+  (allowlist updated in `scripts/dependency_graph.py`).
+- Metrics a bar dataset cannot compute (fundamentals, any `period`) are a 422 `unsupported_metric`, not an empty result.
+  Differences from Python (documented in ADR 0013): that error, `invalid_operand` for ordering against a string (Python
+  raises `TypeError`), and a case-insensitive 252-bar check on 52-week keys.
+- Limits (422 `too_many_rows`): 1,000 instruments, 500 rows, 2,000,000 bars. Unknown instrument is a 404.
+- New wire types `ScreenerQuery`, `ScreenerResponse`, `ScreenerResultRow`; the `screen` MCP tool now takes the scan query.
+  OpenAPI, `.pyi`, MCP and JSON Schema regenerated. The frontend TypeScript (`make schema`) is not regenerated here.
+- Python: `Client.screener_scan(universe, filters=None, *, tf=None, as_of=None)` returning `ScreenerResultRow`, on both
+  transports.
+
 ### REST: compile and list strategies (E11-S3 part 3)
 
 - `POST /strategies` and `GET /strategies` are built (no longer 501). "Compile" is the same step as

@@ -68,6 +68,35 @@ crate its own idea of what an instrument or a bar query is.
   - Source code is unsupported: a body with `code` or `source` is a 422 with `reason = source_unsupported`.
   - The catalog is per process and lost on restart; the in-process Python transport has its own router, so its catalog
     is separate from a `honba serve` instance.
+- **`GET /screener/scan` evaluates predicates in Rust over the bar dataset.** The evaluator is a pure module,
+  `honba_indicators::screener`, pinned to the Python reference (`honba.screener.evaluator`) by the shared golden vectors
+  `schema/conformance/screener_scan.json` (generated once from Python by `scripts/gen_screener_scan_vectors.py`; Rust and
+  Python each run them). It lives in `honba-indicators` (L3) because that is the lowest layer that can name both the
+  predicate types (`honba-entities`, L1) and the indicators it computes with; `honba-entities` cannot depend on
+  indicators, and any higher placement would stop the WASM surface reusing it. It is I/O- and clock-free. The only
+  `scripts/dependency_graph.py` change is `honba-api -> honba-indicators` (L6 to L3, downward), because `honba-api`
+  resolves the query and evaluates each instrument's bars; the handler in `honba-api-rest` only reads bars through the
+  existing ports.
+  - Query: `universe` (JSON array of `SYMBOL.EXCHANGE`, required, sorted and de-duplicated), `filters` (JSON filter group;
+    omitted matches every instrument), `tf` (default `1d`) and `as_of` (inclusive). Response `ScreenerResponse
+    {rows: [{instrument_id, metrics}]}` lists matches in instrument-id order; `metrics` holds the latest value of every
+    metric the filter reads (`null` while warming up).
+  - Metrics computable from bars: `open`, `high`, `low`, `close`, `volume`, `price_52_week_high`/`_low` (need 252 bars),
+    `SMA<N>` and `RSI` (14), case-insensitive. Anything else (fundamentals, any `period` dimension) is a 422,
+    `reason = unsupported_metric`, raised at resolve time before any bar is read: a bar-only dataset never answers a
+    fundamental with an empty result. A predicate `timeframe` must equal `tf` (`unsupported_timeframe`).
+  - Limits, each a 422 `too_many_rows` with `limit`: universe 1,000 instruments, 500 matching rows (no truncation, no
+    pagination), 2,000,000 bars read per scan, and `MAX_BAR_ROWS` per instrument. Filters are bounded to 8 levels of
+    nesting and 64 predicates (`invalid_filter`). An unknown instrument is a 404, never a skipped row.
+  - Deliberate differences from Python, each pinned by the vectors: unsupported metrics error where Python returns
+    false; ordering a number against a string (`gt` with `"5"`) is `invalid_operand` where Python raises `TypeError`;
+    the 252-bar invariant of the 52-week metrics applies to the key case-insensitively, where Python compares the key
+    case-sensitively (so `PRICE_52_WEEK_LOW` over a short history is computed from the short window there, a bug not
+    reproduced). Everything else follows Python, including `True == 1.0`, `like`/`has` matching on Python's `str(float)`
+    and no short-circuit in groups. SMA's window sum is updated in a different operation order from Python, so metric
+    values agree to 1e-9 relative, not bit for bit; pass/fail is exact except on a value tied to the last bit.
+  - The Parquet reader serves `1m` bars, so against a data directory use `tf=1m`; the default `1d` is a 404
+    `market_data_unavailable` there.
 - Instrument id in paths is `SYMBOL.EXCHANGE` (the `InstrumentId` display form),
   split on the last dot.
 
@@ -102,7 +131,7 @@ existing `{iso, unix_nanos}` form. ADR 0011 is not engaged by these endpoints.
   404, rather than a silently shorter list.
 - Not built, answering 501: `POST /backtests`, `GET /backtests/{id}[/journal]`,
   `POST /sweeps`, `GET /sweeps/{id}`, `GET/POST /orders`, `DELETE /orders/{id}`, `POST /positions/close`,
-  `GET /screener/scan`, `GET /journals/{id}`. `POST /strategies/verify` is real (ADR 0012), and so are `GET/POST /strategies` (below).
+  `GET /journals/{id}`. `POST /strategies/verify` is real (ADR 0012), and so are `GET/POST /strategies` and `GET /screener/scan` (below).
 - No auth, TLS or rate limiting on `honba serve`; it is a loopback read API by default, and `honba serve` prints a
   warning on stderr when `--addr` is not loopback.
 - **CORS is off by default** (no CORS headers). `ApiConfig::with_cors_origins` / `honba serve --cors-origin <origin>`
