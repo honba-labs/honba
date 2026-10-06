@@ -8,10 +8,12 @@ carries money, so ADR 0011's ``Money`` is not engaged.
 
 from __future__ import annotations
 
+from typing import Any
+
 from honba.wire.base import Str, _Wire
 from honba.wire.wire import Currency, Float, InstrumentId, NonNegativeFloat
 
-__all__ = ["Depth", "DepthLevel", "Health", "InstrumentInfo"]
+__all__ = ["CompiledStrategy", "Depth", "DepthLevel", "Health", "InstrumentInfo"]
 
 
 class Health(_Wire):
@@ -43,3 +45,12 @@ class Depth(_Wire):
 
     bids: tuple[DepthLevel, ...]
     asks: tuple[DepthLevel, ...]
+
+
+class CompiledStrategy(_Wire):
+    """One strategy of ``GET /strategies`` or the result of ``POST /strategies``."""
+
+    id: Str
+    """Content id: ``sha256:`` plus the digest of the canonical manifest JSON (deterministic)."""
+    ir: dict[str, Any]
+    """The verified IR, a JSON-shaped record exactly as :meth:`Client.verify_strategy` returns it."""

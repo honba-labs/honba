@@ -12,7 +12,7 @@ from typing_extensions import Self
 from honba._native import native_attr
 from honba.client import requests as rq
 from honba.client.errors import InvalidResponseError, error_from_envelope
-from honba.client.models import Depth, Health, InstrumentInfo
+from honba.client.models import CompiledStrategy, Depth, Health, InstrumentInfo
 from honba.client.transport import HttpTransport, InprocTransport, Transport
 from honba.wire.wire import Bar, InstrumentId, QuoteTick
 
@@ -120,6 +120,20 @@ class Client:
         if not isinstance(data, dict):
             raise InvalidResponseError("verify payload is not an object", status=200)
         return data
+
+    def strategies(self) -> list[CompiledStrategy]:
+        """``GET /strategies``: strategies compiled in this server process, ordered by id."""
+        data = self._data(rq.strategies())
+        return self._parse_list(data, "strategies", CompiledStrategy)
+
+    def compile_strategy(self, manifest: Any) -> CompiledStrategy:
+        """``POST /strategies``: verify ``manifest``, keep it, return its id and IR.
+
+        The same manifest always gets the same id and is stored once. Source code is not
+        accepted. ``ValidationApiError`` with ``context["reason"]`` for a manifest that does not
+        verify, ``source_unsupported``, or ``catalog_full`` (the server's catalog is at capacity).
+        """
+        return self._call(rq.compile_strategy(manifest), CompiledStrategy)
 
     # -- plumbing ----------------------------------------------------------------------------
 

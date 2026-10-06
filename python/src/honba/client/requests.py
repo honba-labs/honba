@@ -26,11 +26,13 @@ __all__ = [
     "ApiRequest",
     "TimeLike",
     "bars",
+    "compile_strategy",
     "depth",
     "health",
     "instrument",
     "instruments",
     "quotes",
+    "strategies",
     "verify_strategy",
 ]
 
@@ -239,16 +241,29 @@ def depth(instrument_id: str | InstrumentId, *, levels: int | None = None) -> Ap
     return ApiRequest("GET", path, {"depth": levels})
 
 
-def verify_strategy(manifest: Any) -> ApiRequest:
+def _manifest_body(manifest: Any) -> dict[str, Any]:
     """``manifest`` is a ``StrategyManifest`` or a JSON-shaped, non-empty mapping."""
     if hasattr(manifest, "to_json_dict"):
-        body = manifest.to_json_dict()
-    elif isinstance(manifest, Mapping) and manifest:
-        body = dict(manifest)
-    else:
-        raise RequestValidationError(
-            "manifest",
-            "invalid_manifest",
-            "manifest must be a StrategyManifest or a non-empty dict",
-        )
-    return ApiRequest("POST", "/strategies/verify", body=body)
+        return manifest.to_json_dict()  # type: ignore[no-any-return]
+    if isinstance(manifest, Mapping) and manifest:
+        return dict(manifest)
+    raise RequestValidationError(
+        "manifest",
+        "invalid_manifest",
+        "manifest must be a StrategyManifest or a non-empty dict",
+    )
+
+
+def verify_strategy(manifest: Any) -> ApiRequest:
+    """``POST /strategies/verify``; see :func:`_manifest_body` for the accepted inputs."""
+    return ApiRequest("POST", "/strategies/verify", body=_manifest_body(manifest))
+
+
+def strategies() -> ApiRequest:
+    """``GET /strategies``."""
+    return ApiRequest("GET", "/strategies")
+
+
+def compile_strategy(manifest: Any) -> ApiRequest:
+    """``POST /strategies``: the manifest goes under a ``manifest`` key (no source)."""
+    return ApiRequest("POST", "/strategies", body={"manifest": _manifest_body(manifest)})

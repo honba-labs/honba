@@ -149,6 +149,41 @@ def test_verify_strategy_returns_the_ir_record() -> None:
     assert fake.calls[0] == ("POST", "/strategies/verify", None, {"name": "x"})
 
 
+IR = {"warmup_bars": 20, "manifest": {"name": "x"}}
+
+
+def test_compile_strategy_returns_a_typed_compiled_strategy() -> None:
+    fake = FakeTransport(ok({"id": "sha256:ab", "ir": IR, "added": 1}))
+    got = Client(fake).compile_strategy({"name": "x"})
+    assert (got.id, got.ir) == ("sha256:ab", IR)
+    assert fake.calls[0] == ("POST", "/strategies", None, {"manifest": {"name": "x"}})
+
+
+def test_strategies_lists_compiled_strategies_in_server_order() -> None:
+    rows = [{"id": "sha256:a", "ir": IR}, {"id": "sha256:b", "ir": IR}]
+    fake = FakeTransport(ok({"strategies": rows}), ok({"strategies": []}))
+    client = Client(fake)
+    assert [s.id for s in client.strategies()] == ["sha256:a", "sha256:b"]
+    assert client.strategies() == []
+    assert fake.calls[0] == ("GET", "/strategies", None, None)
+
+
+def test_strategies_rejects_a_payload_that_does_not_parse() -> None:
+    with pytest.raises(InvalidResponseError):
+        Client(FakeTransport(ok({"strategies": [{"id": 1}]}))).strategies()
+    with pytest.raises(InvalidResponseError):
+        Client(FakeTransport(ok({"nope": []}))).strategies()
+
+
+def test_compile_strategy_maps_the_validation_error_with_its_reason() -> None:
+    fake = FakeTransport(
+        failure(422, "validation_invalid_request", context={"reason": "source_unsupported"})
+    )
+    with pytest.raises(ValidationApiError) as err:
+        Client(fake).compile_strategy({"name": "x"})
+    assert err.value.context == {"reason": "source_unsupported"}
+
+
 def test_bad_input_is_rejected_before_the_transport_is_called() -> None:
     fake = FakeTransport()
     client = Client(fake)

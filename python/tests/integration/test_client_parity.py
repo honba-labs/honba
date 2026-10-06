@@ -161,6 +161,10 @@ SCENARIOS: dict[str, Callable[[Client], Any]] = {
     "bars_unknown_instrument": lambda c: c.bars("NOPE.NSE"),
     "verify_unverifiable": lambda c: c.verify_strategy({"name": "x"}),
     "verify_ok": lambda c: c.verify_strategy(MANIFEST),
+    "compile_unverifiable": lambda c: c.compile_strategy({"name": "x"}),
+    "compile_ok": lambda c: c.compile_strategy(MANIFEST),
+    "compile_ok_again": lambda c: c.compile_strategy(MANIFEST),
+    "strategies_after_compile": lambda c: c.strategies(),
 }
 
 MANIFEST = {
@@ -259,6 +263,20 @@ def test_inproc_verify_returns_the_ir(inproc: Client) -> None:
     assert ir["warmup_bars"] == 20 and ir["manifest"]["name"] == "sma"
 
 
+def test_inproc_compile_is_idempotent_and_listed(inproc: Client) -> None:
+    first = inproc.compile_strategy(MANIFEST)
+    second = inproc.compile_strategy(MANIFEST)
+    assert first == second and first.id.startswith("sha256:")
+    assert first.ir["manifest"]["name"] == "sma"
+    assert [s.id for s in inproc.strategies()].count(first.id) == 1
+
+
+def test_inproc_compile_rejects_source_with_its_reason(inproc: Client) -> None:
+    resp = inproc.transport.request("POST", "/strategies", body={"code": "x"})
+    assert resp.status == 422
+    assert resp.json["error"]["context"] == {"reason": "source_unsupported"}
+
+
 def test_inproc_server_side_422_names_the_field_when_the_client_check_is_bypassed(
     inproc: Client,
 ) -> None:
@@ -270,7 +288,7 @@ def test_inproc_server_side_422_names_the_field_when_the_client_check_is_bypasse
 
 
 def test_inproc_501_placeholders(inproc: Client) -> None:
-    for method, path in [("GET", "/orders"), ("GET", "/screener/scan"), ("GET", "/strategies")]:
+    for method, path in [("GET", "/orders"), ("GET", "/screener/scan"), ("GET", "/backtests/x")]:
         resp = inproc.transport.request(method, path)
         assert resp.status == 501
         assert resp.json["error"]["code"] == "not_implemented"
@@ -332,8 +350,10 @@ RAW_REQUESTS: list[tuple[str, str, dict[str, Any] | None, Any]] = [
     ("GET", "/depth/TCS.NSE", {"depth": 51}, None),  # 422
     ("POST", "/strategies/verify", None, {"unknown": 1}),  # 422
     ("POST", "/strategies/verify", None, MANIFEST),
-    ("GET", "/strategies", None, None),  # 501
-    ("POST", "/strategies", None, {"name": "x"}),  # 501
+    ("POST", "/strategies", None, {"manifest": MANIFEST}),
+    ("GET", "/strategies", None, None),
+    ("POST", "/strategies", None, {"code": "class S: pass"}),  # 422 source_unsupported
+    ("POST", "/strategies", None, {"name": "x"}),  # 422: no manifest
     ("POST", "/backtests", None, {}),  # 501
     ("GET", "/backtests/abc", None, None),  # 501
     ("POST", "/sweeps", None, {}),  # 501

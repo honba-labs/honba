@@ -150,6 +150,34 @@ def test_verify_strategy_accepts_a_manifest_model() -> None:
     assert rq.verify_strategy(manifest).body == manifest.to_json_dict()
 
 
+def test_strategies_is_a_plain_get() -> None:
+    assert rq.strategies() == rq.ApiRequest("GET", "/strategies")
+
+
+def test_compile_strategy_wraps_the_manifest_in_a_request_body() -> None:
+    got = rq.compile_strategy({"name": "x"})
+    assert got == rq.ApiRequest("POST", "/strategies", body={"manifest": {"name": "x"}})
+    for bad in ({}, [], "text", None):
+        with pytest.raises(RequestValidationError) as err:
+            rq.compile_strategy(bad)  # type: ignore[arg-type]
+        assert err.value.field == "manifest"
+
+
+def test_compile_strategy_accepts_a_manifest_model() -> None:
+    from honba.entities.instrument import InstrumentId as Id
+    from honba.strategies.manifest import StrategyManifest, Subscriptions, TimeframeSpec, Universe
+    from honba.wire.wire import BarAggregation
+
+    manifest = StrategyManifest.build(
+        "s",
+        "sha256:1",
+        Universe.of_explicit([Id("TCS", "NSE")]),
+        TimeframeSpec(interval=1, aggregation=BarAggregation.DAY),
+        subscriptions=Subscriptions.of([Id("TCS", "NSE")]),
+    )
+    assert rq.compile_strategy(manifest).body == {"manifest": manifest.to_json_dict()}
+
+
 I64_MAX = 2**63 - 1
 
 
