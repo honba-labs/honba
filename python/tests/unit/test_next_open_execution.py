@@ -505,3 +505,12 @@ def test_selling_a_hair_more_than_held_fills_the_whole_position() -> None:
     p.open_session(2, [bar(A, 2, 10.0)])
     assert p.positions == {}
     assert p.drain_rejections() == []
+
+
+def test_an_order_without_a_side_is_refused_at_submit() -> None:
+    p = port()
+    intent = OrderIntent.market_buy(A, 1)
+    object.__setattr__(intent, "side", OrderSide.NO_ORDER_SIDE)  # bypass the constructor check
+    with pytest.raises(ValueError, match="side"):
+        p.submit("o-0", intent, 1)
+    assert p.working_orders == []

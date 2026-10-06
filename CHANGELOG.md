@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Execution ports: an order without a side is refused at submit
+
+- Behavior change: `ScriptedExecution::submit` (Rust) returns an error for an `OrderSide::NoOrderSide` order, and
+  `NextOpenExecution.submit` (Python) raises `ValueError`. Before, the Rust engine filled it as a buy while reporting
+  rejections and cancels with the original side, and the context would release it from the sell slot.
+
 ### Runner: an error mid-drain no longer strands intents or fills
 
 - `StrategyRunner::on_event` (Rust) and `StrategyRunner.on_event` (Python): when the execution port fails a submit, the

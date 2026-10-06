@@ -137,3 +137,15 @@ fn resubmitting_an_order_id_applies_its_script_each_time() {
         [3.0, 2.0]
     );
 }
+
+#[test]
+fn an_order_without_a_side_is_refused_at_submit() {
+    let mut exec = ScriptedExecution::new(10.0).with("O-1", Behavior::Hold);
+    let err = exec
+        .submit(market("O-1", OrderSide::NoOrderSide, 1.0, 1))
+        .unwrap_err();
+    assert!(err.to_string().contains("side"), "{err}");
+    assert!(exec.working_orders().is_empty());
+    assert!(exec.drain_fills().unwrap().is_empty());
+    assert!(exec.drain_rejections().unwrap().is_empty());
+}

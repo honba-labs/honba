@@ -105,11 +105,7 @@ impl ScriptedExecution {
     }
 
     fn fill(&mut self, order: &Order, quantity: f64) {
-        let side = if order.side() == OrderSide::Sell {
-            OrderSide::Sell
-        } else {
-            OrderSide::Buy
-        };
+        let side = order.side(); // Buy or Sell: `submit` refuses an order without a side
         self.fills.push(Trade::new(
             OrderId::new(order.order_id().as_str()),
             order.instrument_id().clone(),
@@ -136,6 +132,12 @@ impl ScriptedExecution {
 
 impl ExecutionEngine for ScriptedExecution {
     fn submit(&mut self, order: Order) -> Result<()> {
+        if order.side() == OrderSide::NoOrderSide {
+            return Err(AlgoError::Component(format!(
+                "order {} has no side: it must be buy or sell",
+                order.order_id().as_str()
+            )));
+        }
         let behavior = self
             .script
             .get(order.order_id().as_str())
