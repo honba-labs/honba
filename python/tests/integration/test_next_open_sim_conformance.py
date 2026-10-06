@@ -44,3 +44,14 @@ def test_every_scenario_is_tagged_with_a_chunk_and_names_are_unique() -> None:
     names = [s["name"] for s in DOC["scenarios"]]
     assert len(names) == len(set(names))
     assert {s["chunk"] for s in DOC["scenarios"]} <= {1, 2, 3}
+
+
+def test_only_the_intended_scenarios_record_an_error_step() -> None:
+    """A vector authoring mistake (an invalid intent) must not masquerade as a port error."""
+    failing = {s["name"] for s in DOC["scenarios"] if any(x.get("error") for x in s["steps"])}
+    assert failing == {
+        "duplicate_working_order_id_is_an_error",
+        "bar_before_the_session_is_non_monotonic",
+        "second_bar_for_an_instrument_in_a_session_is_an_error",
+        "open_session_must_advance",
+    }

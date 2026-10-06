@@ -305,15 +305,15 @@
       "steps": [
         {"op": "bar", "symbol": "AAA", "ts": 1, "open": 100.0, "high": 100.0, "low": 100.0, "close": 100.0},
         {"op": "submit", "id": "o-0", "symbol": "AAA", "side": "buy", "type": "limit", "qty": 1, "ts": 1, "price": 99.0},
-        {"op": "submit", "id": "o-1", "symbol": "AAA", "side": "sell", "type": "stop_market", "qty": 1, "ts": 1, "trigger": 95.0, "error": true},
-        {"op": "submit", "id": "o-2", "symbol": "AAA", "side": "buy", "type": "stop_limit", "qty": 1, "ts": 1, "price": 101.0, "trigger": 100.0, "error": true},
+        {"op": "submit", "id": "o-1", "symbol": "AAA", "side": "sell", "type": "stop_market", "qty": 1, "ts": 1, "trigger": 95.0},
+        {"op": "submit", "id": "o-2", "symbol": "AAA", "side": "buy", "type": "stop_limit", "qty": 1, "ts": 1, "price": 101.0, "trigger": 100.0},
         {"op": "drain"},
         {"op": "bar", "symbol": "AAA", "ts": 2, "open": 100.0, "high": 100.0, "low": 100.0, "close": 100.0},
         {"op": "drain"}
       ],
       "expect": {
         "drains": [
-        {"fills": [], "rejections": [["o-0", "AAA", "buy", 1, "unsupported_order_type", 1]]},
+        {"fills": [], "rejections": [["o-0", "AAA", "buy", 1, "unsupported_order_type", 1], ["o-1", "AAA", "sell", 1, "unsupported_order_type", 1], ["o-2", "AAA", "buy", 1, "unsupported_order_type", 1]]},
         {"fills": [], "rejections": []}
         ],
         "final": {"cash": 1000000, "positions": {}, "working": [], "fees": 0, "traded_notional": 0}

@@ -73,10 +73,12 @@ def _intent(step: dict[str, Any]) -> OrderIntent:
     if kind == "market":
         return OrderIntent(iid, side, qty)
     if kind == "limit":
-        return OrderIntent(iid, side, qty, OrderType.LIMIT, step["price"])
+        return OrderIntent(iid, side, qty, OrderType.LIMIT, price=step["price"])
     if kind == "stop_market":
-        return OrderIntent(iid, side, qty, OrderType.STOP_MARKET, None, step["trigger"])
-    return OrderIntent(iid, side, qty, OrderType.STOP_LIMIT, step["price"], step["trigger"])
+        return OrderIntent(iid, side, qty, OrderType.STOP_MARKET, trigger_price=step["trigger"])
+    return OrderIntent(
+        iid, side, qty, OrderType.STOP_LIMIT, price=step["price"], trigger_price=step["trigger"]
+    )
 
 
 def _side(side: OrderSide) -> str:
