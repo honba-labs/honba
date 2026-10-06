@@ -17,6 +17,7 @@ pub mod capabilities;
 pub mod market;
 pub mod requests;
 pub mod responses;
+pub mod screener;
 pub mod strategies;
 pub mod verify;
 
@@ -31,13 +32,17 @@ pub use market::{
 };
 pub use requests::{
     BacktestRequest, BarsQuery, DepthQuery, InstrumentsQuery, OrdersRequest, QuotesQuery,
-    StrategiesRequest, SweepRequest,
+    ScreenerQuery, StrategiesRequest, SweepRequest,
 };
 pub use responses::{
     BacktestMetrics, BacktestResponse, BacktestStatus, BarsResponse, CapabilitiesResponse,
     CompiledStrategy, DepthLevel, DepthResponse, InstrumentsResponse, OrdersResponse,
-    PositionsResponse, QuotesResponse, RunStatus, StrategiesResponse, SweepReportResponse,
-    SweepResponse, SweepStatus, TradesResponse,
+    PositionsResponse, QuotesResponse, RunStatus, ScreenerResponse, ScreenerResultRow,
+    StrategiesResponse, SweepReportResponse, SweepResponse, SweepStatus, TradesResponse,
+};
+pub use screener::{
+    check_scan_budget, check_screener_rows, ResolvedScreenerQuery, DEFAULT_SCREENER_TIMEFRAME,
+    MAX_SCREENER_BARS, MAX_SCREENER_ROWS, MAX_SCREENER_UNIVERSE,
 };
 pub use strategies::{
     compile_strategy, list_strategies, parse_compile_request, StrategyCatalog,

@@ -67,7 +67,7 @@ ALLOWED_PROD = {
         "honba-config",
         "honba-api",
     },
-    "honba-api": {"honba-messages", "honba-entities", "honba-strategy"},
+    "honba-api": {"honba-messages", "honba-entities", "honba-strategy", "honba-indicators"},
     "honba-testing": {
         "honba-engine",
         "honba-messages",

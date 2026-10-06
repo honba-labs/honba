@@ -46,7 +46,7 @@ pub struct ResolvedBarsQuery {
     pub to: Option<UnixNanos>,
 }
 
-fn invalid(field: &str, reason: &str, message: impl Into<String>) -> ErrorDetail {
+pub(crate) fn invalid(field: &str, reason: &str, message: impl Into<String>) -> ErrorDetail {
     ErrorDetail::new(ErrorCode::ValidationInvalidRequest, message)
         .with_context(json!({"field": field, "reason": reason}))
 }
@@ -81,7 +81,7 @@ pub fn parse_timeframe(text: &str) -> Result<BarSpecification, ErrorDetail> {
     Ok(BarSpecification::new(step, aggregation, PriceType::Last))
 }
 
-fn parse_bound(field: &str, text: &str) -> Result<UnixNanos, ErrorDetail> {
+pub(crate) fn parse_bound(field: &str, text: &str) -> Result<UnixNanos, ErrorDetail> {
     let bad = || {
         invalid(
             field,

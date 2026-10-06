@@ -2,6 +2,7 @@
 
 mod endpoints;
 mod market;
+mod screener;
 mod strategies;
 
 use serde_json::json;

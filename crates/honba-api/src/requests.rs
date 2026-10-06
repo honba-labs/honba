@@ -48,6 +48,31 @@ pub struct BarsQuery {
     pub to: Option<String>,
 }
 
+/// `GET /screener/scan` query parameters.
+///
+/// The structured values are JSON text inside the query string, so the whole request is one
+/// flat string map on every transport.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ScreenerQuery {
+    /// JSON-encoded filter group, `{"operator": "AND"|"OR", "items": [...]}`; items are
+    /// predicates (`{"key", "op", "value"}`) or nested groups. Omitted means no filter: every
+    /// instrument of the universe matches.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filters: Option<String>,
+    /// JSON-encoded array of instrument ids (`["TCS.NSE", ...]`) to scan; required, at most
+    /// `MAX_SCREENER_UNIVERSE` entries.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub universe: Option<String>,
+    /// Timeframe of the bars evaluated (default `1d`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tf: Option<String>,
+    /// Evaluate on the bars known at this time (RFC3339 or ISO-8601 date, inclusive); the
+    /// latest held when omitted.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub as_of: Option<String>,
+}
+
 /// Depth (order book) query parameters.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

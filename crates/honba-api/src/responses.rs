@@ -5,7 +5,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use honba_entities::{Position, Trade};
-use honba_messages::{Bar, Order, QuoteTick};
+use std::collections::BTreeMap;
+
+use honba_messages::{Bar, InstrumentId, Order, QuoteTick};
 use honba_strategy::StrategyIr;
 
 use crate::capabilities::Capabilities;
@@ -32,6 +34,23 @@ pub struct QuotesResponse {
 pub struct BarsResponse {
     /// Bars in ascending `ts_event` order.
     pub bars: Vec<Bar>,
+}
+
+/// One instrument that passed a screener scan.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ScreenerResultRow {
+    /// The instrument that matched.
+    pub instrument_id: InstrumentId,
+    /// Latest value of every metric the filter reads, by key as written in the filter;
+    /// `null` while a metric is still warming up.
+    pub metrics: BTreeMap<String, Option<f64>>,
+}
+
+/// Screener scan response.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ScreenerResponse {
+    /// Matching instruments in instrument-id order.
+    pub rows: Vec<ScreenerResultRow>,
 }
 
 /// One side of the order book.
