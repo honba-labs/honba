@@ -31,7 +31,7 @@ pub use clock::Clock;
 pub use data::DataFeed;
 pub use engine::Engine;
 pub use error::{AlgoError, Result};
-pub use execution::ExecutionEngine;
+pub use execution::{ExecutionEngine, OrderRejection};
 pub use handler::{EngineOutput, Handler, NoopHandler};
 pub use queue::EventQueue;
 pub use state::TradingState;

@@ -1,9 +1,74 @@
 //! Execution engine trait.
 
 use honba_entities::Trade;
-use honba_messages::Order;
+use honba_messages::{InstrumentId, Order, OrderId, OrderSide, UnixNanos};
 
 use crate::error::Result;
+
+/// An order, or the part of one, that will never fill (ADR 008, decision 11).
+///
+/// Either the venue or engine refused it (`cancelled == false`) or it was
+/// cancelled (`cancelled == true`, reason [`OrderRejection::CANCELLED`]).
+/// `quantity` is the unfilled remainder: the amount the strategy's context must
+/// release, so a partly filled order reports only what is left. The Python
+/// mirror is `honba.strategies.execution.OrderRejection`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct OrderRejection {
+    /// The order the remainder belongs to.
+    pub order_id: OrderId,
+    /// The instrument of the order.
+    pub instrument_id: InstrumentId,
+    /// The side of the order.
+    pub side: OrderSide,
+    /// The quantity that will never fill.
+    pub quantity: f64,
+    /// Why, in a stable machine-readable form (`insufficient_funds`,
+    /// `no_position`, `cancelled`, ...).
+    pub reason: String,
+    /// The engine's time for the event.
+    pub ts: UnixNanos,
+    /// True for a cancellation, false for a rejection.
+    pub cancelled: bool,
+}
+
+impl OrderRejection {
+    /// The reason string of a cancellation.
+    pub const CANCELLED: &'static str = "cancelled";
+
+    /// A rejection of `quantity` of an order, for `reason`.
+    pub fn rejected(
+        order_id: OrderId,
+        instrument_id: InstrumentId,
+        side: OrderSide,
+        quantity: f64,
+        reason: impl Into<String>,
+        ts: UnixNanos,
+    ) -> Self {
+        Self {
+            order_id,
+            instrument_id,
+            side,
+            quantity,
+            reason: reason.into(),
+            ts,
+            cancelled: false,
+        }
+    }
+
+    /// A cancellation of the unfilled `quantity` of an order.
+    pub fn cancelled(
+        order_id: OrderId,
+        instrument_id: InstrumentId,
+        side: OrderSide,
+        quantity: f64,
+        ts: UnixNanos,
+    ) -> Self {
+        Self {
+            cancelled: true,
+            ..Self::rejected(order_id, instrument_id, side, quantity, Self::CANCELLED, ts)
+        }
+    }
+}
 
 /// Receives orders and produces fills.
 ///
@@ -14,8 +79,23 @@ pub trait ExecutionEngine: Send {
     fn submit(&mut self, order: Order) -> Result<()>;
 
     /// Cancels an order by id.
+    ///
+    /// An engine holding the order reports the unfilled remainder through
+    /// [`Self::drain_rejections`] with `cancelled == true`. Cancelling an
+    /// unknown or finished order is a no-op.
     fn cancel(&mut self, order_id: &str) -> Result<()>;
 
     /// Drains any fills produced since the last call.
     fn drain_fills(&mut self) -> Result<Vec<Trade>>;
+
+    /// Drains the orders (or parts of orders) that will never fill, rejected
+    /// or cancelled since the last call.
+    ///
+    /// The default reports none: an engine that fills everything it accepts
+    /// needs no override, so engines written before this method compile
+    /// unchanged. Once every working order is cancelled, `filled + released ==
+    /// ordered` for each order.
+    fn drain_rejections(&mut self) -> Result<Vec<OrderRejection>> {
+        Ok(Vec::new())
+    }
 }
