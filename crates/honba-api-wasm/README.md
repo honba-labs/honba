@@ -10,7 +10,7 @@ layer over them.
 
 | Export | Signature |
 |---|---|
-| `indicator_series(name, params_json, closes)` | `(string, string, Float64Array) -> Float64Array`; throws on error |
+| `indicator_series(name, params_json, closes)` | `(string, string, Float64Array) -> Float64Array`; throws a JS `Error` on failure |
 | `list_indicators()` | `() -> string` (JSON catalog: names, params, outputs, warm-up) |
 
 `indicator_series` returns one value per input close; the leading warm-up values are `NaN`

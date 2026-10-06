@@ -11,6 +11,7 @@
 - `honba-api-wasm` drops unused dependencies (`honba-messages/entities/market/engine/strategy/sim`, `serde-wasm-bindgen`,
   `wasm-bindgen-test`, the deprecated `serde-serialize` feature) and the leftover `hello_wasm` export; its
   `dependency_graph.py` allowlist is now `honba-indicators` only.
+- Docs: `indicator_series` errors are documented as a thrown JS `Error` (`JsError`), not a string, in `lib.rs` and the README.
 
 ### REST read API hardening
 
