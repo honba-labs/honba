@@ -1,6 +1,6 @@
 //! A completed round-trip trade: entry and exit paired.
 
-use honba_entities::{Money, PositionSide, Trade};
+use honba_entities::{PositionSide, Trade};
 use honba_messages::{InstrumentId, OrderSide, UnixNanos};
 use serde::{Deserialize, Serialize};
 
