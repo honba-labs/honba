@@ -5,6 +5,7 @@ mod bollinger;
 mod ema;
 mod macd;
 mod rsi;
+mod screener;
 mod sma;
 
 use honba_messages::{

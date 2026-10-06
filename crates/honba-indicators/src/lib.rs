@@ -30,6 +30,7 @@ pub mod ema;
 pub mod indicator;
 pub mod macd;
 pub mod rsi;
+pub mod screener;
 pub mod sma;
 
 pub use atr::Atr;

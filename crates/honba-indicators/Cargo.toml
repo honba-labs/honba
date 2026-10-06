@@ -9,3 +9,5 @@ description = "Incremental technical indicators over price and bar series"
 
 [dependencies]
 honba-messages.workspace = true
+honba-entities.workspace = true
+serde_json.workspace = true
