@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Indian market dates are IST-explicit, not machine-local
+
+- Fix: `InMemoryBarStore.read`, `InMemoryMarketDataProvider.fetch` and the yfinance loader
+  (`dataframe_to_bars`) built interval bounds and date-only/naive bar timestamps with a naive
+  `datetime.combine(...).timestamp()`, so results shifted with the machine's timezone. They now use IST
+  (UTC+5:30). New `honba.markets.india.calendar.ist_midnight_ns(date)`; `IST_TZ` in the yfinance loader is an alias of
+  `IST`. Naive intraday timestamps for NSE/BSE instruments are read as IST. Already IST-explicit paths are unchanged.
+
 ### OrderRejection: `cancelled` can no longer contradict `reason`
 
 - Breaking (Rust): the `cancelled: bool` field of `honba_engine::OrderRejection` is replaced by

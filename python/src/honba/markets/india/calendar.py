@@ -11,6 +11,11 @@ from typing import Protocol
 IST = dt.timezone(dt.timedelta(hours=5, minutes=30), name="IST")
 
 
+def ist_midnight_ns(date: dt.date) -> int:
+    """Unix nanoseconds of 00:00 IST on ``date`` (independent of the machine's local timezone)."""
+    return int(dt.datetime.combine(date, dt.time.min, tzinfo=IST).timestamp()) * 1_000_000_000
+
+
 @dataclass(frozen=True)
 class SessionWindow:
     """A daily trading session time window [open, close)."""

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime as dt
 import math
 from collections.abc import Sequence
 from typing import Any, Protocol
@@ -10,6 +9,7 @@ from typing import Any, Protocol
 from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
 from honba.entities.screener import ScreenerScanRequest, ScreenerScanResponse
+from honba.markets.india.calendar import ist_midnight_ns
 from honba.screener.coverage import CoverageRecord, DateInterval
 
 
@@ -99,8 +99,8 @@ class InMemoryBarStore:
     def read(self, instrument: InstrumentId, timeframe: str, interval: DateInterval) -> list[Bar]:
         key_prefix = (instrument.exchange, instrument.symbol, timeframe)
         # Convert date interval to nanoseconds range [start_ns, end_ns)
-        start_ns = int(dt.datetime.combine(interval.start, dt.time.min).timestamp() * 1e9)
-        end_ns = int(dt.datetime.combine(interval.end, dt.time.min).timestamp() * 1e9)
+        start_ns = ist_midnight_ns(interval.start)
+        end_ns = ist_midnight_ns(interval.end)
 
         matched = [
             bar
@@ -144,8 +144,8 @@ class InMemoryMarketDataProvider:
         interval: DateInterval,
         progress_callback: Any = None,
     ) -> list[Bar]:
-        start_ns = int(dt.datetime.combine(interval.start, dt.time.min).timestamp() * 1e9)
-        end_ns = int(dt.datetime.combine(interval.end, dt.time.min).timestamp() * 1e9)
+        start_ns = ist_midnight_ns(interval.start)
+        end_ns = ist_midnight_ns(interval.end)
 
         matched = [
             bar

@@ -18,6 +18,7 @@ import yfinance as yf
 
 from honba.domain.bar import Bar
 from honba.domain.instrument import InstrumentId
+from honba.markets.india.calendar import IST, ist_midnight_ns
 from honba.screener.coverage import DateInterval
 from honba.screener.ports import validate_bar
 
@@ -103,7 +104,7 @@ MAX_CHUNK_DAYS: dict[str, int] = {
 }
 
 # Indian Standard Time offset
-IST_TZ = dt.timezone(dt.timedelta(hours=5, minutes=30), name="IST")
+IST_TZ = IST
 
 
 def to_yfinance_symbol(
@@ -175,6 +176,13 @@ def normalize_timeframe(timeframe: str) -> str:
     return mapped
 
 
+def _aware(ts: Any, is_india: bool) -> Any:
+    """Interpret a naive Indian-market timestamp as IST (never the machine's local zone)."""
+    if is_india and ts.tzinfo is None:
+        return ts.replace(tzinfo=IST)
+    return ts
+
+
 def dataframe_to_bars(
     df: pd.DataFrame,
     instrument: InstrumentId,
@@ -211,8 +219,8 @@ def dataframe_to_bars(
     start_ns = 0
     end_ns = 0
     if interval is not None:
-        start_ns = int(dt.datetime.combine(interval.start, dt.time.min).timestamp() * 1e9)
-        end_ns = int(dt.datetime.combine(interval.end, dt.time.min).timestamp() * 1e9)
+        start_ns = ist_midnight_ns(interval.start)
+        end_ns = ist_midnight_ns(interval.end)
 
     bars_by_ts: dict[int, Bar] = {}
 
@@ -249,7 +257,7 @@ def dataframe_to_bars(
                 dt_bar = dt.datetime.combine(bar_date, dt.time(9, 15), tzinfo=IST_TZ)
                 ts = int(dt_bar.timestamp() * 1e9)
             else:
-                ts = int(idx.timestamp() * 1e9)
+                ts = int(_aware(idx, is_india).timestamp() * 1e9)
         elif isinstance(idx, (dt.datetime, dt.date)):
             if is_daily_or_longer and is_india:
                 bar_date = (
@@ -260,10 +268,9 @@ def dataframe_to_bars(
                 dt_bar = dt.datetime.combine(bar_date, dt.time(9, 15), tzinfo=IST_TZ)
                 ts = int(dt_bar.timestamp() * 1e9)
             elif isinstance(idx, dt.datetime):
-                ts = int(idx.timestamp() * 1e9)
+                ts = int(_aware(idx, is_india).timestamp() * 1e9)
             else:
-                dt_bar = dt.datetime.combine(idx, dt.time.min)
-                ts = int(dt_bar.timestamp() * 1e9)
+                ts = ist_midnight_ns(idx)
         else:
             continue
 
