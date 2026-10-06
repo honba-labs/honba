@@ -1,6 +1,30 @@
 """Type stubs for honba._honba native PyO3 extension module."""
 
-from typing import Final
+from typing import Final, final
+
+from typing_extensions import Self
+
+__all__ = [
+    "API_VERSION",
+    "SCHEMA_VERSION",
+    "STRATEGY_API_VERSION",
+    "Bar",
+    "Fill",
+    "InstrumentId",
+    "OrderIntent",
+    "QuoteTick",
+    "RustSmaCrossover",
+    "canonical_json",
+    "codegen_artifacts",
+    "codegen_render",
+    "currency_minor_units",
+    "get_runtime_handle",
+    "initialize_runtime",
+    "nse_equity_settlement_days",
+    "run_strategy",
+    "verify_manifest",
+    "wire_enum_values",
+]
 
 SCHEMA_VERSION: Final[int]
 API_VERSION: Final[str]
@@ -13,6 +37,7 @@ def currency_minor_units() -> dict[str, tuple[int, str, str]]:
 
     One major unit is ``10**exponent`` minor units. Rust owns the table (ADR 0011).
     """
+
 def verify_manifest(manifest_json: str) -> str:
     """Compile a ``StrategyManifest`` (JSON) into its ``StrategyIr`` (JSON).
 
@@ -60,11 +85,13 @@ def run_strategy(
     Raises ``ValueError`` for an unknown strategy, invalid JSON or invalid costs.
     """
 
+@final
 class InstrumentId:
     symbol: str
     exchange: str
-    def __init__(self, symbol: str, exchange: str = "NSE") -> None: ...
+    def __new__(cls, symbol: str, exchange: str = "NSE") -> Self: ...
 
+@final
 class QuoteTick:
     symbol: str
     exchange: str
@@ -73,8 +100,8 @@ class QuoteTick:
     bid_size: float
     ask_size: float
     ts: int
-    def __init__(
-        self,
+    def __new__(
+        cls,
         symbol: str,
         bid_price: float,
         ask_price: float,
@@ -82,10 +109,11 @@ class QuoteTick:
         ask_size: float = 1.0,
         ts: int = 0,
         exchange: str = "NSE",
-    ) -> None: ...
+    ) -> Self: ...
     @property
     def mid_price(self) -> float: ...
 
+@final
 class Bar:
     symbol: str
     exchange: str
@@ -95,8 +123,8 @@ class Bar:
     low: float
     close: float
     volume: float
-    def __init__(
-        self,
+    def __new__(
+        cls,
         symbol: str,
         ts: int,
         open: float,
@@ -105,23 +133,25 @@ class Bar:
         close: float,
         volume: float = 0.0,
         exchange: str = "NSE",
-    ) -> None: ...
+    ) -> Self: ...
 
+@final
 class Fill:
     symbol: str
     ts: int
     price: float
     qty: float
     side: str
-    def __init__(
-        self,
+    def __new__(
+        cls,
         symbol: str,
         ts: int,
         price: float,
         qty: float,
         side: str,
-    ) -> None: ...
+    ) -> Self: ...
 
+@final
 class OrderIntent:
     symbol: str
     exchange: str
@@ -131,8 +161,8 @@ class OrderIntent:
     price: float | None
     trigger_price: float | None
     time_in_force: str
-    def __init__(
-        self,
+    def __new__(
+        cls,
         symbol: str,
         side: str,
         quantity: float,
@@ -141,7 +171,7 @@ class OrderIntent:
         time_in_force: str = "day",
         exchange: str = "NSE",
         trigger_price: float | None = None,
-    ) -> None: ...
+    ) -> Self: ...
     @staticmethod
     def market_buy(symbol: str, quantity: float, exchange: str = "NSE") -> OrderIntent: ...
     @staticmethod
@@ -179,8 +209,9 @@ class OrderIntent:
         exchange: str = "NSE",
     ) -> OrderIntent: ...
 
+@final
 class RustSmaCrossover:
-    def __init__(self, fast: int = 3, slow: int = 8, qty: float = 1.0) -> None: ...
+    def __new__(cls, fast: int = 3, slow: int = 8, qty: float = 1.0) -> Self: ...
     def on_bar(self, bar: Bar) -> tuple[str, float] | None: ...
     def on_close(self, close: float) -> tuple[str, float] | None: ...
     @property
@@ -188,3 +219,12 @@ class RustSmaCrossover:
     @property
     def intent_count(self) -> int: ...
     def intents(self) -> list[tuple[str, float]]: ...
+
+def initialize_runtime() -> None:
+    """Initialize the Tokio runtime for the Python async bridge.
+
+    Raises ``RuntimeError`` if the runtime cannot be installed.
+    """
+
+def get_runtime_handle() -> str:
+    """Name of the runtime flavour (``"tokio-multi-thread"``)."""
