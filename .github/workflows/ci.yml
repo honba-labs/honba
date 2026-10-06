@@ -39,6 +39,12 @@ jobs:
       - name: cargo test --doc
         run: cargo test --workspace --doc
 
+      # Regenerates schema/domain, schema/openapi, schema/mcp and the .pyi stubs with the
+      # Rust generator and fails on any modified or untracked file. The frontend TypeScript
+      # check (make check-schema-ts) needs the sibling honba-frontend repo: local only.
+      - name: codegen drift
+        run: make check-codegen-ci
+
       - name: cargo doc
         run: cargo doc --workspace --no-deps
         env:
@@ -86,10 +92,6 @@ jobs:
         working-directory: python
         run: |
           pytest -q tests/
-
-      - name: schema drift
-        run: |
-          make check-schema
 
       - name: lint (ruff)
         run: |

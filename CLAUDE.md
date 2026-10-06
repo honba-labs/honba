@@ -23,17 +23,29 @@ RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
 python3 scripts/dependency_graph.py            # crate-hierarchy check (also a CI job)
 ```
 
-`make build|test|lint|fmt` wrap the above (note `make lint` omits `--workspace`; CI uses it).
+`make build|test|lint|fmt` wrap the above (all with `--workspace`).
 
-Schema workflow (`schema/domain/domain_schema.json`, generated from `honba.entities.wire`):
-- `make schema` regenerates the JSON bundle and, in the workspace, the frontend TypeScript
-  (`FRONTEND_TS_DIR`, default `../honba-frontend/src/core/types/generated`; override with
-  `make schema FRONTEND_TS_DIR=...`). `scripts/export_schema.py` itself skips TypeScript unless
-  `--frontend-dir` or `HONBA_FRONTEND_DIR` is given.
-- `make check-schema` regenerates JSON only and fails on `git diff schema/domain`; works in a
-  single-repo checkout and runs in CI (python job, step "schema drift").
-- `make check-schema-ts` is the cross-repo TypeScript drift check. LOCAL ONLY: it writes into the
-  sibling `../honba-frontend` checkout, so CI does not run it.
+Codegen (Rust `honba-codegen` is the single owner; never edit the outputs by hand, each carries a
+DO NOT EDIT marker):
+
+| Artifact | Committed at | Regenerate |
+|---|---|---|
+| JSON Schema bundle | `schema/domain/domain_schema.json` | `make schema` (also writes frontend TS) |
+| OpenAPI 3.1 | `schema/openapi/openapi.json` | `make openapi` |
+| Python wire stubs | `python/src/honba/wire/generated/__init__.pyi` | `make pyi` |
+| MCP tool schemas | `schema/mcp/mcp_tools.json` | `make mcp` |
+| TypeScript | `../honba-frontend/src/core/types/generated/domain.ts` | `make schema` (`FRONTEND_TS_DIR=...`) |
+
+- `make codegen` regenerates all of them. The Python `honba schema export` and
+  `scripts/export_schema.py` are wrappers: the former writes `honba._honba.codegen_render(kind)`
+  (same bytes, no cargo or npx needed), the latter runs the Rust binary.
+- Drift: `cargo test -p honba-codegen` compares freshly generated artifacts with the committed
+  ones (`tests/committed_artifacts.rs`). `make check-codegen-ci` (schema, openapi, pyi, mcp) runs
+  in CI and fails on any modified **or untracked** file in the generated dirs.
+  `make check-codegen` adds `check-schema-ts`, which is LOCAL ONLY: it writes into the sibling
+  `../honba-frontend` checkout.
+- Renderer goldens live in `crates/honba-codegen/tests/golden/`; `HONBA_BLESS=1 cargo test -p
+  honba-codegen --test renderer_golden` rewrites them after an intended change.
 
 Python (`python/`, built with maturin; extension module `honba._honba`; Python >=3.10):
 
@@ -46,7 +58,7 @@ ruff check .                              # line-length 100
 
 Optional extras: `ai` (openai, anthropic, litellm, mcp), `rl` (torch, gymnasium). CLI entry point: `honba` → `honba.cli.main:app` (typer; subcommands in `python/honba/cli/`: backtest, data, optimize, research, strategy, ai).
 
-CI: Rust job (fmt, check, clippy `-D warnings`, test, doctest, doc), dependency-graph check, and Python job (deps, maturin develop, stubtest, pytest, schema drift, ruff lint: `ruff check python` and `ruff format --check python`) are all blocking.
+CI (`.github/workflows/ci.yml`), all blocking: Rust job (fmt, check, check `honba-market` without default features, clippy `--workspace --all-targets -D warnings`, test, doctest, codegen drift via `make check-codegen-ci`, doc with `-D warnings`; cargo cache via `Swatinem/rust-cache`), dependency-graph check, and Python job (deps, maturin develop, stubtest, pytest, ruff lint: `ruff check python` and `ruff format --check python`). The frontend TypeScript drift check is not in CI.
 
 ## Rust test layout (ADR 007)
 
