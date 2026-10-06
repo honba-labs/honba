@@ -44,7 +44,14 @@ Rules (plan.md §4.2, restated as the binding version):
 4. **Timestamps cross HTTP/WASM as ISO-8601 strings** with a separate integer
    `unix_nanos` string, never as a JSON number (`Number.MAX_SAFE_INTEGER`
    cannot hold u64 nanos). This is E11-S2; it lands before any external
-   consumer ships.
+   consumer ships. The value is `unix_nanos`: plain ASCII decimal digits of
+   a `u64` (no sign, space or exponent; leading zeros are read and dropped).
+   `iso` is RFC 3339 UTC with nine fractional digits, always derived from
+   `unix_nanos` by writers and informational on read (both readers recompute
+   it). Pre-epoch instants are not representable and are rejected.
+   `schema/golden/unix_nanos.json` pins this for Rust, Python and (through
+   the generated `UnixNanos { iso: string; unix_nanos: string }`) TypeScript,
+   including 2^53 + 1 and `u64::MAX`.
 5. **Every breaking wire change gets a migration note** in the crate's
    `CHANGELOG.md` at the same time as the code, not in a follow-up.
 

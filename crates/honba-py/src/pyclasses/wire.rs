@@ -18,12 +18,13 @@ use std::collections::BTreeMap;
 use honba_entities::{Currency, Position, PositionSide, ScreenerFilterPredicate, Trade};
 use honba_messages::{
     AggressorSide, Bar, BarAggregation, Event, InstrumentId, Message, Order, OrderSide,
-    OrderStatus, OrderType, PriceType, TimeInForce, API_VERSION, SCHEMA_VERSION,
+    OrderStatus, OrderType, PriceType, TimeInForce, UnixNanos, API_VERSION, SCHEMA_VERSION,
 };
 use honba_strategy::OrderIntent;
 
 /// Wire-contract type names accepted by [`canonical_json`].
-pub const KINDS: [&str; 9] = [
+pub const KINDS: [&str; 10] = [
+    "UnixNanos",
     "InstrumentId",
     "Bar",
     "Order",
@@ -83,6 +84,7 @@ fn reserialize<T: Serialize + DeserializeOwned>(payload: &str) -> Result<String,
 /// Parses `payload` as the Rust type named `kind` and returns its canonical JSON.
 pub fn canonical(kind: &str, payload: &str) -> Result<String, String> {
     match kind {
+        "UnixNanos" => reserialize::<UnixNanos>(payload),
         "InstrumentId" => reserialize::<InstrumentId>(payload),
         "Bar" => reserialize::<Bar>(payload),
         "Order" => reserialize::<Order>(payload),

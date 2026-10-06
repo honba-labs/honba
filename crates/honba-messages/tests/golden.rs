@@ -379,3 +379,22 @@ fn message_golden_carries_schema_version() {
         ],
     );
 }
+
+/// E11-S2: timestamps cross JSON as `{iso, unix_nanos}`. The vectors pin
+/// values past 2^53 (where a JSON number would lose nanoseconds), the u64
+/// edges, and the rejections (pre-epoch, overflow, a sign, a JSON number).
+#[test]
+fn unix_nanos_golden() {
+    check(
+        "unix_nanos.json",
+        "UnixNanos",
+        vec![
+            ("epoch", ts(0)),
+            ("one_nanosecond", ts(1)),
+            ("two_pow_53", ts(1 << 53)),
+            ("two_pow_53_plus_one", ts((1 << 53) + 1)),
+            ("nanos_beyond_f64_precision", ts(1_700_000_060_123_456_789)),
+            ("u64_max", ts(u64::MAX)),
+        ],
+    );
+}

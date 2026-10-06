@@ -6,6 +6,7 @@ mod event;
 mod identifiers;
 mod order;
 mod tick;
+mod timestamp;
 mod validation;
 
 use crate::{Exchange, InstrumentId};

@@ -75,7 +75,7 @@ def test_golden_invalid_case_rejected(kind, value):
 
 # ADR 0012: records (data a newer producer may extend) ignore unknown fields;
 # commands (authored input whose dropped field would change its meaning) reject them.
-RECORDS = {"InstrumentId", "Bar", "Order", "Trade", "Position", "Event", "Message"}
+RECORDS = {"UnixNanos", "InstrumentId", "Bar", "Order", "Trade", "Position", "Event", "Message"}
 COMMANDS = {"OrderIntent", "ScreenerFilterPredicate"}
 
 

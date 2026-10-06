@@ -112,6 +112,15 @@ impl<'de> Deserialize<'de> for UnixNanos {
         D: Deserializer<'de>,
     {
         let json = UnixNanosJson::deserialize(deserializer)?;
+        // Plain ASCII decimal digits only: `u64::from_str` would also accept a
+        // leading `+`, which the Python reader (and the golden vectors) reject.
+        // `iso` is informational; the value is `unix_nanos`.
+        if json.unix_nanos.is_empty() || !json.unix_nanos.bytes().all(|b| b.is_ascii_digit()) {
+            return Err(serde::de::Error::custom(format!(
+                "unix_nanos must be a decimal u64 string, got {:?}",
+                json.unix_nanos
+            )));
+        }
         let nanos = json
             .unix_nanos
             .parse::<u64>()

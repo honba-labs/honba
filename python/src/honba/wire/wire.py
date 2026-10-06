@@ -45,6 +45,18 @@ _U64_MAX = 2**64 - 1
 _EPOCH = _dt.datetime(1970, 1, 1, tzinfo=_dt.timezone.utc)
 
 
+def _is_u64(value: str) -> bool:
+    """Plain ASCII decimal digits (no sign, space or exponent) within u64."""
+    return value.isascii() and value.isdigit() and int(value) <= _U64_MAX
+
+
+def _iso(ns: int) -> str:
+    """RFC 3339 UTC with nine fractional digits: ``UnixNanos::to_iso_string``."""
+    secs, nanos = divmod(ns, 1_000_000_000)
+    stamp = (_EPOCH + _dt.timedelta(seconds=secs)).strftime("%Y-%m-%dT%H:%M:%S")
+    return f"{stamp}.{nanos:09d}Z"
+
+
 class UnixNanos(_Wire):
     """Nanosecond timestamp with ISO-8601 string and unix_nanos string fields.
 
@@ -56,10 +68,22 @@ class UnixNanos(_Wire):
     iso: Str
     unix_nanos: Str
 
+    @model_validator(mode="before")
+    @classmethod
+    def _canonicalise(cls, data: Any) -> Any:
+        # Like the Rust reader: the value is unix_nanos, and what is written back
+        # is derived from it (leading zeros dropped, iso recomputed).
+        if isinstance(data, dict):
+            iso, raw = data.get("iso"), data.get("unix_nanos")
+            if isinstance(iso, str) and isinstance(raw, str) and _is_u64(raw):
+                ns = int(raw)
+                return {**data, "iso": _iso(ns), "unix_nanos": str(ns)}
+        return data
+
     @field_validator("unix_nanos")
     @classmethod
     def _check_u64(cls, value: str) -> str:
-        if not value.isascii() or not value.isdigit() or int(value) > _U64_MAX:
+        if not _is_u64(value):
             raise ValueError(f"unix_nanos must be a decimal u64, got {value!r}")
         return value
 
@@ -68,9 +92,7 @@ class UnixNanos(_Wire):
         """The wire form of ``ns``, with the same ISO string Rust emits."""
         if isinstance(ns, bool) or not isinstance(ns, int) or not 0 <= ns <= _U64_MAX:
             raise ValueError(f"timestamp must be a u64 of nanoseconds, got {ns!r}")
-        secs, nanos = divmod(ns, 1_000_000_000)
-        stamp = (_EPOCH + _dt.timedelta(seconds=secs)).strftime("%Y-%m-%dT%H:%M:%S")
-        return cls(iso=f"{stamp}.{nanos:09d}Z", unix_nanos=str(ns))
+        return cls(iso=_iso(ns), unix_nanos=str(ns))
 
     def to_ns(self) -> int:
         """Nanoseconds since the Unix epoch."""
@@ -402,6 +424,7 @@ class Message(_Wire):
 
 
 MODELS: Final[dict[str, Any]] = {
+    "UnixNanos": UnixNanos,
     "InstrumentId": InstrumentId,
     "Bar": Bar,
     "Order": Order,
