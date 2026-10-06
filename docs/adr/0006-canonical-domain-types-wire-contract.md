@@ -1,7 +1,7 @@
 # ADR 006: Canonical Domain Types and the JSON Wire Contract (E0-S2)
 
 ## Status
-Accepted
+Accepted. Decision 1 is superseded in part by [ADR 0014](0014-json-schema-from-rust.md).
 
 ## Context
 Per [ROADMAP-borrowed-ideas.md](../../ROADMAP-borrowed-ideas.md) pillar P2 ("domain types (Rust) -> serde JSON ->
