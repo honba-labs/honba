@@ -120,6 +120,15 @@ def _round_major_to_minor(major: float, exponent: int) -> int:
     return _round_half_away(_scaled(major, exponent))
 
 
+def _to_major(amount: int, exponent: int) -> float:
+    return amount / 10**exponent
+
+
+def _format_major(code: str, amount: int, exponent: int) -> str:
+    """``CODE major`` with exactly ``exponent`` decimals (``INR 123.45``, ``JPY 123``)."""
+    return f"{code} {_to_major(amount, exponent):.{exponent}f}"
+
+
 def _format_minor_amount(amount: int, singular: str, plural: str) -> str:
     name = singular if abs(amount) == 1 else plural
     return f"{amount:,} {name}"
@@ -173,7 +182,7 @@ class Money:
 
     def to_major(self) -> float:
         """Major units as a float: lossy by definition, for display and research only."""
-        return self.amount / self.currency.minor_per_major
+        return _to_major(self.amount, self.currency.minor_exponent)
 
     def _checked(self, other: Money) -> None:
         if not isinstance(other, Money):
@@ -193,7 +202,7 @@ class Money:
         return Money(-self.amount, self.currency)
 
     def __str__(self) -> str:
-        return f"{self.currency.value} {self.to_major():.{self.currency.minor_exponent}f}"
+        return _format_major(self.currency.value, self.amount, self.currency.minor_exponent)
 
     def format_minor(self) -> str:
         """The amount in minor units with the unit name: ``1,250 paise``, ``1 cent``."""

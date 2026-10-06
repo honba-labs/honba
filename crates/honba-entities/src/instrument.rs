@@ -168,14 +168,21 @@ impl<'de> Deserialize<'de> for MoneyAmount {
 
 impl std::fmt::Display for Money {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} {:.prec$}",
-            self.currency,
-            self.to_major_f64(),
-            prec = usize::from(self.currency.minor_exponent())
-        )
+        f.write_str(&format_major(
+            &self.currency.to_string(),
+            self.amount,
+            self.currency.minor_exponent(),
+        ))
     }
+}
+
+/// `CODE major` with exactly `exponent` decimals (`INR 123.45`, `JPY 123`).
+pub(crate) fn format_major(code: &str, amount: i64, exponent: u8) -> String {
+    format!(
+        "{code} {:.prec$}",
+        minor_to_major(amount, exponent),
+        prec = usize::from(exponent)
+    )
 }
 
 impl Serialize for Money {

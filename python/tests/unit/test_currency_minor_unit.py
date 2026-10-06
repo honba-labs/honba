@@ -62,6 +62,34 @@ def test_str_uses_the_currency_exponent():
     assert str(Money(12_345, Currency.INR)) == "INR 123.45"
 
 
+@pytest.mark.parametrize(
+    ("amount", "exp", "want"),
+    [
+        (12_345, 0, "XXX 12345"),
+        (12_345, 2, "XXX 123.45"),
+        (12_345, 3, "XXX 12.345"),
+        (-5, 3, "XXX -0.005"),
+    ],
+)
+def test_format_major_uses_exactly_exponent_decimals(amount, exp, want):
+    assert money_mod._format_major("XXX", amount, exp) == want
+
+
+@pytest.mark.parametrize(("amount", "exp", "want"), [(1_234, 0, 1_234.0), (1_234, 3, 1.234)])
+def test_to_major_divides_by_the_exponent(amount, exp, want):
+    assert money_mod._to_major(amount, exp) == want
+
+
+@pytest.mark.parametrize(
+    ("price", "exp", "want"),
+    [(2.5, 0, 3.0), (-2.5, 0, -3.0), (1.2345, 3, 1.235), (1.2344, 3, 1.234), (1.2345, 2, 1.23)],
+)
+def test_position_price_rounding_follows_the_exponent(price, exp, want):
+    from honba.domain import position
+
+    assert position._round_to_exponent(price, exp) == want
+
+
 def test_legacy_minor_per_major_constant_is_deprecated_but_available():
     with pytest.warns(DeprecationWarning, match="minor_per_major"):
         assert money_mod.MINOR_PER_MAJOR == 100

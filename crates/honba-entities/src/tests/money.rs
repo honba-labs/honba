@@ -245,3 +245,29 @@ fn payout_and_stake_reject_non_finite_and_overflow() {
         Err(MoneyError::Overflow)
     );
 }
+
+#[test]
+fn display_uses_exactly_the_exponent_many_decimals() {
+    use crate::instrument::format_major;
+    assert_eq!(format_major("XXX", 12_345, 0), "XXX 12345");
+    assert_eq!(format_major("XXX", 12_345, 2), "XXX 123.45");
+    assert_eq!(format_major("XXX", 12_345, 3), "XXX 12.345");
+    assert_eq!(format_major("XXX", -5, 3), "XXX -0.005");
+}
+
+#[test]
+fn price_rounding_follows_the_exponent() {
+    use crate::instrument::round_to_minor_price;
+    assert_eq!(round_to_minor_price(2.5, 0), 3.0);
+    assert_eq!(round_to_minor_price(-2.5, 0), -3.0);
+    assert_eq!(round_to_minor_price(1.2345, 3), 1.235);
+    assert_eq!(round_to_minor_price(1.2344, 3), 1.234);
+    assert_eq!(round_to_minor_price(1.2345, 2), 1.23);
+}
+
+#[test]
+fn minor_major_conversion_follows_the_exponent() {
+    use crate::instrument::minor_to_major;
+    assert_eq!(minor_to_major(1_234, 0), 1_234.0);
+    assert_eq!(minor_to_major(1_234, 3), 1.234);
+}

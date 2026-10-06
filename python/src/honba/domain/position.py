@@ -97,5 +97,9 @@ class Position:
 
 def _round_to_minor(price: float, currency: Currency) -> float:
     """Nearest minor unit of ``currency``, half away from zero (``f64::round``, as in Rust)."""
-    scale = currency.minor_per_major
+    return _round_to_exponent(price, currency.minor_exponent)
+
+
+def _round_to_exponent(price: float, exponent: int) -> float:
+    scale = 10**exponent
     return _round_half_away(price * scale) / scale
