@@ -62,6 +62,7 @@ impl From<&str> for ApiVersion {
 /// rejected by the caller, which compares `api_version` and `schema_version`
 /// against what it was built for.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(bound(deserialize = "T: Deserialize<'de>"))]
 pub struct ResponseEnvelope<T> {
     /// Semantic version of the API surface.
     pub api_version: ApiVersion,

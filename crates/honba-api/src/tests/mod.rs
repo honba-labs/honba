@@ -60,6 +60,17 @@ fn a_failing_envelope_round_trips_its_stable_code() {
 }
 
 #[test]
+fn an_envelope_deserializes_for_a_payload_without_default() {
+    // BacktestResponse does not implement Default; the envelope must not
+    // demand it just because its `data` field tolerates absence.
+    let env: ResponseEnvelope<crate::BacktestResponse> =
+        ApiResponse::error(ErrorDetail::new(ErrorCode::Timeout, "slow"));
+    let text = serde_json::to_string(&env).unwrap();
+    let back: ResponseEnvelope<crate::BacktestResponse> = serde_json::from_str(&text).unwrap();
+    assert_eq!(back.error.unwrap().code, ErrorCode::Timeout);
+}
+
+#[test]
 fn run_status_serializes_in_snake_case() {
     assert_eq!(
         serde_json::to_value(RunStatus::Completed).unwrap(),
