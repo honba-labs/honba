@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Rust order-rejection queue (ADR 0008, decision 13)
+
+Non-breaking; closes the ADR 0008 known gap. No wire change.
+
+- `honba_engine::OrderRejection` and `ExecutionEngine::drain_rejections()`. The trait method has a default
+  (returns nothing), so existing engines compile unchanged; no trait signature changed.
+- `StrategyRunner` drains rejections after each event's fills, releases the unfilled remainder in the ledger
+  context (`LedgerContext::release_remainder`) and records them (`order_rejections()`); new
+  `StrategyRunner::cancel(order_id)`. Reasons match Python: `insufficient_funds`, `no_position`, `cancelled`.
+- `honba_sim::ScriptedExecution` / `Behavior`: reference engine that rejects, partly fills or holds orders.
+- Shared vectors `schema/conformance/order_rejections.json`, run by Rust and Python; shared `ExecutionEngine`
+  contract test in `honba-sim`. Python needed no change (`OrderRejection`, `drain_rejections` and
+  `RunResult.order_rejections` already existed).
+
 ### Currency-aware minor units (ADR 0011)
 
 Non-breaking. No wire change (`SCHEMA_VERSION` stays 3; amounts are unchanged for

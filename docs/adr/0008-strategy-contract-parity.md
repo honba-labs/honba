@@ -150,6 +150,26 @@ this ADR:
     `schema/conformance/warmup_gate.json` and `schema/conformance/strategy_manifest.json`, run by
     `crates/honba-strategy/tests/warmup.rs` and `python/tests/integration/test_warmup_conformance.py`.
 
+13. **Port reject/cancel path (Rust), parity with decision 11.** `honba_engine::OrderRejection` is a value object
+    in the crate that owns `ExecutionEngine` (`honba-engine`, L3, so no layering change): `order_id`,
+    `instrument_id`, `side`, `quantity` (the unfilled remainder, the amount to release), `reason`, `ts` and
+    `cancelled`, with constructors `OrderRejection::rejected(..)` and `OrderRejection::cancelled(..)` (reason
+    `"cancelled"`). It carries instrument, side and quantity rather than an `OrderIntent` because `OrderIntent`
+    lives in `honba-strategy` (L4), above the port; the runner releases the remainder with
+    `LedgerContext::release_remainder`. `ExecutionEngine` gains `drain_rejections() -> Result<Vec<OrderRejection>>`
+    with a default that returns nothing, so every existing engine compiles and behaves as before. `cancel(order_id)`
+    keeps its signature: an engine holding the order reports the unfilled remainder as a cancelled rejection;
+    cancelling an unknown or finished order is a no-op. `StrategyRunner` drains rejections after the fills of every
+    event (runner step 5, as in Python), releases and records them (`order_rejections()`), and gains `cancel(id)`
+    which books what the engine reports at once. Reason strings are the engine's and shared by both languages:
+    `insufficient_funds`, `no_position`, `cancelled`. `honba_sim::ScriptedExecution` is the reference engine
+    (fill, reject, partial fill, hold until cancelled). Shared vectors: `schema/conformance/order_rejections.json`,
+    run by `crates/honba-strategy/tests/order_rejections.rs` and
+    `python/tests/integration/test_order_rejections_conformance.py`; every in-crate engine also runs the contract
+    test `crates/honba-sim/tests/execution_contract.rs` (`filled + released == ordered` once working orders are
+    cancelled). Not exposed through `honba._honba`: Python already has `OrderRejection` and
+    `RunResult.order_rejections`, and the `run_strategy` reference engine never rejects.
+
 ## Consequences
 - Breaking (Rust): every `Strategy` hook takes `ctx: &mut dyn StrategyContext`; market-data hooks lose `ts_init`;
   `drain_intents` is removed (submit with `ctx.submit`). `StrategyAdapter` owns a `LedgerContext`. In-repo
@@ -171,6 +191,5 @@ this ADR:
 - The Rust stub `python/honba/_lib/__init__.pyi` is not mapped to the module `honba._honba`, so type checkers
   and the CI stubtest do not cover it (including `run_strategy`). Moving it would surface about 79 existing
   stubtest errors in older pyclasses; fixing them is a separate ticket. The stub was deliberately not moved here.
-- Venue-side rejections and cancellations (an order state machine) are E2-S6. Python ports report them through
-  `drain_rejections` (decision 11); the Rust `ExecutionEngine` has `cancel` but no rejection queue yet, so in Rust
-  `release` is still only driven by invariant rejections.
+- Venue-side rejections and cancellations as an order *state machine* (partial-fill lifecycle, amend, venue
+  acknowledgements) are E2-S6. Both languages now carry the reject/cancel queue itself (decision 13).
