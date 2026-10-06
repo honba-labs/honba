@@ -86,6 +86,12 @@ class RetryPolicy:
         return cls(delays=(delay,) * retries)
 
 
+def _dumps(value: Any) -> str:
+    """Compact, key-order-preserving JSON: both transports send the same bytes, so a server
+    message that quotes a column (a parse error) is identical across them."""
+    return json.dumps(value, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+
+
 def _parse_json(text: str) -> Any:
     try:
         return json.loads(text) if text.strip() else None
@@ -159,7 +165,8 @@ class HttpTransport:
                 method,
                 path,
                 params=dict(query) if query else None,
-                json=body if body is not None else None,
+                content=_dumps(body).encode() if body is not None else None,
+                headers={"content-type": "application/json"} if body is not None else None,
             )
         except httpx.TimeoutException as exc:
             raise TransportApiError(
@@ -202,8 +209,8 @@ class InprocTransport:
             self._data_dir,
             method,
             path,
-            json.dumps(dict(query)) if query else None,
-            json.dumps(body) if body is not None else None,
+            _dumps(dict(query)) if query else None,
+            _dumps(body) if body is not None else None,
         )
         return Response(status, _parse_json(text))
 

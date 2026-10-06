@@ -60,6 +60,7 @@ def test_post_sends_a_json_body() -> None:
 
     got = make(handler).request("POST", "/strategies/verify", body={"name": "s"})
     assert got.status == 422
+    assert seen[0].content == b'{"name":"s"}'
     assert json.loads(seen[0].content) == {"name": "s"}
     assert seen[0].headers["content-type"] == "application/json"
 
@@ -208,8 +209,8 @@ def test_inproc_passes_json_strings_to_the_native_function(
         str(tmp_path),
         "POST",
         "/strategies/verify",
-        '{"a": "b"}',
-        '{"n": 1}',
+        '{"a":"b"}',
+        '{"n":1}',
     )
 
 

@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### Python SDK client (E11-S3, part 3)
+
+- New `honba.client`: `Client` with typed methods mirroring the served routes (`health`, `instruments`, `instrument`,
+  `bars`, `quotes`, `depth`, `verify_strategy`) returning the existing wire models (`Bar`, `QuoteTick` with `UnixNanos`
+  timestamps) plus `InstrumentInfo`, `Depth`, `Health` records that ignore unknown fields (ADR 0012). Arguments the
+  server would reject (timeframe, time format, empty range, depth range, instrument id) raise
+  `RequestValidationError(field, reason)` before anything is sent.
+- Failures raise a typed `ApiError` hierarchy built from the `ErrorDetail` envelope (`code`, `category`, `retryable`,
+  `context`, `status`): `ValidationApiError` (422), `NotFoundApiError` (404), `MarketDataUnavailableApiError`,
+  `NotImplementedApiError` (501, a subclass of `UnsupportedApiError`), `TransportApiError`, and so on. An unknown code
+  stays a base `ApiError`; a body that is not an envelope is `InvalidResponseError`.
+- Two interchangeable transports behind a `Transport` protocol. `HttpTransport(base_url, timeout=...)` uses httpx (already
+  a dependency); retries are off by default and, when a bounded `RetryPolicy` is given, only a `retryable` envelope or a
+  connection failure is retried. `InprocTransport(data_dir)` runs the same Rust router without a socket.
+- `honba._honba.api_request(data_dir, method, path, query_json, body_json) -> (status, body_json)` and
+  `honba_api_rest::dispatch` back the in-process transport: `honba-py` builds the router from `AppState::from_parquet_dir`
+  (cached per directory) and drives it with tower's `oneshot`; no handler is reimplemented in Python. New layering edge
+  `honba-py -> honba-api-rest` (both L7; `honba-cli` already has it).
+- Parity tests run every scenario, and the 404/422/501 envelopes, through both transports against a real `honba serve`
+  and require identical results. Not in the client yet: the routes that answer 501 (`/strategies` list and compile,
+  `/backtests`, `/sweeps`, `/orders`, `/positions/close`, `/screener/scan`, `/journals`) plus `/capabilities` and `/schema`.
+
 ### WASM indicator surface (E11-S5, part 1)
 
 - `honba-api-wasm` now exports `indicator_series(name, params_json, closes: Float64Array) -> Float64Array`
