@@ -391,7 +391,6 @@
         "type": "object"
       },
       "BarType": {
-        "additionalProperties": false,
         "description": "Fully identifies a bar: which instrument, and how it aggregates.",
         "properties": {
           "instrument_id": {
@@ -1110,7 +1109,6 @@
             "type": "object"
           },
           {
-            "additionalProperties": false,
             "description": "The exchange accepted an order.",
             "properties": {
               "order_id": {
@@ -1144,7 +1142,6 @@
             "type": "object"
           },
           {
-            "additionalProperties": false,
             "description": "The exchange rejected an order.",
             "properties": {
               "order_id": {
@@ -1183,7 +1180,6 @@
             "type": "object"
           },
           {
-            "additionalProperties": false,
             "description": "An order received a (possibly partial) fill.",
             "properties": {
               "last_px": {
@@ -1229,7 +1225,6 @@
             "type": "object"
           },
           {
-            "additionalProperties": false,
             "description": "An order was cancelled.",
             "properties": {
               "order_id": {
@@ -1503,8 +1498,7 @@
         "type": "object"
       },
       "Message": {
-        "additionalProperties": false,
-        "description": "The envelope that carries an [`Event`] plus Honba-side metadata.\n\nThis is the versioned unit of the wire contract: its JSON form is `{\"schema_version\": 1, \"event\": {...}, \"ts_init\": n}`, and deserializing a message with any other `schema_version` fails.\n\n``` use honba_messages::{Event, Message, UnixNanos, QuoteTick, InstrumentId, Exchange};\n\nlet quote = QuoteTick::new( InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), 22_000.0, 22_001.0, 50.0, 75.0, UnixNanos::from_u64(1), UnixNanos::from_u64(1), ); let msg = Message::new(Event::Quote(quote), UnixNanos::from_u64(2)); assert!(msg.event().is_market_data()); assert_eq!(msg.schema_version(), honba_messages::SCHEMA_VERSION); ```",
+        "description": "The envelope that carries an [`Event`] plus Honba-side metadata.\n\nThis is the versioned unit of the wire contract: its JSON form is `{\"schema_version\": 3, \"event\": {...}, \"ts_init\": {...}}`, and deserializing a message with any other `schema_version` fails. Unknown fields, in the envelope or the event, are ignored (ADR 0012 rule 1): a newer producer's additive fields never break this reader, while a reshaped wire bumps the version and is rejected.\n\n``` use honba_messages::{Event, Message, UnixNanos, QuoteTick, InstrumentId, Exchange};\n\nlet quote = QuoteTick::new( InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), 22_000.0, 22_001.0, 50.0, 75.0, UnixNanos::from_u64(1), UnixNanos::from_u64(1), ); let msg = Message::new(Event::Quote(quote), UnixNanos::from_u64(2)); assert!(msg.event().is_market_data()); assert_eq!(msg.schema_version(), honba_messages::SCHEMA_VERSION); ```",
         "properties": {
           "event": {
             "$ref": "#/components/schemas/Event"
