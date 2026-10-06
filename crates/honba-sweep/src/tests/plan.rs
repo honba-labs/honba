@@ -7,8 +7,8 @@ use honba_strategy::{BuyAndHold, Strategy};
 
 use super::{any_instrument, buy_and_hold_params, report};
 use crate::{
-    Fitness, SharpeFitness, StrategyFactory, StrategySpec, SweepError, SweepPlan, TrialParams,
-    DEFAULT_INITIAL_CASH_MINOR, DEFAULT_MAX_CONCURRENCY, DEFAULT_PERIODS_PER_YEAR,
+    default_initial_cash, Fitness, SharpeFitness, StrategyFactory, StrategySpec, SweepError,
+    SweepPlan, TrialParams, DEFAULT_MAX_CONCURRENCY, DEFAULT_PERIODS_PER_YEAR,
 };
 
 struct Fixed;
@@ -72,11 +72,28 @@ fn max_concurrency_defaults_to_the_trial_count_capped_at_the_documented_limit() 
 #[test]
 fn cash_and_periods_default_to_the_documented_values() {
     let plan = plan_with(2);
-    assert_eq!(plan.initial_cash(), DEFAULT_INITIAL_CASH_MINOR);
+    assert_eq!(
+        plan.initial_cash(),
+        default_initial_cash(Currency::Inr).minor()
+    );
+    assert_eq!(plan.currency(), Currency::Inr);
     assert_eq!(plan.periods_per_year(), DEFAULT_PERIODS_PER_YEAR);
     assert!(plan.validate().is_ok());
-    const _: () = assert!(DEFAULT_INITIAL_CASH_MINOR > 0);
     const _: () = assert!(DEFAULT_PERIODS_PER_YEAR > 0.0);
+}
+
+#[test]
+fn default_cash_is_a_million_major_units_in_every_currency() {
+    for &currency in Currency::ALL {
+        let cash = default_initial_cash(currency);
+        assert_eq!(cash.currency(), currency);
+        assert_eq!(
+            cash.minor(),
+            1_000_000 * 10_i64.pow(u32::from(currency.minor_exponent())),
+            "{currency}"
+        );
+        assert_eq!(cash.to_major_f64(), 1_000_000.0, "{currency}");
+    }
 }
 
 #[test]

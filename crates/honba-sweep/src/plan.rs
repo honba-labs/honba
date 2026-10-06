@@ -47,8 +47,18 @@ use crate::fitness::Fitness;
 /// starts from the number of trials, capped here.
 pub const DEFAULT_MAX_CONCURRENCY: usize = 8;
 
-/// Default starting cash in minor units (for INR: 1,000,000 rupees = 100,000,000 paise).
-pub const DEFAULT_INITIAL_CASH_MINOR: i64 = 100_000_000;
+/// Default starting cash, in whole major units of the settlement currency.
+const DEFAULT_INITIAL_CASH_MAJOR: i64 = 1_000_000;
+
+/// Default starting cash in `currency`: 1,000,000 major units, scaled by the
+/// currency's minor exponent (ADR 0011), so it is the same amount of money in
+/// every currency rather than a fixed minor count.
+pub fn default_initial_cash(currency: Currency) -> Money {
+    Money::new(
+        DEFAULT_INITIAL_CASH_MAJOR * 10_i64.pow(u32::from(currency.minor_exponent())),
+        currency,
+    )
+}
 
 /// The `periods_per_year` a trial's return series is annualized with: 252
 /// daily bars. It must match the bar interval of the dataset the sweep runs
@@ -303,15 +313,16 @@ impl SweepPlan {
     /// `max_concurrency` starts at the number of trials capped at
     /// [`DEFAULT_MAX_CONCURRENCY`], and never below one, so an empty plan is
     /// still a plan that can be run. Cash and periods start at
-    /// [`DEFAULT_INITIAL_CASH_MINOR`] and [`DEFAULT_PERIODS_PER_YEAR`].
+    /// [`default_initial_cash`] and [`DEFAULT_PERIODS_PER_YEAR`].
     pub fn new(trials: Vec<TrialParams>, fitness: Arc<dyn Fitness>) -> Self {
         let max_concurrency = trials.len().clamp(1, DEFAULT_MAX_CONCURRENCY);
+        let cash = default_initial_cash(Currency::Inr);
         Self {
             trials,
             fitness,
             max_concurrency,
-            initial_cash: DEFAULT_INITIAL_CASH_MINOR,
-            currency: Currency::Inr,
+            initial_cash: cash.minor(),
+            currency: cash.currency(),
             periods_per_year: DEFAULT_PERIODS_PER_YEAR,
         }
     }
