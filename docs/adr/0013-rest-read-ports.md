@@ -63,6 +63,7 @@ crate its own idea of what an instrument or a bar query is.
 | route not built yet (see below) | 501 | `not_implemented` |
 | timeframe not held for the instrument (`PortError::Unsupported`) | 404 | `market_data_unavailable` |
 | bad `tf`/`from`/`to`, empty range, unknown query key, malformed id | 422 | `validation_invalid_request` |
+| `/bars/{id}` selection over 100,000 bars (`reason: too_many_rows`) | 422 | `validation_invalid_request` |
 | port unavailable / timeout / transport | 503 / 504 / 502 | `market_data_unavailable` / `timeout` / `transport_error` |
 
 Prices are `f64` observations, so bars carry no money; timestamps use the
@@ -73,7 +74,9 @@ existing `{iso, unix_nanos}` form. ADR 0011 is not engaged by these endpoints.
 - Parquet files carry no reference data: instruments are derived as INR
   equities, lot 1, tick 0.05, and files are read as 1-minute last-price bars.
   A symbol master and per-file timeframes are follow-ups.
-- No pagination or row cap on bars; the DTO has none yet.
+- No pagination on bars. A hard cap of `MAX_BAR_ROWS` (100,000) applies: a selection with more bars is a 422
+  `validation_invalid_request` with `context.reason = too_many_rows` and `context.limit`, telling the caller to narrow
+  `from`/`to`. The check runs after the read port answers, so it bounds the response, not the port's memory.
 - A quote request is all-or-nothing: if one matched instrument has no quote at that time the whole request is
   404, rather than a silently shorter list.
 - Not built, answering 501: `GET/POST /strategies`, `POST /backtests`, `GET /backtests/{id}[/journal]`,

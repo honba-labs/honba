@@ -477,3 +477,27 @@ async fn depth_requests_are_validated_before_the_port_is_asked() {
         );
     }
 }
+
+#[tokio::test]
+async fn a_selection_over_the_row_cap_is_a_422_too_many_rows() {
+    let cap = honba_api_rest::MAX_BAR_ROWS as u64;
+    let app = || {
+        let dataset = Dataset::from_slices(vec![slice("BIG", "NSE", cap + 1)]).unwrap();
+        api_router_with(AppState::from_reader(DatasetReader::from_dataset(dataset)))
+    };
+
+    let (status, body) = get(app(), "/bars/BIG.NSE?tf=1m").await;
+    assert_error(
+        status,
+        &body,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "validation_invalid_request",
+    );
+    assert_eq!(body["error"]["context"]["reason"], "too_many_rows");
+    assert_eq!(body["error"]["context"]["limit"], json!(cap));
+
+    // Narrowing the range below the cap succeeds: [T0, T0 + 10 min) is 10 bars.
+    let (status, body) = get(app(), "/bars/BIG.NSE?tf=1m&to=2024-01-01T00:10:00Z").await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["data"]["bars"].as_array().unwrap().len(), 10);
+}

@@ -58,6 +58,30 @@ where
     }
 }
 
+/// Hard cap on the bars one `GET /bars/{id}` may return.
+///
+/// A request selecting more is a 422 (`reason: too_many_rows`); the caller narrows `from`/`to`.
+/// There is no pagination.
+pub const MAX_BAR_ROWS: usize = 100_000;
+
+/// Rejects a selection of `rows` bars larger than `limit` with a 422-bound detail.
+pub(crate) fn check_row_cap(rows: usize, limit: usize) -> Result<(), ErrorDetail> {
+    if rows <= limit {
+        return Ok(());
+    }
+    Err(ErrorDetail::new(
+        ErrorCode::ValidationInvalidRequest,
+        format!(
+            "the selection has {rows} bars, over the limit of {limit}; narrow the range with from and to"
+        ),
+    )
+    .with_context(serde_json::json!({
+        "field": "to",
+        "reason": "too_many_rows",
+        "limit": limit,
+    })))
+}
+
 fn failure(status: StatusCode, detail: ErrorDetail) -> Response {
     let body: ResponseEnvelope<serde_json::Value> = ApiResponse::error(detail);
     (status, Json(body)).into_response()
@@ -160,7 +184,10 @@ pub(crate) async fn get_bars(
         Err(error) => return port_failure(error),
     };
     match state.bars.read_bars(&request).await {
-        Ok(bars) => success(BarsResponse { bars }),
+        Ok(bars) => match check_row_cap(bars.len(), MAX_BAR_ROWS) {
+            Ok(()) => success(BarsResponse { bars }),
+            Err(detail) => unprocessable(detail),
+        },
         Err(error) => port_failure(error),
     }
 }

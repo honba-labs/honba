@@ -28,7 +28,7 @@ mod market;
 mod state;
 
 pub use dispatch::{build_target, dispatch, DispatchError};
-pub use market::{ApiQuery, ApiQueryRejection};
+pub use market::{ApiQuery, ApiQueryRejection, MAX_BAR_ROWS};
 pub use state::AppState;
 
 /// JSON body extractor whose rejections are the standard error envelope

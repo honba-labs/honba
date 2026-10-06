@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### REST read API hardening
+
+- `GET /bars/{id}` is capped at `MAX_BAR_ROWS` (100,000) bars: a larger selection is a 422
+  `validation_invalid_request` with `context.reason = too_many_rows` and `context.limit`; narrow `from`/`to`.
+  No pagination (ADR 0013).
+
 ### CLI exchange selection
 
 - `honba data load <file> <SYMBOL>` no longer hardcodes NSE: `SYMBOL` is bare (exchange from `--exchange NSE|BSE`,
