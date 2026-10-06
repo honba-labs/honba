@@ -6,7 +6,7 @@
 //!
 //! The Honba event loop is synchronous and single-threaded. `honba-engine` owns the queue, the
 //! clock and the audit trail, and every surface — backtest, paper, live — drives that same kernel
-//! the same way. I/O is the exception, so it lives at the edges, behind the six traits in this
+//! the same way. I/O is the exception, so it lives at the edges, behind the seven traits in this
 //! crate, and nowhere else.
 //!
 //! # Ports
@@ -16,6 +16,7 @@
 //! | [`Clock`] | what time is it, and wait |
 //! | [`MarketDataFeed`] | the next market-data message |
 //! | [`ExecutionGateway`] | route an order, cancel, modify, next fill |
+//! | [`BarReader`] | the stored bars of one instrument over a range |
 //! | [`InstrumentMaster`] | what is this instrument, and what else is there |
 //! | [`Sink`] | append to the audit trail |
 //! | [`SecretStore`] | the credential stored under this key |
@@ -46,6 +47,7 @@
 //! 3. The audit stream is always complete: [`Sink`] is append-only and flushable on demand.
 //! 4. `Ok(None)` means idle or exhausted, never a broken stream. A broken stream is an error.
 
+pub mod bars;
 pub mod clock;
 pub mod error;
 pub mod execution;
@@ -54,6 +56,7 @@ pub mod master;
 pub mod secret;
 pub mod sink;
 
+pub use bars::{BarReader, BarRequest};
 pub use clock::Clock;
 pub use error::{PortError, PortResult};
 pub use execution::ExecutionGateway;
