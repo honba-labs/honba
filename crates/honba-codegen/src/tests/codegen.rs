@@ -184,3 +184,28 @@ fn rendered_json_ends_with_a_newline() {
     let text = Codegen::new().render(Artifact::JsonSchema);
     assert!(text.ends_with("}\n"));
 }
+
+#[test]
+fn the_bundle_root_names_each_wire_and_screener_type() {
+    // The root `properties` let one document carry any wire value under its
+    // snake_case name, as the Python-built bundle did.
+    let schema = Codegen::new().json_schema();
+    assert_eq!(schema["type"], json!("object"));
+    assert_eq!(
+        schema["properties"]["metric_ref"],
+        json!({"$ref": "#/$defs/MetricRef"})
+    );
+    assert_eq!(
+        schema["properties"]["order_intent"],
+        json!({"$ref": "#/$defs/OrderIntent"})
+    );
+    let props = schema["properties"].as_object().unwrap();
+    for name in WIRE_TYPES.iter().chain(SCREENER_TYPES) {
+        assert!(
+            props
+                .values()
+                .any(|v| v["$ref"] == json!(format!("#/$defs/{name}"))),
+            "{name}"
+        );
+    }
+}

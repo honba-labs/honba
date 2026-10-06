@@ -1520,6 +1520,140 @@
         ],
         "type": "object"
       },
+      "MetricDefinition": {
+        "description": "Catalog definition of a metric (mirrors Python MetricDefinition).",
+        "properties": {
+          "defaultPeriod": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricPeriod"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default evaluation period if unspecified."
+          },
+          "defaultTimeframe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timeframe"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default timeframe if unspecified."
+          },
+          "description": {
+            "description": "Human-readable description.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "filterable": {
+            "default": true,
+            "description": "Whether this metric can be filtered upon in scans.",
+            "type": "boolean"
+          },
+          "group": {
+            "description": "Metric catalog group.",
+            "type": "string"
+          },
+          "hasPeriod": {
+            "default": false,
+            "description": "Whether this metric supports evaluation period dimension.",
+            "type": "boolean"
+          },
+          "hasTimeframe": {
+            "default": false,
+            "description": "Whether this metric supports timeframe dimension.",
+            "type": "boolean"
+          },
+          "key": {
+            "description": "Unique metric key sent to the backend.",
+            "type": "string"
+          },
+          "label": {
+            "description": "Human-readable label.",
+            "type": "string"
+          },
+          "sortable": {
+            "default": true,
+            "description": "Whether this metric can be sorted upon in scans.",
+            "type": "boolean"
+          },
+          "source": {
+            "description": "Data source provenance.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UnitType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional unit of measurement."
+          },
+          "valueType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ValueType"
+              }
+            ],
+            "description": "Data type of the metric value."
+          }
+        },
+        "required": [
+          "group",
+          "key",
+          "label",
+          "valueType"
+        ],
+        "type": "object"
+      },
+      "MetricKeySpec": {
+        "description": "Specification of a requested metric with its evaluation dimensions.",
+        "properties": {
+          "key": {
+            "description": "Unique metric key (e.g. `price_earnings_ttm`, `RSI`, `close`).",
+            "type": "string"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricPeriod"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional period dimension (e.g. `TTM`, `FY`, `SNAPSHOT`)."
+          },
+          "timeframe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timeframe"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional timeframe dimension (e.g. `1D`, `1W`, `60`)."
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "type": "object"
+      },
       "MetricPeriod": {
         "description": "Evaluation period dimension for fundamental or snapshot metrics.",
         "oneOf": [
@@ -1566,6 +1700,64 @@
             "type": "string"
           }
         ]
+      },
+      "MetricRef": {
+        "additionalProperties": false,
+        "description": "A metric used as the right-hand operand of a predicate.\n\nMakes metric-to-metric comparisons expressible on the wire, e.g. `SMA50 crosses_above {\"key\": \"SMA200\"}`. `key` is the wire key, never a UI id.",
+        "properties": {
+          "key": {
+            "description": "Wire key of the referenced metric (e.g. `SMA200`).",
+            "type": "string"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricPeriod"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional period dimension."
+          },
+          "timeframe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timeframe"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional timeframe dimension."
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "type": "object"
+      },
+      "MetricValue": {
+        "anyOf": [
+          {
+            "description": "Numeric value.",
+            "format": "double",
+            "type": "number"
+          },
+          {
+            "description": "Text or categorical string.",
+            "type": "string"
+          },
+          {
+            "description": "Boolean flag.",
+            "type": "boolean"
+          },
+          {
+            "description": "Null or missing value.",
+            "type": "null"
+          }
+        ],
+        "description": "Dynamic value of a metric in a screener row or symbol fact table."
       },
       "Money": {
         "description": "Monetary amount in integer minor units (paise/cents).",
@@ -2181,6 +2373,25 @@
           }
         ]
       },
+      "ScreenerFilterGroup": {
+        "description": "Logical grouping of filter predicates (AND / OR).",
+        "properties": {
+          "items": {
+            "description": "Predicates or nested groups.",
+            "items": true,
+            "type": "array"
+          },
+          "operator": {
+            "description": "Operator: \"AND\" or \"OR\".",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "operator"
+        ],
+        "type": "object"
+      },
       "ScreenerFilterPredicate": {
         "description": "Individual filter predicate applied to a metric key.\n\nDeserialization enforces the value contract of [`check_predicate_value`].",
         "properties": {
@@ -2226,6 +2437,214 @@
           "key",
           "op",
           "value"
+        ],
+        "type": "object"
+      },
+      "ScreenerRow": {
+        "description": "Single scanned instrument row returned in screener responses.",
+        "properties": {
+          "fullSymbol": {
+            "description": "Canonical full symbol (e.g. `NSE:RELIANCE`).",
+            "type": "string"
+          },
+          "instrumentId": {
+            "description": "Internal instrument identifier.",
+            "type": "string"
+          },
+          "name": {
+            "description": "Instrument display name.",
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MetricValue"
+            },
+            "description": "Metric values keyed by metric spec string.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "fullSymbol",
+          "instrumentId",
+          "name",
+          "values"
+        ],
+        "type": "object"
+      },
+      "ScreenerScanRequest": {
+        "description": "Request payload for POST /api/v1/screener/scan (mirrors Python ScreenerScanRequest).",
+        "properties": {
+          "columnSet": {
+            "description": "Predefined column set preset name.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "columns": {
+            "default": [],
+            "description": "Explicit column specifications requested.",
+            "items": {
+              "$ref": "#/components/schemas/MetricKeySpec"
+            },
+            "type": "array"
+          },
+          "filters": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScreenerFilterGroup"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Filter expression group."
+          },
+          "market": {
+            "description": "Market identifier (e.g. \"india\").",
+            "type": "string"
+          },
+          "primaryOnly": {
+            "default": true,
+            "description": "Whether to only scan primary listings.",
+            "type": "boolean"
+          },
+          "range": {
+            "default": [
+              0,
+              50
+            ],
+            "description": "Result pagination range (offset, limit).",
+            "items": [
+              {
+                "format": "uint",
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "format": "uint",
+                "minimum": 0.0,
+                "type": "integer"
+              }
+            ],
+            "maxItems": 2,
+            "minItems": 2,
+            "type": "array"
+          },
+          "sort": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SortSpec"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sorting specification."
+          },
+          "types": {
+            "default": [
+              "EQUITY"
+            ],
+            "description": "Instrument asset types to scan (defaults to [\"EQUITY\"]).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "market"
+        ],
+        "type": "object"
+      },
+      "ScreenerScanResponse": {
+        "description": "Full screener scan response.",
+        "properties": {
+          "columns": {
+            "description": "Column keys requested.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "range": {
+            "description": "Range [offset, limit].",
+            "items": [
+              {
+                "format": "uint",
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "format": "uint",
+                "minimum": 0.0,
+                "type": "integer"
+              }
+            ],
+            "maxItems": 2,
+            "minItems": 2,
+            "type": "array"
+          },
+          "rows": {
+            "description": "Rows of instrument data.",
+            "items": {
+              "$ref": "#/components/schemas/ScreenerRow"
+            },
+            "type": "array"
+          },
+          "total": {
+            "description": "Total count of matching instruments.",
+            "format": "uint",
+            "minimum": 0.0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "columns",
+          "range",
+          "rows",
+          "total"
+        ],
+        "type": "object"
+      },
+      "SortSpec": {
+        "description": "Sort direction and dimension for screener results.",
+        "properties": {
+          "dir": {
+            "description": "Sort direction: \"asc\" or \"desc\".",
+            "type": "string"
+          },
+          "key": {
+            "description": "Metric key to sort on.",
+            "type": "string"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricPeriod"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional period dimension."
+          },
+          "timeframe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timeframe"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional timeframe dimension."
+          }
+        },
+        "required": [
+          "dir",
+          "key"
         ],
         "type": "object"
       },
@@ -2647,6 +3066,46 @@
         ],
         "type": "object"
       },
+      "UnitType": {
+        "description": "Unit of measurement for a metric.",
+        "oneOf": [
+          {
+            "description": "Percentage.",
+            "enum": [
+              "PCT"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Absolute price.",
+            "enum": [
+              "PRICE"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Financial or technical ratio.",
+            "enum": [
+              "RATIO"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Share count.",
+            "enum": [
+              "SHARES"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Currency amount.",
+            "enum": [
+              "CURRENCY"
+            ],
+            "type": "string"
+          }
+        ]
+      },
       "Universe": {
         "description": "The set of instruments a strategy may trade.",
         "oneOf": [
@@ -2696,6 +3155,53 @@
           "unix_nanos"
         ],
         "type": "object"
+      },
+      "ValueType": {
+        "description": "Type of metric value.",
+        "oneOf": [
+          {
+            "description": "Floating point or integer numeric value.",
+            "enum": [
+              "NUMBER"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "String / text value.",
+            "enum": [
+              "STRING"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Categorical enum value.",
+            "enum": [
+              "ENUM"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Boolean flag.",
+            "enum": [
+              "BOOL"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Date or timestamp string.",
+            "enum": [
+              "DATE"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Monetary quantity.",
+            "enum": [
+              "MONEY"
+            ],
+            "type": "string"
+          }
+        ]
       }
     }
   },

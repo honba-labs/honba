@@ -36,8 +36,8 @@ pub mod typescript;
 pub mod typings;
 
 pub use registry::{
-    published_names, request_type_names, API_TYPES, CONFIG_TYPES, MANIFEST_TYPES, WIRE_ENUMS,
-    WIRE_TYPES,
+    published_names, request_type_names, API_TYPES, CONFIG_TYPES, MANIFEST_TYPES, SCREENER_TYPES,
+    WIRE_ENUMS, WIRE_TYPES,
 };
 pub use schemas::{local_refs, unresolved_local_refs, SchemaSet};
 
@@ -165,6 +165,8 @@ impl Codegen {
             "description": "Canonical Honba wire models, generated from the Rust source of truth",
             "schema_version": SCHEMA_VERSION,
             "api_version": API_VERSION,
+            "type": "object",
+            "properties": root_properties(),
             "$defs": self.set.to_defs("#/$defs/"),
         })
     }
@@ -257,6 +259,32 @@ impl Codegen {
             self.write_mcp(&base_dir.join("mcp"))?,
         ])
     }
+}
+
+/// The bundle's root `properties`: each wire and screener type under its
+/// snake_case name, so one document can carry any of them.
+fn root_properties() -> Value {
+    let mut out = serde_json::Map::new();
+    for name in WIRE_TYPES.iter().chain(SCREENER_TYPES) {
+        out.insert(snake_case(name), json!({"$ref": format!("#/$defs/{name}")}));
+    }
+    Value::Object(out)
+}
+
+/// `OrderIntent` -> `order_intent`.
+fn snake_case(name: &str) -> String {
+    let mut out = String::with_capacity(name.len() + 4);
+    for (i, c) in name.chars().enumerate() {
+        if c.is_ascii_uppercase() {
+            if i > 0 {
+                out.push('_');
+            }
+            out.push(c.to_ascii_lowercase());
+        } else {
+            out.push(c);
+        }
+    }
+    out
 }
 
 /// Pretty JSON with a trailing newline, so the file is diff-friendly.

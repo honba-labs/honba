@@ -318,7 +318,7 @@ pub fn check_predicate_value(op: FilterOp, value: &serde_json::Value) -> Result<
 }
 
 /// Logical grouping of filter predicates (AND / OR).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ScreenerFilterGroup {
     /// Operator: "AND" or "OR".
     pub operator: String,
@@ -327,7 +327,7 @@ pub struct ScreenerFilterGroup {
 }
 
 /// Sort direction and dimension for screener results.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct SortSpec {
     /// Metric key to sort on.
     pub key: String,
@@ -342,7 +342,7 @@ pub struct SortSpec {
 }
 
 /// Single scanned instrument row returned in screener responses.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ScreenerRow {
     /// Canonical full symbol (e.g. `NSE:RELIANCE`).
@@ -356,7 +356,7 @@ pub struct ScreenerRow {
 }
 
 /// Full screener scan response.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ScreenerScanResponse {
     /// Total count of matching instruments.
     pub total: usize,
@@ -369,7 +369,7 @@ pub struct ScreenerScanResponse {
 }
 
 /// Catalog definition of a metric (mirrors Python MetricDefinition).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MetricDefinition {
     /// Unique metric key sent to the backend.
@@ -414,7 +414,7 @@ const fn default_true() -> bool {
 }
 
 /// Request payload for POST /api/v1/screener/scan (mirrors Python ScreenerScanRequest).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ScreenerScanRequest {
     /// Market identifier (e.g. "india").

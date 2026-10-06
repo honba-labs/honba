@@ -23,6 +23,19 @@ pub const WIRE_TYPES: &[&str] = &[
     "ScreenerFilterPredicate",
 ];
 
+/// The screener contract: metric keys and references, predicates, scan
+/// request and response.
+pub const SCREENER_TYPES: &[&str] = &[
+    "MetricKeySpec",
+    "MetricRef",
+    "MetricDefinition",
+    "ScreenerFilterGroup",
+    "SortSpec",
+    "ScreenerScanRequest",
+    "ScreenerRow",
+    "ScreenerScanResponse",
+];
+
 /// The enums whose variants are published as stable string constants.
 pub const WIRE_ENUMS: &[&str] = &[
     "OrderSide",
@@ -65,6 +78,7 @@ pub const MANIFEST_TYPES: &[&str] = &[
 pub fn published_names() -> Vec<&'static str> {
     let mut names: Vec<&'static str> = Vec::new();
     names.extend_from_slice(WIRE_TYPES);
+    names.extend_from_slice(SCREENER_TYPES);
     names.extend_from_slice(WIRE_ENUMS);
     names.extend_from_slice(API_TYPES);
     names.extend_from_slice(MANIFEST_TYPES);
@@ -87,6 +101,15 @@ pub fn register_all(set: &mut SchemaSet) {
     set.add_type::<honba_messages::Event>("Event");
     set.add_type::<honba_messages::Message>("Message");
     set.add_type::<honba_entities::ScreenerFilterPredicate>("ScreenerFilterPredicate");
+
+    set.add_type::<honba_entities::MetricKeySpec>("MetricKeySpec");
+    set.add_type::<honba_entities::MetricRef>("MetricRef");
+    set.add_type::<honba_entities::MetricDefinition>("MetricDefinition");
+    set.add_type::<honba_entities::ScreenerFilterGroup>("ScreenerFilterGroup");
+    set.add_type::<honba_entities::SortSpec>("SortSpec");
+    set.add_type::<honba_entities::ScreenerScanRequest>("ScreenerScanRequest");
+    set.add_type::<honba_entities::ScreenerRow>("ScreenerRow");
+    set.add_type::<honba_entities::ScreenerScanResponse>("ScreenerScanResponse");
 
     set.add_type::<honba_messages::OrderSide>("OrderSide");
     set.add_type::<honba_messages::OrderType>("OrderType");

@@ -146,7 +146,34 @@ class Message:
     schema_version: int
     ts_init: UnixNanos
 
+class MetricDefinition:
+    defaultPeriod: MetricPeriod | None = None
+    defaultTimeframe: Timeframe | None = None
+    description: str | None = None
+    filterable: bool | None = None
+    group: str
+    hasPeriod: bool | None = None
+    hasTimeframe: bool | None = None
+    key: str
+    label: str
+    sortable: bool | None = None
+    source: str | None = None
+    unit: UnitType | None = None
+    valueType: ValueType
+
+class MetricKeySpec:
+    key: str
+    period: MetricPeriod | None = None
+    timeframe: Timeframe | None = None
+
 MetricPeriod = Literal["SNAPSHOT", "TTM", "FY", "FQ", "H1", "CURRENT"]
+
+class MetricRef:
+    key: str
+    period: MetricPeriod | None = None
+    timeframe: Timeframe | None = None
+
+MetricValue = float | str | bool | None
 
 class Money:
     amount: int
@@ -232,12 +259,44 @@ class ResponseEnvelope(Generic[T]):
 
 RunStatus = Literal["pending", "running", "completed", "failed"]
 
+class ScreenerFilterGroup:
+    items: list[Any]
+    operator: str
+
 class ScreenerFilterPredicate:
     key: str
     op: FilterOp
     period: MetricPeriod | None = None
     timeframe: Timeframe | None = None
     value: Any
+
+class ScreenerRow:
+    fullSymbol: str
+    instrumentId: str
+    name: str
+    values: dict[str, MetricValue]
+
+class ScreenerScanRequest:
+    columnSet: str | None = None
+    columns: list[MetricKeySpec] | None = None
+    filters: ScreenerFilterGroup | None = None
+    market: str
+    primaryOnly: bool | None = None
+    range: list[Any] | None = None
+    sort: SortSpec | None = None
+    types: list[str] | None = None
+
+class ScreenerScanResponse:
+    columns: list[str]
+    range: list[Any]
+    rows: list[ScreenerRow]
+    total: int
+
+class SortSpec:
+    dir: str
+    key: str
+    period: MetricPeriod | None = None
+    timeframe: Timeframe | None = None
 
 class StrategiesRequest:
     code: str | None = None
@@ -299,9 +358,13 @@ TradeId = str
 class TradesResponse:
     trades: list[Trade]
 
+UnitType = Literal["PCT", "PRICE", "RATIO", "SHARES", "CURRENCY"]
+
 Universe = dict[str, Any]
 
 class UnixNanos:
     iso: str
     unix_nanos: str
+
+ValueType = Literal["NUMBER", "STRING", "ENUM", "BOOL", "DATE", "MONEY"]
 

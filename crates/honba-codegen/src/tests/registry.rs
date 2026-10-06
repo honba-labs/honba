@@ -37,3 +37,24 @@ fn published_names_are_unique() {
     let unique: BTreeSet<_> = published_names().into_iter().collect();
     assert_eq!(unique.len(), published_names().len());
 }
+
+#[test]
+fn the_screener_contract_types_are_published() {
+    // The Python bundle used to carry these; once Rust owned the bundle they
+    // went missing, so a screener client had no schema for MetricRef & co.
+    let set = full_registry();
+    for name in [
+        "MetricKeySpec",
+        "MetricRef",
+        "MetricDefinition",
+        "ScreenerFilterPredicate",
+        "ScreenerFilterGroup",
+        "SortSpec",
+        "ScreenerScanRequest",
+        "ScreenerRow",
+        "ScreenerScanResponse",
+    ] {
+        assert!(published_names().contains(&name), "{name} not published");
+        assert!(set.get(name).is_some(), "{name} not registered");
+    }
+}
