@@ -1,6 +1,5 @@
 """`disconnect=False` is a public keyword: it must leave the adapter connected (F1)."""
 
-
 from honba.adapters.contract import verify_adapter_contract
 from honba.adapters.testing import FakeAdapter
 

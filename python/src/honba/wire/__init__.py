@@ -18,9 +18,9 @@ from honba.wire.screener import (
     ValueType,
 )
 from honba.wire.wire import (
+    API_VERSION,
     ENUMS,
     MODELS,
-    API_VERSION,
     SCHEMA_VERSION,
     Bar,
     BarAggregation,
@@ -55,9 +55,9 @@ from honba.wire.wire import (
 )
 
 __all__ = [
+    "API_VERSION",
     "ENUMS",
     "MODELS",
-    "API_VERSION",
     "SCHEMA_VERSION",
     "Bar",
     "BarAggregation",
