@@ -72,3 +72,17 @@ fn an_unknown_code_is_rejected_rather_than_silently_defaulted() {
     let err = serde_json::from_value::<ErrorCode>(json!("totally_new_code"));
     assert!(err.is_err(), "unknown error code must not deserialize");
 }
+
+#[test]
+fn not_implemented_is_an_unsupported_category_code_that_is_not_retryable() {
+    assert_eq!(
+        serde_json::to_value(ErrorCode::NotImplemented).unwrap(),
+        json!("not_implemented")
+    );
+    assert_eq!(ErrorCode::NotImplemented.as_str(), "not_implemented");
+    assert_eq!(
+        ErrorCode::NotImplemented.category(),
+        ErrorCategory::Unsupported
+    );
+    assert!(!ErrorCode::NotImplemented.is_retryable());
+}

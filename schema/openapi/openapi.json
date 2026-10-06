@@ -854,6 +854,13 @@
               "unsupported"
             ],
             "type": "string"
+          },
+          {
+            "description": "The route exists in the contract but its behaviour is not built yet.",
+            "enum": [
+              "not_implemented"
+            ],
+            "type": "string"
           }
         ]
       },

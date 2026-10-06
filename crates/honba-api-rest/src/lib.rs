@@ -16,9 +16,8 @@ use axum::{
     Router,
 };
 use honba_api::{
-    ApiResponse, BacktestRequest, BacktestResponse, Capabilities, CapabilitiesResponse, ErrorCode,
-    ErrorDetail, OrdersRequest, OrdersResponse, QuotesQuery, QuotesResponse, ResponseEnvelope,
-    RunStatus, StrategiesRequest, StrategiesResponse, SweepRequest, SweepResponse,
+    ApiResponse, BacktestRequest, Capabilities, CapabilitiesResponse, ErrorCode, ErrorDetail,
+    OrdersRequest, QuotesQuery, QuotesResponse, ResponseEnvelope, StrategiesRequest, SweepRequest,
     VerifyStrategyRequest, VerifyStrategyResponse,
 };
 use std::sync::Arc;
@@ -158,18 +157,29 @@ async fn get_depth(Path(_id): Path<String>) -> Json<ResponseEnvelope<serde_json:
     Json(ApiResponse::success(serde_json::json!({})))
 }
 
-async fn get_strategies() -> Json<ResponseEnvelope<StrategiesResponse>> {
-    Json(ApiResponse::success(StrategiesResponse {
-        strategies: vec![],
-    }))
+/// The 501 answer of a route that is in the contract but not built yet.
+///
+/// A placeholder must never look like a success: an empty list or a made-up id
+/// would be read as real state by a client or an agent.
+fn not_implemented(what: &str) -> (StatusCode, Json<ResponseEnvelope<serde_json::Value>>) {
+    let detail = ErrorDetail::new(
+        ErrorCode::NotImplemented,
+        format!("{what} is not implemented yet"),
+    );
+    (
+        StatusCode::NOT_IMPLEMENTED,
+        Json(ApiResponse::error(detail)),
+    )
 }
 
-async fn post_strategies(
-    ApiJson(_req): ApiJson<StrategiesRequest>,
-) -> Json<ResponseEnvelope<StrategiesResponse>> {
-    Json(ApiResponse::success(StrategiesResponse {
-        strategies: vec![],
-    }))
+type NotImplemented = (StatusCode, Json<ResponseEnvelope<serde_json::Value>>);
+
+async fn get_strategies() -> NotImplemented {
+    not_implemented("listing strategies")
+}
+
+async fn post_strategies(ApiJson(_req): ApiJson<StrategiesRequest>) -> NotImplemented {
+    not_implemented("compiling a strategy from source")
 }
 
 /// Verifies a manifest and returns its IR; a manifest that does not verify is
@@ -186,83 +196,48 @@ async fn post_verify_strategy(
     }
 }
 
-async fn post_backtests(
-    ApiJson(_req): ApiJson<BacktestRequest>,
-) -> Json<ResponseEnvelope<BacktestResponse>> {
-    Json(ApiResponse::success(BacktestResponse {
-        run_id: "test-run-001".to_string(),
-        status: RunStatus::Pending,
-        metrics: None,
-        assumptions: None,
-    }))
+async fn post_backtests(ApiJson(_req): ApiJson<BacktestRequest>) -> NotImplemented {
+    not_implemented("running a backtest")
 }
 
-async fn get_backtest_by_id(Path(_id): Path<String>) -> Json<ResponseEnvelope<BacktestResponse>> {
-    Json(ApiResponse::success(BacktestResponse {
-        run_id: _id,
-        status: RunStatus::Completed,
-        metrics: None,
-        assumptions: None,
-    }))
+async fn get_backtest_by_id(Path(_id): Path<String>) -> NotImplemented {
+    not_implemented("reading a backtest")
 }
 
-async fn get_backtest_journal(Path(_id): Path<String>) -> (StatusCode, String) {
-    // SSE or plain text; for now return 501/placeholder
-    (
-        StatusCode::NOT_IMPLEMENTED,
-        "Journal streaming via SSE not yet implemented".to_string(),
-    )
+async fn get_backtest_journal(Path(_id): Path<String>) -> NotImplemented {
+    not_implemented("streaming a backtest journal")
 }
 
-async fn post_sweeps(
-    ApiJson(_req): ApiJson<SweepRequest>,
-) -> Json<ResponseEnvelope<SweepResponse>> {
-    Json(ApiResponse::success(SweepResponse {
-        job_id: "sweep-001".to_string(),
-        status: RunStatus::Pending,
-        report: None,
-    }))
+async fn post_sweeps(ApiJson(_req): ApiJson<SweepRequest>) -> NotImplemented {
+    not_implemented("running a sweep")
 }
 
-async fn get_sweep_by_id(Path(_id): Path<String>) -> Json<ResponseEnvelope<SweepResponse>> {
-    Json(ApiResponse::success(SweepResponse {
-        job_id: _id,
-        status: RunStatus::Completed,
-        report: None,
-    }))
+async fn get_sweep_by_id(Path(_id): Path<String>) -> NotImplemented {
+    not_implemented("reading a sweep")
 }
 
-async fn get_orders() -> Json<ResponseEnvelope<OrdersResponse>> {
-    Json(ApiResponse::success(OrdersResponse { orders: vec![] }))
+async fn get_orders() -> NotImplemented {
+    not_implemented("listing orders")
 }
 
-async fn post_orders(
-    ApiJson(_req): ApiJson<OrdersRequest>,
-) -> Json<ResponseEnvelope<serde_json::Value>> {
-    Json(ApiResponse::success(
-        serde_json::json!({"order_id": "ord-001"}),
-    ))
+async fn post_orders(ApiJson(_req): ApiJson<OrdersRequest>) -> NotImplemented {
+    not_implemented("placing an order")
 }
 
-async fn delete_order(Path(_id): Path<String>) -> Json<ResponseEnvelope<serde_json::Value>> {
-    Json(ApiResponse::success(
-        serde_json::json!({"cancelled": true, "order_id": _id}),
-    ))
+async fn delete_order(Path(_id): Path<String>) -> NotImplemented {
+    not_implemented("cancelling an order")
 }
 
-async fn post_close_positions() -> Json<ResponseEnvelope<serde_json::Value>> {
-    Json(ApiResponse::success(serde_json::json!({"closed": true})))
+async fn post_close_positions() -> NotImplemented {
+    not_implemented("closing positions")
 }
 
-async fn get_screener_scan() -> Json<ResponseEnvelope<serde_json::Value>> {
-    Json(ApiResponse::success(serde_json::json!({})))
+async fn get_screener_scan() -> NotImplemented {
+    not_implemented("the screener")
 }
 
-async fn get_journal_by_id(Path(_id): Path<String>) -> (StatusCode, String) {
-    (
-        StatusCode::NOT_IMPLEMENTED,
-        format!("Journal {} not implemented", _id),
-    )
+async fn get_journal_by_id(Path(_id): Path<String>) -> NotImplemented {
+    not_implemented("reading a journal")
 }
 
 #[cfg(test)]

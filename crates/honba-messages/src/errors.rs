@@ -126,6 +126,8 @@ crate::enum_with_all! {
         InternalError,
         /// The operation is not supported on this surface or build.
         Unsupported,
+        /// The route exists in the contract but its behaviour is not built yet.
+        NotImplemented,
     }
 }
 
@@ -149,7 +151,7 @@ impl ErrorCode {
             Self::MarketDataUnavailable => ErrorCategory::MarketData,
             Self::Timeout | Self::TransportError => ErrorCategory::Transport,
             Self::InternalError => ErrorCategory::Internal,
-            Self::Unsupported => ErrorCategory::Unsupported,
+            Self::Unsupported | Self::NotImplemented => ErrorCategory::Unsupported,
         }
     }
 
@@ -186,6 +188,7 @@ impl ErrorCode {
             Self::TransportError => "transport_error",
             Self::InternalError => "internal_error",
             Self::Unsupported => "unsupported",
+            Self::NotImplemented => "not_implemented",
         }
     }
 }
