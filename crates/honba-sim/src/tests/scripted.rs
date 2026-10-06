@@ -87,3 +87,50 @@ fn cancelling_a_finished_or_unknown_order_is_a_no_op() {
     exec.cancel("nope").unwrap();
     assert!(exec.drain_rejections().unwrap().is_empty());
 }
+
+#[test]
+#[should_panic(expected = "partial fill must be positive and finite")]
+fn scripting_a_non_positive_partial_fill_panics() {
+    let _ = ScriptedExecution::new(10.0).with("O-1", Behavior::partial(0.0, "x"));
+}
+
+#[test]
+#[should_panic(expected = "partial fill must be positive and finite")]
+fn scripting_a_nan_partial_fill_panics() {
+    let _ = ScriptedExecution::new(10.0).with("O-1", Behavior::partial(f64::NAN, "x"));
+}
+
+#[test]
+fn a_partial_fill_of_the_whole_order_or_more_is_refused_at_submit() {
+    for filled in [10.0, 12.0] {
+        let mut exec = ScriptedExecution::new(10.0).with("O-1", Behavior::partial(filled, "x"));
+        let err = exec
+            .submit(market("O-1", OrderSide::Buy, 10.0, 1))
+            .unwrap_err();
+        assert!(err.to_string().contains("must be below the order quantity"));
+        assert!(exec.drain_fills().unwrap().is_empty());
+        assert!(exec.drain_rejections().unwrap().is_empty());
+    }
+}
+
+#[test]
+fn a_later_script_entry_for_the_same_order_id_replaces_the_earlier_one() {
+    let mut exec = ScriptedExecution::new(10.0)
+        .with("O-1", Behavior::reject("first"))
+        .with("O-1", Behavior::Hold);
+    exec.submit(market("O-1", OrderSide::Buy, 3.0, 1)).unwrap();
+    assert_eq!(exec.working_orders(), vec!["O-1".to_string()]);
+    assert!(exec.drain_rejections().unwrap().is_empty());
+}
+
+#[test]
+fn resubmitting_an_order_id_applies_its_script_each_time() {
+    let mut exec = ScriptedExecution::new(10.0).with("O-1", Behavior::reject("no_position"));
+    exec.submit(market("O-1", OrderSide::Buy, 3.0, 1)).unwrap();
+    exec.submit(market("O-1", OrderSide::Buy, 2.0, 2)).unwrap();
+    let got = exec.drain_rejections().unwrap();
+    assert_eq!(
+        got.iter().map(|r| r.quantity).collect::<Vec<_>>(),
+        [3.0, 2.0]
+    );
+}

@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use honba_engine::{ExecutionEngine, OrderRejection, Result};
+use honba_engine::{AlgoError, ExecutionEngine, OrderRejection, Result};
 use honba_entities::{Currency, Trade};
 use honba_messages::{Order, OrderId, OrderSide};
 
@@ -73,9 +73,24 @@ impl ScriptedExecution {
         }
     }
 
-    /// Scripts what happens to the order with id `order_id`.
+    /// Scripts what happens to the order with id `order_id`. A later entry
+    /// for the same id replaces the earlier one; the script applies each time
+    /// that id is submitted.
+    ///
+    /// # Panics
+    ///
+    /// If `behavior` is a [`Behavior::Partial`] whose `filled` is not positive
+    /// and finite: the script is a test fixture, so a bad one fails loudly when
+    /// built. A `filled` at or above the order's quantity is only known at
+    /// submit, where it is refused with an error.
     #[must_use]
     pub fn with(mut self, order_id: impl Into<String>, behavior: Behavior) -> Self {
+        if let Behavior::Partial { filled, .. } = &behavior {
+            assert!(
+                filled.is_finite() && *filled > 0.0,
+                "partial fill must be positive and finite, got {filled}"
+            );
+        }
         self.script.insert(order_id.into(), behavior);
         self
     }
@@ -129,6 +144,12 @@ impl ExecutionEngine for ScriptedExecution {
             Behavior::Fill => self.fill(&order, order.quantity()),
             Behavior::Reject { reason } => self.reject(&order, order.quantity(), reason),
             Behavior::Partial { filled, reason } => {
+                if filled >= order.quantity() {
+                    return Err(AlgoError::Component(format!(
+                        "scripted partial fill {filled} must be below the order quantity {}",
+                        order.quantity()
+                    )));
+                }
                 self.fill(&order, filled);
                 self.reject(&order, order.quantity() - filled, reason);
             }
