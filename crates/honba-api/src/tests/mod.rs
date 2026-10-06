@@ -79,3 +79,5 @@ fn api_error_codes_reach_callers_through_the_re_export() {
     let via_messages: honba_messages::ErrorCode = via_api;
     assert_eq!(via_messages, honba_messages::ErrorCode::Timeout);
 }
+
+mod unknown_fields;

@@ -1,4 +1,6 @@
 #![allow(missing_docs)]
+//! Response DTOs. These are *records* (ADR 0012): unknown fields are ignored
+//! on parse so an older client reads a newer server's response.
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -12,7 +14,6 @@ pub type CapabilitiesResponse = Capabilities;
 
 /// Instruments response.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct InstrumentsResponse {
     /// Matching instruments, as of the requested snapshot.
     pub instruments: Vec<serde_json::Value>,
@@ -20,7 +21,6 @@ pub struct InstrumentsResponse {
 
 /// Quotes response.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct QuotesResponse {
     /// Latest top-of-book per requested symbol.
     pub quotes: Vec<QuoteTick>,
@@ -28,7 +28,6 @@ pub struct QuotesResponse {
 
 /// Bars response.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct BarsResponse {
     /// Bars in ascending `ts_event` order.
     pub bars: Vec<Bar>,
@@ -36,7 +35,6 @@ pub struct BarsResponse {
 
 /// One side of the order book.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct DepthLevel {
     /// Price.
     pub price: f64,
@@ -46,7 +44,6 @@ pub struct DepthLevel {
 
 /// Depth (order book) response.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct DepthResponse {
     /// Bid levels, best (highest) first.
     pub bids: Vec<DepthLevel>,
@@ -56,7 +53,6 @@ pub struct DepthResponse {
 
 /// Strategies response: verified manifests.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct StrategiesResponse {
     /// Compiled manifests.
     pub strategies: Vec<serde_json::Value>,
@@ -91,7 +87,6 @@ pub type SweepStatus = RunStatus;
 /// A fixed, documented set rather than a free-form object, so a dashboard can
 /// bind to fields that are guaranteed present.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct BacktestMetrics {
     /// Number of completed round trips.
     pub trades: u64,
@@ -107,7 +102,6 @@ pub struct BacktestMetrics {
 
 /// Backtest response.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct BacktestResponse {
     /// Server-assigned run id.
     pub run_id: String,
@@ -123,7 +117,6 @@ pub struct BacktestResponse {
 
 /// Sweep response.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct SweepResponse {
     /// Server-assigned job id.
     pub job_id: String,
@@ -136,7 +129,6 @@ pub struct SweepResponse {
 
 /// Sweep results: best trials plus the ranking, in a deterministic order.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct SweepReportResponse {
     /// Trials ranked best-first by the fitness function.
     pub ranked: Vec<serde_json::Value>,
@@ -147,7 +139,6 @@ pub struct SweepReportResponse {
 
 /// Orders response.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct OrdersResponse {
     /// Orders matching the query.
     pub orders: Vec<Order>,
@@ -155,7 +146,6 @@ pub struct OrdersResponse {
 
 /// Positions response.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct PositionsResponse {
     /// Open positions.
     pub positions: Vec<Position>,
@@ -163,7 +153,6 @@ pub struct PositionsResponse {
 
 /// Trades response.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct TradesResponse {
     /// Realized trades.
     pub trades: Vec<Trade>,

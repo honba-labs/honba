@@ -5,7 +5,6 @@ use std::collections::BTreeMap;
 
 /// Capability manifest describing what features are available.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct CapabilityManifest {
     /// Crates compiled in.
     pub crates: Vec<String>,
@@ -23,7 +22,6 @@ pub struct CapabilityManifest {
 
 /// Top-level capabilities response.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct Capabilities {
     /// Capability manifest.
     pub capabilities: CapabilityManifest,

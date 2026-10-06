@@ -70,7 +70,6 @@
       "type": "string"
     },
     "BacktestMetrics": {
-      "additionalProperties": false,
       "description": "Headline performance numbers for a completed backtest.\n\nA fixed, documented set rather than a free-form object, so a dashboard can bind to fields that are guaranteed present.",
       "properties": {
         "max_drawdown": {
@@ -169,7 +168,6 @@
       "type": "object"
     },
     "BacktestResponse": {
-      "additionalProperties": false,
       "description": "Backtest response.",
       "properties": {
         "assumptions": {
@@ -435,7 +433,6 @@
       "type": "object"
     },
     "BarsResponse": {
-      "additionalProperties": false,
       "description": "Bars response.",
       "properties": {
         "bars": {
@@ -452,7 +449,6 @@
       "type": "object"
     },
     "Capabilities": {
-      "additionalProperties": false,
       "description": "Top-level capabilities response.",
       "properties": {
         "capabilities": {
@@ -470,7 +466,6 @@
       "type": "object"
     },
     "CapabilityManifest": {
-      "additionalProperties": false,
       "description": "Capability manifest describing what features are available.",
       "properties": {
         "adapters": {
@@ -611,7 +606,6 @@
       ]
     },
     "DepthLevel": {
-      "additionalProperties": false,
       "description": "One side of the order book.",
       "properties": {
         "price": {
@@ -648,7 +642,6 @@
       "type": "object"
     },
     "DepthResponse": {
-      "additionalProperties": false,
       "description": "Depth (order book) response.",
       "properties": {
         "asks": {
@@ -1483,7 +1476,6 @@
       "type": "object"
     },
     "InstrumentsResponse": {
-      "additionalProperties": false,
       "description": "Instruments response.",
       "properties": {
         "instruments": {
@@ -2082,7 +2074,6 @@
       "type": "object"
     },
     "OrdersResponse": {
-      "additionalProperties": false,
       "description": "Orders response.",
       "properties": {
         "orders": {
@@ -2178,7 +2169,6 @@
       ]
     },
     "PositionsResponse": {
-      "additionalProperties": false,
       "description": "Positions response.",
       "properties": {
         "positions": {
@@ -2289,7 +2279,6 @@
       "type": "object"
     },
     "QuotesResponse": {
-      "additionalProperties": false,
       "description": "Quotes response.",
       "properties": {
         "quotes": {
@@ -2670,7 +2659,6 @@
       "type": "object"
     },
     "StrategiesResponse": {
-      "additionalProperties": false,
       "description": "Strategies response: verified manifests.",
       "properties": {
         "strategies": {
@@ -2777,7 +2765,6 @@
       "type": "object"
     },
     "SweepReportResponse": {
-      "additionalProperties": false,
       "description": "Sweep results: best trials plus the ranking, in a deterministic order.",
       "properties": {
         "best": {
@@ -2830,7 +2817,6 @@
       "type": "object"
     },
     "SweepResponse": {
-      "additionalProperties": false,
       "description": "Sweep response.",
       "properties": {
         "job_id": {
@@ -3050,7 +3036,6 @@
       "type": "string"
     },
     "TradesResponse": {
-      "additionalProperties": false,
       "description": "Trades response.",
       "properties": {
         "trades": {

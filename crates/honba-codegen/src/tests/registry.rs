@@ -58,3 +58,42 @@ fn the_screener_contract_types_are_published() {
         assert!(set.get(name).is_some(), "{name} not registered");
     }
 }
+
+#[test]
+fn api_responses_are_open_records_and_api_requests_are_closed_inputs() {
+    // ADR 0012: the published schema must say what serde does, or a generated
+    // client would reject a newer server's response.
+    let set = full_registry();
+    let responses = [
+        "Capabilities",
+        "CapabilityManifest",
+        "InstrumentsResponse",
+        "QuotesResponse",
+        "BarsResponse",
+        "DepthResponse",
+        "StrategiesResponse",
+        "BacktestResponse",
+        "BacktestMetrics",
+        "SweepResponse",
+        "SweepReportResponse",
+        "OrdersResponse",
+        "PositionsResponse",
+        "TradesResponse",
+    ];
+    for name in responses {
+        let schema = set.get(name).expect("registered");
+        assert_ne!(
+            schema.get("additionalProperties"),
+            Some(&serde_json::json!(false)),
+            "{name} is a response and must tolerate unknown fields"
+        );
+    }
+    for name in request_type_names() {
+        let schema = set.get(name).expect("registered");
+        assert_eq!(
+            schema.get("additionalProperties"),
+            Some(&serde_json::json!(false)),
+            "{name} is a request body and must reject unknown fields"
+        );
+    }
+}

@@ -79,9 +79,10 @@ pin it: each record file has a `tolerated` section (`value` with extras,
 same JSON, and each input file keeps an `unknown_field` case under `invalid`
 (`python/tests/unit/test_wire_golden.py::test_golden_files_pin_the_unknown_field_policy`).
 
-Known gap: `honba-api` *response* types still carry `deny_unknown_fields`;
-they are records by this rule and should be relaxed with the codegen/OpenAPI
-owner (the change regenerates `schema/openapi`).
+`honba-api` follows the same split: its response DTOs (and `Capabilities`) are
+records and ignore unknown fields, its request bodies and query DTOs are inputs
+and reject them; `schema/openapi` publishes `additionalProperties: false` only on
+the latter (`crates/honba-api/src/tests/unknown_fields.rs`).
 
 ## Consequences
 
