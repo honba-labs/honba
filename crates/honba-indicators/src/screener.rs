@@ -34,7 +34,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use honba_entities::{
-    FilterOp, MetricPeriod, MetricRef, ScreenerFilterGroup, ScreenerFilterPredicate,
+    FilterOp, MetricPeriod, MetricRef, ScreenerFilterGroup, ScreenerFilterPredicate, Timeframe,
 };
 use honba_messages::Bar;
 use serde_json::Value;
@@ -490,6 +490,24 @@ pub fn group_metric_keys(group: &ScreenerFilterGroup) -> Result<Vec<String>, Scr
         Ok(())
     })?;
     Ok(keys)
+}
+
+/// Every timeframe dimension a filter names (left or right side), first-seen order, no repeats.
+///
+/// The evaluator reads whatever bars it is given, so a caller that knows the bars' timeframe
+/// uses this to refuse a predicate asking for another one rather than answer from the wrong bars.
+pub fn group_timeframes(group: &ScreenerFilterGroup) -> Result<Vec<Timeframe>, ScreenerError> {
+    let mut found: Vec<Timeframe> = Vec::new();
+    walk(group, 1, &mut 0, &mut |pred| {
+        let ref_tf = right_metric(pred).and_then(|r| r.timeframe);
+        for tf in pred.timeframe.iter().cloned().chain(ref_tf) {
+            if !found.contains(&tf) {
+                found.push(tf);
+            }
+        }
+        Ok(())
+    })?;
+    Ok(found)
 }
 
 /// Evaluates a group of predicates (and nested groups) against a bar history.

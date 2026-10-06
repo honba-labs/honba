@@ -7,8 +7,8 @@ use serde_json::{json, Value};
 
 use super::{any_instrument, hlc};
 use crate::screener::{
-    evaluate_group, evaluate_predicate, group_metric_keys, latest_metrics, py_float_repr,
-    validate_group, ScreenerError, MAX_GROUP_DEPTH,
+    evaluate_group, evaluate_predicate, group_metric_keys, group_timeframes, latest_metrics,
+    py_float_repr, validate_group, ScreenerError, MAX_GROUP_DEPTH,
 };
 
 fn closes(values: &[f64]) -> Vec<Bar> {
@@ -388,4 +388,19 @@ fn group_metric_keys_lists_left_and_right_keys_once_in_order() {
         vec!["SMA3", "SMA5", "close"]
     );
     let _ = any_instrument();
+}
+
+#[test]
+fn group_timeframes_lists_every_timeframe_dimension_once() {
+    use honba_entities::Timeframe;
+    let g = group(json!({"operator": "AND", "items": [
+        {"key": "SMA3", "op": "crosses_above", "value": {"key": "SMA5", "timeframe": "1W"},
+         "timeframe": "1D"},
+        {"key": "close", "op": "gt", "value": 1, "timeframe": "1D"},
+        {"key": "close", "op": "gt", "value": 1}
+    ]}));
+    assert_eq!(
+        group_timeframes(&g).unwrap(),
+        vec![Timeframe::D1, Timeframe::W1]
+    );
 }
