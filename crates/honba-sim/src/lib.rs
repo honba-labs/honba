@@ -5,10 +5,12 @@
 //! Simulation and paper execution engines for the Honba platform.
 
 pub mod bar_fill;
+pub mod next_open;
 pub mod paper;
 pub mod scripted;
 
 pub use bar_fill::{BarFillEngine, FillCosts, FillCostsError};
+pub use next_open::NextOpenSim;
 pub use paper::{OrderLedger, PaperExecution};
 pub use scripted::{Behavior, ScriptedExecution};
 

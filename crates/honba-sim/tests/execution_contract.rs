@@ -12,7 +12,7 @@ use honba_messages::{
     Bar, BarAggregation, BarSpecification, BarType, Event, Exchange, InstrumentId, Order, OrderId,
     OrderSide, OrderType, PriceType, TimeInForce, UnixNanos,
 };
-use honba_sim::{BarFillEngine, Behavior, PaperExecution, ScriptedExecution};
+use honba_sim::{BarFillEngine, Behavior, NextOpenSim, PaperExecution, ScriptedExecution};
 
 fn order(id: &str, side: OrderSide, qty: f64, ts: u64) -> Order {
     let t = UnixNanos::from_u64(ts);
@@ -97,4 +97,11 @@ fn scripted_execution_honours_the_contract() {
         .with("c", Behavior::reject("no_position"))
         .with("d", Behavior::Fill);
     check_execution_contract(&mut engine, &["a", "b", "c", "d"]);
+}
+
+#[test]
+fn next_open_sim_honours_the_contract() {
+    use honba_entities::{Currency, Money};
+    let mut engine = NextOpenSim::new(Money::new(1_000_000, Currency::Inr)).unwrap();
+    check_execution_contract(&mut engine, &["a", "b"]);
 }

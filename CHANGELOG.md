@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Rust next-open simulator, chunk 1 (E3-S1a, ADR 0016)
+
+- New `honba_sim::NextOpenSim` (`ExecutionEngine` + `Handler`): port of `NextOpenExecution` for market orders filled at
+  the next bar open, cancel (stamped with the cancel time), the `unsupported_order_type`, `no_position` and
+  `insufficient_funds` rejections, integer-minor-unit cash, long-only caps and lot-sized funding cuts. Settlement,
+  costs and the `SessionOpen` event follow in chunk 2; the PyO3 binding and Python delegation in chunk 3. Python API
+  unchanged.
+- New shared vectors `schema/conformance/next_open_sim.json`, generated from the Python reference by
+  `scripts/gen_next_open_vectors.py`, replayed by `crates/honba-sim/tests/next_open_conformance.rs` and
+  `python/tests/integration/test_next_open_sim_conformance.py` (scenarios carry a `chunk` tag).
+- ADR 0016 catalogs the Python reference behavior and the scope of each chunk.
+
 ### `honba.event_loop`: one explicit async runtime per interpreter (E10-S7, ADR 0015)
 
 - New `honba.event_loop` (`start`, `stop`, `is_running`, `info`, `running()` context manager, `EventLoopError`). It

@@ -1,6 +1,7 @@
 //! Unit tests for this crate, one file per area.
 
 mod bar_fill;
+mod next_open;
 mod paper;
 mod scripted;
 
@@ -25,7 +26,7 @@ fn bar_event(close: f64, ts: u64) -> Event {
 }
 
 /// A day order for [`any_instrument`] stamped at `ts`.
-fn order(
+pub(crate) fn order(
     id: &str,
     side: OrderSide,
     order_type: OrderType,
