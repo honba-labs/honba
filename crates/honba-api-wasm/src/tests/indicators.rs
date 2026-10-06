@@ -128,7 +128,7 @@ fn catalog_lists_every_indicator_with_params_and_warmup() {
         .iter()
         .map(|i| i["name"].as_str().unwrap())
         .collect();
-    assert_eq!(names, ["sma", "ema", "rsi", "macd", "bollinger"]);
+    assert_eq!(names, ["sma", "ema", "rsi", "macd", "bollinger", "atr"]);
     let sma = &v["indicators"][0];
     assert_eq!(sma["input"], "close");
     assert_eq!(sma["params"][0]["name"], "period");

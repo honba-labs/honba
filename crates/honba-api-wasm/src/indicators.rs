@@ -9,7 +9,7 @@
 
 use std::fmt;
 
-use honba_indicators::{BollingerBands, Ema, Indicator, Macd, Rsi, Sma};
+use honba_indicators::{Atr, BollingerBands, Ema, Indicator, Macd, Rsi, Sma};
 use serde::Deserialize;
 use serde_json::json;
 
@@ -27,6 +27,15 @@ pub enum IndicatorError {
     NonFiniteInput(usize),
     /// Finite input overflowed: the output is infinite, or `NaN` after warm-up, at this index.
     NonFiniteOutput(usize),
+    /// The `high`, `low` and `close` series do not have the same length.
+    LengthMismatch {
+        /// Length of `high`.
+        high: usize,
+        /// Length of `low`.
+        low: usize,
+        /// Length of `close`.
+        close: usize,
+    },
 }
 
 impl fmt::Display for IndicatorError {
@@ -38,6 +47,10 @@ impl fmt::Display for IndicatorError {
             Self::NonFiniteOutput(i) => {
                 write!(f, "numeric overflow: non-finite output at index {i}")
             }
+            Self::LengthMismatch { high, low, close } => write!(
+                f,
+                "series lengths differ: high={high}, low={low}, close={close}"
+            ),
         }
     }
 }
@@ -128,6 +141,20 @@ where
         .collect()
 }
 
+/// Leading NaNs are warm-up. An infinity, or a NaN after the first value, means finite input
+/// overflowed f64 (e.g. a running sum of 1e308 values); refuse rather than return garbage.
+fn check_output(out: &[f64]) -> Result<(), IndicatorError> {
+    let first = out.iter().position(|v| !v.is_nan()).unwrap_or(out.len());
+    match out
+        .iter()
+        .enumerate()
+        .position(|(i, v)| v.is_infinite() || (i > first && v.is_nan()))
+    {
+        Some(i) => Err(IndicatorError::NonFiniteOutput(i)),
+        None => Ok(()),
+    }
+}
+
 /// Computes the full series of indicator `name` over `closes`.
 ///
 /// `params_json` is a JSON object (see [`list_indicators_json`]); blank means `{}`. Unknown
@@ -206,23 +233,62 @@ pub fn indicator_series(
             [v.macd, v.signal, v.histogram][out]
         }),
     };
-    // Leading NaNs are warm-up. An infinity, or a NaN after the first value, means finite input
-    // overflowed f64 (e.g. a running sum of 1e308 values); refuse rather than return garbage.
-    let first = out.iter().position(|v| !v.is_nan()).unwrap_or(out.len());
-    if let Some(i) = out
-        .iter()
-        .enumerate()
-        .position(|(i, v)| v.is_infinite() || (i > first && v.is_nan()))
-    {
-        return Err(IndicatorError::NonFiniteOutput(i));
+    check_output(&out)?;
+    Ok(out)
+}
+
+/// Computes the full series of OHLC-input indicator `name` over equal-length `high`, `low` and
+/// `close` series (currently `atr`: Wilder, `period` required).
+///
+/// Same conventions as [`indicator_series`]: params are validated first (unknown fields rejected,
+/// `period` in `1..=MAX_PERIOD`), then lengths, then finiteness; the output has the input's
+/// length with `period - 1` leading `NaN`s (the first bar's true range is `high - low`); empty
+/// input gives empty output; infinite output from finite input is [`IndicatorError::NonFiniteOutput`].
+///
+/// # Errors
+///
+/// [`IndicatorError`] for an unknown (or close-only) name, bad params, unequal lengths,
+/// non-finite input, or overflow.
+pub fn ohlc_indicator_series(
+    name: &str,
+    params_json: &str,
+    high: &[f64],
+    low: &[f64],
+    close: &[f64],
+) -> Result<Vec<f64>, IndicatorError> {
+    let n = match name {
+        "atr" => period("period", parse::<PeriodParams>(params_json)?.period)?,
+        other => return Err(IndicatorError::UnknownIndicator(other.to_string())),
+    };
+    if high.len() != low.len() || high.len() != close.len() {
+        return Err(IndicatorError::LengthMismatch {
+            high: high.len(),
+            low: low.len(),
+            close: close.len(),
+        });
     }
+    for series in [high, low, close] {
+        if let Some(i) = series.iter().position(|v| !v.is_finite()) {
+            return Err(IndicatorError::NonFiniteInput(i));
+        }
+    }
+    let mut atr = Atr::new(n);
+    let out: Vec<f64> = high
+        .iter()
+        .zip(low)
+        .zip(close)
+        .map(|((&h, &l), &c)| atr.update_hlc(h, l, c).unwrap_or(f64::NAN))
+        .collect();
+    check_output(&out)?;
     Ok(out)
 }
 
 /// Describes the available indicators as JSON: names, inputs, params, outputs and warm-up.
 ///
 /// Shape: `{"warmup_value":"NaN","indicators":[{"name","input","params":[{"name","type",
-/// "required","default"?,"min"?}],"outputs":[..],"warmup":".."}]}`. The `warmup` text is the
+/// "required","default"?,"min"?}],"outputs":[..],"warmup":".."}]}`. `input` is `close` for
+/// [`indicator_series`] indicators and `ohlc` for [`ohlc_indicator_series`] ones (those also carry
+/// `"export":"ohlc_indicator_series"`). The `warmup` text is the
 /// number of leading `NaN` values.
 pub fn list_indicators_json() -> String {
     let period = json!({"name": "period", "type": "integer", "required": true, "min": 1,
@@ -253,6 +319,8 @@ pub fn list_indicators_json() -> String {
                                  "default": 2.0, "min": 0},
                         output(&["middle", "upper", "lower"])],
              "outputs": ["middle", "upper", "lower"], "warmup": "period - 1"},
+            {"name": "atr", "input": "ohlc", "export": "ohlc_indicator_series",
+             "params": [period], "outputs": ["value"], "warmup": "period - 1"},
         ],
     })
     .to_string()

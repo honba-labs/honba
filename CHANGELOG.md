@@ -9,6 +9,14 @@
 
 ### WASM indicator surface
 
+- New export `ohlc_indicator_series(name, params_json, high, low, close)` (additive; `indicator_series` is unchanged) with
+  `atr` (Wilder, `period`). Equal-length arrays are required (`IndicatorError::LengthMismatch`); other conventions as
+  `indicator_series`. `list_indicators()` gains an `atr` entry (`"input":"ohlc"`, `"export":"ohlc_indicator_series"`); the
+  catalog name list is now `sma,ema,rsi,macd,bollinger,atr` (deliberate extension of the existing catalog assertions).
+- New shared fixture `schema/conformance/ohlc_series.json` (10 ATR vectors, generated from Python `Atr(include_first_bar=True)`),
+  run by Rust, Python and the wasm/node harness. Python's default `include_first_bar=False` differs from Rust (see README).
+- `honba_indicators::Atr::update_hlc(high, low, close)` feeds raw prices without a `Bar` (`update` now delegates to it).
+
 - `indicator_series` refuses finite input whose result overflows `f64` (infinite output, or `NaN` after warm-up) with a
   thrown error (`IndicatorError::NonFiniteOutput`) instead of returning `Infinity`/`NaN`; leading warm-up `NaN`s are unchanged.
 - Shared `indicator_series` conformance fixture gains 14 edge vectors (empty input, single bar, bollinger period 1, k=0,
