@@ -15,7 +15,7 @@ import httpx
 
 from honba.domain.bar import Bar
 from honba.domain.instrument import InstrumentId
-from honba.markets.india.calendar import NseCalendar
+from honba.markets.india.calendar import IST, NseCalendar
 from honba.screener.coverage import DateInterval
 from honba.screener.ports import validate_bar
 
@@ -96,9 +96,9 @@ def parse_bhavcopy_csv(csv_content: str, exchange: str = "NSE") -> dict[str, Bar
             vol = 0.0
 
         raw_date_str = (row.get(date_col) or "").strip() if date_col else ""
-        bar_date = _parse_date(raw_date_str) or dt.date.today()  # noqa: DTZ011 - fallback bar date is the local calendar date, as the ts below is local
+        bar_date = _parse_date(raw_date_str) or dt.datetime.now(IST).date()
 
-        ts = int(dt.datetime.combine(bar_date, dt.time(9, 15)).timestamp() * 1e9)
+        ts = int(dt.datetime.combine(bar_date, dt.time(9, 15), tzinfo=IST).timestamp() * 1e9)
         inst_id = InstrumentId(symbol=raw_sym, exchange=exchange)
 
         b = Bar(

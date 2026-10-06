@@ -7,6 +7,9 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Protocol
 
+# NSE/BSE session clock: UTC+05:30, no DST. Fixed offset avoids a tzdata dependency.
+IST = dt.timezone(dt.timedelta(hours=5, minutes=30), name="IST")
+
 
 @dataclass(frozen=True)
 class SessionWindow:

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### NSE bhavcopy timestamps
+
+- Bhavcopy bar timestamps are now built as 09:15 IST explicitly (`honba.markets.india.calendar.IST`) instead of via the
+  machine-local timezone; identical on IST machines, previously off by the local UTC offset elsewhere.
+
 ### WASM indicator surface
 
 - `indicator_series` refuses finite input whose result overflows `f64` (infinite output, or `NaN` after warm-up) with a
