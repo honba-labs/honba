@@ -21,8 +21,9 @@ pub fn hello_wasm() -> String {
 
 /// Full indicator series over `closes`, same length as the input, `NaN` during warm-up.
 ///
-/// `params_json` is a JSON object such as `{"period":14}`. Throws a string error on an unknown
-/// indicator, bad params or non-finite input.
+/// `params_json` is a JSON object such as `{"period":14}`. Throws a JavaScript `Error` (a `JsError`
+/// carrying the message) on an unknown indicator, bad params, non-finite input, or finite input
+/// whose result overflows `f64` (e.g. an SMA of values near `1e308`); it never returns infinity.
 #[wasm_bindgen]
 pub fn indicator_series(
     name: &str,

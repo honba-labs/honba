@@ -136,3 +136,18 @@ fn catalog_lists_every_indicator_with_params_and_warmup() {
     assert_eq!(sma["warmup"], "period - 1");
     assert_eq!(v["warmup_value"], "NaN");
 }
+
+#[test]
+fn finite_input_that_overflows_is_an_error_not_infinity() {
+    let big = [1e308, 1e308, 1e308];
+    let err = indicator_series("sma", r#"{"period":2}"#, &big).unwrap_err();
+    assert_eq!(err, IndicatorError::NonFiniteOutput(1));
+    assert!(err.to_string().contains("index 1"));
+}
+
+#[test]
+fn leading_warmup_nan_is_not_an_overflow_error() {
+    let out = indicator_series("sma", r#"{"period":2}"#, &[1e300, 1e300]).unwrap();
+    assert!(out[0].is_nan());
+    assert_eq!(out[1], 1e300);
+}

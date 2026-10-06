@@ -14,7 +14,7 @@ layer over them.
 | `list_indicators()` | `() -> string` (JSON catalog: names, params, outputs, warm-up) |
 
 `indicator_series` returns one value per input close; the leading warm-up values are `NaN`
-(`list_indicators` states the count per indicator). Inputs must be finite. Params are a JSON object
+(`list_indicators` states the count per indicator). Inputs must be finite; a call throws an `Error` (message text) on bad input or params. If finite input overflows `f64` (e.g. SMA of values near `1e308`) the call throws rather than return infinity. Params are a JSON object
 and unknown fields are rejected, e.g. `{"period":14}`.
 
 | name | params (default) | warm-up `NaN`s |

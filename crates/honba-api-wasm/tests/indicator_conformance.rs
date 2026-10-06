@@ -57,3 +57,9 @@ fn every_vector_matches_the_pure_module() {
         }
     }
 }
+
+#[test]
+fn overflowing_finite_input_is_refused_not_returned_as_infinity() {
+    let err = indicator_series("sma", r#"{"period":2}"#, &[1e308, 1e308, 1e308]).unwrap_err();
+    assert!(err.to_string().contains("overflow"), "{err}");
+}

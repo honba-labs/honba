@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### WASM indicator surface
+
+- `indicator_series` refuses finite input whose result overflows `f64` (infinite output, or `NaN` after warm-up) with a
+  thrown error (`IndicatorError::NonFiniteOutput`) instead of returning `Infinity`/`NaN`; leading warm-up `NaN`s are unchanged.
+
 ### REST read API hardening
 
 - `GET /bars/{id}` is capped at `MAX_BAR_ROWS` (100,000) bars: a larger selection is a 422

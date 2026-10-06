@@ -33,5 +33,8 @@ if (names.join() !== "sma,ema,rsi,macd,bollinger") { failures++; console.error("
 let threw = false;
 try { wasm.indicator_series("sma", '{"period":0}', new Float64Array([1])); } catch { threw = true; }
 if (!threw) { failures++; console.error("FAIL bad params must throw"); }
+threw = false;
+try { wasm.indicator_series("sma", '{"period":2}', new Float64Array([1e308, 1e308, 1e308])); } catch { threw = true; }
+if (!threw) { failures++; console.error("FAIL overflow must throw"); }
 if (failures) process.exit(1);
 console.log(`wasm conformance: ${fx.cases.length} vectors ok`);

@@ -25,6 +25,8 @@ pub enum IndicatorError {
     InvalidParams(String),
     /// The input contains a `NaN` or infinity at this index.
     NonFiniteInput(usize),
+    /// Finite input overflowed: the output is infinite, or `NaN` after warm-up, at this index.
+    NonFiniteOutput(usize),
 }
 
 impl fmt::Display for IndicatorError {
@@ -33,6 +35,9 @@ impl fmt::Display for IndicatorError {
             Self::UnknownIndicator(n) => write!(f, "unknown indicator `{n}`"),
             Self::InvalidParams(m) => write!(f, "invalid params: {m}"),
             Self::NonFiniteInput(i) => write!(f, "non-finite input at index {i}"),
+            Self::NonFiniteOutput(i) => {
+                write!(f, "numeric overflow: non-finite output at index {i}")
+            }
         }
     }
 }
@@ -131,7 +136,8 @@ where
 ///
 /// # Errors
 ///
-/// [`IndicatorError`] for an unknown name, bad params, or non-finite input.
+/// [`IndicatorError`] for an unknown name, bad params, non-finite input, or finite input whose
+/// result overflows `f64` (infinite output, or `NaN` after warm-up).
 pub fn indicator_series(
     name: &str,
     params_json: &str,
@@ -189,7 +195,7 @@ pub fn indicator_series(
     if let Some(i) = closes.iter().position(|c| !c.is_finite()) {
         return Err(IndicatorError::NonFiniteInput(i));
     }
-    Ok(match plan {
+    let out = match plan {
         Plan::Sma(n) => run(Sma::new(n), closes, |v| v),
         Plan::Ema(n) => run(Ema::new(n), closes, |v| v),
         Plan::Rsi(n) => run(Rsi::new(n), closes, |v| v),
@@ -199,7 +205,18 @@ pub fn indicator_series(
         Plan::Macd(f, s, g, out) => run(Macd::new(f, s, g), closes, |v| {
             [v.macd, v.signal, v.histogram][out]
         }),
-    })
+    };
+    // Leading NaNs are warm-up. An infinity, or a NaN after the first value, means finite input
+    // overflowed f64 (e.g. a running sum of 1e308 values); refuse rather than return garbage.
+    let first = out.iter().position(|v| !v.is_nan()).unwrap_or(out.len());
+    if let Some(i) = out
+        .iter()
+        .enumerate()
+        .position(|(i, v)| v.is_infinite() || (i > first && v.is_nan()))
+    {
+        return Err(IndicatorError::NonFiniteOutput(i));
+    }
+    Ok(out)
 }
 
 /// Describes the available indicators as JSON: names, inputs, params, outputs and warm-up.
