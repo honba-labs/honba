@@ -113,6 +113,7 @@ class NextOpenExecution(BaseExecutionPort):
         self._long_only = long_only
         self._session = -1
         self._session_ts: int | None = None
+        self._from_open = False  # the current session came from a SessionOpen event
         self._opened: set[InstrumentId] = set()
         self._working: list[_Working] = []
         self._receivables: list[tuple[int, Money]] = []  # (available from session, amount)
@@ -168,10 +169,27 @@ class NextOpenExecution(BaseExecutionPort):
         """Observe the runner's event stream (called before the strategy sees it)."""
         if isinstance(event, SessionOpen):
             self.open_session(event.ts, event.bars)
+            self._from_open = True
         elif isinstance(event, Bar):
-            if self._session_ts is None or event.ts > self._session_ts:
+            if self._from_open:
+                # The SessionOpen carried this session's bars and its key need not be a
+                # timestamp, so a bar never opens or orders sessions here; it only
+                # opens an instrument the SessionOpen left out, at the same ts.
+                if event.ts == self._session_ts and event.instrument_id not in self._opened:
+                    self._fill_at([event])
+            elif self._session_ts is None or event.ts > self._session_ts:
                 self.open_session(event.ts, [event])
-            elif event.ts == self._session_ts and event.instrument_id not in self._opened:
+                self._from_open = False
+            elif event.ts < self._session_ts:
+                raise ValueError(
+                    f"non-monotonic bar: ts {event.ts} is before session {self._session_ts}"
+                )
+            elif event.instrument_id in self._opened:
+                raise ValueError(
+                    f"duplicate bar for {event.instrument_id} at ts {event.ts} in session "
+                    f"{self._session_ts}"
+                )
+            else:
                 self._fill_at([event])
 
     def open_session(self, ts: int, bars: Sequence[Bar]) -> None:
@@ -199,7 +217,7 @@ class NextOpenExecution(BaseExecutionPort):
     def _fill_at(self, bars: Sequence[Bar]) -> None:
         opens: dict[InstrumentId, Bar] = {}
         for b in bars:
-            if b.instrument_id not in self._opened:
+            if b.instrument_id not in self._opened and _usable_open(b.open):
                 opens.setdefault(b.instrument_id, b)
         self._opened.update(opens)
         eligible = [
@@ -215,17 +233,18 @@ class NextOpenExecution(BaseExecutionPort):
                 self._fill_buy(w, opens[w.intent.instrument_id])
 
     def _fill_sell(self, w: _Working, bar: Bar) -> None:
-        self._working.remove(w)
         want = w.intent.quantity
         qty = want
         if self._long_only:
             qty = max(0.0, min(want, self.positions.get(w.intent.instrument_id, 0.0)))
+        if qty > 0:  # compute before dequeuing: a failure leaves the order working
+            notional = Money.mul_qty(qty, bar.open, self._currency)
+            cost = self._costs(OrderSide.SELL, qty, bar.open)
+        self._working.remove(w)
         if qty < want:
             self._reject_part(w, want - qty, "no_position")
         if qty <= 0:
             return
-        notional = Money.mul_qty(qty, bar.open, self._currency)
-        cost = self._costs(OrderSide.SELL, qty, bar.open)
         proceeds = notional - cost
         self.cash = self.cash + proceeds
         self._receivables.append((self._session + self.settlement_days, proceeds))
@@ -238,17 +257,18 @@ class NextOpenExecution(BaseExecutionPort):
         available = self.available_cash
         if self._buy_cost(want, px).amount <= available.amount:
             qty = want
-        elif self._session - w.first_try < self.settlement_days:
+        elif self.unsettled.amount > 0 and self._session - w.first_try < self.settlement_days:
             return  # wait for pending sale proceeds to settle
         else:
             qty = self._affordable(want, px, available)
+        if qty > 0:  # compute before dequeuing: a failure leaves the order working
+            notional = Money.mul_qty(qty, px, self._currency)
+            cost = self._costs(OrderSide.BUY, qty, px)
         self._working.remove(w)
         if qty < want:
             self._reject_part(w, want - qty, "insufficient_funds")
         if qty <= 0:
             return
-        notional = Money.mul_qty(qty, px, self._currency)
-        cost = self._costs(OrderSide.BUY, qty, px)
         self.cash = self.cash - (notional + cost)
         self._book(w, bar, qty, notional, cost)
 
@@ -280,6 +300,10 @@ class NextOpenExecution(BaseExecutionPort):
 
     def _reject(self, order_id: str, intent: OrderIntent, reason: str, ts: int) -> None:
         self._rejections.append(OrderRejection(order_id, intent, reason, ts))
+
+
+def _usable_open(price: float) -> bool:
+    return math.isfinite(price) and price > 0
 
 
 def group_sessions(

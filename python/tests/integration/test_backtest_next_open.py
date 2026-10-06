@@ -187,3 +187,54 @@ def test_multi_instrument_rotation_with_t2_settlement() -> None:
     assert result.ctx.positions() == {b: 10.0}
     assert result.ctx.cash() == port.cash
     assert result.order_rejections == []
+
+
+def test_ordinal_session_keys_run_through_the_runner_for_several_days() -> None:
+    a, b = InstrumentId("AAA", "NSE"), InstrumentId("BBB", "NSE")
+
+    class Rotate(Strategy):
+        name = "rotate-ordinal"
+
+        def __init__(self) -> None:
+            self.n = 0
+
+        def on_bar(self, bar: Bar) -> None:
+            if bar.instrument_id != b:
+                return
+            self.n += 1
+            if self.n == 1:
+                self.ctx.submit(OrderIntent.market_buy(a, 10))
+            elif self.n == 2:
+                self.ctx.submit(OrderIntent.market_buy(b, 10))
+                self.ctx.submit(OrderIntent.market_sell(a, 10))
+
+    bars = _bars(a, [100.0] * 5) + _bars(b, [100.0] * 5)
+    port = NextOpenExecution(cash=Money.from_major(1_000.0, INR), settlement_days=0)
+    runner = StrategyRunner(Rotate(), port, ctx=LedgerContext(cash=1_000.0))
+    result = runner.run(group_sessions(bars, key=lambda x: x.ts // DAY))
+    assert [(f.instrument_id.symbol, f.side) for f in result.fills] == [
+        ("AAA", OrderSide.BUY),
+        ("AAA", OrderSide.SELL),  # sells fill before buys within the session
+        ("BBB", OrderSide.BUY),
+    ]
+
+
+def test_an_unsorted_bar_feed_is_refused_instead_of_silently_dropped() -> None:
+    bars = _bars(X, [100.0, 110.0, 120.0])
+    bars[1], bars[2] = bars[2], bars[1]
+    with pytest.raises(ValueError, match="non-monotonic"):
+        Honba.backtest(
+            _Noop(),
+            symbol="XYZ",
+            start="2024-01-01",
+            end="2024-02-01",
+            cash=100_000.0,
+            data=Provider(bars),
+        ).run()
+
+
+class _Noop(Strategy):
+    name = "noop"
+
+    def on_bar(self, bar: Bar) -> None:
+        return None

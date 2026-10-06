@@ -101,11 +101,14 @@ def test_sale_proceeds_settle_after_settlement_days_sessions() -> None:
 
 def test_an_unfunded_buy_waits_for_settlement_then_is_cut_and_the_rest_rejected() -> None:
     p = port(cash=250.0, settlement_days=1)
-    p.open_session(1, [bar(A, 1, 100.0)])
+    p.positions[B] = 1.0
+    p.open_session(1, [bar(A, 1, 100.0), bar(B, 1, 10.0)])
     p.submit("b", OrderIntent.market_buy(A, 5), 1)
-    p.open_session(2, [bar(A, 2, 100.0)])  # first try: waits one session
-    assert p.drain_fills() == [] and p.drain_rejections() == []
-    p.open_session(3, [bar(A, 3, 100.0)])  # still short: cut to 2 shares
+    p.submit("s", OrderIntent.market_sell(B, 1), 1)
+    # The sell fills (proceeds pending until session 3), so the unfunded buy waits.
+    p.open_session(2, [bar(A, 2, 100.0), bar(B, 2, 10.0)])
+    assert [f.order_id for f in p.drain_fills()] == ["s"] and p.drain_rejections() == []
+    p.open_session(3, [bar(A, 3, 100.0), bar(B, 3, 10.0)])  # settled: 260 buys 2, cut
     (fill,) = p.drain_fills()
     (rej,) = p.drain_rejections()
     assert fill.quantity == 2
@@ -115,7 +118,7 @@ def test_an_unfunded_buy_waits_for_settlement_then_is_cut_and_the_rest_rejected(
         "insufficient_funds",
         False,
     )
-    assert p.cash == rupees(50.0)
+    assert p.cash == rupees(60.0)
 
 
 def test_with_t0_settlement_an_unfunded_buy_is_cut_at_once() -> None:
@@ -182,7 +185,8 @@ def test_plain_bar_events_open_sessions_by_timestamp() -> None:
     assert [f.order_id for f in p.drain_fills()] == ["a"]
     p.on_event(bar(B, 2, 21.0), 2)  # B prints later in the same session
     assert [(f.order_id, f.price) for f in p.drain_fills()] == [("b", 21.0)]
-    p.on_event(bar(B, 2, 99.0), 2)  # a repeated bar does not fill anything twice
+    with pytest.raises(ValueError, match="duplicate"):  # a repeated bar is an error now
+        p.on_event(bar(B, 2, 99.0), 2)
     assert p.drain_fills() == []
 
 
@@ -288,3 +292,106 @@ def test_group_sessions_accepts_a_session_key() -> None:
         ("SessionOpen", 2 * day + 5),
         ("Bar", 2 * day + 5),
     ]
+
+
+# -- review fixes ------------------------------------------------------------------
+
+
+def _feed(p: NextOpenExecution, *bars: Bar) -> None:
+    for b in bars:
+        p.on_event(b, b.ts)
+
+
+def test_session_open_with_non_ts_keys_ignores_the_following_bars() -> None:
+    day = 86_400 * 10**9
+    t0 = 1_700_000_000 * 10**9
+    bars = [bar(i, t0 + d * day, 100.0 + d) for d in range(3) for i in (A, B)]
+    p = port()
+    for event, ts in group_sessions(bars, key=lambda b: b.ts // day):
+        p.on_event(event, ts)  # must not raise "does not follow session"
+    assert p._session == 2
+
+
+def test_ordinal_session_keys_keep_sells_before_buys_across_instruments() -> None:
+    day = 86_400 * 10**9
+    t0 = 1_700_000_000 * 10**9
+    p = port(cash=1_000.0)
+    p.positions[B] = 10
+    bars = [bar(i, t0 + d * day, 100.0) for d in range(3) for i in (A, B)]
+    events = group_sessions(bars, key=lambda b: b.ts // day)
+    p.on_event(*events[0])
+    p.submit("buy-a", OrderIntent.market_buy(A, 10), t0)
+    p.submit("sell-b", OrderIntent.market_sell(B, 10), t0)
+    for event, ts in events[1:]:
+        p.on_event(event, ts)
+    assert [f.order_id for f in p.drain_fills()] == ["sell-b", "buy-a"]
+
+
+def test_an_unfundable_buy_does_not_wait_when_nothing_is_unsettled() -> None:
+    p = port(cash=1_000.0, settlement_days=2)
+    _feed(p, bar(A, 1, 100.0))
+    p.submit("o", OrderIntent.market_buy(A, 20), 1)
+    _feed(p, bar(A, 2, 100.0))
+    (fill,) = p.drain_fills()
+    assert (fill.quantity, fill.ts) == (10, 2)
+    (rej,) = p.drain_rejections()
+    assert (rej.reason, rej.intent.quantity) == ("insufficient_funds", 10)
+
+
+def test_an_unfundable_buy_waits_while_proceeds_are_pending_then_is_cut() -> None:
+    p = port(cash=0.0, settlement_days=2)
+    p.positions[B] = 10
+    _feed(p, bar(A, 1, 100.0), bar(B, 1, 100.0))
+    p.submit("sell", OrderIntent.market_sell(B, 10), 1)
+    _feed(p, bar(A, 2, 100.0), bar(B, 2, 100.0))  # sell fills; proceeds due session 4
+    p.submit("buy", OrderIntent.market_buy(A, 20), 2)
+    _feed(p, bar(A, 3, 100.0), bar(B, 3, 100.0))  # proceeds still unsettled: it waits
+    assert [f.order_id for f in p.drain_fills()] == ["sell"]
+    _feed(p, bar(A, 4, 100.0), bar(B, 4, 100.0))  # settled: 1000 buys 10, cut
+    (fill,) = p.drain_fills()
+    assert (fill.order_id, fill.quantity, fill.ts) == ("buy", 10, 4)
+
+
+@pytest.mark.parametrize("bad", [0.0, -10.0, float("nan"), float("inf")])
+def test_bars_with_unusable_opens_never_fill_and_the_order_keeps_waiting(bad: float) -> None:
+    p = port(cash=1_000.0)
+    _feed(p, bar(A, 1, 100.0))
+    p.submit("o", OrderIntent.market_buy(A, 5), 1)
+    _feed(p, Bar(A, 2, bad, 100.0, 100.0, 100.0, 1.0))
+    assert p.drain_fills() == [] and p.cash == rupees(1_000.0)
+    assert p.working_orders == ["o"] and p.drain_rejections() == []
+    _feed(p, bar(A, 3, 100.0))
+    (fill,) = p.drain_fills()
+    assert (fill.price, fill.ts) == (100.0, 3)
+
+
+def test_a_sell_on_an_unusable_open_keeps_waiting_and_the_position_intact() -> None:
+    p = port(cash=0.0)
+    p.positions[A] = 5
+    _feed(p, bar(A, 1, 100.0))
+    p.submit("s", OrderIntent.market_sell(A, 5), 1)
+    _feed(p, bar(A, 2, 0.0, close=100.0))
+    assert p.drain_fills() == [] and p.positions == {A: 5} and p.working_orders == ["s"]
+
+
+def test_a_failing_cost_function_does_not_lose_the_order() -> None:
+    def boom(side: OrderSide, qty: float, px: float) -> Money:
+        raise RuntimeError("cost")
+
+    p = port(cash=1_000.0, costs=boom)
+    _feed(p, bar(A, 1, 100.0))
+    p.submit("o", OrderIntent.market_sell(A, 1), 1)
+    p.positions[A] = 1
+    with pytest.raises(RuntimeError):
+        _feed(p, bar(A, 2, 100.0))
+    assert p.working_orders == ["o"] and p.positions == {A: 1}
+
+
+def test_plain_bar_mode_rejects_out_of_order_and_duplicate_bars() -> None:
+    p = port()
+    _feed(p, bar(A, 5, 100.0))
+    with pytest.raises(ValueError, match="non-monotonic"):
+        _feed(p, bar(A, 3, 100.0))
+    with pytest.raises(ValueError, match="duplicate"):
+        _feed(p, bar(A, 5, 100.0))
+    _feed(p, bar(B, 5, 100.0), bar(A, 6, 100.0))  # same ts, other instrument: legal
