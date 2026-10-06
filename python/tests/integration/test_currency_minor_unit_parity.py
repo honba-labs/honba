@@ -50,5 +50,9 @@ def test_position_and_account_settle_in_each_currency(currency):
     pos.apply_fill(PositionSide.LONG, 100.0, 10.0)
     pos.apply_fill(PositionSide.SHORT, 40.0, 12.0)
     assert pos.realized_pnl.amount == 8_000
-    acct.credit(Money(8_000, currency))
+    acct.credit(pos.realized_pnl)
+    assert acct.cash == Money(10_008_000, currency)
+    assert acct.cash.currency is currency
+    assert acct.cash.to_major() == 10_008_000 / currency.minor_per_major
+    assert acct.cash.format_minor() == f"10,008,000 {currency.minor_unit.plural}"
     assert acct.cash.format_minor().endswith(currency.minor_unit.plural)
