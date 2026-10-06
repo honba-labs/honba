@@ -262,6 +262,10 @@ fn minor_scale(exponent: u8) -> f64 {
     10f64.powi(i32::from(exponent))
 }
 
+/// 2^63 as f64. `i64::MAX as f64` rounds up to this value, so a `>` against it would
+/// let +-2^63 through and the `as i64` cast would saturate.
+const I64_RANGE_LIMIT: f64 = 9_223_372_036_854_775_808.0;
+
 /// Scales a major-unit value to (fractional) minor units at `exponent`,
 /// rejecting NaN, infinities and overflow.
 fn scale_to_minor(value: f64, exponent: u8) -> Result<f64, MoneyError> {
@@ -269,7 +273,7 @@ fn scale_to_minor(value: f64, exponent: u8) -> Result<f64, MoneyError> {
         return Err(MoneyError::NonFinite);
     }
     let scaled = value * minor_scale(exponent);
-    if scaled.abs() > i64::MAX as f64 {
+    if scaled.abs() >= I64_RANGE_LIMIT {
         return Err(MoneyError::Overflow);
     }
     Ok(scaled)

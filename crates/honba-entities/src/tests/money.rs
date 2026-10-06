@@ -49,6 +49,19 @@ fn from_major_rejects_overflow() {
 }
 
 #[test]
+fn from_major_rejects_exactly_two_to_the_63_minor_units() {
+    // 92233720368547758.08 INR is 2^63 paise: it does not fit i64 and must not saturate.
+    assert_eq!(
+        Money::from_major_f64(92_233_720_368_547_758.08, Currency::Inr),
+        Err(MoneyError::Overflow)
+    );
+    assert_eq!(
+        Money::from_major_f64(-92_233_720_368_547_758.08, Currency::Inr),
+        Err(MoneyError::Overflow)
+    );
+}
+
+#[test]
 fn to_major_is_exact_division() {
     let m = Money::new(12_345, Currency::Inr);
     assert_eq!(m.to_major_f64(), 123.45);

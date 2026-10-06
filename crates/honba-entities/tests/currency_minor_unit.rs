@@ -50,3 +50,22 @@ fn format_minor_matches_golden() {
         );
     }
 }
+
+#[test]
+fn major_to_minor_bounds_match_golden() {
+    let doc = load();
+    for case in doc["major_to_minor"].as_array().unwrap() {
+        let c = currency(case["currency"].as_str().unwrap());
+        let major = case["major"].as_f64().unwrap();
+        let want = case["minor"].as_i64();
+        let name = &case["name"];
+        let results = [
+            Money::from_major_f64(major, c),
+            Money::payout_from_major_f64(major, c),
+            Money::stake_from_major_f64(major, c),
+        ];
+        for got in results {
+            assert_eq!(got.ok().map(|m| m.minor()), want, "{name}");
+        }
+    }
+}

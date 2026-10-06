@@ -18,5 +18,13 @@
     {"name": "gbp_plural", "currency": "GBP", "amount": 300, "text": "300 pence"},
     {"name": "gbp_singular", "currency": "GBP", "amount": 1, "text": "1 penny"},
     {"name": "gbp_negative_singular", "currency": "GBP", "amount": -1, "text": "-1 penny"}
+  ],
+  "major_to_minor": [
+    {"name": "just_below_upper_bound", "currency": "INR", "major": 92233720368547740.0, "minor": 9223372036854774784},
+    {"name": "at_upper_bound_rejected", "currency": "INR", "major": 92233720368547758.08, "minor": null},
+    {"name": "above_upper_bound_rejected", "currency": "INR", "major": 92233720368547770.0, "minor": null},
+    {"name": "just_below_lower_bound", "currency": "INR", "major": -92233720368547740.0, "minor": -9223372036854774784},
+    {"name": "at_lower_bound_rejected", "currency": "INR", "major": -92233720368547758.08, "minor": null},
+    {"name": "usd_at_upper_bound_rejected", "currency": "USD", "major": 92233720368547758.08, "minor": null}
   ]
 }

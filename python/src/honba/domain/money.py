@@ -71,6 +71,8 @@ def __getattr__(name: str) -> int:
 
 
 _I64_MAX = 2**63 - 1
+_I64_RANGE_LIMIT = float(2**63)
+"""Scaled amounts at or beyond +-2**63 do not fit (same guard as Rust)."""
 
 _DIRECTIONAL_NOISE_MINOR = 1e-6
 """Float noise below this many minor units is treated as exact before a floor or
@@ -81,7 +83,7 @@ def _scaled(major: float, exponent: int) -> float:
     if not math.isfinite(major):
         raise ValueError("money amount must be finite")
     scaled = major * 10**exponent
-    if abs(scaled) > _I64_MAX:
+    if abs(scaled) >= _I64_RANGE_LIMIT:
         raise ValueError("money amount exceeds i64 minor units")
     return scaled
 

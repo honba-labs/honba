@@ -41,6 +41,18 @@ def test_format_minor_matches_shared_vector(case):
     assert m.format_minor() == case["text"]
 
 
+@pytest.mark.parametrize("case", DOC["major_to_minor"], ids=lambda c: c["name"])
+def test_major_to_minor_bounds_match_shared_vector(case):
+    c = Currency(case["currency"])
+    makers = (Money.from_major, Money.payout_from_major, Money.stake_from_major)
+    for make in makers:
+        if case["minor"] is None:
+            with pytest.raises(ValueError, match="i64"):
+                make(case["major"], c)
+        else:
+            assert make(case["major"], c).amount == case["minor"]
+
+
 def test_minor_per_major_is_ten_to_the_exponent():
     for c in Currency:
         assert c.minor_per_major == 10**c.minor_exponent
