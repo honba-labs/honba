@@ -3,7 +3,7 @@
 //! Every artifact — JSON Schema, OpenAPI, TypeScript, `.pyi`, MCP tool schemas
 //! — is rendered from this list. Adding a type here is the only step needed to
 //! expose it everywhere; that is the whole point of inverting the direction
-//! from Python-generated to Rust-generated (plan.md §4.1).
+//! from Python-generated to Rust-generated (docs/archive/plan.md §4.1).
 
 use schemars::JsonSchema;
 use serde_json::{json, Value};
@@ -63,10 +63,10 @@ pub const API_TYPES: &[&str] = &[
     "ParamLocation",
 ];
 
-/// The run-configuration types (plan.md E0-S4).
+/// The run-configuration types (docs/archive/plan.md E0-S4).
 pub const CONFIG_TYPES: &[&str] = &["BacktestRunConfig"];
 
-/// The strategy manifest and verified IR types (plan.md E0-S8).
+/// The strategy manifest and verified IR types (docs/archive/plan.md E0-S8).
 pub const MANIFEST_TYPES: &[&str] = &[
     "StrategyManifest",
     "Universe",

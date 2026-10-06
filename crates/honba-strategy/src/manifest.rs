@@ -1,5 +1,5 @@
 //! The strategy manifest: the single unit a backtest, sweep, live run, MCP
-//! call, and frontend request all name (plan.md E0-S8).
+//! call, and frontend request all name (docs/archive/plan.md E0-S8).
 //!
 //! A strategy written in Python or TypeScript is turned into a manifest *once*,
 //! by a verify step, and everything downstream consumes the manifest rather

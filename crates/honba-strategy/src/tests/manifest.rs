@@ -1,4 +1,4 @@
-//! Tests for the strategy manifest (plan.md E0-S8).
+//! Tests for the strategy manifest (docs/archive/plan.md E0-S8).
 
 use honba_messages::{BarAggregation, Exchange, InstrumentId};
 

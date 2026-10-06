@@ -1,4 +1,4 @@
-//! The endpoint registry (plan.md E11-S1).
+//! The endpoint registry (docs/archive/plan.md E11-S1).
 //!
 //! One table describes every endpoint: its method, path, and the request and
 //! response types inside the envelope. Two consumers read it, which is the point:
@@ -47,7 +47,7 @@ impl std::fmt::Display for HttpMethod {
 /// Whether an endpoint is read-only or mutates state.
 ///
 /// Write endpoints are the ones an approval queue and the risk stage must gate
-/// (plan.md E11-S7), so the distinction has to be in the registry rather than
+/// (docs/archive/plan.md E11-S7), so the distinction has to be in the registry rather than
 /// inferred from the HTTP method.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -186,7 +186,7 @@ pub fn write_endpoints() -> Vec<String> {
         .collect()
 }
 
-/// Endpoints that mutate state and therefore require gating (plan.md §4.3).
+/// Endpoints that mutate state and therefore require gating (docs/archive/plan.md §4.3).
 ///
 /// `POST /strategies` and `POST /strategies/verify` compile rather than trade,
 /// so they are not gated; the order and position routes are.

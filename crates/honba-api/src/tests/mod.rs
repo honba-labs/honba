@@ -87,7 +87,7 @@ fn run_status_serializes_in_snake_case() {
 
 #[test]
 fn api_error_codes_reach_callers_through_the_re_export() {
-    // The codes moved to honba-messages (plan.md 4.2); this pins that the
+    // The codes moved to honba-messages (docs/archive/plan.md 4.2); this pins that the
     // honba-api re-export is the same type, not a copy.
     let via_api: crate::ErrorCode = ErrorCode::Timeout;
     let via_messages: honba_messages::ErrorCode = via_api;

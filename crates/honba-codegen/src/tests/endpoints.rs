@@ -52,7 +52,7 @@ fn path_parameters_are_declared_and_required() {
 
 #[test]
 fn a_write_endpoint_is_labelled_as_one() {
-    // plan.md 4.3: the approval queue is gated off this label.
+    // docs/archive/plan.md 4.3: the approval queue is gated off this label.
     let paths = paths();
     assert_eq!(paths["/orders"]["post"]["x-honba-access"], json!("write"));
     assert_eq!(
@@ -91,7 +91,7 @@ fn a_post_declares_a_request_body() {
 
 #[test]
 fn every_failure_is_covered_by_a_default_response() {
-    // plan.md 4.2: errors are enveloped, so every operation needs one.
+    // docs/archive/plan.md 4.2: errors are enveloped, so every operation needs one.
     let paths = paths();
     for (_, item) in paths.as_object().unwrap() {
         for (_, op) in item.as_object().unwrap() {

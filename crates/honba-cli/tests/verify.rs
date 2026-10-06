@@ -1,5 +1,5 @@
 //! `honba verify <manifest.json>` prints the compiled strategy IR as JSON
-//! (plan.md E0-S8). Runs the built binary; hermetic.
+//! (docs/archive/plan.md E0-S8). Runs the built binary; hermetic.
 
 use std::fs;
 use std::path::PathBuf;

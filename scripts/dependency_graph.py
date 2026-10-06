@@ -1,16 +1,16 @@
-"""Crate layering for the async/API surface added in plan.md phases 1-2.
+"""Crate layering for the async/API surface added in docs/archive/plan.md phases 1-2.
 
 Dependencies point inward, so L0 (honba-messages) may depend on nothing and a
 binary at L7 may depend on most of the stack. Two rules are stricter than the
 plain hierarchy:
 
 - Async isolation. The event kernel stays synchronous and single-threaded
-  (plan.md section 1). Only the async boundary may name tokio; if honba-engine
+  (docs/archive/plan.md section 1). Only the async boundary may name tokio; if honba-engine
   ever grows a tokio dependency, the single-writer guarantee the whole
   determinism argument rests on is gone.
 - WASM purity. honba-api-wasm compiles to wasm32-unknown-unknown, which has no
   filesystem and no tokio. Anything it needs must already be a pure L0-L4 crate
-  (plan.md section 4.4).
+  (docs/archive/plan.md section 4.4).
 """
 
 import sys
@@ -166,7 +166,7 @@ SYNC_KERNEL_CRATES = {
 }
 
 # Crates allowed to depend on tokio in PRODUCTION. The event kernel is absent
-# on purpose: plan.md 1 keeps the loop synchronous and single-threaded.
+# on purpose: docs/archive/plan.md 1 keeps the loop synchronous and single-threaded.
 ASYNC_BOUNDARY_CRATES = {
     "honba-async",
     "honba-sweep",

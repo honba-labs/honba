@@ -1,4 +1,4 @@
-//! Tests for the verified strategy IR (plan.md E0-S8).
+//! Tests for the verified strategy IR (docs/archive/plan.md E0-S8).
 
 use honba_messages::{BarAggregation, Exchange, InstrumentId, SCHEMA_VERSION};
 

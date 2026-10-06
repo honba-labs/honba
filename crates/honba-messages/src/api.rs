@@ -1,4 +1,4 @@
-//! The versioned response envelope (plan.md §4.2).
+//! The versioned response envelope (docs/archive/plan.md §4.2).
 //!
 //! Every response is enveloped, success and failure alike, so a client parses
 //! one shape regardless of outcome:
@@ -179,7 +179,7 @@ mod tests {
 
     #[test]
     fn an_unknown_optional_field_from_a_newer_writer_is_ignored() {
-        // plan.md 4.2: readers must ignore unknown fields so a v1 reader can
+        // docs/archive/plan.md 4.2: readers must ignore unknown fields so a v1 reader can
         // consume v1-with-extras safely.
         let raw = json!({
             "api_version": API_VERSION,

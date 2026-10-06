@@ -1,4 +1,7 @@
-"""``honba verify``: compile a strategy manifest and print its IR as JSON (plan.md E0-S8)."""
+"""``honba verify``: compile a strategy manifest and print its IR as JSON.
+
+Story E0-S8 (docs/ROADMAP.md; history in docs/archive/plan.md).
+"""
 
 from __future__ import annotations
 

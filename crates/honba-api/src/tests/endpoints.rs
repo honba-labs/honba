@@ -1,4 +1,4 @@
-//! Tests for the endpoint registry (plan.md E11-S1).
+//! Tests for the endpoint registry (docs/archive/plan.md E11-S1).
 
 use honba_messages::{write_endpoints, Access, Endpoint, HttpMethod, ParamLocation, ENDPOINTS};
 

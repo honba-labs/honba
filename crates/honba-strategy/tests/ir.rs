@@ -1,5 +1,5 @@
 //! Integration: shared manifest vectors -> `StrategyIr::compile` -> JSON ->
-//! the runner, through the public API only (plan.md E0-S8).
+//! the runner, through the public API only (docs/archive/plan.md E0-S8).
 
 use std::path::PathBuf;
 

@@ -1,6 +1,6 @@
 //! Turning the endpoint registry into OpenAPI `paths`.
 //!
-//! plan.md §4.3 requires the spec to be generated, never hand-written. Reading
+//! docs/archive/plan.md §4.3 requires the spec to be generated, never hand-written. Reading
 //! the registry rather than a second list is what keeps the two in step: a route
 //! added to the registry appears in the spec, and a route missing from the
 //! registry cannot appear in the spec.

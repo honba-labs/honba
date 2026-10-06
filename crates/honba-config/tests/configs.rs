@@ -1,5 +1,5 @@
 //! Every committed backtest run config parses as `BacktestRunConfig`, passes
-//! `validate()`, and compiles its strategy (plan.md E0-S4 follow-up).
+//! `validate()`, and compiles its strategy (docs/archive/plan.md E0-S4 follow-up).
 //!
 //! `configs/backtest/*.toml` is what docs, examples and agents copy; a file
 //! that no longer matches the schema is a broken example. Live and AI configs

@@ -1,4 +1,4 @@
-"""Verify a strategy manifest: compile it to the Rust ``StrategyIr`` (plan.md E0-S8).
+"""Verify a strategy manifest: compile it to the Rust ``StrategyIr`` (docs/archive/plan.md E0-S8).
 
 The IR is the manifest plus everything a runner would otherwise infer: the concrete
 universe, per-channel subscription lists, the timeframes to load and the warm-up.

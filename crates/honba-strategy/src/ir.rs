@@ -1,4 +1,4 @@
-//! The verified strategy IR (plan.md E0-S8).
+//! The verified strategy IR (docs/archive/plan.md E0-S8).
 //!
 //! A [`StrategyManifest`] is what an author (or an agent) declares; a
 //! [`StrategyIr`] is what `verify` proves about it and what every runner

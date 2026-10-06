@@ -1,6 +1,6 @@
 //! honba-codegen: one registry of Rust wire types, rendered five ways.
 //!
-//! Rust is the source of truth for the contract (plan.md §4.1). This crate walks
+//! Rust is the source of truth for the contract (docs/archive/plan.md §4.1). This crate walks
 //! the wire types once and emits:
 //!
 //! - **JSON Schema** — the conformance bundle, with every `$ref` resolvable.
@@ -15,7 +15,7 @@
 //! Generation is checked in CI by drift, not by review: regenerate and
 //! `git diff --exit-code`.
 //!
-//! Two version axes are owned here (plan.md §4.1, §4.2):
+//! Two version axes are owned here (docs/archive/plan.md §4.1, §4.2):
 //! `SCHEMA_VERSION` (wire shape, integer) and `API_VERSION` (endpoint surface,
 //! semver). Both are re-exported from the crates that define the types so there
 //! is exactly one of each.
@@ -43,12 +43,12 @@ pub use registry::{
 };
 pub use schemas::{local_refs, unresolved_local_refs, SchemaSet};
 
-/// Version of the JSON wire contract, owned here per plan.md §4.1.
+/// Version of the JSON wire contract, owned here per docs/archive/plan.md §4.1.
 ///
 /// Re-exported from `honba-messages`, where the envelope is defined.
 pub const SCHEMA_VERSION: u32 = honba_messages::SCHEMA_VERSION;
 
-/// Semantic version of the API surface, owned here per plan.md §4.1.
+/// Semantic version of the API surface, owned here per docs/archive/plan.md §4.1.
 ///
 /// Re-exported from `honba-messages`, where the envelope is defined.
 pub const API_VERSION: &str = honba_messages::API_VERSION;

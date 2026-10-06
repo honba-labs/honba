@@ -1,4 +1,4 @@
-//! Tests for integer minor-unit money (ADR 0011, plan.md E0-S6).
+//! Tests for integer minor-unit money (ADR 0011, docs/archive/plan.md E0-S6).
 
 use crate::{Currency, Money, MoneyError};
 

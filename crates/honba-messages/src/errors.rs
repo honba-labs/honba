@@ -1,4 +1,4 @@
-//! The stable error taxonomy (plan.md E0-S5, §4.2).
+//! The stable error taxonomy (docs/archive/plan.md E0-S5, §4.2).
 //!
 //! No error crosses a surface — Python, REST, WASM, MCP — without one of these
 //! codes. The taxonomy lives in `honba-messages` (L0) rather than in the API
@@ -74,7 +74,7 @@ impl fmt::Display for ErrorCategory {
 }
 
 crate::enum_with_all! {
-    /// One code per failure mode, stable across releases (plan.md §4.2).
+    /// One code per failure mode, stable across releases (docs/archive/plan.md §4.2).
     ///
     /// Deserialization is deliberately strict: an unrecognized code is an
     /// error rather than a default, because silently mapping a newer server's

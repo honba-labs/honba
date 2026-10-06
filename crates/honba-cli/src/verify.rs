@@ -1,4 +1,4 @@
-//! `honba verify` – compile a strategy manifest into its IR (plan.md E0-S8).
+//! `honba verify` – compile a strategy manifest into its IR (docs/archive/plan.md E0-S8).
 //!
 //! The CLI reads a JSON file, deserializes it as a `StrategyManifest` (unknown
 //! fields rejected: a manifest is an input) and compiles it with

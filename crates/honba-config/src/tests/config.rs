@@ -1,4 +1,4 @@
-//! Tests for the run-configuration types (plan.md E0-S4).
+//! Tests for the run-configuration types (docs/archive/plan.md E0-S4).
 
 use crate::*;
 

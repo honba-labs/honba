@@ -1,4 +1,4 @@
-//! Run-configuration schema (plan.md E0-S4).
+//! Run-configuration schema (docs/archive/plan.md E0-S4).
 //!
 //! Config is the input to every surface — a backtest, a sweep, a live session,
 //! a CI job — so its shape has to be one declared type that the code generator

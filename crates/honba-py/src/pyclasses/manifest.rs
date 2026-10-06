@@ -1,4 +1,4 @@
-//! The strategy manifest surface exposed to Python (plan.md E0-S8, ADR 0012).
+//! The strategy manifest surface exposed to Python (docs/archive/plan.md E0-S8, ADR 0012).
 //!
 //! `verify_manifest` is the one compiler from a `StrategyManifest` to its
 //! `StrategyIr`; Python's `honba.strategies.verify` and `honba verify` wrap it

@@ -1,4 +1,6 @@
-"""The strategy manifest: Python mirror of ``honba_strategy::StrategyManifest`` (plan.md E0-S8).
+"""The strategy manifest: Python mirror of ``honba_strategy::StrategyManifest``.
+
+Story E0-S8 (docs/archive/plan.md).
 
 A manifest is data, not behaviour: the strategy's name, a digest of its source, the
 universe it may trade, what it subscribes to, its driving timeframe and the number of

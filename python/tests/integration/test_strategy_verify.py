@@ -1,4 +1,4 @@
-"""Verify a manifest through the Rust compiler (plan.md E0-S8).
+"""Verify a manifest through the Rust compiler (docs/archive/plan.md E0-S8).
 
 ``honba.strategies.verify.verify_manifest`` and ``honba verify`` call
 ``honba._honba.verify_manifest``; the IR they return is the Rust ``StrategyIr``.

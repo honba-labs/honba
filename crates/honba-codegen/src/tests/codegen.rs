@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 
 #[test]
 fn the_version_axes_are_owned_here() {
-    // plan.md 4.1: both constants have exactly one owner; codegen
+    // docs/archive/plan.md 4.1: both constants have exactly one owner; codegen
     // re-exports them rather than repeating the literal.
     assert_eq!(SCHEMA_VERSION, honba_messages::SCHEMA_VERSION);
     assert_eq!(API_VERSION, honba_messages::API_VERSION);

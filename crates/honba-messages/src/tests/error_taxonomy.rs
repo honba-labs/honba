@@ -1,4 +1,4 @@
-//! Tests for the stable error-code taxonomy (ADR 0011, plan.md E0-S5).
+//! Tests for the stable error-code taxonomy (ADR 0011, docs/archive/plan.md E0-S5).
 
 use serde_json::json;
 
@@ -37,7 +37,7 @@ fn every_code_declares_a_category() {
 
 #[test]
 fn retryable_flags_are_set_only_for_transport_level_codes() {
-    // The plan (plan.md 4.2) requires `retryable` to be set for anything a
+    // The plan (docs/archive/plan.md 4.2) requires `retryable` to be set for anything a
     // caller may safely repeat. Domain/risk/validation refusals must never
     // claim to be retryable, or a caller would loop forever.
     for code in ErrorCode::ALL {
