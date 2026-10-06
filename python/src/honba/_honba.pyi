@@ -14,6 +14,7 @@ __all__ = [
     "OrderIntent",
     "QuoteTick",
     "RustSmaCrossover",
+    "api_request",
     "canonical_json",
     "codegen_artifacts",
     "codegen_render",
@@ -29,6 +30,23 @@ __all__ = [
 SCHEMA_VERSION: Final[int]
 API_VERSION: Final[str]
 STRATEGY_API_VERSION: Final[str]
+
+def api_request(
+    data_dir: str,
+    method: str,
+    path: str,
+    query_json: str | None = None,
+    body_json: str | None = None,
+) -> tuple[int, str]:
+    """Send one request through the REST read API's router, in process (no socket).
+
+    Builds the router ``honba serve`` serves over the ``SYMBOL.EXCHANGE.parquet`` files in
+    ``data_dir`` (loaded once per process and cached) and returns ``(status, body_json)``.
+    ``query_json`` is a flat JSON object of scalars. A request the API rejects (404, 422,
+    501) is a normal return carrying the error envelope. Raises ``OSError`` when ``data_dir``
+    cannot be loaded and ``ValueError`` for a malformed request (bad method, relative path,
+    non-flat query). Wrapped by ``honba.client.InprocTransport``.
+    """
 
 def canonical_json(kind: str, payload: str) -> str: ...
 def wire_enum_values() -> dict[str, list[str]]: ...

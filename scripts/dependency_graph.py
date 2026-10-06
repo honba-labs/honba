@@ -83,6 +83,8 @@ ALLOWED_PROD = {
         "honba-strategy",
         "honba-sim",
         "honba-codegen",
+        # The in-process SDK transport drives the served router (no handler is reimplemented).
+        "honba-api-rest",
     },
     "honba-cli": {
         "honba-messages",
