@@ -16,16 +16,30 @@ Non-finite input and amounts outside ``i64`` are rejected with ``ValueError``.
 
 from __future__ import annotations
 
+import functools
+import importlib
 import math
 import warnings
 from dataclasses import dataclass
 from enum import Enum
 from typing import NamedTuple
 
-from honba import _honba
 
-_MINOR_UNITS: dict[str, tuple[int, str, str]] = _honba.currency_minor_units()
-"""Rust's ``Currency`` table: code -> (minor exponent, singular name, plural name)."""
+@functools.lru_cache(maxsize=1)
+def _minor_units() -> dict[str, tuple[int, str, str]]:
+    """Rust's ``Currency`` table: code -> (minor exponent, singular name, plural name).
+
+    Loaded on first use so that importing this module (and ``import honba``) does not
+    need the compiled extension.
+    """
+    ext = importlib.import_module("honba._honba")
+    table = getattr(ext, "currency_minor_units", None)
+    if table is None:
+        raise RuntimeError(
+            "honba._honba has no currency_minor_units: the compiled extension is stale, "
+            "rebuild it (maturin develop)"
+        )
+    return dict(table())
 
 
 class MinorUnit(NamedTuple):
@@ -44,7 +58,7 @@ class Currency(Enum):
     @property
     def minor_exponent(self) -> int:
         """One major unit is ``10**minor_exponent`` minor units."""
-        return _MINOR_UNITS[self.value][0]
+        return _minor_units()[self.value][0]
 
     @property
     def minor_per_major(self) -> int:
@@ -54,7 +68,7 @@ class Currency(Enum):
     @property
     def minor_unit(self) -> MinorUnit:
         """Names of the minor unit, for display only (generic code says "minor")."""
-        _, singular, plural = _MINOR_UNITS[self.value]
+        _, singular, plural = _minor_units()[self.value]
         return MinorUnit(singular, plural)
 
 
