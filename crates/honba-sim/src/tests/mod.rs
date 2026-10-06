@@ -2,6 +2,7 @@
 
 mod bar_fill;
 mod paper;
+mod scripted;
 
 use honba_messages::{
     Bar, BarAggregation, BarSpecification, BarType, Event, Exchange, InstrumentId, Order, OrderId,
