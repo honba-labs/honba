@@ -7,6 +7,7 @@
 //! Provides read-only endpoints as specified in Phase 2 (E11-S3, E11-S4).
 //! All responses are wrapped in the versioned envelope from `honba-api`.
 
+use axum::http::{HeaderValue, Method};
 use axum::{
     async_trait,
     extract::{rejection::JsonRejection, FromRequest, Path, Request, State},
@@ -21,7 +22,11 @@ use honba_api::{
     VerifyStrategyResponse,
 };
 use std::sync::Arc;
-use tower_http::{compression::CompressionLayer, cors::CorsLayer, trace::TraceLayer};
+use tower_http::{
+    compression::CompressionLayer,
+    cors::{AllowOrigin, CorsLayer},
+    trace::TraceLayer,
+};
 
 mod dispatch;
 mod market;
@@ -68,6 +73,41 @@ where
     }
 }
 
+/// Server configuration beyond the data: today only the CORS allow-list.
+///
+/// The default sends no CORS headers at all, so browsers refuse cross-origin reads; origins
+/// are opt-in, one explicit entry each (never a wildcard).
+#[derive(Clone, Debug, Default)]
+pub struct ApiConfig {
+    cors_origins: Vec<HeaderValue>,
+}
+
+impl ApiConfig {
+    /// The allowed CORS origins; empty means CORS is off.
+    pub fn cors_origins(&self) -> &[HeaderValue] {
+        &self.cors_origins
+    }
+
+    /// Allows exactly these origins (e.g. `https://app.example`); an entry that cannot be a
+    /// header value, or a bare `*`, is an error.
+    pub fn with_cors_origins<I, S>(mut self, origins: I) -> Result<Self, String>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        for origin in origins {
+            let origin = origin.as_ref();
+            if origin == "*" {
+                return Err("cors origin '*' is not allowed; list explicit origins".to_owned());
+            }
+            let value = HeaderValue::from_str(origin)
+                .map_err(|_| format!("cors origin {origin:?} is not a valid header value"))?;
+            self.cors_origins.push(value);
+        }
+        Ok(self)
+    }
+}
+
 /// Create the API router over an empty catalogue.
 pub fn api_router() -> Router {
     api_router_with(AppState::default())
@@ -75,6 +115,11 @@ pub fn api_router() -> Router {
 
 /// Create the API router serving `state`.
 pub fn api_router_with(state: AppState) -> Router {
+    api_router_with_config(state, &ApiConfig::default())
+}
+
+/// Create the API router serving `state` under `config`.
+pub fn api_router_with_config(state: AppState, config: &ApiConfig) -> Router {
     let state = Arc::new(state);
     Router::new()
         .route("/capabilities", get(get_capabilities))
@@ -99,8 +144,19 @@ pub fn api_router_with(state: AppState) -> Router {
         .route("/journals/:id", get(get_journal_by_id))
         .with_state(state)
         .layer(CompressionLayer::new())
-        .layer(CorsLayer::permissive())
+        .layer(cors_layer(config))
         .layer(TraceLayer::new_for_http())
+}
+
+/// No CORS headers unless origins are listed; then only for those, read methods only.
+fn cors_layer(config: &ApiConfig) -> CorsLayer {
+    if config.cors_origins.is_empty() {
+        return CorsLayer::new();
+    }
+    CorsLayer::new()
+        .allow_origin(AllowOrigin::list(config.cors_origins.clone()))
+        .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
+        .allow_headers([axum::http::header::CONTENT_TYPE])
 }
 
 /// Serves [`api_router_with`]`(state)` on `listener` until `shutdown` completes.
@@ -113,7 +169,17 @@ pub async fn serve(
     state: AppState,
     shutdown: impl std::future::Future<Output = ()> + Send + 'static,
 ) -> std::io::Result<()> {
-    axum::serve(listener, api_router_with(state))
+    serve_with_config(listener, state, &ApiConfig::default(), shutdown).await
+}
+
+/// [`serve`] under an explicit [`ApiConfig`].
+pub async fn serve_with_config(
+    listener: tokio::net::TcpListener,
+    state: AppState,
+    config: &ApiConfig,
+    shutdown: impl std::future::Future<Output = ()> + Send + 'static,
+) -> std::io::Result<()> {
+    axum::serve(listener, api_router_with_config(state, config))
         .with_graceful_shutdown(shutdown)
         .await
 }

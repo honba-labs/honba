@@ -82,4 +82,8 @@ existing `{iso, unix_nanos}` form. ADR 0011 is not engaged by these endpoints.
 - Not built, answering 501: `GET/POST /strategies`, `POST /backtests`, `GET /backtests/{id}[/journal]`,
   `POST /sweeps`, `GET /sweeps/{id}`, `GET/POST /orders`, `DELETE /orders/{id}`, `POST /positions/close`,
   `GET /screener/scan`, `GET /journals/{id}`. `POST /strategies/verify` is real (ADR 0012).
-- No auth, TLS or rate limiting on `honba serve`; it is a loopback read API by default.
+- No auth, TLS or rate limiting on `honba serve`; it is a loopback read API by default, and `honba serve` prints a
+  warning on stderr when `--addr` is not loopback.
+- **CORS is off by default** (no CORS headers). `ApiConfig::with_cors_origins` / `honba serve --cors-origin <origin>`
+  (repeatable) opt in explicit origins; `*` and invalid header values are rejected. `api_router_with` keeps the
+  default config; `api_router_with_config` / `serve_with_config` take an `ApiConfig`.

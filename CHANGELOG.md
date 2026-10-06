@@ -7,6 +7,8 @@
 - `GET /bars/{id}` is capped at `MAX_BAR_ROWS` (100,000) bars: a larger selection is a 422
   `validation_invalid_request` with `context.reason = too_many_rows` and `context.limit`; narrow `from`/`to`.
   No pagination (ADR 0013).
+- CORS is no longer permissive: no CORS headers by default; `honba serve --cors-origin <origin>` (repeatable, via
+  `ApiConfig`) allow-lists explicit origins. `honba serve` warns on stderr when `--addr` is not loopback (no auth/TLS).
 
 ### CLI exchange selection
 

@@ -92,7 +92,12 @@ fn clap_definition_is_consistent() {
 #[test]
 fn serve_defaults_to_loopback_and_needs_a_data_dir() {
     match parse(&["serve", "--data-dir", "bars"]).unwrap().command {
-        Commands::Serve { data_dir, addr } => {
+        Commands::Serve {
+            data_dir,
+            addr,
+            cors_origin,
+        } => {
+            assert!(cors_origin.is_empty());
             assert_eq!(data_dir, PathBuf::from("bars"));
             assert_eq!(addr, "127.0.0.1:8080".parse().unwrap());
         }
@@ -107,4 +112,25 @@ fn serve_defaults_to_loopback_and_needs_a_data_dir() {
     }
     assert!(parse(&["serve"]).is_err());
     assert!(parse(&["serve", "--data-dir", "d", "--addr", "not-an-addr"]).is_err());
+}
+
+#[test]
+fn serve_cors_origin_is_repeatable() {
+    match parse(&[
+        "serve",
+        "--data-dir",
+        "d",
+        "--cors-origin",
+        "https://a.example",
+        "--cors-origin",
+        "https://b.example",
+    ])
+    .unwrap()
+    .command
+    {
+        Commands::Serve { cors_origin, .. } => {
+            assert_eq!(cors_origin, vec!["https://a.example", "https://b.example"])
+        }
+        _ => panic!("expected serve"),
+    }
 }

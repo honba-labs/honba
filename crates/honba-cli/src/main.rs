@@ -63,6 +63,9 @@ enum Commands {
         /// Address to listen on
         #[arg(long, default_value = "127.0.0.1:8080")]
         addr: SocketAddr,
+        /// Allow this browser origin to read the API (CORS); repeatable. Default: none
+        #[arg(long = "cors-origin")]
+        cors_origin: Vec<String>,
     },
     /// Verify a strategy manifest and print its compiled IR as JSON
     Verify {
@@ -144,7 +147,11 @@ fn main() -> Result<()> {
             pyi,
             mcp,
         } => schema::export_all(&schema_dir, &typescript, &openapi, &pyi, &mcp),
-        Commands::Serve { data_dir, addr } => serve::run(&data_dir, addr),
+        Commands::Serve {
+            data_dir,
+            addr,
+            cors_origin,
+        } => serve::run(&data_dir, addr, &cors_origin),
         Commands::Verify { manifest } => verify::run(&manifest),
     }
 }

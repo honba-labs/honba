@@ -105,3 +105,108 @@ fn a_missing_data_dir_fails_before_listening() {
     assert!(output.stdout.is_empty());
     assert!(String::from_utf8_lossy(&output.stderr).contains("data directory"));
 }
+
+/// Sends `GET /health` with an `Origin` header and returns the raw response head.
+fn head_with_origin(addr: SocketAddr, origin: &str) -> String {
+    let mut stream = TcpStream::connect(addr).unwrap();
+    write!(
+        stream,
+        "GET /health HTTP/1.0\r\nHost: {addr}\r\nOrigin: {origin}\r\n\r\n"
+    )
+    .unwrap();
+    let mut text = String::new();
+    stream.read_to_string(&mut text).unwrap();
+    text.split_once("\r\n\r\n").unwrap().0.to_ascii_lowercase()
+}
+
+fn stop(mut child: Child) {
+    Command::new("kill")
+        .args(["-INT", &child.id().to_string()])
+        .status()
+        .unwrap();
+    child.wait().unwrap();
+}
+
+#[test]
+fn cors_is_off_by_default_and_opt_in_per_origin() {
+    let dir = data_dir("cors");
+    let d = dir.to_str().unwrap();
+    let (child, addr) = start(&["--data-dir", d, "--addr", "127.0.0.1:0"]);
+    let head = head_with_origin(addr, "https://app.example");
+    assert!(!head.contains("access-control-allow-origin"), "{head}");
+    stop(child);
+
+    let (child, addr) = start(&[
+        "--data-dir",
+        d,
+        "--addr",
+        "127.0.0.1:0",
+        "--cors-origin",
+        "https://app.example",
+    ]);
+    let head = head_with_origin(addr, "https://app.example");
+    assert!(
+        head.contains("access-control-allow-origin: https://app.example"),
+        "{head}"
+    );
+    let head = head_with_origin(addr, "https://evil.example");
+    assert!(!head.contains("access-control-allow-origin"), "{head}");
+    stop(child);
+}
+
+#[test]
+fn an_invalid_cors_origin_fails_before_listening() {
+    let dir = data_dir("badcors");
+    let output = Command::new(env!("CARGO_BIN_EXE_honba"))
+        .args([
+            "serve",
+            "--data-dir",
+            dir.to_str().unwrap(),
+            "--cors-origin",
+            "bad\norigin",
+        ])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("cors"));
+}
+
+#[test]
+fn a_non_loopback_address_warns_on_stderr_and_loopback_does_not() {
+    let dir = data_dir("warn");
+    let d = dir.to_str().unwrap();
+    let (mut child, _) = start(&["--data-dir", d, "--addr", "0.0.0.0:0"]);
+    // The banner is printed after the warning, so the warning is already written.
+    Command::new("kill")
+        .args(["-INT", &child.id().to_string()])
+        .status()
+        .unwrap();
+    child.wait().unwrap();
+    let mut err = String::new();
+    child
+        .stderr
+        .take()
+        .unwrap()
+        .read_to_string(&mut err)
+        .unwrap();
+    assert!(
+        err.contains("warning") && err.contains("auth") && err.contains("TLS"),
+        "{err}"
+    );
+
+    let (mut child, _) = start(&["--data-dir", d, "--addr", "127.0.0.1:0"]);
+    Command::new("kill")
+        .args(["-INT", &child.id().to_string()])
+        .status()
+        .unwrap();
+    child.wait().unwrap();
+    let mut err = String::new();
+    child
+        .stderr
+        .take()
+        .unwrap()
+        .read_to_string(&mut err)
+        .unwrap();
+    assert!(!err.contains("warning"), "{err}");
+}
