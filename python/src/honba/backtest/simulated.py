@@ -157,6 +157,8 @@ class NextOpenExecution(BaseExecutionPort):
     def submit(self, order_id: str, intent: OrderIntent, ts: int) -> None:
         if intent.side not in (OrderSide.BUY, OrderSide.SELL):
             raise ValueError(f"order {order_id} has no side: it must be buy or sell")
+        if any(w.order_id == order_id for w in self._working):
+            raise ValueError(f"order id {order_id} is already working")
         if intent.order_type is not OrderType.MARKET:
             self._reject(order_id, intent, "unsupported_order_type", ts)
             return

@@ -138,6 +138,16 @@ impl ExecutionEngine for ScriptedExecution {
                 order.order_id().as_str()
             )));
         }
+        if self
+            .working
+            .iter()
+            .any(|o| o.order_id().as_str() == order.order_id().as_str())
+        {
+            return Err(AlgoError::Component(format!(
+                "order id {} is already working",
+                order.order_id().as_str()
+            )));
+        }
         let behavior = self
             .script
             .get(order.order_id().as_str())

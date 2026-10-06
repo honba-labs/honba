@@ -149,3 +149,39 @@ fn an_order_without_a_side_is_refused_at_submit() {
     assert!(exec.drain_fills().unwrap().is_empty());
     assert!(exec.drain_rejections().unwrap().is_empty());
 }
+
+#[test]
+fn a_duplicate_working_order_id_is_refused_at_submit() {
+    let mut exec = ScriptedExecution::new(10.0).with("O-1", Behavior::Hold);
+    exec.submit(market("O-1", OrderSide::Buy, 7.0, 1)).unwrap();
+    let err = exec
+        .submit(market("O-1", OrderSide::Buy, 3.0, 2))
+        .unwrap_err();
+    assert!(err.to_string().contains("O-1"), "{err}");
+    assert_eq!(exec.working_orders(), vec!["O-1".to_string()]);
+
+    // The first order is untouched: one cancel reports its 7.0, once.
+    exec.cancel("O-1", honba_messages::UnixNanos::from_u64(5))
+        .unwrap();
+    let got = exec.drain_rejections().unwrap();
+    assert_eq!(got.len(), 1);
+    assert_eq!(got[0].quantity, 7.0);
+}
+
+#[test]
+fn an_id_may_be_resubmitted_once_it_is_no_longer_working() {
+    let mut exec = ScriptedExecution::new(10.0).with("O-1", Behavior::Hold);
+    exec.submit(market("O-1", OrderSide::Buy, 7.0, 1)).unwrap();
+    exec.cancel("O-1", honba_messages::UnixNanos::from_u64(2))
+        .unwrap();
+    exec.submit(market("O-1", OrderSide::Buy, 4.0, 3)).unwrap();
+    exec.cancel("O-1", honba_messages::UnixNanos::from_u64(4))
+        .unwrap();
+    let quantities: Vec<f64> = exec
+        .drain_rejections()
+        .unwrap()
+        .iter()
+        .map(|r| r.quantity)
+        .collect();
+    assert_eq!(quantities, vec![7.0, 4.0]);
+}

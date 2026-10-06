@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Execution ports: a working order id must be unique
+
+- Behavior change: `ScriptedExecution::submit` (Rust) returns an error and `NextOpenExecution.submit` (Python) raises
+  `ValueError` when the order id is already working (held, not yet filled, rejected or cancelled). Before, a duplicate
+  was queued and `cancel` removed only the first match. An id may be resubmitted once it is no longer working. The
+  runner generates unique ids, so this only affects code driving a port directly.
+
 ### Execution ports: an order without a side is refused at submit
 
 - Behavior change: `ScriptedExecution::submit` (Rust) returns an error for an `OrderSide::NoOrderSide` order, and

@@ -514,3 +514,23 @@ def test_an_order_without_a_side_is_refused_at_submit() -> None:
     with pytest.raises(ValueError, match="side"):
         p.submit("o-0", intent, 1)
     assert p.working_orders == []
+
+
+def test_a_duplicate_working_order_id_is_refused_at_submit() -> None:
+    p = port()
+    p.submit("o-0", OrderIntent.market_buy(A, 7), 1)
+    with pytest.raises(ValueError, match="o-0"):
+        p.submit("o-0", OrderIntent.market_buy(A, 3), 2)
+    assert p.working_orders == ["o-0"]
+    p.cancel("o-0")
+    (rejection,) = p.drain_rejections()
+    assert rejection.intent.quantity == 7  # the first order, cancelled once
+
+
+def test_an_id_may_be_resubmitted_once_it_is_no_longer_working() -> None:
+    p = port()
+    p.submit("o-0", OrderIntent.market_buy(A, 7), 1)
+    p.cancel("o-0")
+    p.submit("o-0", OrderIntent.market_buy(A, 4), 2)
+    p.cancel("o-0")
+    assert [r.intent.quantity for r in p.drain_rejections()] == [7, 4]
