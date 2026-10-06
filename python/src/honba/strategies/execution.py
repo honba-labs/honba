@@ -31,6 +31,7 @@ from honba.entities.order import OrderIntent
 from honba.entities.trade import Trade
 
 __all__ = [
+    "CANCELLED_REASON",
     "BaseExecutionPort",
     "ExecutionPort",
     "OrderRejection",
@@ -40,6 +41,10 @@ __all__ = [
 ]
 
 
+CANCELLED_REASON = "cancelled"
+"""The ``reason`` of a cancellation (shared with Rust ``OrderRejection::CANCELLED``)."""
+
+
 @dataclass(frozen=True, slots=True)
 class OrderRejection:
     """An order, or the part of one, that will never fill.
@@ -47,7 +52,9 @@ class OrderRejection:
     ``intent`` carries the quantity that is released (the unfilled remainder for a
     partial fill). ``cancelled`` distinguishes a cancel (wire ``order_cancelled``)
     from a rejection by the venue or port (wire ``order_rejected``). ``ts`` is the
-    port's time for the event in unix ns (0 if it has none).
+    port's time for the event in unix ns (0 if it has none). ``cancelled`` and ``reason``
+    cannot disagree: ``cancelled`` is true exactly when ``reason == "cancelled"``
+    (``CANCELLED_REASON``), as in the Rust ``OrderRejection::is_cancelled``.
     """
 
     order_id: str
@@ -59,6 +66,11 @@ class OrderRejection:
     def __post_init__(self) -> None:
         if not self.order_id:
             raise ValueError("OrderRejection.order_id must not be empty")
+        if self.cancelled != (self.reason == CANCELLED_REASON):
+            raise ValueError(
+                f"OrderRejection.cancelled={self.cancelled} contradicts reason={self.reason!r}: "
+                f"cancelled must be true exactly when the reason is {CANCELLED_REASON!r}"
+            )
 
 
 @runtime_checkable

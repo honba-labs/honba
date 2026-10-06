@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### OrderRejection: `cancelled` can no longer contradict `reason`
+
+- Breaking (Rust): the `cancelled: bool` field of `honba_engine::OrderRejection` is replaced by
+  `OrderRejection::is_cancelled()`, derived from `reason == OrderRejection::CANCELLED`. The constructors are unchanged.
+  Python `honba.strategies.execution.OrderRejection` keeps its `cancelled` field and now raises `ValueError` when it
+  disagrees with `reason == "cancelled"` (new constant `CANCELLED_REASON`); a cancellation must pass `cancelled=True`
+  and a venue rejection must not use the reason `"cancelled"`. Not a wire or schema type; the conformance vectors are
+  unchanged.
+
 ### Execution ports: a working order id must be unique
 
 - Behavior change: `ScriptedExecution::submit` (Rust) returns an error and `NextOpenExecution.submit` (Python) raises

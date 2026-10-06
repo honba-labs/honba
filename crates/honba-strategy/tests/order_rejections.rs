@@ -107,7 +107,7 @@ fn order_rejection_vectors() {
                     r.quantity,
                     r.reason,
                     r.ts.as_u64(),
-                    r.cancelled
+                    r.is_cancelled()
                 ])
             })
             .collect();

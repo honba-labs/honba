@@ -7,8 +7,9 @@ use crate::error::Result;
 
 /// An order, or the part of one, that will never fill (ADR 008, decision 13).
 ///
-/// Either the venue or engine refused it (`cancelled == false`) or it was
-/// cancelled (`cancelled == true`, reason [`OrderRejection::CANCELLED`]).
+/// Either the venue or engine refused it, or it was cancelled: a cancellation is
+/// exactly a rejection whose `reason` is [`OrderRejection::CANCELLED`], so
+/// [`Self::is_cancelled`] is derived from the reason and the two cannot disagree.
 /// `quantity` is the unfilled remainder: the amount the strategy's context must
 /// release, so a partly filled order reports only what is left. The Python
 /// mirror is `honba.strategies.execution.OrderRejection`.
@@ -27,8 +28,6 @@ pub struct OrderRejection {
     pub reason: String,
     /// The engine's time for the event.
     pub ts: UnixNanos,
-    /// True for a cancellation, false for a rejection.
-    pub cancelled: bool,
 }
 
 impl OrderRejection {
@@ -51,8 +50,12 @@ impl OrderRejection {
             quantity,
             reason: reason.into(),
             ts,
-            cancelled: false,
         }
+    }
+
+    /// True for a cancellation (reason [`Self::CANCELLED`]), false for a rejection.
+    pub fn is_cancelled(&self) -> bool {
+        self.reason == Self::CANCELLED
     }
 
     /// A cancellation of the unfilled `quantity` of an order.
@@ -63,10 +66,7 @@ impl OrderRejection {
         quantity: f64,
         ts: UnixNanos,
     ) -> Self {
-        Self {
-            cancelled: true,
-            ..Self::rejected(order_id, instrument_id, side, quantity, Self::CANCELLED, ts)
-        }
+        Self::rejected(order_id, instrument_id, side, quantity, Self::CANCELLED, ts)
     }
 }
 
@@ -81,7 +81,7 @@ pub trait ExecutionEngine: Send {
     /// Cancels an order by id, at time `now`.
     ///
     /// An engine holding the order reports the unfilled remainder through
-    /// [`Self::drain_rejections`] with `cancelled == true`. Cancelling an
+    /// [`Self::drain_rejections`] as a cancellation (`is_cancelled()`). Cancelling an
     /// unknown or finished order is a no-op. The cancellation is stamped with
     /// `now`, the engine time at which the cancel is processed, not the
     /// order's original `ts_event` (ADR 008, decision 13 addendum).

@@ -66,7 +66,7 @@ fn cancelling_a_held_order_is_final_and_a_later_bar_changes_nothing() {
     bar(&mut r, 2);
     assert!(!r.context().busy(&instrument("X")));
     assert_eq!(r.order_rejections().len(), 1, "released exactly once");
-    assert!(r.order_rejections()[0].cancelled);
+    assert!(r.order_rejections()[0].is_cancelled());
     assert!(r.fills().is_empty());
     assert_eq!(r.context().position(&instrument("X")), 0.0);
 }

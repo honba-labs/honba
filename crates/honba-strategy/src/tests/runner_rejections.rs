@@ -39,7 +39,7 @@ fn a_rejection_is_recorded_and_releases_the_instrument() {
     bar(&mut r, 1);
     assert_eq!(r.order_rejections().len(), 1);
     assert_eq!(r.order_rejections()[0].reason, "insufficient_funds");
-    assert!(!r.order_rejections()[0].cancelled);
+    assert!(!r.order_rejections()[0].is_cancelled());
     assert!(!r.context().busy(&any_instrument()));
 }
 
@@ -55,7 +55,7 @@ fn cancel_books_the_remainder_at_once() {
     r.cancel(&id).unwrap();
     assert!(!r.context().busy(&any_instrument()));
     let got = &r.order_rejections()[0];
-    assert!(got.cancelled);
+    assert!(got.is_cancelled());
     assert_eq!(got.reason, "cancelled");
     assert_eq!(got.quantity, 1.0);
 }

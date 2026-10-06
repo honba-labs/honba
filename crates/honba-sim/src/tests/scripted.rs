@@ -31,7 +31,7 @@ fn a_rejected_order_reports_its_whole_quantity() {
         ("O-1", 5.0, "no_position")
     );
     assert_eq!(
-        (r.side, r.cancelled, r.ts.as_u64()),
+        (r.side, r.is_cancelled(), r.ts.as_u64()),
         (OrderSide::Sell, false, 3)
     );
     assert_eq!(r.instrument_id, any_instrument());

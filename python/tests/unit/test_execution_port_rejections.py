@@ -193,3 +193,14 @@ def test_a_handle_rejected_override_sees_port_rejections() -> None:
 def test_order_rejection_requires_an_order_id() -> None:
     with pytest.raises(ValueError):
         OrderRejection("", OrderIntent.market_buy(X, 1), "x")
+
+
+def test_cancelled_and_reason_cannot_disagree() -> None:
+    intent = OrderIntent.market_buy(X, 1)
+    ok = OrderRejection("o", intent, "cancelled", cancelled=True)
+    assert ok.cancelled
+    assert not OrderRejection("o", intent, "no_position").cancelled
+    with pytest.raises(ValueError, match="cancelled"):
+        OrderRejection("o", intent, "cancelled")  # a cancel must say so
+    with pytest.raises(ValueError, match="cancelled"):
+        OrderRejection("o", intent, "no_position", cancelled=True)

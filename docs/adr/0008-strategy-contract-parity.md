@@ -185,6 +185,10 @@ this ADR:
     and the Python integration test also drives the real `NextOpenExecution` through it. Higher-fidelity venues that
     only learn of the cancel at the venue acknowledgement (L2, live) are left to the order-state ADR (ROADMAP D2).
 
+    **Addendum to decision 13 (one source of truth).** `cancelled` is not stored: Rust exposes
+    `OrderRejection::is_cancelled()` (`reason == "cancelled"`), and Python's `OrderRejection` rejects a `cancelled` flag
+    that contradicts its reason. A port also refuses an order without a side and a duplicate working order id at submit.
+
 ## Consequences
 - Breaking (Rust): every `Strategy` hook takes `ctx: &mut dyn StrategyContext`; market-data hooks lose `ts_init`;
   `drain_intents` is removed (submit with `ctx.submit`). `StrategyAdapter` owns a `LedgerContext`. In-repo
