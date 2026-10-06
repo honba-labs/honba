@@ -1,6 +1,6 @@
 # ADR 0015: One Explicit Async Runtime Per Interpreter, No pyo3 `auto-initialize`
 
-Date: 2026-10-06. Status: Accepted (implementation pending). Roadmap story: E10-S7 (plan.md §3.2, §9 row 3).
+Date: 2026-10-06. Status: Accepted (implemented, E10-S7). Roadmap story: E10-S7 (plan.md §3.2, §9 row 3).
 
 ## Context
 
@@ -52,3 +52,31 @@ Not built:
   replacement for the leaked runtime that can be torn down, a test that a second creation is refused or returns the same
   runtime, and a check that `Cargo.toml` does not enable `auto-initialize`.
 - This ADR is revisited if `honba-py` is ever split into per-crate bindings (plan.md §9 row 7 says it will not be).
+
+## Addendum: what shipped (E10-S7)
+
+- `honba::runtime` (`crates/honba-py/src/runtime.rs`) holds the runtime in a process-global slot (`RwLock<Option<..>>`),
+  not a leak. `start(worker_threads)` builds a named multi-thread runtime and refuses a second start
+  (`RuntimeError::AlreadyRunning`); `stop()` waits for in-flight `block_on` calls, then drops the runtime, which joins
+  its threads; `start` after `stop` works and bumps a `generation` counter. Bound as `honba._honba.runtime_start`,
+  `runtime_stop`, `runtime_info`.
+- `honba.event_loop` is the Python owner: `start`/`stop`/`is_running`/`info`/`running()`. `start` is idempotent for the
+  owner and raises `EventLoopError` if the runtime was started outside the module or with a different explicit
+  `worker_threads`. `stop` is registered with `atexit`. A runtime started directly through `_honba` is never adopted or
+  stopped by it.
+- `pyclasses/api.rs` no longer owns a runtime. `request` calls `runtime::block_on`: it uses the started runtime, or, with
+  none started, a current-thread runtime built for that single call and dropped with it. So no second runtime ever
+  outlives a call, and in-process REST answers are byte-identical inside and outside `event_loop.running()`.
+- Enforcement: `crates/honba-py/tests/no_auto_initialize.rs` reads the resolved pyo3 features from `cargo metadata` and
+  fails if `auto-initialize` is on (including through another crate); verified red by enabling it.
+- `initialize_runtime()` and `get_runtime_handle()` stay as deprecated shims over the slot.
+
+Limits:
+
+- `pyo3-async-runtimes` is not handed the runtime. `init_with_runtime` takes a `&'static` runtime once per process, which
+  needs a leak and forbids teardown and restart. Nothing in the crate uses `future_into_py` yet; the first async Python
+  API must either be built on `runtime::block_on`/a stored `Handle`, or this ADR is revisited (a bridge that creates
+  the Python future from our runtime handle). `honba.async_run` from the roadmap row is not built.
+- The runtime is per process (one interpreter); sub-interpreters are not supported.
+- `stop()` blocks until in-flight `block_on` calls and spawned blocking tasks finish; there is no timeout.
+- Calling `block_on` from inside the runtime panics (tokio rule); callers are Python threads with the GIL released.

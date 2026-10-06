@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### `honba.event_loop`: one explicit async runtime per interpreter (E10-S7, ADR 0015)
+
+- New `honba.event_loop` (`start`, `stop`, `is_running`, `info`, `running()` context manager, `EventLoopError`). It
+  owns the single tokio runtime: `start()` is idempotent for the owner and raises when the runtime was started
+  elsewhere or with a different `worker_threads`; `stop()` joins the runtime threads, is idempotent and also runs at
+  interpreter exit; restart after `stop()` works. New natives `honba._honba.runtime_start/runtime_stop/runtime_info`
+  backed by `honba::runtime` (Rust), replacing the leaked `Box::leak` runtime.
+- Behavior change: `initialize_runtime()` is deprecated and now idempotent (it used to leak a runtime on every call);
+  `get_runtime_handle()` is deprecated and raises `RuntimeError` when no runtime is running (it used to return a
+  constant string).
+- The in-process REST path (`InprocTransport` -> `api_request`) reuses the started runtime; with none started it builds
+  a current-thread runtime per call. The private process-lifetime runtime in `pyclasses/api.rs` is gone. Answers are
+  identical either way.
+- New test that pyo3 resolves without `auto-initialize` (`crates/honba-py/tests/no_auto_initialize.rs`).
+
 ### Indian market dates are IST-explicit, not machine-local
 
 - Fix: `InMemoryBarStore.read`, `InMemoryMarketDataProvider.fetch` and the yfinance loader
