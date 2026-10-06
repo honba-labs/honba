@@ -41,8 +41,10 @@ pub const CORE_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn alias(name: &str, schema: &Value) -> String {
     // A generic envelope keeps its parameter: `ResponseEnvelope[T]`.
     if name == "ResponseEnvelope" {
-        return "class ResponseEnvelope(Generic[T]):\n    data: T | None\n    error: ErrorDetail | None\n"
-            .to_string();
+        return envelope(schema);
+    }
+    if let Some(tagged) = tagged_union(name, schema) {
+        return tagged;
     }
     if let Some(literals) = enum_union(schema) {
         return format!("{name} = {literals}\n");
@@ -62,6 +64,117 @@ pub fn alias(name: &str, schema: &Value) -> String {
         }
     }
     format!("{name} = {}\n", py_type(schema))
+}
+
+/// The generic response envelope: its `data` field is the type parameter `T`.
+///
+/// Falls back to the minimal `data`/`error` shape when the schema declares no properties.
+fn envelope(schema: &Value) -> String {
+    let Some(props) = schema.get("properties").and_then(Value::as_object) else {
+        return "class ResponseEnvelope(Generic[T]):\n    data: T | None\n    error: ErrorDetail | None\n"
+            .to_string();
+    };
+    let mut generic = schema.clone();
+    let mut props = props.clone();
+    props.insert("data".to_string(), serde_json::json!({"$ref": "#/$defs/T"}));
+    generic["properties"] = Value::Object(props);
+    class_body("ResponseEnvelope", &generic).replacen(
+        "class ResponseEnvelope:",
+        "class ResponseEnvelope(Generic[T]):",
+        1,
+    )
+}
+
+/// Renders an internally tagged union (`oneOf` of objects sharing a required
+/// single-literal property, serde's `#[serde(tag = "type")]`) as one `TypedDict` per
+/// variant plus a union alias, so a checker can narrow on the discriminator.
+///
+/// Returns `None` when the schema is not such a union.
+fn tagged_union(name: &str, schema: &Value) -> Option<String> {
+    let variants = schema.get("oneOf").and_then(Value::as_array)?;
+    if variants.len() < 2 {
+        return None;
+    }
+    let tag = discriminator(variants)?;
+    let mut blocks = Vec::new();
+    let mut names = Vec::new();
+    for variant in variants {
+        let literal = variant["properties"][&tag]
+            .get("enum")
+            .and_then(Value::as_array)
+            .and_then(|a| a.first())
+            .and_then(Value::as_str)?;
+        let variant_name = format!("{name}{}", pascal(literal));
+        blocks.push(typed_dict_class(&variant_name, variant));
+        names.push(variant_name);
+    }
+    blocks.push(format!("{name} = {}\n", names.join(" | ")));
+    Some(blocks.join("\n"))
+}
+
+/// A property required in every variant whose schema is a single string literal,
+/// with distinct values; `type` is preferred.
+fn discriminator(variants: &[Value]) -> Option<String> {
+    let first = variants.first()?.get("properties")?.as_object()?;
+    let mut keys: Vec<&String> = first.keys().collect();
+    keys.sort_by_key(|k| k.as_str() != "type");
+    keys.into_iter().find_map(|key| {
+        let mut seen = Vec::new();
+        for variant in variants {
+            let required = required_fields(variant);
+            let literal = single_literal(variant.get("properties")?.get(key)?)?;
+            if !required.contains(key) || seen.contains(&literal) {
+                return None;
+            }
+            seen.push(literal);
+        }
+        Some(key.clone())
+    })
+}
+
+fn single_literal(schema: &Value) -> Option<String> {
+    match schema.get("enum").and_then(Value::as_array)?.as_slice() {
+        [Value::String(s)] => Some(s.clone()),
+        _ => None,
+    }
+}
+
+/// `order_filled` -> `OrderFilled`.
+fn pascal(tag: &str) -> String {
+    tag.split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            let mut chars = part.chars();
+            chars.next().map_or_else(String::new, |first| {
+                first.to_ascii_uppercase().to_string() + chars.as_str()
+            })
+        })
+        .collect()
+}
+
+/// An object schema as a `TypedDict` (class form when its fields are declarable).
+fn typed_dict_class(name: &str, schema: &Value) -> String {
+    let declarable = schema
+        .get("properties")
+        .and_then(Value::as_object)
+        .map_or(true, |props| props.keys().all(|k| is_identifier(k)));
+    if !declarable {
+        return typed_dict(name, schema);
+    }
+    let required = required_fields(schema);
+    let mut out = format!("class {name}(TypedDict):\n");
+    if let Some(props) = schema.get("properties").and_then(Value::as_object) {
+        for (prop, prop_schema) in props {
+            let base = py_type(prop_schema);
+            let rendered = if required.contains(prop) {
+                base
+            } else {
+                format!("NotRequired[{base}]")
+            };
+            out.push_str(&format!("    {prop}: {rendered}\n"));
+        }
+    }
+    out
 }
 
 /// Renders an object schema as a dataclass-style stub.

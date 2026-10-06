@@ -44,10 +44,21 @@ pub fn declaration(name: &str, schema: &Value) -> String {
     if let Some(literals) = enum_union(schema) {
         return format!("export type {name} = {literals};\n");
     }
+    if name == "ResponseEnvelope" && schema.get("properties").is_some() {
+        return generic_envelope(schema);
+    }
     if schema.get("properties").is_some() {
         return interface(name, schema);
     }
     format!("export type {name} = {};\n", ts_type(schema))
+}
+
+/// The response envelope, generic over its payload: `data?: T | null`.
+fn generic_envelope(schema: &Value) -> String {
+    let mut generic = schema.clone();
+    generic["properties"]["data"] =
+        serde_json::json!({"anyOf": [{"$ref": "#/$defs/T"}, {"type": "null"}]});
+    interface("ResponseEnvelope<T = unknown>", &generic)
 }
 
 /// Renders an object schema as an interface.

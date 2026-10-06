@@ -28,12 +28,21 @@ MaybeFlag = Literal["on"] | None
 Range = TypedDict("Range", {"from": NotRequired[str | None], "tf": str})
 
 class ResponseEnvelope(Generic[T]):
-    data: T | None
-    error: ErrorDetail | None
+    api_version: str
+    data: T | None = None
+    error: ErrorDetail | None = None
 
 Side = Literal["buy", "sell"]
 
-Tick = dict[str, Any]
+class TickQuote(TypedDict):
+    bid: NotRequired[float]
+    type: Literal["quote"]
+
+class TickTrade(TypedDict):
+    px: NotRequired[float]
+    type: Literal["trade"]
+
+Tick = TickQuote | TickTrade
 
 Venue = Literal["NSE", "BSE"]
 

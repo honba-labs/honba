@@ -114,7 +114,75 @@ class ErrorDetail:
     message: str
     retryable: bool
 
-Event = dict[str, Any]
+class EventQuote(TypedDict):
+    ask_price: float
+    ask_size: float
+    bid_price: float
+    bid_size: float
+    instrument_id: InstrumentId
+    ts_event: UnixNanos
+    ts_init: UnixNanos
+    type: Literal["quote"]
+
+class EventTrade(TypedDict):
+    aggressor_side: AggressorSide
+    instrument_id: InstrumentId
+    price: float
+    size: float
+    trade_id: TradeId
+    ts_event: UnixNanos
+    ts_init: UnixNanos
+    type: Literal["trade"]
+
+class EventBar(TypedDict):
+    bar_type: BarType
+    close: float
+    high: float
+    low: float
+    open: float
+    ts_event: UnixNanos
+    ts_init: UnixNanos
+    type: Literal["bar"]
+    volume: float
+
+class EventOrder(TypedDict):
+    instrument_id: InstrumentId
+    order_id: OrderId
+    order_type: OrderType
+    price: NotRequired[float | None]
+    quantity: float
+    side: OrderSide
+    status: OrderStatus
+    time_in_force: TimeInForce
+    trigger_price: NotRequired[float | None]
+    ts_event: UnixNanos
+    ts_init: UnixNanos
+    type: Literal["order"]
+
+class EventOrderAccepted(TypedDict):
+    order_id: OrderId
+    ts_event: UnixNanos
+    type: Literal["order_accepted"]
+
+class EventOrderRejected(TypedDict):
+    order_id: OrderId
+    reason: str
+    ts_event: UnixNanos
+    type: Literal["order_rejected"]
+
+class EventOrderFilled(TypedDict):
+    last_px: float
+    last_qty: float
+    order_id: OrderId
+    ts_event: UnixNanos
+    type: Literal["order_filled"]
+
+class EventOrderCancelled(TypedDict):
+    order_id: OrderId
+    ts_event: UnixNanos
+    type: Literal["order_cancelled"]
+
+Event = EventQuote | EventTrade | EventBar | EventOrder | EventOrderAccepted | EventOrderRejected | EventOrderFilled | EventOrderCancelled
 
 Exchange = str
 
@@ -263,8 +331,10 @@ class QuotesResponse:
     quotes: list[QuoteTick]
 
 class ResponseEnvelope(Generic[T]):
-    data: T | None
-    error: ErrorDetail | None
+    api_version: str
+    data: T | None = None
+    error: ErrorDetail | None = None
+    schema_version: int
 
 RunStatus = Literal["pending", "running", "completed", "failed"]
 

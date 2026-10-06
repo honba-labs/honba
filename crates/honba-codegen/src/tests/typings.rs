@@ -188,3 +188,48 @@ fn the_stub_ends_with_exactly_one_newline() {
         "{pyi:?}"
     );
 }
+
+fn tagged_union() -> serde_json::Value {
+    json!({"oneOf": [
+        {"description": "A quote.", "type": "object",
+         "required": ["type", "bid"],
+         "properties": {"type": {"enum": ["quote"], "type": "string"}, "bid": {"type": "number"}}},
+        {"type": "object",
+         "required": ["type"],
+         "properties": {"type": {"enum": ["order_filled"], "type": "string"},
+                        "px": {"type": "number"}}}
+    ]})
+}
+
+#[test]
+fn an_internally_tagged_union_renders_per_variant_typed_dicts() {
+    let out = alias("Event", &tagged_union());
+    assert_eq!(
+        out,
+        "class EventQuote(TypedDict):\n    bid: float\n    type: Literal[\"quote\"]\n\n\
+         class EventOrderFilled(TypedDict):\n    px: NotRequired[float]\n    type: Literal[\"order_filled\"]\n\n\
+         Event = EventQuote | EventOrderFilled\n"
+    );
+}
+
+#[test]
+fn a_union_without_a_common_literal_discriminator_stays_a_plain_union() {
+    let schema = json!({"oneOf": [
+        {"type": "object", "properties": {"a": {"type": "string"}}},
+        {"type": "object", "properties": {"b": {"type": "string"}}}
+    ]});
+    assert_eq!(alias("Mixed", &schema), "Mixed = dict[str, Any]\n");
+}
+
+#[test]
+fn the_envelope_is_generic_over_its_data_and_keeps_its_other_fields() {
+    let schema = json!({"type": "object", "required": ["api_version"], "properties": {
+        "api_version": {"type": "string"},
+        "data": {"type": "null"},
+        "error": {"anyOf": [{"$ref": "#/$defs/ErrorDetail"}, {"type": "null"}]}
+    }});
+    assert_eq!(
+        alias("ResponseEnvelope", &schema),
+        "class ResponseEnvelope(Generic[T]):\n    api_version: str\n    data: T | None = None\n    error: ErrorDetail | None = None\n"
+    );
+}

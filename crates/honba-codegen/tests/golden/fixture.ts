@@ -22,7 +22,11 @@ export interface Range {
   tf: string;
 }
 
-export type ResponseEnvelope = Record<string, unknown>;
+export interface ResponseEnvelope<T = unknown> {
+  api_version: string;
+  data?: T | null;
+  error?: ErrorDetail | null;
+}
 
 export type Side = "buy" | "sell";
 

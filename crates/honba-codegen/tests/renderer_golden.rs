@@ -3,7 +3,7 @@
 //! A fixed fixture covers each schema shape `schemars` emits for the wire
 //! types: unit enums as `oneOf`-of-`enum`, `anyOf` enums, nullable type arrays,
 //! nullable enums, `allOf` newtype wrappers, maps, arrays, tagged unions of
-//! inline objects, a keyword-named field, and the generic envelope. The
+//! inline objects, a keyword-named field, and the generic envelope (`ResponseEnvelope<T>` / `ResponseEnvelope[T]`). The
 //! expected output is checked in under `tests/golden/`; set
 //! `HONBA_BLESS=1` to rewrite it after an intended rendering change.
 
@@ -58,7 +58,18 @@ fn fixture() -> SchemaSet {
             {"type": "object", "required": ["type"], "properties": {"type": {"enum": ["trade"]}, "px": {"type": "number"}}}
         ]}),
     );
-    set.insert("ResponseEnvelope", json!({"type": "object"}));
+    set.insert(
+        "ResponseEnvelope",
+        json!({
+            "type": "object",
+            "required": ["api_version"],
+            "properties": {
+                "api_version": {"type": "string"},
+                "data": {"type": "null"},
+                "error": {"anyOf": [{"$ref": "#/$defs/ErrorDetail"}, {"type": "null"}]}
+            }
+        }),
+    );
     set
 }
 

@@ -178,3 +178,16 @@ fn the_module_ends_with_exactly_one_newline() {
         "{ts:?}"
     );
 }
+
+#[test]
+fn the_envelope_is_generic_over_its_data() {
+    let schema = json!({"type": "object", "required": ["api_version"], "properties": {
+        "api_version": {"type": "string"},
+        "data": {"type": "null"},
+        "error": {"anyOf": [{"$ref": "#/$defs/ErrorDetail"}, {"type": "null"}]}
+    }});
+    assert_eq!(
+        declaration("ResponseEnvelope", &schema),
+        "export interface ResponseEnvelope<T = unknown> {\n  api_version: string;\n  data?: T | null;\n  error?: ErrorDetail | null;\n}\n"
+    );
+}
