@@ -4,45 +4,40 @@
 
 //! WASM compute surface for Honba frontend.
 //!
-//! Pure compute only: indicators, screener evaluation, backtest replay over local data.
-//! No tokio, no filesystem, no network. Depends only on pure L0–L4 crates.
+//! Pure compute only: indicators now; screener evaluation and backtest replay later. No tokio,
+//! no filesystem, no network. Depends only on pure L0-L4 crates.
+//!
+//! The logic lives in plain Rust modules ([`indicators`]) that are tested natively; this file is
+//! only the `wasm-bindgen` layer over them. Slices cross the boundary as `Float64Array`.
 
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
-}
+pub mod indicators;
 
 #[wasm_bindgen]
 pub fn hello_wasm() -> String {
     "Honba WASM ready".to_string()
 }
 
-/// Compute a simple moving average over a slice of values (WASM demo).
+/// Full indicator series over `closes`, same length as the input, `NaN` during warm-up.
+///
+/// `params_json` is a JSON object such as `{"period":14}`. Throws a string error on an unknown
+/// indicator, bad params or non-finite input.
 #[wasm_bindgen]
-pub fn sma(values: &[f64], period: usize) -> f64 {
-    if values.is_empty() || period == 0 {
-        return 0.0;
-    }
-    let start = if values.len() >= period {
-        values.len() - period
-    } else {
-        0
-    };
-    let slice = &values[start..];
-    let sum: f64 = slice.iter().sum();
-    sum / slice.len() as f64
+pub fn indicator_series(
+    name: &str,
+    params_json: &str,
+    closes: &[f64],
+) -> Result<Vec<f64>, JsError> {
+    indicators::indicator_series(name, params_json, closes)
+        .map_err(|e| JsError::new(&e.to_string()))
+}
+
+/// JSON catalog of the available indicators: names, params, outputs and warm-up length.
+#[wasm_bindgen]
+pub fn list_indicators() -> String {
+    indicators::list_indicators_json()
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_sma_basic() {
-        let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-        assert_eq!(sma(&values, 5), 3.0);
-    }
-}
+mod tests;
