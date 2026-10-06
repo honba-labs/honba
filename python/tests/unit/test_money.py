@@ -26,7 +26,7 @@ def test_money_is_exported_from_honba_entities_with_one_currency_enum():
         (0.125, 13),  # half away from zero; Python's round() would give 12
         (-0.125, -13),
         (0.375, 38),
-        (2.5 / 100, 3),  # 2.5 paise
+        (2.5 / 100, 3),  # 2.5 minor units
         (10.004, 1000),
         (-10.006, -1001),
     ],

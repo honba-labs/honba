@@ -6,7 +6,7 @@ values: frozen, validated at construction, no I/O, no framework, no wall clock. 
 are unix nanoseconds, matching ``honba.domain``.
 
 Prices and quantities are ``float`` here, consistent with ``honba.domain``. The
-money-representation decision (integer paise vs fixed point, E0-S6) will settle this; until
+money-representation decision (integer minor units vs fixed point, E0-S6) will settle this; until
 then these types follow the existing domain convention rather than diverging from it.
 
 Deliberately *not* in this module: instrument master snapshots with an as-of date (E1-S3),

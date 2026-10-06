@@ -172,7 +172,7 @@ def test_bar_close_fills_flat_only_and_bps_only():
 
 
 def test_bar_close_fills_round_each_cost_leg_once_before_summing():
-    # ADR 0011, mirrors honba-sim: 0.005 flat -> 1 paisa, 1 bps of 50.00 -> 1 paisa: 2 paise.
+    # ADR 0011, mirrors honba-sim: 0.005 flat -> 1 minor unit, 1 bps of 50.00 -> 1 minor unit: 2.
     ex = BarCloseFills(flat_cost=0.005, cost_bps=1.0)
     ex.on_event(bar(50.0, 1), ts_init=1)
     ex.submit("a-0", OrderIntent.market_buy(X, 1), 1)
@@ -350,7 +350,7 @@ def test_fill_costs_reach_the_context_cash_through_the_runner():
         Trade(X, OrderSide.BUY, 2, 10.0, 5, "rec-0", costs=Money(150, Currency.INR))
     ]
     runner.on_event(bar(10.0, 5), ts_init=5)
-    # A buy debits cost on top of the notional (integer paise, ADR 0011).
+    # A buy debits cost on top of the notional (integer minor units, ADR 0011).
     assert runner.ctx.cash() == Money(-(2000 + 150), Currency.INR)
     ex.pending_fills = [
         Trade(X, OrderSide.SELL, 2, 11.0, 6, "rec-1", costs=Money(200, Currency.INR))

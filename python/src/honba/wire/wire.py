@@ -117,7 +117,7 @@ class PositionSide(Enum):
 
 
 class Money(_Wire):
-    """Monetary amount in integer minor units (paise/cents)."""
+    """Monetary amount in integer minor units (see Currency.minor_exponent)."""
 
     amount: Annotated[int, Strict(), Field(ge=-(2**63) + 1, le=2**63 - 1)]
     currency: Currency
