@@ -217,6 +217,52 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
         (adapter.into_inner(), execution, fills)
     }
 
+    /// Validates and submits `intents` in order. Every intent it takes is
+    /// either submitted, suppressed or released, including the one that fails;
+    /// the caller releases the ones left in the iterator.
+    fn submit_drained(
+        &mut self,
+        intents: &mut std::vec::IntoIter<OrderIntent>,
+        ts_init: UnixNanos,
+    ) -> Result<()> {
+        for intent in intents.by_ref() {
+            if let Err(error) = intent.validate() {
+                let (strategy, ctx) = self.adapter.parts_mut();
+                ctx.release(&intent);
+                let hook = strategy.on_intent_rejected(ctx, &intent, &error);
+                self.rejections.push(IntentRejection {
+                    intent,
+                    error,
+                    ts_init,
+                });
+                hook?;
+                continue;
+            }
+            if self.warming_up() {
+                self.adapter.parts_mut().1.release(&intent);
+                self.suppressed.push(SuppressedIntent { ts_init, intent });
+                continue;
+            }
+            let id = self.next_order_id();
+            let sent = intent
+                .clone()
+                .into_order(id.clone(), ts_init)
+                .map_err(|e| AlgoError::Component(e.to_string()))
+                .and_then(|order| self.execution.submit(order));
+            if let Err(e) = sent {
+                self.adapter.parts_mut().1.release(&intent);
+                return Err(e);
+            }
+            // Recorded only once the execution port accepted it (Python parity).
+            self.submitted.push(SubmittedIntent {
+                ts_init,
+                intent,
+                order_id: id,
+            });
+        }
+        Ok(())
+    }
+
     fn next_order_id(&mut self) -> OrderId {
         let id = format!("{}-{}", self.adapter.inner().name(), self.order_seq);
         self.order_seq += 1;
@@ -245,51 +291,41 @@ impl<S: Strategy, E: ExecutionEngine> Handler for StrategyRunner<S, E> {
         // 1. Set the clock and dispatch to the strategy.
         self.adapter.on_event(event, ts_init)?;
 
-        // 2-3. Drain intents, validate and submit them.
-        let intents = self.adapter.drain_intents();
-        for intent in intents {
-            if let Err(error) = intent.validate() {
-                let (strategy, ctx) = self.adapter.parts_mut();
-                ctx.release(&intent);
-                strategy.on_intent_rejected(ctx, &intent, &error)?;
-                self.rejections.push(IntentRejection {
-                    intent,
-                    error,
-                    ts_init,
-                });
-                continue;
-            }
-            if self.warming_up() {
+        // 2-3. Drain intents, validate and submit them. An error is terminal
+        // for the run, but the intents not yet submitted are released first so
+        // the context never keeps an instrument busy for an order that was
+        // never sent.
+        let mut intents = self.adapter.drain_intents().into_iter();
+        if let Err(e) = self.submit_drained(&mut intents, ts_init) {
+            for intent in intents {
                 self.adapter.parts_mut().1.release(&intent);
-                self.suppressed.push(SuppressedIntent { ts_init, intent });
-                continue;
             }
-            let id = self.next_order_id();
-            let order = intent
-                .clone()
-                .into_order(id.clone(), ts_init)
-                .map_err(|e| AlgoError::Component(e.to_string()))?;
-            self.execution.submit(order)?;
-            // Recorded only once the execution port accepted it (Python parity).
-            self.submitted.push(SubmittedIntent {
-                ts_init,
-                intent,
-                order_id: id,
-            });
+            return Err(e);
         }
 
-        // 4. Drain fills, book them, and feed them back to the strategy.
+        // 4. Drain fills, book them, and feed them back to the strategy. A
+        // failure does not lose the other drained fills: each is still booked
+        // and recorded, and the first error is returned afterwards.
         let new_fills = self.execution.drain_fills()?;
-        let (strategy, ctx) = self.adapter.parts_mut();
-        for fill in &new_fills {
-            ctx.apply_fill(fill)
-                .map_err(|e| AlgoError::Component(format!("booking fill: {e}")))?;
-            strategy.on_fill(ctx, fill)?;
+        let mut first_error = None;
+        for fill in new_fills {
+            let (strategy, ctx) = self.adapter.parts_mut();
+            if let Err(e) = ctx.apply_fill(&fill) {
+                first_error.get_or_insert(AlgoError::Component(format!("booking fill: {e}")));
+                continue;
+            }
+            if let Err(e) = strategy.on_fill(ctx, &fill) {
+                first_error.get_or_insert(e);
+            }
+            self.fills.push(fill);
         }
-        self.fills.extend(new_fills);
 
         // 5. Drain rejections and release them in the context.
-        self.book_rejections()?;
+        let rejections = self.book_rejections();
+        if let Some(e) = first_error {
+            return Err(e);
+        }
+        rejections?;
 
         Ok(honba_engine::EngineOutput::None)
     }

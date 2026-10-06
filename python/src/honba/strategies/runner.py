@@ -160,8 +160,10 @@ class StrategyRunner:
         elif isinstance(event, TradeTick):
             self.strategy.on_trade(event)
         self._submit_intents(ts_init)
-        self._book_fills()
-        self._book_rejections()
+        try:
+            self._book_fills()
+        finally:
+            self._book_rejections()  # a failed fill hook must not strand rejections
 
     def cancel(self, order_id: str) -> bool:
         """Ask the port to cancel ``order_id`` and book what it reports at once.
@@ -205,7 +207,8 @@ class StrategyRunner:
         return self.ctx.drain_intents()
 
     def _submit_intents(self, ts_init: int) -> None:
-        for intent in self._drain():
+        drained = self._drain()
+        for index, intent in enumerate(drained):
             try:
                 validate_intent(
                     intent.side,
@@ -244,7 +247,14 @@ class StrategyRunner:
 
             order_id = f"{self.strategy.name}-{self._seq}"
             self._seq += 1
-            self.execution.submit(order_id, intent, ts_init)
+            try:
+                self.execution.submit(order_id, intent, ts_init)
+            except BaseException:
+                # Terminal for the run, but the intents that were drained and never
+                # sent (this one and the rest) must not leave their instruments busy.
+                for unsent in drained[index:]:
+                    self._release(unsent)
+                raise
             self.intents.append(SubmittedIntent(ts_init, intent, order_id))
             # Wire type: order (DEBUG — not emitted unless level <= DEBUG)
             self.logger.debug(
@@ -263,42 +273,62 @@ class StrategyRunner:
             )
 
     def _book_fills(self) -> None:
+        # A failing hook does not lose the other drained fills: each is still booked
+        # and recorded, and the first error is raised afterwards.
+        first_error: Exception | None = None
         for fill in self.execution.drain_fills():
-            if _overrides(self.strategy, "handle_fill"):
-                self.strategy.handle_fill(fill)  # deprecated override, honoured until 0.3
-            else:
-                self.ctx.apply_fill(fill)
-                self.strategy.on_fill(fill)
-            self.fills.append(fill)
-            # Wire type: order_filled (INFO)
-            # ts_event is the simulated bar date (Unix ns), formatted as YYYY-MM-DD for readability
-            ts_ns = fill.ts or 0
-            if ts_ns > 0:
-                from datetime import datetime, timezone
+            try:
+                self._book_fill(fill)
+            except Exception as error:  # noqa: BLE001 - the first one is re-raised below
+                first_error = first_error or error
+        if first_error is not None:
+            raise first_error
 
-                bar_date = datetime.fromtimestamp(ts_ns / 1e9, tz=timezone.utc).strftime("%Y-%m-%d")
-            else:
-                bar_date = "?"
-            self.logger.info(
-                "order_filled: ts_event=%s order_id=%s symbol=%s side=%s last_qty=%s last_px=%.4f cost=%.4f",
-                bar_date,
-                fill.order_id or "?",
-                fill.instrument_id.symbol,
-                fill.side.name,
-                fill.quantity,
-                fill.price,
-                fill.costs.to_major(),
-                extra={
-                    "event_type": "order_filled",
-                    "ts_event": bar_date,
-                    "order_id": fill.order_id,
-                    "symbol": fill.instrument_id.symbol,
-                    "side": fill.side.name,
-                    "last_qty": fill.quantity,
-                    "last_px": fill.price,
-                    "cost": fill.costs.to_major(),
-                },
-            )
+    def _book_fill(self, fill: Trade) -> None:
+        if _overrides(self.strategy, "handle_fill"):
+            # deprecated override, honoured until 0.3
+            try:
+                self.strategy.handle_fill(fill)
+            finally:
+                self._record_fill(fill)
+            return
+        self.ctx.apply_fill(fill)  # a fill that cannot be booked is not recorded
+        try:
+            self.strategy.on_fill(fill)
+        finally:
+            self._record_fill(fill)
+
+    def _record_fill(self, fill: Trade) -> None:
+        self.fills.append(fill)
+        # Wire type: order_filled (INFO)
+        # ts_event is the simulated bar date (Unix ns), formatted as YYYY-MM-DD for readability
+        ts_ns = fill.ts or 0
+        if ts_ns > 0:
+            from datetime import datetime, timezone
+
+            bar_date = datetime.fromtimestamp(ts_ns / 1e9, tz=timezone.utc).strftime("%Y-%m-%d")
+        else:
+            bar_date = "?"
+        self.logger.info(
+            "order_filled: ts_event=%s order_id=%s symbol=%s side=%s last_qty=%s last_px=%.4f cost=%.4f",
+            bar_date,
+            fill.order_id or "?",
+            fill.instrument_id.symbol,
+            fill.side.name,
+            fill.quantity,
+            fill.price,
+            fill.costs.to_major(),
+            extra={
+                "event_type": "order_filled",
+                "ts_event": bar_date,
+                "order_id": fill.order_id,
+                "symbol": fill.instrument_id.symbol,
+                "side": fill.side.name,
+                "last_qty": fill.quantity,
+                "last_px": fill.price,
+                "cost": fill.costs.to_major(),
+            },
+        )
 
     def _release(self, intent: OrderIntent) -> None:
         if _overrides(self.strategy, "handle_rejected"):

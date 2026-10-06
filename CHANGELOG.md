@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Runner: an error mid-drain no longer strands intents or fills
+
+- `StrategyRunner::on_event` (Rust) and `StrategyRunner.on_event` (Python): when the execution port fails a submit, the
+  failed intent and every drained intent not yet sent are released in the context (the instruments no longer stay busy);
+  when `on_fill` or fill booking fails, the other drained fills are still booked and recorded, rejections are still
+  released, and the first error is returned afterwards. The error stays terminal for the run.
+
 ### Execution: cancellations are stamped with the cancel time (breaking, Rust)
 
 - Behavior change: a cancelled `OrderRejection` now carries the time of the cancel, not the order's original `ts_event`,

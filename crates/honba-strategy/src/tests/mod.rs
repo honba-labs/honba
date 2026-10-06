@@ -6,6 +6,7 @@ mod intent;
 mod ir;
 mod ledger;
 mod manifest;
+mod runner_errors;
 mod runner_rejections;
 mod runner_warmup;
 

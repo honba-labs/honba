@@ -108,3 +108,53 @@ fn a_rejection_in_the_same_event_as_a_fill_that_submits_a_follow_up() {
     assert_eq!(r.context().position(&instrument("X")), 3.0);
     assert_eq!(r.order_rejections().len(), 1);
 }
+
+/// Wraps a scripted engine and fails the `fail_at`-th submit (0-based).
+struct FailingSubmit {
+    inner: ScriptedExecution,
+    fail_at: usize,
+    seen: usize,
+}
+
+impl honba_engine::ExecutionEngine for FailingSubmit {
+    fn submit(&mut self, order: honba_messages::Order) -> Result<()> {
+        let n = self.seen;
+        self.seen += 1;
+        if n == self.fail_at {
+            return Err(honba_engine::AlgoError::Component("port down".into()));
+        }
+        self.inner.submit(order)
+    }
+    fn cancel(&mut self, order_id: &str, now: UnixNanos) -> Result<()> {
+        self.inner.cancel(order_id, now)
+    }
+    fn drain_fills(&mut self) -> Result<Vec<Trade>> {
+        self.inner.drain_fills()
+    }
+    fn drain_rejections(&mut self) -> Result<Vec<honba_engine::OrderRejection>> {
+        self.inner.drain_rejections()
+    }
+}
+
+#[test]
+fn a_port_error_mid_drain_leaves_the_context_consistent() {
+    // Three intents on X; the second submit fails. The first is working at the
+    // port, the failed and the never-attempted third must be released, so only
+    // the first one's 4.0 is pending and cancelling it clears the instrument.
+    let exec = FailingSubmit {
+        inner: ScriptedExecution::new(10.0).with("edge-0", Behavior::Hold),
+        fail_at: 1,
+        seen: 0,
+    };
+    let mut r = StrategyRunner::new(Edge::new(&[4.0, 2.0, 1.0], None), exec);
+    let event = VecFeed::bar("X", 10.0, 1).event().clone();
+    assert!(r.on_event(&event, UnixNanos::from_u64(1)).is_err());
+    assert_eq!(r.submitted().len(), 1);
+    assert!(r.context().busy(&instrument("X")));
+
+    r.cancel("edge-0").unwrap();
+    assert!(
+        !r.context().busy(&instrument("X")),
+        "released intents must not leave X busy"
+    );
+}
