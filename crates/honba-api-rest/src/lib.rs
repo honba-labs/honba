@@ -16,20 +16,19 @@ use axum::{
     Router,
 };
 use honba_api::{
-    ApiResponse, BacktestRequest, BacktestResponse, BarsQuery, BarsResponse, Capabilities,
-    CapabilitiesResponse, ErrorCode, ErrorDetail, InstrumentsQuery, InstrumentsResponse,
-    OrdersRequest, OrdersResponse, QuotesQuery, QuotesResponse, ResponseEnvelope, RunStatus,
-    StrategiesRequest, StrategiesResponse, SweepRequest, SweepResponse, VerifyStrategyRequest,
-    VerifyStrategyResponse,
+    ApiResponse, BacktestRequest, BacktestResponse, Capabilities, CapabilitiesResponse, ErrorCode,
+    ErrorDetail, OrdersRequest, OrdersResponse, QuotesQuery, QuotesResponse, ResponseEnvelope,
+    RunStatus, StrategiesRequest, StrategiesResponse, SweepRequest, SweepResponse,
+    VerifyStrategyRequest, VerifyStrategyResponse,
 };
 use std::sync::Arc;
 use tower_http::{compression::CompressionLayer, cors::CorsLayer, trace::TraceLayer};
 
-/// App state for REST API.
-#[derive(Clone, Debug, Default)]
-pub struct AppState {
-    // Placeholder state - will be wired to actual engine/data in later phases
-}
+mod market;
+mod state;
+
+pub use market::{ApiQuery, ApiQueryRejection};
+pub use state::AppState;
 
 /// JSON body extractor whose rejections are the standard error envelope
 /// (`validation_invalid_request`) rather than axum's plain-text message.
@@ -68,17 +67,22 @@ where
     }
 }
 
-/// Create the API router.
+/// Create the API router over an empty catalogue.
 pub fn api_router() -> Router {
-    let state = Arc::new(AppState::default());
+    api_router_with(AppState::default())
+}
+
+/// Create the API router serving `state`.
+pub fn api_router_with(state: AppState) -> Router {
+    let state = Arc::new(state);
     Router::new()
         .route("/capabilities", get(get_capabilities))
         .route("/health", get(get_health))
         .route("/schema", get(get_schema))
-        .route("/instruments", get(get_instruments))
-        .route("/instruments/:id", get(get_instrument_by_id))
+        .route("/instruments", get(market::get_instruments))
+        .route("/instruments/:id", get(market::get_instrument_by_id))
         .route("/quotes", get(get_quotes))
-        .route("/bars/:id", get(get_bars))
+        .route("/bars/:id", get(market::get_bars))
         .route("/depth/:id", get(get_depth))
         .route("/strategies", post(post_strategies).get(get_strategies))
         .route("/strategies/verify", post(post_verify_strategy))
@@ -143,36 +147,11 @@ async fn get_schema() -> Json<ResponseEnvelope<serde_json::Value>> {
     })))
 }
 
-async fn get_instruments(
-    State(_state): State<Arc<AppState>>,
-    Query(_query): Query<InstrumentsQuery>,
-) -> Json<ResponseEnvelope<InstrumentsResponse>> {
-    Json(ApiResponse::success(InstrumentsResponse {
-        instruments: vec![],
-    }))
-}
-
-async fn get_instrument_by_id(
-    Path(_id): Path<String>,
-) -> Json<ResponseEnvelope<serde_json::Value>> {
-    Json(ApiResponse::error(ErrorDetail::new(
-        ErrorCode::InstrumentNotFound,
-        "instrument not found",
-    )))
-}
-
 async fn get_quotes(
     State(_state): State<Arc<AppState>>,
     Query(_query): Query<QuotesQuery>,
 ) -> Json<ResponseEnvelope<QuotesResponse>> {
     Json(ApiResponse::success(QuotesResponse { quotes: vec![] }))
-}
-
-async fn get_bars(
-    Path(_id): Path<String>,
-    Query(_query): Query<BarsQuery>,
-) -> Json<ResponseEnvelope<BarsResponse>> {
-    Json(ApiResponse::success(BarsResponse { bars: vec![] }))
 }
 
 async fn get_depth(Path(_id): Path<String>) -> Json<ResponseEnvelope<serde_json::Value>> {

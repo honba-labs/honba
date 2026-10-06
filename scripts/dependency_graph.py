@@ -103,6 +103,7 @@ ALLOWED_PROD = {
         "honba-entities",
         "honba-data",
         "honba-market",
+        "honba-ports",
     },
     # Plan 4.4: pure L0-L4 only. The wasm surface computes indicators, screener
     # predicates, and replay; it has no filesystem and must stay replay-only.
