@@ -225,3 +225,18 @@ def test_inproc_requires_an_existing_directory(tmp_path: Path) -> None:
     (tmp_path / "f").write_text("x")
     with pytest.raises(NotADirectoryError):
         InprocTransport(tmp_path / "f")
+
+
+@pytest.mark.parametrize("exc", [OSError("data dir gone"), ValueError("bad utf8")])
+def test_inproc_native_failures_become_non_retryable_transport_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, exc: Exception
+) -> None:
+    def boom(*args: Any) -> tuple[int, str]:
+        raise exc
+
+    monkeypatch.setattr("honba.client.transport.native_attr", lambda name: boom)
+    with pytest.raises(TransportApiError) as err:
+        InprocTransport(tmp_path).request("GET", "/health")
+    assert err.value.code == "transport_error"
+    assert err.value.retryable is False
+    assert err.value.__cause__ is exc

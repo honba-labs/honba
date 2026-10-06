@@ -41,6 +41,8 @@
 - Parity tests run every scenario, and the 404/422/501 envelopes, through both transports against a real `honba serve`
   and require identical results. Not in the client yet: the routes that answer 501 (`/strategies` list and compile,
   `/backtests`, `/sweeps`, `/orders`, `/positions/close`, `/screener/scan`, `/journals`) plus `/capabilities` and `/schema`.
+- `InprocTransport` wraps native `OSError`/`ValueError` (e.g. data directory removed after construction) into a
+  non-retryable `TransportApiError`, so `except ApiError` behaves the same on both transports.
 
 ### WASM indicator surface (E11-S5, part 1)
 

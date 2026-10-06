@@ -205,13 +205,20 @@ class InprocTransport:
         query: Mapping[str, Any] | None = None,
         body: Any = None,
     ) -> Response:
-        status, text = native_attr("api_request")(
-            self._data_dir,
-            method,
-            path,
-            _dumps(dict(query)) if query else None,
-            _dumps(body) if body is not None else None,
-        )
+        try:
+            status, text = native_attr("api_request")(
+                self._data_dir,
+                method,
+                path,
+                _dumps(dict(query)) if query else None,
+                _dumps(body) if body is not None else None,
+            )
+        except (OSError, ValueError) as exc:
+            # Same type and code HTTP uses when no answer arrived; not retryable: a data
+            # directory that vanished or a malformed call will not fix itself.
+            raise TransportApiError(
+                "transport_error", str(exc) or type(exc).__name__, retryable=False
+            ) from exc
         return Response(status, _parse_json(text))
 
     def close(self) -> None:
