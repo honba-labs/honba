@@ -8,6 +8,9 @@
   thrown error (`IndicatorError::NonFiniteOutput`) instead of returning `Infinity`/`NaN`; leading warm-up `NaN`s are unchanged.
 - Shared `indicator_series` conformance fixture gains 14 edge vectors (empty input, single bar, bollinger period 1, k=0,
   flat-price RSI); Rust, Python and the wasm/node harness agree on all 28.
+- `honba-api-wasm` drops unused dependencies (`honba-messages/entities/market/engine/strategy/sim`, `serde-wasm-bindgen`,
+  `wasm-bindgen-test`, the deprecated `serde-serialize` feature) and the leftover `hello_wasm` export; its
+  `dependency_graph.py` allowlist is now `honba-indicators` only.
 
 ### REST read API hardening
 

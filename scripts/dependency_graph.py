@@ -111,13 +111,7 @@ ALLOWED_PROD = {
     # Plan 4.4: pure L0-L4 only. The wasm surface computes indicators, screener
     # predicates, and replay; it has no filesystem and must stay replay-only.
     "honba-api-wasm": {
-        "honba-messages",
-        "honba-entities",
-        "honba-market",
         "honba-indicators",
-        "honba-engine",
-        "honba-strategy",
-        "honba-sim",
     },
 }
 

@@ -14,11 +14,6 @@ use wasm_bindgen::prelude::*;
 
 pub mod indicators;
 
-#[wasm_bindgen]
-pub fn hello_wasm() -> String {
-    "Honba WASM ready".to_string()
-}
-
 /// Full indicator series over `closes`, same length as the input, `NaN` during warm-up.
 ///
 /// `params_json` is a JSON object such as `{"period":14}`. Throws a JavaScript `Error` (a `JsError`
