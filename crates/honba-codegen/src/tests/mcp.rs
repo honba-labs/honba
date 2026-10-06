@@ -234,3 +234,23 @@ fn compile_and_list_strategies_are_read_only_tools_on_their_routes() {
         .unwrap();
     assert_eq!(compile["inputSchema"]["required"], json!(["request"]));
 }
+
+#[test]
+fn screen_takes_the_scan_query_and_is_read_only() {
+    let rendered = render(&full());
+    let screen = rendered["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["name"] == "screen")
+        .unwrap();
+    let tool = TOOLS.iter().find(|t| t.name == "screen").unwrap();
+    assert_eq!(tool.endpoint, ("GET", "/screener/scan"));
+    assert_eq!(screen["annotations"]["readOnlyHint"], json!(true));
+    assert_eq!(screen["inputSchema"]["required"], json!(["query"]));
+    let props = screen["inputSchema"]["properties"]["query"]["properties"].to_string();
+    assert!(
+        props.contains("universe") && props.contains("filters"),
+        "{props}"
+    );
+}

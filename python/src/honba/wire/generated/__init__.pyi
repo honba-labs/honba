@@ -355,6 +355,19 @@ class ScreenerFilterPredicate:
     timeframe: Timeframe | None = None
     value: Any
 
+class ScreenerQuery:
+    as_of: str | None = None
+    filters: str | None = None
+    tf: str | None = None
+    universe: str | None = None
+
+class ScreenerResponse:
+    rows: list[ScreenerResultRow]
+
+class ScreenerResultRow:
+    instrument_id: InstrumentId
+    metrics: dict[str, float | None]
+
 class ScreenerRow:
     fullSymbol: str
     instrumentId: str

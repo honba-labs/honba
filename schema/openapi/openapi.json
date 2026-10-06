@@ -2528,6 +2528,86 @@
         ],
         "type": "object"
       },
+      "ScreenerQuery": {
+        "additionalProperties": false,
+        "description": "`GET /screener/scan` query parameters.\n\nThe structured values are JSON text inside the query string, so the whole request is one flat string map on every transport.",
+        "properties": {
+          "as_of": {
+            "description": "Evaluate on the bars known at this time (RFC3339 or ISO-8601 date, inclusive); the latest held when omitted.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "filters": {
+            "description": "JSON-encoded filter group, `{\"operator\": \"AND\"|\"OR\", \"items\": [...]}`; items are predicates (`{\"key\", \"op\", \"value\"}`) or nested groups. Omitted means no filter: every instrument of the universe matches.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tf": {
+            "description": "Timeframe of the bars evaluated (default `1d`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "universe": {
+            "description": "JSON-encoded array of instrument ids (`[\"TCS.NSE\", ...]`) to scan; required, at most `MAX_SCREENER_UNIVERSE` entries.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ScreenerResponse": {
+        "description": "Screener scan response.",
+        "properties": {
+          "rows": {
+            "description": "Matching instruments in instrument-id order.",
+            "items": {
+              "$ref": "#/components/schemas/ScreenerResultRow"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows"
+        ],
+        "type": "object"
+      },
+      "ScreenerResultRow": {
+        "description": "One instrument that passed a screener scan.",
+        "properties": {
+          "instrument_id": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InstrumentId"
+              }
+            ],
+            "description": "The instrument that matched."
+          },
+          "metrics": {
+            "additionalProperties": {
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "description": "Latest value of every metric the filter reads, by key as written in the filter; `null` while a metric is still warming up.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "instrument_id",
+          "metrics"
+        ],
+        "type": "object"
+      },
       "ScreenerRow": {
         "description": "Single scanned instrument row returned in screener responses.",
         "properties": {
@@ -4083,12 +4163,62 @@
     "/screener/scan": {
       "get": {
         "operationId": "get_screener_scan",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "description": "Evaluate on the bars known at this time (RFC3339 or ISO-8601 date, inclusive); the latest held when omitted.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "filters",
+            "required": false,
+            "schema": {
+              "description": "JSON-encoded filter group, `{\"operator\": \"AND\"|\"OR\", \"items\": [...]}`; items are predicates (`{\"key\", \"op\", \"value\"}`) or nested groups. Omitted means no filter: every instrument of the universe matches.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "tf",
+            "required": false,
+            "schema": {
+              "description": "Timeframe of the bars evaluated (default `1d`).",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "universe",
+            "required": false,
+            "schema": {
+              "description": "JSON-encoded array of instrument ids (`[\"TCS.NSE\", ...]`) to scan; required, at most `MAX_SCREENER_UNIVERSE` entries.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TradesResponse"
+                  "$ref": "#/components/schemas/ScreenerResponse"
                 }
               }
             },

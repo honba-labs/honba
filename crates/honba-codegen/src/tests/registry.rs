@@ -80,6 +80,8 @@ fn api_responses_are_open_records_and_api_requests_are_closed_inputs() {
         "OrdersResponse",
         "PositionsResponse",
         "TradesResponse",
+        "ScreenerResponse",
+        "ScreenerResultRow",
     ];
     for name in responses {
         let schema = set.get(name).expect("registered");

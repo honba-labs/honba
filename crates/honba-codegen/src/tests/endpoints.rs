@@ -203,3 +203,20 @@ fn compiling_a_strategy_returns_one_compiled_strategy_and_listing_returns_the_li
         schema("get")
     );
 }
+
+#[test]
+fn the_screener_scan_documents_its_query_and_a_screener_response() {
+    let paths = paths();
+    let op = &paths["/screener/scan"]["get"];
+    let response = op["responses"]["200"].to_string();
+    assert!(response.contains("ScreenerResponse"), "{response}");
+    let names: Vec<&str> = op["parameters"]
+        .as_array()
+        .expect("query parameters")
+        .iter()
+        .map(|p| p["name"].as_str().unwrap())
+        .collect();
+    for want in ["filters", "universe", "tf", "as_of"] {
+        assert!(names.contains(&want), "{names:?}");
+    }
+}

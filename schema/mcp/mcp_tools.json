@@ -1333,281 +1333,48 @@
       "annotations": {
         "readOnlyHint": true
       },
-      "description": "Evaluate a screener predicate over the instrument catalog.",
+      "description": "Screen a universe of instruments with a filter evaluated over their bars (OHLCV, SMA<N>, RSI, 52-week high/low); fundamentals are rejected as unsupported.",
       "inputSchema": {
-        "$defs": {
-          "FilterOp": {
-            "description": "Comparison operators for screener filter expressions.",
-            "oneOf": [
-              {
-                "description": "Equal",
-                "enum": [
-                  "eq"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "Not equal",
-                "enum": [
-                  "neq"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "Greater than",
-                "enum": [
-                  "gt"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "Greater than or equal",
-                "enum": [
-                  "gte"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "Less than",
-                "enum": [
-                  "lt"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "Less than or equal",
-                "enum": [
-                  "lte"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "Between lower and upper bounds",
-                "enum": [
-                  "between"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "In set",
-                "enum": [
-                  "in"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "Not in set",
-                "enum": [
-                  "not_in"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "Pattern match / substring",
-                "enum": [
-                  "like"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "Collection contains",
-                "enum": [
-                  "has"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "Crosses above threshold or second series",
-                "enum": [
-                  "crosses_above"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "Crosses below threshold or second series",
-                "enum": [
-                  "crosses_below"
-                ],
-                "type": "string"
-              }
-            ]
-          },
-          "MetricPeriod": {
-            "description": "Evaluation period dimension for fundamental or snapshot metrics.",
-            "oneOf": [
-              {
-                "description": "Latest snapshot.",
-                "enum": [
-                  "SNAPSHOT"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "Trailing twelve months.",
-                "enum": [
-                  "TTM"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "Fiscal year.",
-                "enum": [
-                  "FY"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "Fiscal quarter.",
-                "enum": [
-                  "FQ"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "Half year.",
-                "enum": [
-                  "H1"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "Current point-in-time value.",
-                "enum": [
-                  "CURRENT"
-                ],
-                "type": "string"
-              }
-            ]
-          },
-          "Timeframe": {
-            "description": "Bar or indicator timeframe dimension for technical metrics.",
-            "oneOf": [
-              {
-                "description": "1 minute",
-                "enum": [
-                  "1"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "5 minutes",
-                "enum": [
-                  "5"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "15 minutes",
-                "enum": [
-                  "15"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "30 minutes",
-                "enum": [
-                  "30"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "1 hour / 60 minutes",
-                "enum": [
-                  "60"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "2 hours / 120 minutes",
-                "enum": [
-                  "120"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "4 hours / 240 minutes",
-                "enum": [
-                  "240"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "1 day",
-                "enum": [
-                  "1D"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "1 week",
-                "enum": [
-                  "1W"
-                ],
-                "type": "string"
-              },
-              {
-                "description": "1 month",
-                "enum": [
-                  "1M"
-                ],
-                "type": "string"
-              }
-            ]
-          }
-        },
         "additionalProperties": false,
         "properties": {
-          "predicate": {
-            "description": "The predicate tree to evaluate.",
+          "query": {
+            "additionalProperties": false,
+            "description": "JSON-encoded filters and universe (instrument ids), plus optional tf and as_of.",
             "properties": {
-              "key": {
-                "description": "Target metric key to filter by.",
-                "type": "string"
+              "as_of": {
+                "description": "Evaluate on the bars known at this time (RFC3339 or ISO-8601 date, inclusive); the latest held when omitted.",
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
-              "op": {
-                "allOf": [
-                  {
-                    "$ref": "#/$defs/FilterOp"
-                  }
-                ],
-                "description": "Comparison operator."
+              "filters": {
+                "description": "JSON-encoded filter group, `{\"operator\": \"AND\"|\"OR\", \"items\": [...]}`; items are predicates (`{\"key\", \"op\", \"value\"}`) or nested groups. Omitted means no filter: every instrument of the universe matches.",
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
-              "period": {
-                "anyOf": [
-                  {
-                    "$ref": "#/$defs/MetricPeriod"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "Optional period dimension."
+              "tf": {
+                "description": "Timeframe of the bars evaluated (default `1d`).",
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
-              "timeframe": {
-                "anyOf": [
-                  {
-                    "$ref": "#/$defs/Timeframe"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "Optional timeframe dimension."
-              },
-              "value": {
-                "description": "Target value, array of values, or a [`MetricRef`] object."
+              "universe": {
+                "description": "JSON-encoded array of instrument ids (`[\"TCS.NSE\", ...]`) to scan; required, at most `MAX_SCREENER_UNIVERSE` entries.",
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
-            "required": [
-              "key",
-              "op",
-              "value"
-            ],
             "type": "object"
           }
         },
         "required": [
-          "predicate"
+          "query"
         ],
         "type": "object"
       },

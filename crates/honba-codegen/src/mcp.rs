@@ -105,13 +105,13 @@ pub(crate) const TOOLS: &[Tool] = &[
     },
     Tool {
         name: "screen",
-        description: "Evaluate a screener predicate over the instrument catalog.",
+        description: "Screen a universe of instruments with a filter evaluated over their bars (OHLCV, SMA<N>, RSI, 52-week high/low); fundamentals are rejected as unsupported.",
         endpoint: ("GET", "/screener/scan"),
         args: &[(
-            "predicate",
-            "ScreenerFilterPredicate",
+            "query",
+            "ScreenerQuery",
             true,
-            "The predicate tree to evaluate.",
+            "JSON-encoded filters and universe (instrument ids), plus optional tf and as_of.",
         )],
     },
     Tool {

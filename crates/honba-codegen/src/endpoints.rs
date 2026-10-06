@@ -33,7 +33,7 @@ fn response_type_for(method: &str, path: &str) -> Option<&'static str> {
         ("GET", "/orders") => "OrdersResponse",
         ("DELETE", "/orders/{id}") => "OrdersResponse",
         ("POST", "/positions/close") => "PositionsResponse",
-        ("GET", "/screener/scan") => "TradesResponse",
+        ("GET", "/screener/scan") => "ScreenerResponse",
         ("GET", "/journals/{id}") => "TradesResponse",
         _ => return None,
     })
@@ -51,6 +51,7 @@ fn request_type_for(method: &str, path: &str) -> Option<&'static str> {
         ("GET", "/quotes") => "QuotesQuery",
         ("GET", "/bars/{id}") => "BarsQuery",
         ("GET", "/depth/{id}") => "DepthQuery",
+        ("GET", "/screener/scan") => "ScreenerQuery",
         _ => return None,
     })
 }

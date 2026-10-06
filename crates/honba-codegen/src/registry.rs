@@ -159,6 +159,7 @@ pub fn request_type_names() -> &'static [&'static str] {
         "QuotesQuery",
         "BarsQuery",
         "DepthQuery",
+        "ScreenerQuery",
         "StrategiesRequest",
         "BacktestRequest",
         "SweepRequest",
@@ -172,6 +173,7 @@ pub fn register_requests(set: &mut SchemaSet) {
     set.add_type::<honba_api::QuotesQuery>("QuotesQuery");
     set.add_type::<honba_api::BarsQuery>("BarsQuery");
     set.add_type::<honba_api::DepthQuery>("DepthQuery");
+    set.add_type::<honba_api::ScreenerQuery>("ScreenerQuery");
     set.add_type::<honba_api::StrategiesRequest>("StrategiesRequest");
     set.add_type::<honba_api::BacktestRequest>("BacktestRequest");
     set.add_type::<honba_api::SweepRequest>("SweepRequest");
@@ -184,6 +186,8 @@ pub fn register_responses(set: &mut SchemaSet) {
     set.add_type::<honba_api::QuotesResponse>("QuotesResponse");
     set.add_type::<honba_api::BarsResponse>("BarsResponse");
     set.add_type::<honba_api::DepthResponse>("DepthResponse");
+    set.add_type::<honba_api::ScreenerResultRow>("ScreenerResultRow");
+    set.add_type::<honba_api::ScreenerResponse>("ScreenerResponse");
     set.add_type::<honba_api::CompiledStrategy>("CompiledStrategy");
     set.add_type::<honba_api::StrategiesResponse>("StrategiesResponse");
     set.add_type::<honba_api::BacktestResponse>("BacktestResponse");
