@@ -1,6 +1,6 @@
 # ADR 0013: REST Reads Go Through Domain-Owned Ports
 
-Date: 2026-10-06. Status: accepted. Roadmap story: E11-S3 (part 1).
+Date: 2026-10-06. Status: accepted. Roadmap story: E11-S3 (parts 1 and 2).
 
 ## Context
 
@@ -28,6 +28,25 @@ crate its own idea of what an instrument or a bar query is.
   only in `AppState`'s constructors** (`from_reader`, `from_parquet_dir`). That
   is the composition root, which the layering allows (`honba-api-rest` was
   already permitted `honba-data`; `honba-ports` is added). Handlers see ports only.
+- **Quotes and depth are two more read ports in `honba-ports`**: `QuoteReader`
+  (`read_quote(id, as_of) -> Option<QuoteTick>`, inclusive `as_of`, `None` = latest) and
+  `DepthReader` (`read_depth(id, levels) -> DepthSnapshot`). They are separate from `BarReader` because a
+  bar store can derive a last-price quote but cannot have a book, while a tick store could answer both
+  truthfully. `DatasetReader` implements both; `AppState` holds `quotes` and `depth` beside `instruments`
+  and `bars`.
+- **Quote derivation is documented, not hidden**: bid = ask = close of the latest bar stamped at or before
+  `as_of`, bid and ask size `0`, `ts_event == ts_init ==` the bar timestamp. Zero sizes say "last price,
+  no book". Depth from a bar dataset is `PortError::Unsupported`, which is the existing 404
+  `market_data_unavailable`; no levels are fabricated.
+- `QuotesQuery::resolve` (symbols, venue, `as_of`) and `DepthQuery::levels` (default 5, `1..=50`) are pure
+  and live in `honba-api` with the other resolvers.
+- **`honba serve`** (`--data-dir`, `--addr`, default `127.0.0.1:8080`) loads the directory once, then calls
+  `honba_api_rest::serve(listener, state, shutdown)`, where the CLI's shutdown future is ctrl-c. The
+  listener and stop signal belong to the caller so tests bind `127.0.0.1:0`. `honba-cli` is allowed to
+  depend on `honba-api-rest` (both L7; added to `ALLOWED_PROD`).
+- **Placeholders are honest**: a route in the contract whose behaviour is not built answers 501 with
+  `ErrorCode::NotImplemented` (`not_implemented`, category `unsupported`) inside the envelope. A request
+  body that does not parse is still 422 first.
 - Instrument id in paths is `SYMBOL.EXCHANGE` (the `InstrumentId` display form),
   split on the last dot.
 
@@ -37,6 +56,11 @@ crate its own idea of what an instrument or a bar query is.
 |---|---|---|
 | ok | 200 | - |
 | unknown instrument | 404 | `instrument_not_found` |
+| `/quotes` without `symbols`, empty entries, bad `as_of`, unknown key | 422 | `validation_invalid_request` |
+| `/quotes` symbol matching no instrument (given `venue`) | 404 | `instrument_not_found` |
+| `/quotes` instrument with no bar at or before `as_of` | 404 | `market_data_unavailable` |
+| `/depth/{id}` over a bar dataset; `depth` outside 1..=50 | 404 / 422 | `market_data_unavailable` / `validation_invalid_request` |
+| route not built yet (see below) | 501 | `not_implemented` |
 | timeframe not held for the instrument (`PortError::Unsupported`) | 404 | `market_data_unavailable` |
 | bad `tf`/`from`/`to`, empty range, unknown query key, malformed id | 422 | `validation_invalid_request` |
 | port unavailable / timeout / transport | 503 / 504 / 502 | `market_data_unavailable` / `timeout` / `transport_error` |
@@ -50,4 +74,9 @@ existing `{iso, unix_nanos}` form. ADR 0011 is not engaged by these endpoints.
   equities, lot 1, tick 0.05, and files are read as 1-minute last-price bars.
   A symbol master and per-file timeframes are follow-ups.
 - No pagination or row cap on bars; the DTO has none yet.
-- Quotes, depth and the other routes are still placeholders.
+- A quote request is all-or-nothing: if one matched instrument has no quote at that time the whole request is
+  404, rather than a silently shorter list.
+- Not built, answering 501: `GET/POST /strategies`, `POST /backtests`, `GET /backtests/{id}[/journal]`,
+  `POST /sweeps`, `GET /sweeps/{id}`, `GET/POST /orders`, `DELETE /orders/{id}`, `POST /positions/close`,
+  `GET /screener/scan`, `GET /journals/{id}`. `POST /strategies/verify` is real (ADR 0012).
+- No auth, TLS or rate limiting on `honba serve`; it is a loopback read API by default.

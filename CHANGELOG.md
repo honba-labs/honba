@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### REST read API, part 2 (E11-S3, ADR 0013)
+
+- `GET /quotes?symbols=A,B[&venue=NSE][&as_of=<time>]` and `GET /depth/{id}[?depth=N]` are served through two new
+  `honba-ports` read ports, `QuoteReader` and `DepthReader`. `QuotesQuery` gains an optional `as_of` (OpenAPI, domain
+  schema and `.pyi` regenerated).
+- The Parquet-backed dataset has bars only, so a quote is derived: bid and ask are the close of the latest bar at or
+  before `as_of` (inclusive), sizes are `0`. Depth is `404 market_data_unavailable` (no order book is invented).
+- `honba serve --data-dir DIR [--addr 127.0.0.1:8080]` runs the API over `SYMBOL.EXCHANGE.parquet` files, prints
+  `listening on http://<addr>` and stops gracefully on ctrl-c. `honba_api_rest::serve` is the embeddable form.
+- Placeholder routes no longer fake success. Strategy listing/compile, backtests, sweeps, orders, `positions/close`,
+  screener and journals answer `501` with the new error code `not_implemented` (category `unsupported`, not
+  retryable). Breaking for anything that read their old empty or made-up bodies. `honba-frontend` generated
+  `ErrorCode` needs the new member (`make check-schema-ts`).
+
 ### Backtest metrics
 
 - `BacktestResult.equity_curve` now has one `(ts, equity)` point per bar session, marking every instrument at its last
