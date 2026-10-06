@@ -8,12 +8,14 @@ pub mod dataset;
 pub mod export;
 /// Data import sources and loaders
 pub mod import;
+pub mod reader;
 
 pub use dataset::{ColumnarSlice, ColumnarSliceBuilder, Dataset, DatasetBuildError, DatasetFeed};
 pub use export::{
     CsvReportWriter, ExportError, JsonReportWriter, MarkdownReportWriter, ReportWriter,
 };
 pub use import::parquet_source::{ParquetBarSource, ParquetError};
+pub use reader::{DatasetReader, ReaderError};
 
 #[cfg(test)]
 mod tests;

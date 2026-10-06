@@ -48,6 +48,7 @@ ALLOWED_PROD = {
         "honba-entities",
         "honba-engine",
         "honba-analytics",
+        "honba-ports",
     },
     "honba-sweep": {
         "honba-messages",
