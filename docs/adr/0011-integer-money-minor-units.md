@@ -101,3 +101,13 @@ wire form for no gain over `i64` minor units (Indian equities need 2 decimals;
 - The directional-rounding snap constant (1e-6 minor units) is below one f64 ulp
   beyond roughly 1e10 minor units, so at those magnitudes it no longer snaps
   float noise to the integer before a floor or ceiling.
+- The generated TypeScript types render `Money.amount` (an `i64` of minor units) as
+  `number`, which is exact only up to 2^53 - 1 (about 9.007e15 minor units, roughly
+  9e13 major units at exponent 2, i.e. 90 trillion rupees). Rust and Python are
+  exact over the full `i64` range; JSON parsers that read numbers as IEEE doubles
+  (browsers' `JSON.parse`) silently round above that bound. Every realistic balance,
+  P&L and fee is far below it, so the type stays `number`. A consumer that must
+  handle amounts beyond 2^53 minor units (aggregated notionals, currencies with a
+  large exponent) should not rely on the generated type: parse the raw JSON text
+  with a BigInt-aware reader and treat `amount` as `bigint`, or carry the amount as
+  a decimal string at that boundary.
