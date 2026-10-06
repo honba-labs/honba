@@ -788,11 +788,402 @@
       "input": "zigzag",
       "name": "macd_default_zigzag",
       "params": {}
+    },
+    {
+      "expected": [],
+      "indicator": "sma",
+      "input": "empty",
+      "name": "sma_3_empty",
+      "params": {
+        "period": 3
+      }
+    },
+    {
+      "expected": [],
+      "indicator": "macd",
+      "input": "empty",
+      "name": "macd_default_empty",
+      "params": {}
+    },
+    {
+      "expected": [
+        42.5
+      ],
+      "indicator": "sma",
+      "input": "single",
+      "name": "sma_1_single",
+      "params": {
+        "period": 1
+      }
+    },
+    {
+      "expected": [
+        null
+      ],
+      "indicator": "sma",
+      "input": "single",
+      "name": "sma_3_single",
+      "params": {
+        "period": 3
+      }
+    },
+    {
+      "expected": [
+        42.5
+      ],
+      "indicator": "ema",
+      "input": "single",
+      "name": "ema_1_single",
+      "params": {
+        "period": 1
+      }
+    },
+    {
+      "expected": [
+        null
+      ],
+      "indicator": "rsi",
+      "input": "single",
+      "name": "rsi_3_single",
+      "params": {
+        "period": 3
+      }
+    },
+    {
+      "expected": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0,
+        8.0,
+        9.0,
+        10.0,
+        11.0,
+        12.0
+      ],
+      "indicator": "bollinger",
+      "input": "ramp",
+      "name": "bollinger_1_middle_ramp",
+      "params": {
+        "period": 1
+      }
+    },
+    {
+      "expected": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0,
+        8.0,
+        9.0,
+        10.0,
+        11.0,
+        12.0
+      ],
+      "indicator": "bollinger",
+      "input": "ramp",
+      "name": "bollinger_1_upper_ramp",
+      "params": {
+        "output": "upper",
+        "period": 1
+      }
+    },
+    {
+      "expected": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0,
+        8.0,
+        9.0,
+        10.0,
+        11.0,
+        12.0
+      ],
+      "indicator": "bollinger",
+      "input": "ramp",
+      "name": "bollinger_1_lower_ramp",
+      "params": {
+        "output": "lower",
+        "period": 1
+      }
+    },
+    {
+      "expected": [
+        null,
+        null,
+        null,
+        null,
+        107.7,
+        106.95,
+        107.6,
+        108.25,
+        108.9,
+        109.55,
+        110.2,
+        110.85,
+        110.1,
+        110.75,
+        111.4,
+        112.05,
+        112.7,
+        113.35000000000001,
+        114.0,
+        113.25,
+        113.9,
+        114.55000000000001,
+        115.2,
+        111.25,
+        111.9,
+        112.55000000000001,
+        111.80000000000001,
+        112.45,
+        113.10000000000001,
+        113.75,
+        114.4,
+        115.05000000000001,
+        115.7,
+        114.95,
+        115.60000000000001,
+        116.25,
+        116.9,
+        117.55000000000001,
+        118.2,
+        118.85,
+        118.1,
+        118.75,
+        119.4,
+        120.05,
+        120.69999999999999,
+        121.35,
+        117.39999999999999,
+        116.64999999999999,
+        117.3,
+        117.94999999999999,
+        118.6,
+        119.24999999999999,
+        119.89999999999999,
+        120.54999999999998,
+        119.79999999999998,
+        120.44999999999999,
+        121.09999999999998,
+        121.74999999999999,
+        122.39999999999998,
+        123.04999999999998
+      ],
+      "indicator": "bollinger",
+      "input": "zigzag",
+      "name": "bollinger_5_k0_middle_zigzag",
+      "params": {
+        "k": 0.0,
+        "output": "middle",
+        "period": 5
+      }
+    },
+    {
+      "expected": [
+        null,
+        null,
+        null,
+        null,
+        107.7,
+        106.95,
+        107.6,
+        108.25,
+        108.9,
+        109.55,
+        110.2,
+        110.85,
+        110.1,
+        110.75,
+        111.4,
+        112.05,
+        112.7,
+        113.35000000000001,
+        114.0,
+        113.25,
+        113.9,
+        114.55000000000001,
+        115.2,
+        111.25,
+        111.9,
+        112.55000000000001,
+        111.80000000000001,
+        112.45,
+        113.10000000000001,
+        113.75,
+        114.4,
+        115.05000000000001,
+        115.7,
+        114.95,
+        115.60000000000001,
+        116.25,
+        116.9,
+        117.55000000000001,
+        118.2,
+        118.85,
+        118.1,
+        118.75,
+        119.4,
+        120.05,
+        120.69999999999999,
+        121.35,
+        117.39999999999999,
+        116.64999999999999,
+        117.3,
+        117.94999999999999,
+        118.6,
+        119.24999999999999,
+        119.89999999999999,
+        120.54999999999998,
+        119.79999999999998,
+        120.44999999999999,
+        121.09999999999998,
+        121.74999999999999,
+        122.39999999999998,
+        123.04999999999998
+      ],
+      "indicator": "bollinger",
+      "input": "zigzag",
+      "name": "bollinger_5_k0_upper_zigzag",
+      "params": {
+        "k": 0.0,
+        "output": "upper",
+        "period": 5
+      }
+    },
+    {
+      "expected": [
+        null,
+        null,
+        null,
+        null,
+        107.7,
+        106.95,
+        107.6,
+        108.25,
+        108.9,
+        109.55,
+        110.2,
+        110.85,
+        110.1,
+        110.75,
+        111.4,
+        112.05,
+        112.7,
+        113.35000000000001,
+        114.0,
+        113.25,
+        113.9,
+        114.55000000000001,
+        115.2,
+        111.25,
+        111.9,
+        112.55000000000001,
+        111.80000000000001,
+        112.45,
+        113.10000000000001,
+        113.75,
+        114.4,
+        115.05000000000001,
+        115.7,
+        114.95,
+        115.60000000000001,
+        116.25,
+        116.9,
+        117.55000000000001,
+        118.2,
+        118.85,
+        118.1,
+        118.75,
+        119.4,
+        120.05,
+        120.69999999999999,
+        121.35,
+        117.39999999999999,
+        116.64999999999999,
+        117.3,
+        117.94999999999999,
+        118.6,
+        119.24999999999999,
+        119.89999999999999,
+        120.54999999999998,
+        119.79999999999998,
+        120.44999999999999,
+        121.09999999999998,
+        121.74999999999999,
+        122.39999999999998,
+        123.04999999999998
+      ],
+      "indicator": "bollinger",
+      "input": "zigzag",
+      "name": "bollinger_5_k0_lower_zigzag",
+      "params": {
+        "k": 0.0,
+        "output": "lower",
+        "period": 5
+      }
+    },
+    {
+      "expected": [
+        null,
+        null,
+        null,
+        100.0,
+        100.0,
+        100.0,
+        100.0,
+        100.0
+      ],
+      "indicator": "rsi",
+      "input": "flat",
+      "name": "rsi_3_flat",
+      "params": {
+        "period": 3
+      }
+    },
+    {
+      "expected": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "indicator": "rsi",
+      "input": "flat",
+      "name": "rsi_14_flat",
+      "params": {
+        "period": 14
+      }
     }
   ],
-  "description": "Full indicator series over closes, as returned by honba-api-wasm `indicator_series(name, params_json, closes)`. Output has the input's length; null means NaN (warm-up). Expected values were generated from the honba-indicators implementation (streaming update per close). Inputs use multiples of 0.25 so they are exact in binary floating point on every platform.",
+  "description": "Full indicator series over closes, as returned by honba-api-wasm `indicator_series(name, params_json, closes)`. Output has the input's length; null means NaN (warm-up). Expected values were generated from the honba-indicators implementation (streaming update per close); the edge cases (empty, single bar, bollinger period 1, k=0, flat-price RSI) were generated from the Python indicators and verified identical against the Rust implementation. Inputs use multiples of 0.25 so they are exact in binary floating point on every platform.",
   "fixture_version": 1,
   "inputs": {
+    "empty": [],
+    "flat": [
+      100.0,
+      100.0,
+      100.0,
+      100.0,
+      100.0,
+      100.0,
+      100.0,
+      100.0
+    ],
     "ramp": [
       1.0,
       2.0,
@@ -811,6 +1202,9 @@
       10.0,
       11.0,
       12.0
+    ],
+    "single": [
+      42.5
     ],
     "zigzag": [
       100.0,

@@ -6,6 +6,8 @@
 
 - `indicator_series` refuses finite input whose result overflows `f64` (infinite output, or `NaN` after warm-up) with a
   thrown error (`IndicatorError::NonFiniteOutput`) instead of returning `Infinity`/`NaN`; leading warm-up `NaN`s are unchanged.
+- Shared `indicator_series` conformance fixture gains 14 edge vectors (empty input, single bar, bollinger period 1, k=0,
+  flat-price RSI); Rust, Python and the wasm/node harness agree on all 28.
 
 ### REST read API hardening
 
