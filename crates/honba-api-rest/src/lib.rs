@@ -23,9 +23,11 @@ use honba_api::{
 use std::sync::Arc;
 use tower_http::{compression::CompressionLayer, cors::CorsLayer, trace::TraceLayer};
 
+mod dispatch;
 mod market;
 mod state;
 
+pub use dispatch::{build_target, dispatch, DispatchError};
 pub use market::{ApiQuery, ApiQueryRejection};
 pub use state::AppState;
 
