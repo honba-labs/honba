@@ -127,6 +127,49 @@ fn round_trip_from_fills_short_profits_on_decline() {
     assert!((rt.gross_pnl - 100.0).abs() < 1e-9);
 }
 
+fn fill(side: honba_messages::OrderSide, n: u64, costs: Money) -> Trade {
+    use honba_messages::OrderId;
+    Trade::new(
+        OrderId::new(format!("T{n}")),
+        id(),
+        side,
+        10.0,
+        100.0,
+        costs.currency(),
+        ts(n),
+        ts(n),
+    )
+    .with_costs(costs)
+}
+
+#[test]
+fn round_trip_from_fills_rejects_fee_currency_mismatch() {
+    use honba_messages::OrderSide;
+
+    let entry = fill(OrderSide::Buy, 1, Money::new(50, Currency::Inr));
+    let exit = fill(OrderSide::Sell, 2, Money::new(50, Currency::Usd));
+    match RoundTrip::from_fills(&entry, &exit) {
+        Err(AnalyticsError::TradeMismatch(msg)) => {
+            assert!(msg.contains("cannot sum fees"), "{msg}")
+        }
+        other => panic!("expected TradeMismatch, got {other:?}"),
+    }
+}
+
+#[test]
+fn round_trip_from_fills_rejects_fee_overflow() {
+    use honba_messages::OrderSide;
+
+    let entry = fill(OrderSide::Buy, 1, Money::new(i64::MAX, Currency::Inr));
+    let exit = fill(OrderSide::Sell, 2, Money::new(1, Currency::Inr));
+    match RoundTrip::from_fills(&entry, &exit) {
+        Err(AnalyticsError::TradeMismatch(msg)) => {
+            assert!(msg.contains("cannot sum fees"), "{msg}")
+        }
+        other => panic!("expected TradeMismatch, got {other:?}"),
+    }
+}
+
 // --- EquityStats ---
 
 #[test]
