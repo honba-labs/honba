@@ -4,7 +4,7 @@
 Accepted. Decision 1 is superseded in part by [ADR 0014](0014-json-schema-from-rust.md).
 
 ## Context
-Per [ROADMAP-borrowed-ideas.md](../../ROADMAP-borrowed-ideas.md) pillar P2 ("domain types (Rust) -> serde JSON ->
+Per [docs/archive/ROADMAP-borrowed-ideas.md](../archive/ROADMAP-borrowed-ideas.md) pillar P2 ("domain types (Rust) -> serde JSON ->
 Python models -> JSON Schema") and story E0-S2, the core domain types need one serialized form shared by Rust and
 Python. Before this ADR:
 

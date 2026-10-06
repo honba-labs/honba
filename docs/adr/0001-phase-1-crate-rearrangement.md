@@ -4,7 +4,7 @@
 Accepted / Completed
 
 ## Context
-Per [ROADMAP-borrowed-ideas.md](../../ROADMAP-borrowed-ideas.md), the Honba workspace requires structural decoupling:
+Per [docs/archive/ROADMAP-borrowed-ideas.md](../archive/ROADMAP-borrowed-ideas.md), the Honba workspace requires structural decoupling:
 1. `honba-algo-testing` mixes test-only fixtures (`VecFeed`, assertion helpers) with core simulation and execution models (`BarFillEngine`, `PaperExecution`, latency, cost, and backtest node).
 2. PyO3 is bound directly inside `honba-cli`, preventing `python/pyproject.toml` from importing `honba._honba` as a clean extension cdylib crate.
 3. `honba-india` contains both generic market contracts (`TradingCalendar`, `CostModelSource`, `UniverseSource`) and India-specific market logic (NSE calendar, STT calculations, NIFTY 50 universe).

@@ -4,7 +4,7 @@
 Accepted / Completed
 
 ## Context
-Per [ROADMAP-borrowed-ideas.md](../../ROADMAP-borrowed-ideas.md) Section 2b, the workspace requires strict inward dependency layering:
+Per [docs/archive/ROADMAP-borrowed-ideas.md](../archive/ROADMAP-borrowed-ideas.md) Section 2b, the workspace requires strict inward dependency layering:
 ```text
 L0  honba-messages
 L1  honba-entities

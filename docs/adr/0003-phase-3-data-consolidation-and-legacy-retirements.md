@@ -4,7 +4,7 @@
 Accepted / Completed
 
 ## Context
-Per [ROADMAP-borrowed-ideas.md](../../ROADMAP-borrowed-ideas.md) Section 2b:
+Per [docs/archive/ROADMAP-borrowed-ideas.md](../archive/ROADMAP-borrowed-ideas.md) Section 2b:
 1. `honba-algo-import` and `honba-algo-export` were small, split crates dealing with complementary halves of market data ingestion and report generation. The roadmap calls for consolidating them into a unified catalog and data crate `honba-data` (L5).
 2. `honba-india` had all its functionality lifted to `honba-market` (L2) with a pluggable architecture (generic market interfaces + `india` feature module + `null` market pack).
 3. The old directories (`honba-algo-import`, `honba-algo-export`, `honba-india`) remained as duplicate or legacy folders.

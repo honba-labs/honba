@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-Story E0-S3 in [ROADMAP-borrowed-ideas.md](../../ROADMAP-borrowed-ideas.md) asks for one strategy contract in both
+Story E0-S3 in [docs/archive/ROADMAP-borrowed-ideas.md](../archive/ROADMAP-borrowed-ideas.md) asks for one strategy contract in both
 languages: the same hooks, a `StrategyContext` (clock, portfolio, positions, instrument lookup, order submit) and a
 shared conformance fixture that runs the same scripted event stream through a Python and a Rust strategy. Before
 this ADR:

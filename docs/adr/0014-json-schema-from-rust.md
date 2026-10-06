@@ -1,6 +1,6 @@
 # ADR 0014: JSON Schema and Every Other Contract Artifact Are Generated From Rust
 
-Date: 2026-10-06. Status: accepted. Supersedes ADR 0006 decision 1 (in part). Roadmap story: E0-S2 follow-up (plan.md
+Date: 2026-10-06. Status: accepted. Supersedes ADR 0006 decision 1 (in part). Roadmap story: E0-S2 follow-up (docs/archive/plan.md
 §4.1, §9 row 6).
 
 ## Context
@@ -10,7 +10,7 @@ placed JSON Schema *downstream of the Python models*: a later story would export
 (`model_json_schema()`) and diff it in CI. The Rust-to-Python link was kept honest by convention plus tests (golden
 vectors, `wire_enum_values()` parity, the `canonical_json` round trip).
 
-plan.md §4.1 needs more than JSON Schema: OpenAPI, TypeScript, `.pyi` stubs and MCP tool schemas must all describe the
+docs/archive/plan.md §4.1 needs more than JSON Schema: OpenAPI, TypeScript, `.pyi` stubs and MCP tool schemas must all describe the
 same types. With pydantic as the schema source, the REST, TypeScript and MCP artifacts would each need a second
 generator reading a Python re-implementation of the Rust types, and a field added in Rust would reach them only after
 someone mirrored it by hand. One generator reading the Rust types removes that step.
@@ -66,6 +66,6 @@ TypeScript (`typescript.rs`), `.pyi` stubs (`typings.rs`) and MCP tool schemas (
   The validator covers only the keywords `schemars` emits and fails on any other validating keyword. Not checked:
   `invalid*` vectors (rejected by Rust invariants the schema cannot express, such as `low <= high`), engine scenario
   scripts and indicator series (not wire instances), and string formats (`format` is treated as an annotation).
-- The Python wire models are still hand-maintained mirrors. Generating them (plan.md §4.1 "Python types are generated,
+- The Python wire models are still hand-maintained mirrors. Generating them (docs/archive/plan.md §4.1 "Python types are generated,
   then hand-extended") is not done; `python/src/honba/wire/generated` holds `.pyi` stubs only. This ADR does not
   decide that step.

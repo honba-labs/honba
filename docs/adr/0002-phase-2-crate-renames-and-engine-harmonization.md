@@ -4,7 +4,7 @@
 Accepted / Completed
 
 ## Context
-Per [ROADMAP-borrowed-ideas.md](../../ROADMAP-borrowed-ideas.md) Section 2b, the workspace uses inconsistent naming prefixes:
+Per [docs/archive/ROADMAP-borrowed-ideas.md](../archive/ROADMAP-borrowed-ideas.md) Section 2b, the workspace uses inconsistent naming prefixes:
 - `honba-algo` serves as the event loop engine but carries the ambiguous name `algo`.
 - Five feature crates contain the verbose `-algo-` infix (`honba-algo-indicators`, `honba-algo-strategies`, `honba-algo-analytics`, `honba-algo-testing`), contrasting with `honba-messages`, `honba-entities`, `honba-sim`, and `honba-market`.
 

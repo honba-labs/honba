@@ -4,7 +4,7 @@ Date: 2026-10-05. Status: accepted. Roadmap story: E0-S5.
 
 ## Context
 
-plan.md §4.2 names three version axes but never pins who owns what, and the
+docs/archive/plan.md §4.2 names three version axes but never pins who owns what, and the
 code grew two owners for `SCHEMA_VERSION` (`honba_messages::SCHEMA_VERSION`
 and the Python `honba.entities.wire.SCHEMA_VERSION`). Duplicate owners are how
 a field becomes a liar: one bumps, the other does not, and readers disagree.
@@ -30,7 +30,7 @@ are read from `honba._honba` at import time, and
 `python/tests/unit/test_versioning.py` fails on any literal assignment to
 those names anywhere under `python/src/honba` (generated code excepted).
 
-Rules (plan.md §4.2, restated as the binding version):
+Rules (docs/archive/plan.md §4.2, restated as the binding version):
 
 1. **Wire additive changes do not bump `schema_version`.** A new optional
    field is additive. Readers must reject an unknown `schema_version` and must

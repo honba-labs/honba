@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-Story E1-S1 in [ROADMAP-borrowed-ideas.md](../../ROADMAP-borrowed-ideas.md) asks for the formal
+Story E1-S1 in [docs/archive/ROADMAP-borrowed-ideas.md](../archive/ROADMAP-borrowed-ideas.md) asks for the formal
 broker-adapter surface: session/auth, order placement and cancellation, the account books,
 market data and the instrument master, a capability descriptor and lazy registry discovery,
 all behind a shared contract suite. Before this ADR:

@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-Per [ROADMAP-borrowed-ideas.md](../../ROADMAP-borrowed-ideas.md) Section 2b & E0-S7:
+Per [docs/archive/ROADMAP-borrowed-ideas.md](../archive/ROADMAP-borrowed-ideas.md) Section 2b & E0-S7:
 1. `honba-market` (L2, formerly `honba-india`) was only moved under `src/india/` without true generic market decoupling.
 2. The `india` cargo feature does not compile when disabled (`cargo check -p honba-market --no-default-features` fails).
 3. Core contracts such as `CostBreakdown`, `Segment`, and calendar types remained India-shaped with fixed fields (`stt`, `gst`, `stamp_duty`, `sebi_fee`).

@@ -1,11 +1,11 @@
 # ADR 0015: One Explicit Async Runtime Per Interpreter, No pyo3 `auto-initialize`
 
-Date: 2026-10-06. Status: Accepted (implemented, E10-S7). Roadmap story: E10-S7 (plan.md §3.2, §9 row 3).
+Date: 2026-10-06. Status: Accepted (implemented, E10-S7). Roadmap story: E10-S7 (docs/archive/plan.md §3.2, §9 row 3).
 
 ## Context
 
 `honba-py` is the `honba._honba` extension module. It is loaded into a host Python interpreter, so it never owns the
-process: Python starts first and the extension is imported into it. plan.md §3.2 puts all I/O in an async shell on
+process: Python starts first and the extension is imported into it. docs/archive/plan.md §3.2 puts all I/O in an async shell on
 tokio around a synchronous engine kernel, which means the extension has to run a tokio runtime on behalf of Python.
 
 Two hazards follow. pyo3's `auto-initialize` feature starts an interpreter from Rust, which is for embedding Python in a
@@ -17,7 +17,7 @@ interpreter ends up with several runtimes, with no defined owner for startup, sh
 - `honba-py` does not enable pyo3 `auto-initialize`. It stays an `extension-module`; the interpreter belongs to the host.
 - There is exactly one async runtime per interpreter. It is created and torn down explicitly by `honba.event_loop`
   (E10-S7), a Python-side owner that creates it before the first async call, hands it to `pyo3-async-runtimes`, and
-  shuts it down deterministically at exit, so the audit stream is complete (plan.md §3.2 rule 5).
+  shuts it down deterministically at exit, so the audit stream is complete (docs/archive/plan.md §3.2 rule 5).
 - No other module creates a runtime that outlives a call, drives timers or sockets, or runs engine work.
 
 ## Current state (verified 2026-10-06)
@@ -51,7 +51,7 @@ Not built:
 - E10-S7 must deliver, test-first: the `honba.event_loop` owner (create, idempotent get, shutdown), a Rust-side
   replacement for the leaked runtime that can be torn down, a test that a second creation is refused or returns the same
   runtime, and a check that `Cargo.toml` does not enable `auto-initialize`.
-- This ADR is revisited if `honba-py` is ever split into per-crate bindings (plan.md §9 row 7 says it will not be).
+- This ADR is revisited if `honba-py` is ever split into per-crate bindings (docs/archive/plan.md §9 row 7 says it will not be).
 
 ## Addendum: what shipped (E10-S7)
 
