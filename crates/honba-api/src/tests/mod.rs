@@ -1,6 +1,7 @@
 //! Unit tests for `honba-api` (ADR 007: one file per area).
 
 mod endpoints;
+mod market;
 
 use serde_json::json;
 

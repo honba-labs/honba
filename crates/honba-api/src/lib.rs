@@ -14,6 +14,7 @@
 #![deny(unsafe_code)]
 
 pub mod capabilities;
+pub mod market;
 pub mod requests;
 pub mod responses;
 pub mod verify;
@@ -22,6 +23,9 @@ pub use capabilities::{Capabilities, CapabilityManifest};
 pub use honba_messages::{
     write_endpoints, Access, ApiResponse, ApiVersion, Endpoint, ErrorCategory, ErrorCode,
     ErrorDetail, HttpMethod, ParamLocation, ResponseEnvelope, API_VERSION, ENDPOINTS, WRITE_PATHS,
+};
+pub use market::{
+    instrument_json, parse_instrument_id, parse_timeframe, ResolvedBarsQuery, DEFAULT_TIMEFRAME,
 };
 pub use requests::{
     BacktestRequest, BarsQuery, DepthQuery, InstrumentsQuery, OrdersRequest, QuotesQuery,
