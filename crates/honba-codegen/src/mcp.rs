@@ -87,6 +87,23 @@ pub(crate) const TOOLS: &[Tool] = &[
         )],
     },
     Tool {
+        name: "compile_strategy",
+        description: "Compile a strategy manifest and keep it in this session's catalog; returns its content id and StrategyIr.",
+        endpoint: ("POST", "/strategies"),
+        args: &[(
+            "request",
+            "StrategiesRequest",
+            true,
+            "The strategy manifest to compile. Source code is not accepted.",
+        )],
+    },
+    Tool {
+        name: "list_strategies",
+        description: "List the strategies compiled in this session, ordered by id.",
+        endpoint: ("GET", "/strategies"),
+        args: &[],
+    },
+    Tool {
         name: "screen",
         description: "Evaluate a screener predicate over the instrument catalog.",
         endpoint: ("GET", "/screener/scan"),

@@ -72,6 +72,7 @@ fn api_responses_are_open_records_and_api_requests_are_closed_inputs() {
         "BarsResponse",
         "DepthResponse",
         "StrategiesResponse",
+        "CompiledStrategy",
         "BacktestResponse",
         "BacktestMetrics",
         "SweepResponse",

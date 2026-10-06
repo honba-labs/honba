@@ -1059,6 +1059,280 @@
       "annotations": {
         "readOnlyHint": true
       },
+      "description": "Compile a strategy manifest and keep it in this session's catalog; returns its content id and StrategyIr.",
+      "inputSchema": {
+        "$defs": {
+          "BarAggregation": {
+            "description": "How a bar aggregates its underlying data.",
+            "oneOf": [
+              {
+                "description": "Aggregate every N ticks.",
+                "enum": [
+                  "tick"
+                ],
+                "type": "string"
+              },
+              {
+                "description": "Aggregate every N seconds.",
+                "enum": [
+                  "second"
+                ],
+                "type": "string"
+              },
+              {
+                "description": "Aggregate every N minutes.",
+                "enum": [
+                  "minute"
+                ],
+                "type": "string"
+              },
+              {
+                "description": "Aggregate every N hours.",
+                "enum": [
+                  "hour"
+                ],
+                "type": "string"
+              },
+              {
+                "description": "Aggregate every N days.",
+                "enum": [
+                  "day"
+                ],
+                "type": "string"
+              },
+              {
+                "description": "Aggregate every N weeks.",
+                "enum": [
+                  "week"
+                ],
+                "type": "string"
+              },
+              {
+                "description": "Aggregate every N calendar months.",
+                "enum": [
+                  "month"
+                ],
+                "type": "string"
+              }
+            ]
+          },
+          "Exchange": {
+            "description": "A trading exchange, e.g. `NSE`, `BSE`, `NASDAQ`.",
+            "type": "string"
+          },
+          "InstrumentId": {
+            "description": "A trading instrument, combining a symbol and its exchange.",
+            "properties": {
+              "exchange": {
+                "$ref": "#/$defs/Exchange"
+              },
+              "symbol": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "exchange",
+              "symbol"
+            ],
+            "type": "object"
+          },
+          "StrategyManifest": {
+            "additionalProperties": false,
+            "description": "A verified, hashable description of a strategy, ready to be run.",
+            "properties": {
+              "api_version": {
+                "description": "Strategy contract version this was compiled against.",
+                "type": "string"
+              },
+              "driving_timeframe": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/TimeframeSpec"
+                  }
+                ],
+                "description": "The bar timeframe that drives the strategy's clock."
+              },
+              "name": {
+                "description": "Strategy's declared name, used in journals and reports.",
+                "type": "string"
+              },
+              "schedules": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Optional wall-clock schedules (session open/close, rebalance times).",
+                "type": "object"
+              },
+              "source_hash": {
+                "description": "Stable digest of the source that produced this manifest.\n\nTwo runs with the same `source_hash` and the same data must produce a byte-identical journal; a changed hash is what tells a cache it cannot reuse a previous result.",
+                "type": "string"
+              },
+              "subscriptions": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/Subscriptions"
+                  }
+                ],
+                "description": "What the strategy needs fed to it."
+              },
+              "universe": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/Universe"
+                  }
+                ],
+                "description": "The universe the strategy may trade, as a named set or explicit list."
+              },
+              "warmup_bars": {
+                "description": "Bars required before the first decision, so indicators converge.",
+                "format": "uint32",
+                "minimum": 0.0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "api_version",
+              "driving_timeframe",
+              "name",
+              "source_hash",
+              "subscriptions",
+              "universe",
+              "warmup_bars"
+            ],
+            "type": "object"
+          },
+          "Subscriptions": {
+            "additionalProperties": false,
+            "description": "The market data a strategy subscribes to.\n\nA strategy that forgets a subscription gets no events for it, which in a backtest looks like a strategy that never trades. Recording the set explicitly is what lets the loader fail loudly instead.",
+            "properties": {
+              "instruments": {
+                "description": "Instruments whose bars this strategy consumes.",
+                "items": {
+                  "$ref": "#/$defs/InstrumentId"
+                },
+                "type": "array"
+              },
+              "quotes": {
+                "default": false,
+                "description": "Whether top-of-book quotes are delivered.",
+                "type": "boolean"
+              },
+              "trades": {
+                "default": false,
+                "description": "Whether trade prints are delivered.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "instruments"
+            ],
+            "type": "object"
+          },
+          "TimeframeSpec": {
+            "additionalProperties": false,
+            "description": "A bar aggregation interval.",
+            "properties": {
+              "aggregation": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/BarAggregation"
+                  }
+                ],
+                "description": "The unit the interval counts."
+              },
+              "interval": {
+                "description": "Number of units per bar, e.g. 5 in `5m`.",
+                "format": "uint32",
+                "minimum": 0.0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "aggregation",
+              "interval"
+            ],
+            "type": "object"
+          },
+          "Universe": {
+            "description": "The set of instruments a strategy may trade.",
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "description": "A named index or curated list resolved by the broker adapter.",
+                "properties": {
+                  "named": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "named"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "description": "An explicit list of instruments.",
+                "properties": {
+                  "explicit": {
+                    "items": {
+                      "$ref": "#/$defs/InstrumentId"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "explicit"
+                ],
+                "type": "object"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "additionalProperties": false,
+            "description": "The strategy manifest to compile. Source code is not accepted.",
+            "properties": {
+              "manifest": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/StrategyManifest"
+                  }
+                ],
+                "description": "The strategy manifest, as accepted by `POST /strategies/verify`."
+              }
+            },
+            "required": [
+              "manifest"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "name": "compile_strategy"
+    },
+    {
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "description": "List the strategies compiled in this session, ordered by id.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "name": "list_strategies"
+    },
+    {
+      "annotations": {
+        "readOnlyHint": true
+      },
       "description": "Evaluate a screener predicate over the instrument catalog.",
       "inputSchema": {
         "$defs": {

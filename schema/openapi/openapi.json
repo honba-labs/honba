@@ -529,6 +529,28 @@
         ],
         "type": "object"
       },
+      "CompiledStrategy": {
+        "description": "A strategy that verified, with the id the server keeps it under.",
+        "properties": {
+          "id": {
+            "description": "Content id: `sha256:` plus the hex digest of the canonical manifest JSON. The same manifest always has the same id; a backtest names it as `strategy`.",
+            "type": "string"
+          },
+          "ir": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StrategyIr"
+              }
+            ],
+            "description": "The verified IR the manifest compiled to."
+          }
+        },
+        "required": [
+          "id",
+          "ir"
+        ],
+        "type": "object"
+      },
       "Currency": {
         "description": "A currency in which instruments are denominated.\n\n``` use honba_entities::Currency;\n\nassert_eq!(Currency::Inr.code(), \"INR\"); assert_eq!(Currency::Inr.to_string(), \"INR\"); ```",
         "oneOf": [
@@ -2716,31 +2738,30 @@
       },
       "StrategiesRequest": {
         "additionalProperties": false,
-        "description": "Strategies request: submit source or a manifest to verify and compile.",
+        "description": "`POST /strategies` request: the manifest to verify, compile and keep.\n\nSource code is not accepted (`code` or `source` is a 422 with `reason = source_unsupported`); a manifest is the only input a server can verify without running author code.",
         "properties": {
-          "code": {
-            "description": "Strategy source code to verify and compile to a manifest.",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "name": {
-            "description": "Strategy name.",
-            "type": [
-              "string",
-              "null"
-            ]
+          "manifest": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StrategyManifest"
+              }
+            ],
+            "description": "The strategy manifest, as accepted by `POST /strategies/verify`."
           }
         },
+        "required": [
+          "manifest"
+        ],
         "type": "object"
       },
       "StrategiesResponse": {
-        "description": "Strategies response: verified manifests.",
+        "description": "Strategies response: the compiled strategies of this process, ordered by id.",
         "properties": {
           "strategies": {
-            "description": "Compiled manifests.",
-            "items": true,
+            "description": "Compiled strategies.",
+            "items": {
+              "$ref": "#/components/schemas/CompiledStrategy"
+            },
             "type": "array"
           }
         },
@@ -4139,7 +4160,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StrategiesResponse"
+                  "$ref": "#/components/schemas/CompiledStrategy"
                 }
               }
             },

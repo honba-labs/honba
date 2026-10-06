@@ -90,6 +90,10 @@ class CapabilityManifest:
     not_implemented: list[str] | None = None
     toolsets: list[str]
 
+class CompiledStrategy:
+    id: str
+    ir: StrategyIr
+
 Currency = Literal["INR", "USD", "EUR", "GBP"]
 
 DataSourceConfig = dict[str, Any]
@@ -380,11 +384,10 @@ class SortSpec:
     timeframe: Timeframe | None = None
 
 class StrategiesRequest:
-    code: str | None = None
-    name: str | None = None
+    manifest: StrategyManifest
 
 class StrategiesResponse:
-    strategies: list[Any]
+    strategies: list[CompiledStrategy]
 
 class StrategyIr:
     driving_timeframe: TimeframeSpec

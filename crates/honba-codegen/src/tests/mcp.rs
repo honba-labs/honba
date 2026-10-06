@@ -214,3 +214,23 @@ fn verify_strategy_drives_the_dedicated_read_only_endpoint() {
         json!(["strategy_manifest"])
     );
 }
+
+#[test]
+fn compile_and_list_strategies_are_read_only_tools_on_their_routes() {
+    let rendered = render(&full());
+    let tools = rendered["tools"].as_array().unwrap();
+    for (name, endpoint) in [
+        ("compile_strategy", ("POST", "/strategies")),
+        ("list_strategies", ("GET", "/strategies")),
+    ] {
+        let tool = TOOLS.iter().find(|t| t.name == name).unwrap();
+        assert_eq!(tool.endpoint, endpoint);
+        let out = tools.iter().find(|t| t["name"] == name).unwrap();
+        assert_eq!(out["annotations"]["readOnlyHint"], json!(true), "{name}");
+    }
+    let compile = tools
+        .iter()
+        .find(|t| t["name"] == "compile_strategy")
+        .unwrap();
+    assert_eq!(compile["inputSchema"]["required"], json!(["request"]));
+}

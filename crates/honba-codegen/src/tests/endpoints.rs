@@ -187,3 +187,19 @@ fn a_post_body_is_not_also_published_as_query_parameters() {
         );
     }
 }
+
+#[test]
+fn compiling_a_strategy_returns_one_compiled_strategy_and_listing_returns_the_list() {
+    let paths = paths();
+    let schema = |method: &str| paths["/strategies"][method]["responses"]["200"].to_string();
+    assert!(
+        schema("post").contains("CompiledStrategy"),
+        "{}",
+        schema("post")
+    );
+    assert!(
+        schema("get").contains("StrategiesResponse"),
+        "{}",
+        schema("get")
+    );
+}

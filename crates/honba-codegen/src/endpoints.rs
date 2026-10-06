@@ -21,7 +21,7 @@ fn response_type_for(method: &str, path: &str) -> Option<&'static str> {
         ("GET", "/quotes") => "QuotesResponse",
         ("GET", "/bars/{id}") => "BarsResponse",
         ("GET", "/depth/{id}") => "DepthResponse",
-        ("POST", "/strategies") => "StrategiesResponse",
+        ("POST", "/strategies") => "CompiledStrategy",
         ("GET", "/strategies") => "StrategiesResponse",
         ("POST", "/strategies/verify") => "StrategyIr",
         ("POST", "/backtests") => "BacktestResponse",

@@ -184,6 +184,7 @@ pub fn register_responses(set: &mut SchemaSet) {
     set.add_type::<honba_api::QuotesResponse>("QuotesResponse");
     set.add_type::<honba_api::BarsResponse>("BarsResponse");
     set.add_type::<honba_api::DepthResponse>("DepthResponse");
+    set.add_type::<honba_api::CompiledStrategy>("CompiledStrategy");
     set.add_type::<honba_api::StrategiesResponse>("StrategiesResponse");
     set.add_type::<honba_api::BacktestResponse>("BacktestResponse");
     set.add_type::<honba_api::BacktestMetrics>("BacktestMetrics");
