@@ -139,26 +139,87 @@ def find_catalog(
     raise CatalogError(f"honba-strategies catalog not found: pass its path or set ${CATALOG_ENV}.")
 
 
+_SKIPPED_DIRS = frozenset({"node_modules", "__pycache__", "venv", "site-packages", "build", "dist"})
+
+
+def _scannable(relative: Path) -> bool:
+    """False for hidden (``.git``, ``.venv``) and vendor directories anywhere in the path."""
+    return not any(part.startswith(".") or part in _SKIPPED_DIRS for part in relative.parts)
+
+
+def _read_registry(path: Path) -> object:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise CatalogError(f"unreadable registry {path}: {exc}") from exc
+
+
 def _registry_entries(catalog: Path) -> dict[str, str]:
-    """``{name: relative path}`` from the top-level and per-strategy registries."""
+    """``{name: relative path}`` from the top-level and per-strategy registries.
+
+    The registry is untrusted content: a malformed one raises :class:`CatalogError`.
+    """
     entries: dict[str, str] = {}
-    top = json.loads((catalog / "registry.json").read_text(encoding="utf-8"))
-    for e in top.get("strategies", []):
+    top_path = catalog / "registry.json"
+    top = _read_registry(top_path)
+    if not isinstance(top, dict):
+        raise CatalogError(f"malformed registry {top_path}: expected a JSON object")
+    listed = top.get("strategies", [])
+    if not isinstance(listed, list):
+        raise CatalogError(f"malformed registry {top_path}: 'strategies' must be a list")
+    for e in listed:
+        if not (
+            isinstance(e, dict)
+            and isinstance(e.get("name"), str)
+            and isinstance(e.get("path"), str)
+        ):
+            raise CatalogError(
+                f"malformed registry {top_path}: each strategy needs a string 'name' and 'path', "
+                f"got {e!r}"
+            )
         entries.setdefault(e["name"], e["path"])
     for reg in sorted(catalog.glob("**/registry.json")):
-        if reg.parent == catalog:
+        if reg.parent == catalog or not _scannable(reg.parent.relative_to(catalog)):
             continue
-        e = json.loads(reg.read_text(encoding="utf-8"))
-        if isinstance(e, dict) and "name" in e:
-            entries.setdefault(e["name"], e.get("path") or str(reg.parent.relative_to(catalog)))
+        e = _read_registry(reg)
+        if isinstance(e, dict) and isinstance(e.get("name"), str):
+            path = e.get("path")
+            if path is not None and not isinstance(path, str):
+                raise CatalogError(f"malformed registry {reg}: 'path' must be a string")
+            entries.setdefault(e["name"], path or str(reg.parent.relative_to(catalog)))
     return entries
+
+
+def _load_module_isolated(strategy_dir: Path, catalog: Path, module_name: str) -> ModuleType:
+    """Import ``strategy.py`` with its directory chain on ``sys.path``, then undo the leaks.
+
+    The strategy directory, its two parents and the catalog root are on ``sys.path`` only
+    while importing (the catalog's own test convention), so sibling imports resolve. After
+    the import ``sys.path`` is restored and every module the strategy pulled in from its
+    own directory (``helpers.py`` beside it) is dropped from ``sys.modules``, so two
+    strategies that each have a ``helpers.py`` never see each other's. Imports a strategy
+    defers to call time will not find its siblings.
+    """
+    saved_path = list(sys.path)
+    before = set(sys.modules)
+    for p in (catalog, strategy_dir.parent.parent, strategy_dir.parent, strategy_dir):
+        sys.path.insert(0, str(p))
+    try:
+        return _import_file(strategy_dir / "strategy.py", module_name)
+    finally:
+        sys.path[:] = saved_path
+        for mod_name in set(sys.modules) - before - {module_name}:
+            mod_file = getattr(sys.modules[mod_name], "__file__", None)
+            if mod_file and Path(mod_file).resolve().is_relative_to(strategy_dir):
+                del sys.modules[mod_name]
 
 
 def load_catalog_strategy(name: str, catalog: str | Path) -> CatalogStrategy:
     """Import the strategy registered as ``name`` and read its ``config.toml``.
 
-    The strategy directory, its two parents and the catalog root go on ``sys.path``
-    (the catalog's own test convention), so sibling imports inside the catalog resolve.
+    The strategy directory, its two parents and the catalog root are put on ``sys.path`` while importing
+    (see :func:`_load_module_isolated`). A registry path that resolves outside the
+    catalog is refused.
     """
     catalog = Path(catalog).resolve()
     entries = _registry_entries(catalog)
@@ -167,10 +228,13 @@ def load_catalog_strategy(name: str, catalog: str | Path) -> CatalogStrategy:
             f"no strategy named {name!r} in {catalog}; available: {', '.join(sorted(entries))}"
         )
     strategy_dir = (catalog / entries[name]).resolve()
-    for p in (strategy_dir, strategy_dir.parent, strategy_dir.parent.parent, catalog):
-        if str(p) not in sys.path:
-            sys.path.insert(0, str(p))
-    module = _import_file(strategy_dir / "strategy.py", f"honba_catalog_{name}")
+    if not strategy_dir.is_relative_to(catalog):
+        raise CatalogError(
+            f"strategy {name!r}: path {entries[name]!r} resolves outside the catalog {catalog}"
+        )
+    if not (strategy_dir / "strategy.py").is_file():
+        raise CatalogError(f"strategy {name!r}: {strategy_dir / 'strategy.py'} not found")
+    module = _load_module_isolated(strategy_dir, catalog, f"honba_catalog_{name}")
     classes = _strategy_classes(module)
     named = [c for c in classes if getattr(c, "name", None) == name]
     if len(named) == 1:

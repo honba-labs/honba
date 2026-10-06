@@ -170,3 +170,87 @@ def test_a_failed_import_leaves_nothing_in_sys_modules(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="boom"):
         load_strategy(path)
     assert set(sys.modules) == before
+
+
+def _registry(catalog: Path, entries: object) -> None:
+    (catalog / "registry.json").write_text(json.dumps(entries))
+
+
+def test_a_registry_path_escaping_the_catalog_is_refused(catalog: Path, tmp_path: Path) -> None:
+    outside = tmp_path / "outside" / "evil"
+    _strategy(outside, "evil", "Evil")
+    _registry(catalog, {"strategies": [{"name": "evil", "path": "../outside/evil"}]})
+    with pytest.raises(CatalogError, match="outside the catalog"):
+        load_catalog_strategy("evil", catalog)
+    _registry(catalog, {"strategies": [{"name": "evil", "path": str(outside)}]})
+    with pytest.raises(CatalogError, match="outside the catalog"):
+        load_catalog_strategy("evil", catalog)
+
+
+def test_a_per_strategy_registry_path_escaping_the_catalog_is_refused(
+    catalog: Path, tmp_path: Path
+) -> None:
+    _strategy(tmp_path / "elsewhere", "esc", "Esc")
+    d = catalog / "swing" / "esc"
+    d.mkdir()
+    (d / "registry.json").write_text(json.dumps({"name": "esc", "path": "../../../elsewhere"}))
+    with pytest.raises(CatalogError, match="outside the catalog"):
+        load_catalog_strategy("esc", catalog)
+
+
+@pytest.mark.parametrize("hidden", [".venv", "node_modules", ".git", "__pycache__", ".hidden"])
+def test_hidden_and_vendor_dirs_are_not_scanned_for_registries(catalog: Path, hidden: str) -> None:
+    d = catalog / hidden / "pkg" / "ghost"
+    _strategy(d, "ghost", "Ghost")
+    (d / "registry.json").write_text(json.dumps({"name": "ghost"}))
+    with pytest.raises(CatalogError, match="available: alpha, beta$"):
+        load_catalog_strategy("ghost", catalog)
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        [],
+        {"strategies": "alpha"},
+        {"strategies": ["alpha"]},
+        {"strategies": [{"path": "momentum/trend/alpha"}]},
+        {"strategies": [{"name": "alpha"}]},
+        {"strategies": [{"name": 3, "path": "x"}]},
+    ],
+)
+def test_a_malformed_registry_raises_a_clear_error(catalog: Path, bad: object) -> None:
+    _registry(catalog, bad)
+    with pytest.raises(CatalogError, match="registry"):
+        load_catalog_strategy("alpha", catalog)
+
+
+def test_unparseable_registry_json_raises_a_clear_error(catalog: Path) -> None:
+    (catalog / "registry.json").write_text("{not json")
+    with pytest.raises(CatalogError, match="registry"):
+        load_catalog_strategy("alpha", catalog)
+
+
+def test_loading_restores_sys_path(catalog: Path) -> None:
+    import sys
+
+    before = list(sys.path)
+    load_catalog_strategy("alpha", catalog)
+    assert sys.path == before
+
+
+def test_sibling_modules_do_not_collide_between_strategies(tmp_path: Path) -> None:
+    root = tmp_path / "cat"
+    entries = []
+    for name, value in (("one", 1), ("two", 2)):
+        d = root / "g" / name
+        d.mkdir(parents=True)
+        (d / "helpers.py").write_text(f"VALUE = {value}\n")
+        (d / "strategy.py").write_text(
+            "from honba.strategies.base import Strategy\nimport helpers\n\n\n"
+            f"class S(Strategy):\n    name = '{name}'\n    value = helpers.VALUE\n"
+        )
+        (d / "config.toml").write_text(CONFIG.format(name=name))
+        entries.append({"name": name, "path": f"g/{name}"})
+    _registry(root, {"strategies": entries})
+    assert load_catalog_strategy("one", root).cls.value == 1
+    assert load_catalog_strategy("two", root).cls.value == 2
