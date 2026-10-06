@@ -1,6 +1,6 @@
 //! The shared `ExecutionEngine` contract, run against every engine in this crate.
 //!
-//! Contract (ADR 008, decision 11): fills belong to submitted orders, and once
+//! Contract (ADR 008, decision 13): fills belong to submitted orders, and once
 //! the working orders are cancelled `filled + released == ordered` for every
 //! order; draining twice never repeats an item; cancelling a finished or
 //! unknown order is a no-op.

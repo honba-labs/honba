@@ -5,7 +5,7 @@ use honba_messages::{InstrumentId, Order, OrderId, OrderSide, UnixNanos};
 
 use crate::error::Result;
 
-/// An order, or the part of one, that will never fill (ADR 008, decision 11).
+/// An order, or the part of one, that will never fill (ADR 008, decision 13).
 ///
 /// Either the venue or engine refused it (`cancelled == false`) or it was
 /// cancelled (`cancelled == true`, reason [`OrderRejection::CANCELLED`]).
@@ -82,7 +82,14 @@ pub trait ExecutionEngine: Send {
     ///
     /// An engine holding the order reports the unfilled remainder through
     /// [`Self::drain_rejections`] with `cancelled == true`. Cancelling an
-    /// unknown or finished order is a no-op.
+    /// unknown or finished order is a no-op. The cancellation carries the
+    /// order's original `ts_event`, not the time of the call.
+    ///
+    /// Fills the engine has produced but not yet drained are not an ordering
+    /// hazard: the cancelled remainder excludes whatever already filled, and
+    /// the context's pending count only ever decreases by `filled + released`,
+    /// which sums to the ordered quantity whichever is booked first. The
+    /// remainder must never include a quantity that is also in a fill.
     fn cancel(&mut self, order_id: &str) -> Result<()>;
 
     /// Drains any fills produced since the last call.

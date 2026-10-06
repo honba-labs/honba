@@ -159,7 +159,10 @@ this ADR:
     `LedgerContext::release_remainder`. `ExecutionEngine` gains `drain_rejections() -> Result<Vec<OrderRejection>>`
     with a default that returns nothing, so every existing engine compiles and behaves as before. `cancel(order_id)`
     keeps its signature: an engine holding the order reports the unfilled remainder as a cancelled rejection;
-    cancelling an unknown or finished order is a no-op. `StrategyRunner` drains rejections after the fills of every
+    cancelling an unknown or finished order is a no-op, and the cancellation is stamped with the order's original
+    `ts_event` (not the time of the call), matching the shared vectors and the Python venue. Because the
+    remainder excludes anything already filled, `StrategyRunner::cancel` need not drain fills first: pending only
+    decreases by `filled + released`, which sums to the ordered quantity in either booking order. `StrategyRunner` drains rejections after the fills of every
     event (runner step 5, as in Python), releases and records them (`order_rejections()`), and gains `cancel(id)`
     which books what the engine reports at once. Reason strings are the engine's and shared by both languages:
     `insufficient_funds`, `no_position`, `cancelled`. `honba_sim::ScriptedExecution` is the reference engine
