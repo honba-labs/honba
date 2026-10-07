@@ -137,3 +137,20 @@ existing `{iso, unix_nanos}` form. ADR 0011 is not engaged by these endpoints.
 - **CORS is off by default** (no CORS headers). `ApiConfig::with_cors_origins` / `honba serve --cors-origin <origin>`
   (repeatable) opt in explicit origins; `*` and invalid header values are rejected. `api_router_with` keeps the
   default config; `api_router_with_config` / `serve_with_config` take an `ApiConfig`.
+
+## Addendum (2026-10-07): the 501 routes are specified elsewhere
+
+The routes listed above as "Not built, answering 501" are no longer open
+questions. They are specified by accepted ADRs and ship story by story:
+
+- `POST /backtests`, `GET /backtests/{id}[/journal]`, `POST /sweeps`,
+  `GET /sweeps/{id}`, `GET /journals/{id}`: ADR 0017 (run lifecycle and
+  `run_id`), roadmap E4-S3, E4-S5 and E11-S3 (rest).
+- `GET/POST /orders`, `DELETE /orders/{id}`, `POST /positions/close`: ADR 0018
+  (risk stage gates every write path) and ADR 0019 (order-state FSM), roadmap
+  E2-S2 and E11-S7.
+
+This ADR's decisions on read ports, error envelope, and the other known
+limits stand. The 501 sentence above is superseded in part: as each route
+lands, it leaves `NOT_IMPLEMENTED_ENDPOINTS` and the capability manifest in
+the same commit.
