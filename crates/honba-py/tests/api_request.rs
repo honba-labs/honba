@@ -6,11 +6,28 @@ use std::path::PathBuf;
 use honba::pyclasses::api::request;
 use serde_json::{json, Value};
 
-fn data_dir() -> String {
-    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("honba-py-api-request");
+/// A fresh data directory owned by one test. Each test passes its own `label`, so tests running in
+/// parallel never remove or reuse each other's directory.
+fn data_dir(label: &str) -> String {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+        .join("honba-py-api-request")
+        .join(label);
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir.to_str().unwrap().to_owned()
+}
+
+#[test]
+fn data_dirs_of_different_tests_do_not_collide() {
+    let first = data_dir("collide_first");
+    let marker = PathBuf::from(&first).join("marker");
+    std::fs::write(&marker, "x").unwrap();
+    let second = data_dir("collide_second");
+    assert_ne!(first, second);
+    assert!(
+        marker.exists(),
+        "creating another test's directory removed this one's files"
+    );
 }
 
 fn call(
@@ -26,7 +43,7 @@ fn call(
 
 #[test]
 fn reads_answer_inside_the_envelope() {
-    let dir = data_dir();
+    let dir = data_dir("reads_answer_inside_the_envelope");
     let (status, body) = call(&dir, "GET", "/health", None, None);
     assert_eq!((status, &body["data"]["status"]), (200, &json!("ok")));
     let (status, body) = call(
@@ -42,7 +59,7 @@ fn reads_answer_inside_the_envelope() {
 
 #[test]
 fn error_statuses_and_codes_match_the_served_api() {
-    let dir = data_dir();
+    let dir = data_dir("error_statuses_and_codes_match_the_served_api");
     let (status, body) = call(&dir, "GET", "/instruments/TCS.NSE", None, None);
     assert_eq!(
         (status, &body["error"]["code"]),
@@ -62,7 +79,7 @@ fn error_statuses_and_codes_match_the_served_api() {
 
 #[test]
 fn a_post_body_reaches_the_handler() {
-    let dir = data_dir();
+    let dir = data_dir("a_post_body_reaches_the_handler");
     let (status, body) = call(&dir, "POST", "/strategies/verify", None, Some("{}"));
     assert_eq!(status, 422);
     assert_eq!(body["error"]["code"], "validation_invalid_request");
