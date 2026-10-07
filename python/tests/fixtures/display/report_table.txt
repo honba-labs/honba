@@ -1,0 +1,41 @@
+           Honba backtest report           
+  Strategy        sma_crossover            
+  Instrument      RELIANCE.NSE             
+  Period          2024-01-01 → 2024-06-30  
+  Timeframe       1d                       
+  Initial cash    ₹10.00L                  
+  Fills           12                       
+  Rejections      0                        
+           Metrics            
+┏━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┓
+┃ Metric           ┃   Value ┃
+┡━━━━━━━━━━━━━━━━━━╇━━━━━━━━━┩
+│ Final Equity     │ ₹10.84L │
+│ Final Cash       │  ₹4.12L │
+│ Total Return Pct │  +8.43% │
+│ Max Drawdown Pct │  -3.20% │
+│ N Trades         │      12 │
+│ N Fills          │      12 │
+│ Sharpe           │   1.457 │
+└──────────────────┴─────────┘
+                     Recent fills (last 10)                     
+┏━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━┓
+┃ Time       ┃ Side ┃ Symbol       ┃     Qty ┃   Price ┃ Costs ┃
+┡━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━┩
+│ 2024-01-04 │ BUY  │ RELIANCE.NSE │ 12.0000 │ 2425.00 │  3.25 │
+│ 2024-01-05 │ SELL │ RELIANCE.NSE │ 13.0000 │ 2437.50 │  4.25 │
+│ 2024-01-06 │ BUY  │ RELIANCE.NSE │ 14.0000 │ 2450.00 │  5.25 │
+│ 2024-01-07 │ SELL │ RELIANCE.NSE │ 15.0000 │ 2462.50 │  6.25 │
+│ 2024-01-08 │ BUY  │ RELIANCE.NSE │ 16.0000 │ 2475.00 │  7.25 │
+│ 2024-01-09 │ SELL │ RELIANCE.NSE │ 17.0000 │ 2487.50 │  8.25 │
+│ 2024-01-10 │ BUY  │ RELIANCE.NSE │ 18.0000 │ 2500.00 │  9.25 │
+│ 2024-01-11 │ SELL │ RELIANCE.NSE │ 19.0000 │ 2512.50 │ 10.25 │
+│ 2024-01-12 │ BUY  │ RELIANCE.NSE │ 20.0000 │ 2525.00 │ 11.25 │
+│ 2024-01-13 │ SELL │ RELIANCE.NSE │ 21.0000 │ 2537.50 │ 12.25 │
+└────────────┴──────┴──────────────┴─────────┴─────────┴───────┘
+┏━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Notes                 ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━┩
+│ • warm-up: 20 bars    │
+│ • costs: india.equity │
+└───────────────────────┘

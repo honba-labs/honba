@@ -1,0 +1,180 @@
+{
+  "strategy": "sma_crossover",
+  "config": {
+    "symbol": "RELIANCE",
+    "exchange": "NSE",
+    "start": "2024-01-01",
+    "end": "2024-06-30",
+    "timeframe": "1d",
+    "cash": 1000000.0,
+    "currency": "INR",
+    "costs": "india.equity",
+    "fill": "next_open",
+    "data": null,
+    "warmup_bars": null,
+    "settlement_days": null
+  },
+  "metrics": {
+    "final_equity": 1084250.5,
+    "final_cash": 412000.0,
+    "total_return_pct": 8.425,
+    "max_drawdown_pct": -3.2,
+    "n_trades": 12,
+    "n_fills": 12,
+    "sharpe": 1.4567
+  },
+  "n_fills": 12,
+  "n_rejections": 0,
+  "fills": [
+    {
+      "instrument_id": "RELIANCE.NSE",
+      "side": "buy",
+      "quantity": 10,
+      "price": 2400.0,
+      "ts": 1704153600000000000,
+      "order_id": "o0",
+      "costs": {
+        "amount": 125,
+        "currency": "INR"
+      }
+    },
+    {
+      "instrument_id": "RELIANCE.NSE",
+      "side": "sell",
+      "quantity": 11,
+      "price": 2412.5,
+      "ts": 1704240000000000000,
+      "order_id": "o1",
+      "costs": {
+        "amount": 225,
+        "currency": "INR"
+      }
+    },
+    {
+      "instrument_id": "RELIANCE.NSE",
+      "side": "buy",
+      "quantity": 12,
+      "price": 2425.0,
+      "ts": 1704326400000000000,
+      "order_id": "o2",
+      "costs": {
+        "amount": 325,
+        "currency": "INR"
+      }
+    },
+    {
+      "instrument_id": "RELIANCE.NSE",
+      "side": "sell",
+      "quantity": 13,
+      "price": 2437.5,
+      "ts": 1704412800000000000,
+      "order_id": "o3",
+      "costs": {
+        "amount": 425,
+        "currency": "INR"
+      }
+    },
+    {
+      "instrument_id": "RELIANCE.NSE",
+      "side": "buy",
+      "quantity": 14,
+      "price": 2450.0,
+      "ts": 1704499200000000000,
+      "order_id": "o4",
+      "costs": {
+        "amount": 525,
+        "currency": "INR"
+      }
+    },
+    {
+      "instrument_id": "RELIANCE.NSE",
+      "side": "sell",
+      "quantity": 15,
+      "price": 2462.5,
+      "ts": 1704585600000000000,
+      "order_id": "o5",
+      "costs": {
+        "amount": 625,
+        "currency": "INR"
+      }
+    },
+    {
+      "instrument_id": "RELIANCE.NSE",
+      "side": "buy",
+      "quantity": 16,
+      "price": 2475.0,
+      "ts": 1704672000000000000,
+      "order_id": "o6",
+      "costs": {
+        "amount": 725,
+        "currency": "INR"
+      }
+    },
+    {
+      "instrument_id": "RELIANCE.NSE",
+      "side": "sell",
+      "quantity": 17,
+      "price": 2487.5,
+      "ts": 1704758400000000000,
+      "order_id": "o7",
+      "costs": {
+        "amount": 825,
+        "currency": "INR"
+      }
+    },
+    {
+      "instrument_id": "RELIANCE.NSE",
+      "side": "buy",
+      "quantity": 18,
+      "price": 2500.0,
+      "ts": 1704844800000000000,
+      "order_id": "o8",
+      "costs": {
+        "amount": 925,
+        "currency": "INR"
+      }
+    },
+    {
+      "instrument_id": "RELIANCE.NSE",
+      "side": "sell",
+      "quantity": 19,
+      "price": 2512.5,
+      "ts": 1704931200000000000,
+      "order_id": "o9",
+      "costs": {
+        "amount": 1025,
+        "currency": "INR"
+      }
+    },
+    {
+      "instrument_id": "RELIANCE.NSE",
+      "side": "buy",
+      "quantity": 20,
+      "price": 2525.0,
+      "ts": 1705017600000000000,
+      "order_id": "o10",
+      "costs": {
+        "amount": 1125,
+        "currency": "INR"
+      }
+    },
+    {
+      "instrument_id": "RELIANCE.NSE",
+      "side": "sell",
+      "quantity": 21,
+      "price": 2537.5,
+      "ts": 1705104000000000000,
+      "order_id": "o11",
+      "costs": {
+        "amount": 1225,
+        "currency": "INR"
+      }
+    }
+  ],
+  "rejections": [],
+  "equity_curve": [],
+  "notes": [
+    "warm-up: 20 bars",
+    "costs: india.equity"
+  ]
+}

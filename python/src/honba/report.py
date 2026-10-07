@@ -8,12 +8,16 @@ engine.
 Formats
 -------
 table
-    Human-readable stdout (default for ``honba run``). Uses Rich when
-    installed; plain text otherwise.
+    Human-readable stdout (default for ``honba run``), rendered by ``honba.display``:
+    Rich when installed, aligned plain text otherwise.
+plain
+    The same tables as aligned plain text, never Rich.
 tui
     Rich-based terminal UI layout with panels and tables (more visual).
 json
     Machine-readable dump of config + metrics + trades (for scripts / CI).
+csv
+    The fills as CSV rows (header row of stable keys).
 html
     Lightweight HTML fragment (notebooks / research); optional.
 
@@ -33,18 +37,19 @@ import json
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, is_dataclass
-from datetime import datetime, timezone
 from typing import Any, TextIO
 
+from honba.display import (
+    Column,
+    format_money,
+    format_timestamp_ns,
+    render,
+    render_kv,
+    render_table,
+)
 
-def _format_timestamp_ns(ts_ns: int) -> str:
-    """Convert nanosecond timestamp to human-readable UTC date string."""
-    if ts_ns <= 0:
-        return "?"
-    try:
-        return datetime.fromtimestamp(ts_ns / 1e9, tz=timezone.utc).strftime("%Y-%m-%d")
-    except (ValueError, OSError, OverflowError):
-        return "?"
+# Kept for callers/tests that imported the private name before it moved to honba.display.
+_format_timestamp_ns = format_timestamp_ns
 
 
 # BacktestResult is defined in session; import for type checkers only at
@@ -67,6 +72,7 @@ def print_backtest_report(
     format: str = "tui",
     file: TextIO | None = None,
     title: str | None = None,
+    width: int | None = None,
 ) -> None:
     """Print ``result`` to ``file`` (default stdout) in the given format.
 
@@ -75,17 +81,22 @@ def print_backtest_report(
     result:
         Outcome of ``BacktestSession.run()``.
     format:
-        ``"table"`` | ``"tui"`` | ``"json"`` | ``"html"``.
+        ``"table"`` | ``"plain"`` | ``"tui"`` | ``"json"`` | ``"csv"`` | ``"html"``.
+        ``plain`` is ``table`` without Rich; ``csv`` is the fills as machine-readable rows.
     file:
         Output stream; defaults to ``sys.stdout``.
     title:
         Optional heading override (table/html only).
+    width:
+        Fixed layout width for table/plain (default: terminal width); use for snapshots.
     """
     out = file if file is not None else sys.stdout
     fmt = (format or "table").strip().lower()
 
-    if fmt == "table":
-        _print_table(result, out=out, title=title)
+    if fmt in ("table", "plain"):
+        _print_table(result, out=out, title=title, width=width, plain=fmt == "plain")
+    elif fmt == "csv":
+        render(_fill_rows(list(getattr(result, "fills", []) or [])), _FILL_COLUMNS, "csv", out=out)
     elif fmt == "tui":
         _print_tui(result, out=out, title=title)
     elif fmt == "json":
@@ -94,7 +105,8 @@ def print_backtest_report(
         _print_html(result, out=out, title=title)
     else:
         raise ValueError(
-            f"unknown report format {format!r}; expected 'table', 'tui', 'json', or 'html'"
+            f"unknown report format {format!r}; expected 'table', 'plain', 'tui', "
+            "'json', 'csv', or 'html'"
         )
 
 
@@ -129,13 +141,62 @@ def result_to_dict(result: BacktestResult) -> dict[str, Any]:
 # =============================================================================
 
 
+_PREFERRED_METRICS = (
+    "final_equity",
+    "final_cash",
+    "total_return_pct",
+    "max_drawdown_pct",
+    "n_trades",
+    "n_fills",
+    "initial_cash",
+)
+
+
+def _fmt_ts_cell(v: Any) -> str:
+    return format_timestamp_ns(v) if isinstance(v, int) else str(v)
+
+
+_FILL_COLUMNS = (
+    Column("ts", "Time", align="left", fmt=_fmt_ts_cell),
+    Column("side", "Side"),
+    Column("symbol", "Symbol"),
+    Column("quantity", "Qty", fmt=lambda v: f"{v:.4f}"),
+    Column("price", "Price", fmt=lambda v: f"{v:.2f}"),
+    Column("costs", "Costs", fmt=lambda v: f"{v:.2f}"),
+)
+
+
+def _fill_rows(fills: Sequence[Any]) -> list[dict[str, Any]]:
+    """Fills as flat, machine-readable rows (raw values; the table formats them)."""
+    rows: list[dict[str, Any]] = []
+    for t in fills:
+        side = getattr(t, "side", None)
+        costs = getattr(t, "costs", 0)
+        if hasattr(costs, "to_major"):  # integer Money (ADR 0011): display in major units
+            costs = costs.to_major()
+        inst = getattr(t, "instrument_id", None)
+        rows.append(
+            {
+                "ts": getattr(t, "ts", 0),
+                "side": side.value.upper() if hasattr(side, "value") else str(side),
+                "symbol": f"{inst.symbol}.{inst.exchange}" if inst else "?",
+                "quantity": getattr(t, "quantity", 0),
+                "price": getattr(t, "price", 0),
+                "costs": float(costs),
+            }
+        )
+    return rows
+
+
 def _print_table(
     result: BacktestResult,
     *,
     out: TextIO,
     title: str | None,
+    width: int | None = None,
+    plain: bool = False,
 ) -> None:
-    """Stdout summary: header, metrics block, optional trade tail."""
+    """Stdout summary: header, metrics, recent fills and notes via ``honba.display``."""
     strategy = getattr(result, "strategy_name", "?")
     config = getattr(result, "config", None)
     metrics: Mapping[str, float] = getattr(result, "metrics", {}) or {}
@@ -152,168 +213,47 @@ def _print_table(
     cash = _cfg_get(config, "cash", None)
     currency = _cfg_get(config, "currency", "INR")
 
-    # Prefer Rich when available for aligned columns and mild colour.
-    if _try_rich_table(
+    meta: list[tuple[str, Any]] = [
+        ("Strategy", strategy),
+        ("Instrument", f"{symbol}.{exchange}"),
+        ("Period", f"{start} → {end}"),
+        ("Timeframe", str(timeframe)),
+    ]
+    if cash is not None:
+        meta.append(("Initial cash", _fmt_money(cash, currency=currency)))
+    meta += [("Fills", len(fills)), ("Rejections", len(rejections))]
+    render_kv(meta, title=heading, out=out, width=width, plain=plain)
+
+    keys = [k for k in _PREFERRED_METRICS if k in metrics]
+    keys += sorted(k for k in metrics if k not in _PREFERRED_METRICS)
+    metric_rows = [(_label(k), _fmt_metric(k, metrics[k])) for k in keys]
+    render_table(
+        metric_rows,
+        [Column("metric", "Metric"), Column("value", "Value", align="right")],
+        title="Metrics",
         out=out,
-        heading=heading,
-        strategy=strategy,
-        symbol=symbol,
-        exchange=exchange,
-        start=start,
-        end=end,
-        timeframe=timeframe,
-        cash=cash,
-        currency=currency,
-        metrics=metrics,
-        fills=fills,
-        rejections=rejections,
-        notes=notes,
-    ):
-        return
-
-    # ---- Plain-text fallback -------------------------------------------------
-    width = 56
-    line = "=" * width
-    thin = "-" * width
-
-    def row(label: str, value: Any) -> None:
-        print(f"  {label:<22} {value}", file=out)
-
-    print(line, file=out)
-    print(f"  {heading}", file=out)
-    print(line, file=out)
-    row("Strategy", strategy)
-    row("Instrument", f"{symbol}.{exchange}")
-    row("Period", f"{start} → {end}")
-    row("Timeframe", timeframe)
-    if cash is not None:
-        row("Initial cash", _fmt_money(cash, currency=currency))
-    print(thin, file=out)
-
-    # Metrics — fixed order first, then any extras
-    preferred = [
-        "final_equity",
-        "final_cash",
-        "total_return_pct",
-        "max_drawdown_pct",
-        "n_trades",
-        "n_fills",
-        "initial_cash",
-    ]
-    seen: set[str] = set()
-    for key in preferred:
-        if key in metrics:
-            row(_label(key), _fmt_metric(key, metrics[key]))
-            seen.add(key)
-    for key in sorted(metrics.keys()):
-        if key not in seen:
-            row(_label(key), _fmt_metric(key, metrics[key]))
-
-    print(thin, file=out)
-    row("Fills", len(fills))
-    row("Rejections", len(rejections))
+        width=width,
+        plain=plain,
+    )
 
     if fills:
-        print(thin, file=out)
-        print("  Recent fills (last 10)", file=out)
-        for t in fills[-10:]:
-            print(f"    {_format_fill_line(t)}", file=out)
+        render_table(
+            _fill_rows(fills[-10:]),
+            _FILL_COLUMNS,
+            title="Recent fills (last 10)",
+            out=out,
+            width=width,
+            plain=plain,
+        )
 
     if notes:
-        print(thin, file=out)
-        print("  Notes", file=out)
-        for n in notes:
-            print(f"    • {n}", file=out)
-
-    print(line, file=out)
-
-
-def _try_rich_table(
-    *,
-    out: TextIO,
-    heading: str,
-    strategy: str,
-    symbol: str,
-    exchange: str,
-    start: Any,
-    end: Any,
-    timeframe: str,
-    cash: Any,
-    currency: str = "INR",
-    metrics: Mapping[str, float],
-    fills: Sequence[Any],
-    rejections: Sequence[Any],
-    notes: Sequence[str],
-) -> bool:
-    """Render with Rich if importable; return False to fall back to plain text."""
-    try:
-        from rich.console import Console
-        from rich.panel import Panel
-        from rich.table import Table
-        from rich.text import Text
-    except ImportError:
-        return False
-
-    console = Console(file=out)
-
-    meta = Table(show_header=False, box=None, padding=(0, 2))
-    meta.add_column("k", style="dim")
-    meta.add_column("v")
-    meta.add_row("Strategy", strategy)
-    meta.add_row("Instrument", f"{symbol}.{exchange}")
-    meta.add_row("Period", f"{start} → {end}")
-    meta.add_row("Timeframe", str(timeframe))
-    if cash is not None:
-        meta.add_row("Initial cash", _fmt_money(cash, currency=currency))
-
-    mtable = Table(title="Metrics", show_header=True, header_style="bold")
-    mtable.add_column("Metric")
-    mtable.add_column("Value", justify="right")
-    preferred = [
-        "final_equity",
-        "final_cash",
-        "total_return_pct",
-        "max_drawdown_pct",
-        "n_trades",
-        "n_fills",
-    ]
-    seen: set[str] = set()
-    for key in preferred:
-        if key in metrics:
-            mtable.add_row(_label(key), _fmt_metric(key, metrics[key]))
-            seen.add(key)
-    for key in sorted(metrics.keys()):
-        if key not in seen:
-            mtable.add_row(_label(key), _fmt_metric(key, metrics[key]))
-
-    console.print(Panel(Text(heading, style="bold"), expand=False))
-    console.print(meta)
-    console.print(mtable)
-    console.print(f"[dim]Fills: {len(fills)}  Rejections: {len(rejections)}[/dim]")
-
-    if fills:
-        ftable = Table(title="Recent fills (last 10)", show_header=True)
-        ftable.add_column("Time")
-        ftable.add_column("Side")
-        ftable.add_column("Qty", justify="right")
-        ftable.add_column("Price", justify="right")
-        for t in fills[-10:]:
-            try:
-                ts = getattr(t, "ts", 0)
-                time_str = _format_timestamp_ns(ts)
-            except (ValueError, OSError):
-                time_str = "?"
-            side = getattr(t, "side", None)
-            side_str = side.value.upper() if hasattr(side, "value") else str(side)
-            qty = getattr(t, "quantity", 0)
-            price = getattr(t, "price", 0)
-            ftable.add_row(time_str, side_str, f"{qty:.4f}", f"{price:.2f}")
-        console.print(ftable)
-
-    if notes:
-        console.print(Panel("\n".join(f"• {n}" for n in notes), title="Notes"))
-
-    return True
+        render_table(
+            [(f"• {n}",) for n in notes],
+            [Column("notes", "Notes")],
+            out=out,
+            width=width,
+            plain=plain,
+        )
 
 
 # =============================================================================
@@ -460,19 +400,7 @@ def _cfg_get(obj: Any, key: str, default: Any = None) -> Any:
     return default
 
 
-def _fmt_money(v: Any, currency: str = "INR") -> str:
-    try:
-        from honba.utils.format import format_currency
-
-        return format_currency(v, currency=currency)
-    except (ImportError, AttributeError):
-        try:
-            f = float(v)
-            if abs(f) >= 100000:
-                return f"₹{f / 100000:.2f}L"
-            return f"₹{f:.2f}"
-        except (ValueError, TypeError):
-            return str(v)
+_fmt_money = format_money
 
 
 def _fmt_metric(key: str, v: Any) -> str:
@@ -536,20 +464,6 @@ def _rejection_to_dict(r: Any) -> dict[str, Any]:
     if hasattr(r, "__dict__"):
         return dict(r.__dict__)
     return str(r)
-
-
-def _format_fill_line(t: Any) -> str:
-    try:
-        ts = getattr(t, "ts", "?")
-        side = getattr(t, "side", None)
-        side_str = side.value.upper() if hasattr(side, "value") else str(side)
-        qty = getattr(t, "quantity", 0)
-        price = getattr(t, "price", 0)
-        inst = getattr(t, "instrument_id", None)
-        sym = f"{inst.symbol}" if inst else ""
-        return f"{ts} {side_str} {qty:.4f} {sym}@{price:.2f}"
-    except (ValueError, TypeError, AttributeError):
-        return str(t)
 
 
 def _print_json(result: BacktestResult, *, out: TextIO) -> None:
