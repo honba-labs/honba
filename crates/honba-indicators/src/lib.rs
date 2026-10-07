@@ -26,20 +26,26 @@
 
 pub mod atr;
 pub mod bollinger;
+pub mod donchian;
 pub mod ema;
 pub mod indicator;
 pub mod macd;
 pub mod rsi;
 pub mod screener;
 pub mod sma;
+pub mod stochastic;
+pub mod williams_r;
 
 pub use atr::Atr;
 pub use bollinger::{BollingerBands, BollingerValue};
+pub use donchian::{Donchian, DonchianValue};
 pub use ema::Ema;
 pub use indicator::Indicator;
 pub use macd::{Macd, MacdValue};
 pub use rsi::Rsi;
 pub use sma::Sma;
+pub use stochastic::{Stochastic, StochasticValue};
+pub use williams_r::WilliamsR;
 
 #[cfg(test)]
 mod tests;

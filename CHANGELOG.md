@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Monotonic-deque indicators (E6 batch 3)
+
+- New `honba_indicators::Donchian` (channel over `period` bars: `upper`/`lower`/`middle`),
+  `WilliamsR` (`%R in [-100, 0]`) and `Stochastic` (`%K`/`%D` over `period`/`d_period`):
+  O(1) amortised updates via monotonic deques for the rolling high/low, including flat-window
+  conventions (`-50.0` for `%R` and `50.0` for `%K`). Each has `update(&Bar)`,
+  `update_hl`/`update_hlc` and `reset`. Shared golden vectors
+  `crates/honba-indicators/tests/vectors_batch3.json` are replayed by an integration test
+  `crates/honba-indicators/tests/batch3_vectors.rs` (also verified against a pure O(n) reference).
+
 ### Thin Python MCP server over the generated tool schemas (E5-S1)
 
 - New `honba.ai.mcp`: `McpGateway` loads `schema/mcp/mcp_tools.json` (never invents schemas),

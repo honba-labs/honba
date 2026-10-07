@@ -2,11 +2,14 @@
 
 mod atr;
 mod bollinger;
+mod donchian;
 mod ema;
 mod macd;
 mod rsi;
 mod screener;
 mod sma;
+mod stochastic;
+mod williams_r;
 
 use honba_messages::{
     Bar, BarAggregation, BarSpecification, BarType, Exchange, InstrumentId, PriceType, UnixNanos,
