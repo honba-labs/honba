@@ -837,6 +837,62 @@
           "type": "string"
         },
         {
+          "description": "Orders per window exceeded the configured rate limit (ADR 0018).",
+          "enum": [
+            "risk_order_rate_exceeded"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Order quantity is below the instrument minimum (ADR 0018).",
+          "enum": [
+            "risk_quantity_below_min"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Order quantity exceeds the instrument freeze quantity (ADR 0018).",
+          "enum": [
+            "risk_quantity_over_freeze"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Order quantity is not a multiple of the lot size (ADR 0018).",
+          "enum": [
+            "risk_lot_multiple_violation"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Order price is non-positive or off the tick grid (ADR 0018).",
+          "enum": [
+            "risk_tick_size_violation"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Order price is outside the instrument price band (ADR 0018).",
+          "enum": [
+            "risk_price_band_exceeded"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Order would not reduce the position while reduce-only (ADR 0018).",
+          "enum": [
+            "risk_reduce_only_violation"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "No trading rules exist for the order's instrument (ADR 0018).",
+          "enum": [
+            "risk_instrument_unknown"
+          ],
+          "type": "string"
+        },
+        {
           "description": "The exchange or gateway rejected the order.",
           "enum": [
             "order_rejected"

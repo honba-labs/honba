@@ -49,7 +49,9 @@ pub use null::{
     NullMarketProfile, NullSymbolGrammar,
 };
 pub use profile::{MarketProfile, MarketRegistry};
-pub use rules::{InstrumentRules, InstrumentRulesProvider, PriceBand, SymbolGrammar};
+pub use rules::{
+    InstrumentRules, InstrumentRulesProvider, PriceBand, QuantityViolation, SymbolGrammar,
+};
 pub use settlement::{
     MarginModel, MarginRequirement, SettlementRules, SettlementSchedule, SettlementType,
     StandardRollingSettlement,

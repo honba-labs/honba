@@ -73,6 +73,7 @@ pub mod events;
 pub mod identifiers;
 pub mod market_data;
 pub mod orders;
+pub mod trading_state;
 pub mod validation;
 
 pub use api::{ApiResponse, ApiVersion, ResponseEnvelope, API_VERSION};
@@ -88,6 +89,7 @@ pub use market_data::{
 };
 pub use orders::order::{Order, OrderSide, OrderStatus, OrderType, TimeInForce};
 pub use orders::state::{IllegalTransition, OrderEvent, OrderEventKind, OrderState};
+pub use trading_state::TradingState;
 pub use validation::InvariantError;
 
 #[cfg(test)]

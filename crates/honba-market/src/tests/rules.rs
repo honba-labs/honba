@@ -1,7 +1,10 @@
 //! Unit tests for `crate::rules`.
 
-use crate::{InstrumentRules, MarketError, NullSymbolGrammar, PriceBand, SymbolGrammar};
+use crate::{
+    InstrumentRules, MarketError, NullSymbolGrammar, PriceBand, QuantityViolation, SymbolGrammar,
+};
 
+/// Price validation is still string-typed (typed `PriceViolation` is chunk r2 of E2-S2).
 fn violation(r: crate::Result<()>) -> String {
     match r {
         Err(MarketError::RuleViolation(msg)) => msg,
@@ -22,9 +25,56 @@ fn quantity_must_be_a_lot_multiple_within_bounds() {
     let r = InstrumentRules::new(25.0, 0.05).with_max_quantity(100.0);
     assert_eq!(r.validate_quantity(25.0), Ok(()));
     assert_eq!(r.validate_quantity(100.0), Ok(()));
-    assert!(violation(r.validate_quantity(10.0)).contains("below minimum"));
-    assert!(violation(r.validate_quantity(125.0)).contains("freeze limit"));
-    assert!(violation(r.validate_quantity(30.0)).contains("multiple of lot size"));
+    assert_eq!(
+        r.validate_quantity(10.0),
+        Err(QuantityViolation::BelowMin {
+            quantity: 10.0,
+            min: 25.0
+        })
+    );
+    assert_eq!(
+        r.validate_quantity(125.0),
+        Err(QuantityViolation::OverFreeze {
+            quantity: 125.0,
+            max: 100.0
+        })
+    );
+    assert_eq!(
+        r.validate_quantity(30.0),
+        Err(QuantityViolation::NotLotMultiple {
+            quantity: 30.0,
+            lot: 25.0
+        })
+    );
+}
+
+#[test]
+fn quantity_violation_displays_todays_prose_and_converts_to_market_error() {
+    let below = QuantityViolation::BelowMin {
+        quantity: 10.0,
+        min: 25.0,
+    };
+    assert_eq!(below.to_string(), "quantity 10 below minimum 25");
+    let over = QuantityViolation::OverFreeze {
+        quantity: 125.0,
+        max: 100.0,
+    };
+    assert_eq!(
+        over.to_string(),
+        "quantity 125 exceeds maximum freeze limit 100"
+    );
+    let lot = QuantityViolation::NotLotMultiple {
+        quantity: 30.0,
+        lot: 25.0,
+    };
+    assert_eq!(
+        lot.to_string(),
+        "quantity 30 is not an exact multiple of lot size 25"
+    );
+    assert_eq!(
+        MarketError::from(lot),
+        MarketError::RuleViolation(lot.to_string())
+    );
 }
 
 #[test]

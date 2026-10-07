@@ -112,6 +112,22 @@ crate::enum_with_all! {
         RiskMaxDrawdownExceeded,
         /// The submitter refused an order because trading is halted (ADR 0018).
         RiskTradingHalted,
+        /// Orders per window exceeded the configured rate limit (ADR 0018).
+        RiskOrderRateExceeded,
+        /// Order quantity is below the instrument minimum (ADR 0018).
+        RiskQuantityBelowMin,
+        /// Order quantity exceeds the instrument freeze quantity (ADR 0018).
+        RiskQuantityOverFreeze,
+        /// Order quantity is not a multiple of the lot size (ADR 0018).
+        RiskLotMultipleViolation,
+        /// Order price is non-positive or off the tick grid (ADR 0018).
+        RiskTickSizeViolation,
+        /// Order price is outside the instrument price band (ADR 0018).
+        RiskPriceBandExceeded,
+        /// Order would not reduce the position while reduce-only (ADR 0018).
+        RiskReduceOnlyViolation,
+        /// No trading rules exist for the order's instrument (ADR 0018).
+        RiskInstrumentUnknown,
         /// The exchange or gateway rejected the order.
         OrderRejected,
         /// No execution engine is attached to receive the order (ADR 0018).
@@ -151,7 +167,15 @@ impl ErrorCode {
             Self::RiskMaxNotionalExceeded
             | Self::RiskMaxPositionExceeded
             | Self::RiskMaxDrawdownExceeded
-            | Self::RiskTradingHalted => ErrorCategory::Risk,
+            | Self::RiskTradingHalted
+            | Self::RiskOrderRateExceeded
+            | Self::RiskQuantityBelowMin
+            | Self::RiskQuantityOverFreeze
+            | Self::RiskLotMultipleViolation
+            | Self::RiskTickSizeViolation
+            | Self::RiskPriceBandExceeded
+            | Self::RiskReduceOnlyViolation
+            | Self::RiskInstrumentUnknown => ErrorCategory::Risk,
             Self::OrderRejected | Self::OrderExecutionUnavailable => ErrorCategory::Order,
             Self::MarketDataUnavailable => ErrorCategory::MarketData,
             Self::Timeout | Self::TransportError => ErrorCategory::Transport,
@@ -186,6 +210,14 @@ impl ErrorCode {
             Self::RiskMaxPositionExceeded => "risk_max_position_exceeded",
             Self::RiskMaxDrawdownExceeded => "risk_max_drawdown_exceeded",
             Self::RiskTradingHalted => "risk_trading_halted",
+            Self::RiskOrderRateExceeded => "risk_order_rate_exceeded",
+            Self::RiskQuantityBelowMin => "risk_quantity_below_min",
+            Self::RiskQuantityOverFreeze => "risk_quantity_over_freeze",
+            Self::RiskLotMultipleViolation => "risk_lot_multiple_violation",
+            Self::RiskTickSizeViolation => "risk_tick_size_violation",
+            Self::RiskPriceBandExceeded => "risk_price_band_exceeded",
+            Self::RiskReduceOnlyViolation => "risk_reduce_only_violation",
+            Self::RiskInstrumentUnknown => "risk_instrument_unknown",
             Self::OrderRejected => "order_rejected",
             Self::OrderExecutionUnavailable => "order_execution_unavailable",
             Self::OrderNotFound => "order_not_found",

@@ -108,3 +108,33 @@ fn pre_gate_refusal_codes_have_their_adr_0018_spelling_and_category() {
         assert!(!code.is_retryable(), "{wire} must not be retryable");
     }
 }
+
+#[test]
+fn risk_stage_refusal_codes_have_their_adr_0018_spelling_and_category() {
+    // ADR 0018 decision 5: one wire code per risk rule refusal.
+    for (code, wire) in [
+        (ErrorCode::RiskOrderRateExceeded, "risk_order_rate_exceeded"),
+        (ErrorCode::RiskQuantityBelowMin, "risk_quantity_below_min"),
+        (
+            ErrorCode::RiskQuantityOverFreeze,
+            "risk_quantity_over_freeze",
+        ),
+        (
+            ErrorCode::RiskLotMultipleViolation,
+            "risk_lot_multiple_violation",
+        ),
+        (ErrorCode::RiskTickSizeViolation, "risk_tick_size_violation"),
+        (ErrorCode::RiskPriceBandExceeded, "risk_price_band_exceeded"),
+        (
+            ErrorCode::RiskReduceOnlyViolation,
+            "risk_reduce_only_violation",
+        ),
+        (ErrorCode::RiskInstrumentUnknown, "risk_instrument_unknown"),
+    ] {
+        assert_eq!(serde_json::to_value(code).unwrap(), json!(wire));
+        assert_eq!(code.as_str(), wire);
+        assert_eq!(code.category(), ErrorCategory::Risk);
+        assert!(!code.is_retryable(), "{wire} must not be retryable");
+        assert!(ErrorCode::ALL.contains(&code));
+    }
+}

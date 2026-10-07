@@ -6,7 +6,6 @@ mod engine;
 mod execution;
 mod order_store;
 mod queue;
-mod state;
 
 use honba_messages::{Exchange, InstrumentId};
 

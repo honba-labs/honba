@@ -1,6 +1,8 @@
-//! Unit tests for `crate::state`.
+//! Unit tests for `crate::TradingState` (moved from `honba-engine`, ADR 0018 decision 2).
 
 use std::collections::HashSet;
+
+use serde_json::json;
 
 use crate::TradingState;
 
@@ -43,4 +45,20 @@ fn states_are_copy_and_hashable() {
         assert!(seen.insert(copy));
     }
     assert_eq!(seen.len(), ALL.len());
+}
+
+#[test]
+fn trading_state_serde_snake_case() {
+    for (state, wire) in [
+        (TradingState::Active, "active"),
+        (TradingState::Reducing, "reducing"),
+        (TradingState::Halted, "halted"),
+    ] {
+        assert_eq!(serde_json::to_value(state).unwrap(), json!(wire));
+        assert_eq!(
+            serde_json::from_value::<TradingState>(json!(wire)).unwrap(),
+            state
+        );
+    }
+    assert!(serde_json::from_value::<TradingState>(json!("Reducing")).is_err());
 }

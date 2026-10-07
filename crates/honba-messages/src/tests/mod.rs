@@ -10,6 +10,7 @@ mod order;
 mod order_state;
 mod tick;
 mod timestamp;
+mod trading_state;
 mod validation;
 
 use crate::{Exchange, InstrumentId};

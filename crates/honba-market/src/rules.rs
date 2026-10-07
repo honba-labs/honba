@@ -28,6 +28,59 @@ impl PriceBand {
     }
 }
 
+/// Why an order quantity breaks an instrument's rules (ADR 0018 decision 4a).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum QuantityViolation {
+    /// The quantity is below the minimum order quantity.
+    BelowMin {
+        /// The offending quantity.
+        quantity: f64,
+        /// The minimum allowed quantity.
+        min: f64,
+    },
+    /// The quantity exceeds the freeze (maximum single order) quantity.
+    OverFreeze {
+        /// The offending quantity.
+        quantity: f64,
+        /// The maximum allowed quantity.
+        max: f64,
+    },
+    /// The quantity is not an exact multiple of the lot size.
+    NotLotMultiple {
+        /// The offending quantity.
+        quantity: f64,
+        /// The lot size it must be a multiple of.
+        lot: f64,
+    },
+}
+
+impl std::fmt::Display for QuantityViolation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::BelowMin { quantity, min } => {
+                write!(f, "quantity {quantity} below minimum {min}")
+            }
+            Self::OverFreeze { quantity, max } => {
+                write!(f, "quantity {quantity} exceeds maximum freeze limit {max}")
+            }
+            Self::NotLotMultiple { quantity, lot } => {
+                write!(
+                    f,
+                    "quantity {quantity} is not an exact multiple of lot size {lot}"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for QuantityViolation {}
+
+impl From<QuantityViolation> for MarketError {
+    fn from(v: QuantityViolation) -> Self {
+        MarketError::RuleViolation(v.to_string())
+    }
+}
+
 /// Trading rules governing lot sizes, tick sizes, freeze quantities, and price limits.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct InstrumentRules {
@@ -59,29 +112,32 @@ impl InstrumentRules {
     }
 
     /// Validates whether an order quantity complies with lot size and quantity limits.
-    pub fn validate_quantity(&self, quantity: f64) -> Result<()> {
+    ///
+    /// Checks run in order: minimum, freeze quantity, lot multiple; the first
+    /// failure is returned with the numbers it needs.
+    pub fn validate_quantity(&self, quantity: f64) -> std::result::Result<(), QuantityViolation> {
         if quantity < self.min_order_quantity {
-            return Err(MarketError::RuleViolation(format!(
-                "quantity {} below minimum {}",
-                quantity, self.min_order_quantity
-            )));
+            return Err(QuantityViolation::BelowMin {
+                quantity,
+                min: self.min_order_quantity,
+            });
         }
 
         if let Some(max_qty) = self.max_order_quantity {
             if quantity > max_qty {
-                return Err(MarketError::RuleViolation(format!(
-                    "quantity {} exceeds maximum freeze limit {}",
-                    quantity, max_qty
-                )));
+                return Err(QuantityViolation::OverFreeze {
+                    quantity,
+                    max: max_qty,
+                });
             }
         }
 
         let rem = (quantity / self.lot_size).fract();
         if rem.abs() > 1e-6 && (1.0 - rem.abs()) > 1e-6 {
-            return Err(MarketError::RuleViolation(format!(
-                "quantity {} is not an exact multiple of lot size {}",
-                quantity, self.lot_size
-            )));
+            return Err(QuantityViolation::NotLotMultiple {
+                quantity,
+                lot: self.lot_size,
+            });
         }
 
         Ok(())
