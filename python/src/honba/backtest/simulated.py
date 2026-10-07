@@ -19,12 +19,16 @@ Rules:
   the proceeds only become *available* ``settlement_days`` sessions later.
 * **Funding.** A buy that available cash cannot cover waits up to ``settlement_days``
   sessions for sale proceeds to settle, then is cut to the whole units cash allows; the
-  rest is reported as an ``OrderRejection`` (``"insufficient_funds"``).
+  rest is reported as a ``Rejected`` event (``"insufficient_funds"``), after the fill.
 * **Long only** (default). A sell is capped at the position held; the rest is rejected
   (``"no_position"``).
 * **Order types.** Market orders only; any other type is rejected
   (``"unsupported_order_type"``).
-* **Cancel.** ``cancel(order_id)`` drops a working order and reports it cancelled.
+* **Cancel.** ``cancel(order_id, now)`` drops a working order and reports it as a ``Cancelled``
+  event stamped ``now``.
+* **Events.** ``drain_events()`` is the one ordered stream (ADR 0019): a ``Fill`` precedes the
+  ``Rejected`` of its remainder. ``drain_fills()`` / ``drain_rejections()`` are the buffered
+  legacy shim over it (removed in 0.3.0).
 
 The settlement cycle and the cost schedule are market rules and are injected:
 :func:`make_simulator` takes them from ``honba.markets.india``
@@ -58,7 +62,15 @@ from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
 from honba.entities.order import OrderIntent, OrderSide, OrderType
 from honba.entities.trade import Trade
-from honba.strategies.execution import BaseExecutionPort, ExecutionPort, OrderRejection
+from honba.strategies.execution import (
+    BaseExecutionPort,
+    Cancelled,
+    ExecutionEvent,
+    ExecutionPortLike,
+    Fill,
+    Rejected,
+    events_from_native,
+)
 
 __all__ = [
     "BACKEND_ENV",
@@ -160,8 +172,7 @@ class _PythonSim:
         self._opened: set[InstrumentId] = set()
         self._working: list[_Working] = []
         self._receivables: list[tuple[int, Money]] = []  # (available from session, amount)
-        self._fills: list[Trade] = []
-        self._rejections: list[OrderRejection] = []
+        self._events: list[ExecutionEvent] = []
 
     # -- cash ----------------------------------------------------------------------
     @property
@@ -194,21 +205,15 @@ class _PythonSim:
             return
         self._working.append(_Working(order_id, intent, self._session))
 
-    def drain_fills(self) -> list[Trade]:
-        fills, self._fills = self._fills, []
-        return fills
-
-    def drain_rejections(self) -> list[OrderRejection]:
-        out, self._rejections = self._rejections, []
+    def drain_events(self) -> list[ExecutionEvent]:
+        out, self._events = self._events, []
         return out
 
-    def cancel(self, order_id: str) -> None:
+    def cancel(self, order_id: str, now: int) -> None:
         for w in self._working:
             if w.order_id == order_id:
                 self._working.remove(w)
-                self._rejections.append(
-                    OrderRejection(order_id, w.intent, "cancelled", self._now(), cancelled=True)
-                )
+                self._events.append(Cancelled(order_id, w.intent, now))
                 return
 
     # -- session driver ------------------------------------------------------------
@@ -309,14 +314,13 @@ class _PythonSim:
             notional = Money.mul_qty(qty, bar.open, self._currency)
             cost = self._costs(OrderSide.SELL, qty, bar.open)
         self._working.remove(w)
+        if qty > 0:  # the fill, then the remainder's rejection: one queue, in that order
+            proceeds = notional - cost
+            self.cash = self.cash + proceeds
+            self._receivables.append((self._session + self.settlement_days, proceeds))
+            self._book(w, bar, qty, notional, cost, qty >= want)
         if qty < want:
             self._reject_part(w, want - qty, "no_position")
-        if qty <= 0:
-            return
-        proceeds = notional - cost
-        self.cash = self.cash + proceeds
-        self._receivables.append((self._session + self.settlement_days, proceeds))
-        self._book(w, bar, qty, notional, cost)
 
     def _fill_buy(self, w: _Working, bar: Bar) -> None:
         if w.first_try is None:
@@ -335,12 +339,11 @@ class _PythonSim:
             notional = Money.mul_qty(qty, px, self._currency)
             cost = self._costs(OrderSide.BUY, qty, px)
         self._working.remove(w)
+        if qty > 0:  # the fill, then the remainder's rejection: one queue, in that order
+            self.cash = self.cash - (notional + cost)
+            self._book(w, bar, qty, notional, cost, qty >= want)
         if qty < want:
             self._reject_part(w, want - qty, "insufficient_funds")
-        if qty <= 0:
-            return
-        self.cash = self.cash - (notional + cost)
-        self._book(w, bar, qty, notional, cost)
 
     def _buy_cost(self, qty: float, px: float) -> Money:
         return Money.mul_qty(qty, px, self._currency) + self._costs(OrderSide.BUY, qty, px)
@@ -366,7 +369,9 @@ class _PythonSim:
                 hi = mid - 1
         return lo * lot
 
-    def _book(self, w: _Working, bar: Bar, qty: float, notional: Money, cost: Money) -> None:
+    def _book(
+        self, w: _Working, bar: Bar, qty: float, notional: Money, cost: Money, complete: bool
+    ) -> None:
         iid = w.intent.instrument_id
         signed = qty if w.intent.side is OrderSide.BUY else -qty
         held = self.positions.get(iid, 0.0) + signed
@@ -376,13 +381,15 @@ class _PythonSim:
             self.positions[iid] = held
         self.fees = self.fees + cost
         self.traded_notional = self.traded_notional + notional
-        self._fills.append(Trade(iid, w.intent.side, qty, bar.open, bar.ts, w.order_id, costs=cost))
+        trade = Trade(iid, w.intent.side, qty, bar.open, bar.ts, w.order_id, costs=cost)
+        # One fill per order: its cumulative quantity is its own.
+        self._events.append(Fill(trade, qty, complete))
 
     def _reject_part(self, w: _Working, qty: float, reason: str) -> None:
         self._reject(w.order_id, dataclasses.replace(w.intent, quantity=qty), reason, self._now())
 
     def _reject(self, order_id: str, intent: OrderIntent, reason: str, ts: int) -> None:
-        self._rejections.append(OrderRejection(order_id, intent, reason, ts))
+        self._events.append(Rejected(order_id, intent, reason, ts))
 
 
 _QTY_EPS = 1e-9  # quantities closer than this are equal (float residue from fractional fills)
@@ -607,38 +614,29 @@ class _NativeSim:
         self._seq += 1
         self._intents[native_id] = intent
 
-    def cancel(self, order_id: str) -> None:
+    def cancel(self, order_id: str, now: int) -> None:
         for native_id in self._sim.working_orders:
             if _user_id(native_id) == order_id:
-                self._sim.cancel(native_id, self._sim.session_ts or 0)
+                self._sim.cancel(native_id, now)
                 return
 
-    def drain_fills(self) -> list[Trade]:
-        return [
-            Trade(
-                InstrumentId(f["symbol"], f["exchange"]),
-                OrderSide.BUY if f["side"] == "buy" else OrderSide.SELL,
-                f["quantity"],
-                f["price"],
-                f["ts"],
-                _user_id(f["order_id"]),
-                costs=self._money(f["costs"]),
-            )
-            for f in self._sim.drain_fills()
-        ]
+    def drain_events(self) -> list[ExecutionEvent]:
+        out: list[ExecutionEvent] = []
+        for raw in self._sim.drain_events():
+            native_id = raw["order_id"]
 
-    def drain_rejections(self) -> list[OrderRejection]:
-        out: list[OrderRejection] = []
-        for r in self._sim.drain_rejections():
-            intent = self._intents.get(r["order_id"])
-            if intent is None:  # pragma: no cover - every accepted order is remembered
-                side = OrderSide.BUY if r["side"] == "buy" else OrderSide.SELL
-                intent = OrderIntent(InstrumentId(r["symbol"], r["exchange"]), side, r["quantity"])
-            if intent.quantity != r["quantity"]:
-                intent = dataclasses.replace(intent, quantity=r["quantity"])
-            out.append(
-                OrderRejection(
-                    _user_id(r["order_id"]), intent, r["reason"], r["ts"], r["cancelled"]
+            def intent_of(_: str, default: OrderIntent, native_id: str = native_id) -> OrderIntent:
+                # The remembered intent (order type, prices) with the event's quantity.
+                intent = self._intents.get(native_id)
+                if intent is None:  # pragma: no cover - every accepted order is remembered
+                    return default
+                if intent.quantity != default.quantity:
+                    intent = dataclasses.replace(intent, quantity=default.quantity)
+                return intent
+
+            out.extend(
+                events_from_native(
+                    [raw], currency=self._currency, user_id=_user_id, intent_of=intent_of
                 )
             )
         working = set(self._sim.working_orders)
@@ -744,14 +742,16 @@ class NextOpenExecution(BaseExecutionPort):
     def submit(self, order_id: str, intent: OrderIntent, ts: int) -> None:
         self._impl.submit(order_id, intent, ts)
 
-    def drain_fills(self) -> list[Trade]:
-        return self._impl.drain_fills()
+    def drain_events(self) -> list[ExecutionEvent]:
+        """Return and clear the ordered execution events (a fill precedes its remainder's reject).
 
-    def drain_rejections(self) -> list[OrderRejection]:
-        return self._impl.drain_rejections()
+        ``drain_fills()`` / ``drain_rejections()`` are the buffered legacy split of this stream.
+        """
+        return self._impl.drain_events()
 
-    def cancel(self, order_id: str) -> None:
-        self._impl.cancel(order_id)
+    def cancel(self, order_id: str, now: int) -> None:
+        """Cancel a working order; the ``Cancelled`` event is stamped ``now``."""
+        self._impl.cancel(order_id, now)
 
     # -- session driver ------------------------------------------------------------------
     def on_event(self, event: Any, ts_init: int) -> None:
@@ -869,7 +869,7 @@ def make_simulator(
     timeframe: str = "1d",
     as_of: date | None = None,
     lot_sizes: Mapping[InstrumentId, float] | None = None,
-) -> ExecutionPort:
+) -> ExecutionPortLike:
     """Build the simulated port for ``fill``.
 
     * ``"next_open"``: :class:`NextOpenExecution`; ``settlement_days`` defaults to the

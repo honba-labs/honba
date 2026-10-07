@@ -21,6 +21,7 @@ from honba.strategies.base import Strategy
 from honba.strategies.execution import (
     BaseExecutionPort,
     ExecutionPort,
+    LegacyExecutionPort,
     OrderRejection,
     RejectingExecutionPort,
     cancel_order,
@@ -151,7 +152,8 @@ def test_shims_tolerate_ports_without_the_optional_methods() -> None:
 
 def test_protocols_classify_ports() -> None:
     assert isinstance(HoldingPort(), RejectingExecutionPort)
-    assert isinstance(LegacyPort(), ExecutionPort)
+    assert isinstance(LegacyPort(), LegacyExecutionPort)  # the pre-0019 shape (ADR 0019 shim)
+    assert not isinstance(LegacyPort(), ExecutionPort)  # no drain_events / two-argument cancel
     assert not isinstance(LegacyPort(), RejectingExecutionPort)
 
 
@@ -163,7 +165,7 @@ def test_base_port_defaults_are_inert() -> None:
             return []
 
     port = Minimal()
-    port.cancel("unknown")  # default: nothing to cancel
+    port.cancel("unknown", 0)  # default: nothing to cancel
     assert port.drain_rejections() == []
     with pytest.raises(TypeError):
         BaseExecutionPort()  # type: ignore[abstract]

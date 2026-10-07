@@ -18,6 +18,18 @@
   splits them; nothing is lost, only the cross-queue order). An engine that implements only the
   legacy pair keeps working (default `drain_events`, or `LegacyPortEvents` for correct partial
   fills). Implementers: add `drain_events` and return `true` from `native_events`.
+- Python (`honba.strategies`): `ExecutionPort` is now `submit`, `cancel(order_id, now)`,
+  `drain_events() -> list[ExecutionEvent]`; `StrategyRunner` drains it once, keeps an `OrderState`
+  per order (`order_state`, `released_quantity`) and releases per instrument from the one stream.
+  `BaseExecutionPort.drain_fills()` / `drain_rejections()` are the buffered shim (each call runs
+  `drain_events()` once and splits it; `Expired` shows as `reason="expired"`), and
+  `OrderRejection` is derived from `Rejected`/`Cancelled`/`Expired`. A legacy port (only
+  `drain_fills`/`drain_rejections`, one-argument `cancel(order_id)`) is adapted by `adapt_port`
+  (`LegacyPortEvents`; `inspect.signature` picks the cancel form and the one-argument form emits a
+  `DeprecationWarning`). `NextOpenExecution.cancel` is now `cancel(order_id, now)` and stamps
+  `Cancelled` with `now` (was the session ts); `FakeAdapter` derives report status from
+  `OrderState` (new `order_state(order_id)` affordance; adapter port surface unchanged). The
+  shims and `cancel_order` / `drain_port_rejections` are removed in 0.3.0.
 
 ### Wire `schema_version` 4: order-state events (E2-S6a, ADR 0019)
 

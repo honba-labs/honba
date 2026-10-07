@@ -70,7 +70,7 @@ from honba.strategies.base import Strategy
 from honba.strategies.context import LedgerContext, StrategyContext
 from honba.strategies.execution import OrderRejection
 from honba.strategies.runner import (
-    ExecutionPort,
+    ExecutionPortLike,
     IntentRejection,
     StrategyRunner,
     SubmittedIntent,
@@ -257,7 +257,7 @@ class BacktestSession:
         config: BacktestConfig,
         *,
         data: DataProvider,
-        execution: ExecutionPort,
+        execution: ExecutionPortLike,
         ctx: LedgerContext | None = None,
         # True when the simulator's settlement cycle is the market default, so run() re-resolves
         # it as of the first session's date once the bars are known.
@@ -410,7 +410,7 @@ class Honba:
         costs: str | FillCostFn | CostModel = "india.equity",
         fill: FillModel = "next_open",
         data: DataProvider | None = None,
-        execution: ExecutionPort | None = None,
+        execution: ExecutionPortLike | None = None,
         on_bar: Callable[[int, Bar], None] | None = None,
         warmup_bars: int | None = None,
         settlement_days: int | None = None,
@@ -548,7 +548,7 @@ def _is_cost_model(costs: object) -> bool:
     return not isinstance(costs, str) and hasattr(costs, "apply")
 
 
-def _default_execution(config: BacktestConfig, cost_model: CostModel | None) -> ExecutionPort:
+def _default_execution(config: BacktestConfig, cost_model: CostModel | None) -> ExecutionPortLike:
     """Build the simulated execution port for the config (``honba.backtest.simulated``).
 
     A pack name or fill-cost function is charged by the simulator itself; a post-hoc

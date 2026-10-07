@@ -29,8 +29,8 @@ quantities are plain numbers):
 * ``{"op": "open_session", "ts", "bars": [bar, ...]}``: open a session with all its bars.
 * ``{"op": "submit", "id", "symbol", "side": "buy"|"sell", "type": "market"|"limit"|
   "stop_market"|"stop_limit", "qty", "ts", "price"?, "trigger"?}``
-* ``{"op": "cancel", "id", "now"}``: ``now`` is the engine time of the cancel (informational for
-  Python, whose session ts is the same value in every vector).
+* ``{"op": "cancel", "id", "now"}``: ``now`` is the engine time of the cancel; the Python
+  backends and the Rust binding stamp the ``Cancelled`` event with it (ADR 0019).
 * ``{"op": "drain"}``: drain fills and rejections; recorded in ``expect.drains``.
 * ``{"op": "session_open", "ts", "bars": [bar, ...]}`` (chunk 2): the ``SessionOpen`` event.
 * ``{"op": "set_settlement_days", "days"}`` (chunk 2): ``set_settlement_days``.
@@ -59,12 +59,7 @@ from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
 from honba.entities.order import OrderIntent, OrderSide, OrderType
 
-OUT = (
-    Path(__file__).resolve().parents[1]
-    / "schema"
-    / "conformance"
-    / "next_open_sim.json"
-)
+OUT = Path(__file__).resolve().parents[1] / "schema" / "conformance" / "next_open_sim.json"
 FIXTURE_VERSION = 1
 
 
@@ -93,9 +88,7 @@ def _intent(step: dict[str, Any]) -> OrderIntent:
     if kind == "limit":
         return OrderIntent(iid, side, qty, OrderType.LIMIT, price=step["price"])
     if kind == "stop_market":
-        return OrderIntent(
-            iid, side, qty, OrderType.STOP_MARKET, trigger_price=step["trigger"]
-        )
+        return OrderIntent(iid, side, qty, OrderType.STOP_MARKET, trigger_price=step["trigger"])
     return OrderIntent(
         iid,
         side,
@@ -114,10 +107,7 @@ def _cost_fn(spec: dict[str, int], currency: Currency) -> FillCostFn:
     def cost(side: OrderSide, quantity: float, price: float) -> Money:
         tag = "buy" if side is OrderSide.BUY else "sell"
         notional = Money.mul_qty(quantity, price, currency).amount
-        minor = (
-            spec.get(f"flat_{tag}", 0)
-            + (notional * spec.get(f"bps_{tag}", 0) + 5000) // 10000
-        )
+        minor = spec.get(f"flat_{tag}", 0) + (notional * spec.get(f"bps_{tag}", 0) + 5000) // 10000
         return Money.from_minor(minor, currency)
 
     return cost
@@ -174,7 +164,7 @@ def replay(scenario: dict[str, Any], backend: str | None = None) -> dict[str, An
             elif op == "submit":
                 port.submit(step["id"], _intent(step), step["ts"])
             elif op == "cancel":
-                port.cancel(step["id"])
+                port.cancel(step["id"], step["now"])
             elif op == "drain":
                 drains.append(
                     {
@@ -211,9 +201,7 @@ def replay(scenario: dict[str, Any], backend: str | None = None) -> dict[str, An
     expect = {
         "drains": drains,
         "cash": port.cash.amount,
-        "positions": {
-            i.symbol: q for i, q in sorted(port.positions.items(), key=_pos_key)
-        },
+        "positions": {i.symbol: q for i, q in sorted(port.positions.items(), key=_pos_key)},
         "working": port.working_orders,
         "fees": port.fees.amount,
         "traded_notional": port.traded_notional.amount,
@@ -296,9 +284,7 @@ def cfg(cash_rupees: float, **kw: Any) -> dict[str, Any]:
     }
 
 
-def scenario(
-    name: str, config: dict[str, Any], steps: list[dict[str, Any]], chunk: int = 1
-):
+def scenario(name: str, config: dict[str, Any], steps: list[dict[str, Any]], chunk: int = 1):
     return {"name": name, "chunk": chunk, "config": config, "steps": steps}
 
 
@@ -512,9 +498,7 @@ def scenarios() -> list[dict[str, Any]]:
                 b("AAA", 1, 100.0),
                 order("o-0", "buy", "AAA", 1, 1, "limit", price=99.0),
                 order("o-1", "sell", "AAA", 1, 1, "stop_market", trigger=95.0),
-                order(
-                    "o-2", "buy", "AAA", 1, 1, "stop_limit", price=101.0, trigger=100.0
-                ),
+                order("o-2", "buy", "AAA", 1, 1, "stop_limit", price=101.0, trigger=100.0),
                 DRAIN,
                 b("AAA", 2, 100.0),
                 DRAIN,

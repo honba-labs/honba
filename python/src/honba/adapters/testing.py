@@ -37,6 +37,7 @@ from honba.adapters.models import (
 from honba.domain.bar import Bar
 from honba.domain.instrument import Instrument, InstrumentId, InstrumentKind
 from honba.domain.order import OrderIntent, OrderSide, OrderStatus, OrderType
+from honba.domain.order_state import OrderEvent, OrderState
 from honba.domain.position import Position, PositionSide
 from honba.domain.tick import QuoteTick
 from honba.domain.trade import Trade
@@ -115,6 +116,7 @@ class FakeAdapter(Adapter):
         self._ts = _EPOCH_NS
         self._seq = 0
         self._orders: dict[str, OrderReport] = {}
+        self._states: dict[str, OrderState] = {}
         self._trades: list[Trade] = []
         self._positions: dict[InstrumentId, Position] = {}
         self._subscriptions: dict[
@@ -261,12 +263,14 @@ class FakeAdapter(Adapter):
         )
         notional = intent.quantity * fill_price
         if notional > self._cash and intent.side is OrderSide.BUY:
+            state = self._new_state(order_id, intent.quantity)
+            state.apply(OrderEvent.rejected())
             report = OrderReport(
                 order_id=order_id,
                 instrument_id=intent.instrument_id,
                 side=intent.side,
                 quantity=intent.quantity,
-                status=OrderStatus.REJECTED,
+                status=state.status,
                 product=product,
                 order_type=intent.order_type,
                 time_in_force=intent.time_in_force,
@@ -278,12 +282,14 @@ class FakeAdapter(Adapter):
             self._orders[order_id] = report
             return report
         if not marketable:
+            state = self._new_state(order_id, intent.quantity)
+            state.apply(OrderEvent.accepted())
             report = OrderReport(
                 order_id=order_id,
                 instrument_id=intent.instrument_id,
                 side=intent.side,
                 quantity=intent.quantity,
-                status=OrderStatus.ACCEPTED,
+                status=state.status,
                 product=product,
                 order_type=intent.order_type,
                 time_in_force=intent.time_in_force,
@@ -294,12 +300,15 @@ class FakeAdapter(Adapter):
             self._orders[order_id] = report
             return report
 
+        state = self._new_state(order_id, intent.quantity)
+        state.apply(OrderEvent.accepted())
+        state.apply(OrderEvent.fill(intent.quantity, True))
         filled = OrderReport(
             order_id=order_id,
             instrument_id=intent.instrument_id,
             side=intent.side,
             quantity=intent.quantity,
-            status=OrderStatus.FILLED,
+            status=state.status,
             product=product,
             order_type=intent.order_type,
             time_in_force=intent.time_in_force,
@@ -330,14 +339,17 @@ class FakeAdapter(Adapter):
         report = self._orders.get(order_id)
         if report is None:
             raise AdapterError(f"unknown order {order_id!r}")
-        if report.status in (OrderStatus.FILLED, OrderStatus.CANCELLED, OrderStatus.REJECTED):
+        state = self._states[order_id]
+        if state.status in (OrderStatus.FILLED, OrderStatus.CANCELLED, OrderStatus.REJECTED):
             return  # cancelling a terminal order is a no-op, not an error
+        state.apply(OrderEvent.cancel_requested())
+        state.apply(OrderEvent.cancelled())
         self._orders[order_id] = OrderReport(
             order_id=report.order_id,
             instrument_id=report.instrument_id,
             side=report.side,
             quantity=report.quantity,
-            status=OrderStatus.CANCELLED,
+            status=state.status,
             product=report.product,
             order_type=report.order_type,
             time_in_force=report.time_in_force,
@@ -403,6 +415,13 @@ class FakeAdapter(Adapter):
         """Add cash, so a test can place an order larger than the opening balance."""
         self._cash += amount
 
+    def order_state(self, order_id: str) -> OrderState:
+        """The FSM state behind ``order_id``'s report (ADR 0019): the status is derived from it."""
+        try:
+            return self._states[order_id]
+        except KeyError:
+            raise AdapterError(f"unknown order {order_id!r}") from None
+
     def advance_prices(self, instrument_id: InstrumentId) -> None:
         """Move to the next (bid, ask) pair and push it to every matching subscriber."""
         series = self._series(instrument_id)
@@ -467,6 +486,13 @@ class FakeAdapter(Adapter):
                 order_id=report.order_id,
             )
         )
+
+    def _new_state(self, order_id: str, quantity: float) -> OrderState:
+        """A fresh FSM for ``order_id``, already submitted (the fake has no pre-gate)."""
+        state = OrderState()
+        state.apply(OrderEvent.submitted(quantity))
+        self._states[order_id] = state
+        return state
 
     def _tick(self) -> int:
         now, self._ts = self._ts, self._ts + _TICK_NS

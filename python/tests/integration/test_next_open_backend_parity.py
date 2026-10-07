@@ -206,7 +206,7 @@ def generate(seed: int) -> Scenario:
             )
         if order_ids and rng.random() < 0.2:
             cancel_id = rng.choice(order_ids) if rng.random() < 0.85 else "unknown"
-            steps.append({"op": "cancel", "id": cancel_id})
+            steps.append({"op": "cancel", "id": cancel_id, "now": ts})
         if rng.random() < 0.08:
             steps.append(
                 {"op": "set_lot_size", "iid": rng.choice(universe), "lot": rng.choice([2.0, 0.0])}
@@ -261,7 +261,7 @@ def run(sc: Scenario, backend: str) -> list[Any]:
             elif op == "submit":
                 port.submit(step["id"], step["intent"], step["ts"])
             elif op == "cancel":
-                port.cancel(step["id"])
+                port.cancel(step["id"], step["now"])
             elif op == "set_settlement_days":
                 port.set_settlement_days(step["days"])
             elif op == "set_lot_size":
