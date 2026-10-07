@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Rust next-open simulator, chunk 2 (E3-S1a, ADR 0016)
+
+- `honba_sim::NextOpenSim` gains the settlement cycle (`with_settlement_days`, `set_settlement_days`, `unsettled`,
+  `available_cash`, `receivables`; buys wait for pending sale proceeds), the injected fill-cost hook (`FillCostFn`,
+  `with_costs`; cost-aware funding cuts, negative cost is an error that leaves the order working, `fees()` accumulates)
+  and the session-open event path (`on_session_open`, the Python `_from_open` leniency). Python API unchanged.
+- The `CostSchedule` adapter stays above `honba-sim` (layering unchanged); it will live in `honba-py` in chunk 3.
+- `schema/conformance/next_open_sim.json` gains 23 `chunk: 2` scenarios (generator ops `session_open`,
+  `set_settlement_days`, `probe`, `config.costs`); chunk 1 scenarios are byte-identical. Rust replays chunks 1 and 2.
+
 ### Rust next-open simulator, chunk 1 (E3-S1a, ADR 0016)
 
 - New `honba_sim::NextOpenSim` (`ExecutionEngine` + `Handler`): port of `NextOpenExecution` for market orders filled at

@@ -134,3 +134,50 @@ overflow also raises.
 - One new public type in `honba-sim`; no change to `ExecutionEngine`.
 - Until chunk 3 the Python class is untouched and the Rust type is unused outside tests.
 - Vector changes are made by changing the Python reference and regenerating; Rust must follow.
+
+## Chunk 2 addendum (settlement, costs, session open)
+
+Implemented in `honba_sim::NextOpenSim`; vectors tagged `chunk: 2` (23 scenarios) replay identically in Rust and
+Python.
+
+- **Settlement.** `with_settlement_days` / `set_settlement_days(i64)`, `settlement_days()`, `unsettled()`,
+  `available_cash()`, `receivables()` (pending `(due session index, amount)`). A sell books `notional - cost` at once and
+  a receivable due at `session + settlement_days`; due receivables are dropped when a session opens. A buy compares
+  notional plus cost with available cash; on a shortfall it waits while proceeds are pending and
+  `session - first_try < settlement_days` (`first_try` is set when the order is first considered at an open, so an
+  instrument that does not print does not start the clock), else it is cut. `set_settlement_days` returns
+  `Err(AlgoError::Component)` with the state unchanged for a negative value or after the first session (Python raises
+  `ValueError` / `RuntimeError`; the vectors flag both as `error`).
+- **Costs hook.** `pub type FillCostFn = Box<dyn Fn(OrderSide, f64, f64) -> Result<Money> + Send>`, installed with
+  `with_costs` (default zero). The cost is part of funding (the lot bisection uses notional plus cost), is computed
+  before the order is dequeued (a failure leaves it working, state unchanged), `fees()` accumulates it and `Trade::costs`
+  carries it. A negative cost is an error; a zero cost is currency-neutral; a non-zero cost in another currency is an
+  error (Rust raises it before dequeuing; Python raises it later, after dequeuing a sell, an edge no vector covers).
+- **Adapter location (decision).** The adapter from `honba_market::CostSchedule` to `FillCostFn`
+  (`nse_equity_delivery_cost_fn`, rounding each charge leg to minor units like Python
+  `nse_equity_delivery_fill_cost`) is NOT in this chunk. `scripts/dependency_graph.py` allows no crate that may depend on
+  both `honba-sim` and `honba-market` except the L7 crates `honba-py` and `honba-cli`: `honba-testing` and `honba-sweep`
+  do not allow `honba-market`, and `honba-market` is not an allowed production or dev dependency of `honba-sim`.
+  Layering is not weakened. The adapter will live in `honba-py` (chunk 3 binding crate), where `make_simulator` needs it
+  anyway, with a test comparing it to the Python function over a grid of sides, quantities and prices. The cost vectors
+  use a parametric test model (`config.costs`: `flat_buy/flat_sell/bps_buy/bps_sell`, defined in
+  `scripts/gen_next_open_vectors.py`) that both runners implement.
+- **Session open.** Rust has no `SessionOpen` event variant (adding one to the L0 `Event` would touch wire, codegen and
+  every match), so the equivalent is the inherent `NextOpenSim::on_session_open(ts, &[Bar])`: it opens the session and then
+  switches to the lenient `_from_open` bar rules permanently (a bar only opens an instrument the event left out, at the
+  same ts; everything else is ignored). If opening fails the mode does not change. Vector op: `session_open`.
+- **Vector additions** (chunk 1 bytes unchanged): ops `session_open`, `set_settlement_days`, `probe`; `config.costs`;
+  chunk 2 scenarios also record `unsettled`, `available_cash` and `probes` in `expect.final`.
+
+### Remaining for chunk 3
+
+1. `honba-py` PyO3 class for `NextOpenSim` plus `.pyi` stub and stubtest; expose `on_session_open`, `open_session`,
+   `on_bar`, `set_lot_size`, settlement and cost configuration, accessors (`cash`, `fees`, `traded_notional`, `positions`,
+   `unsettled`, `available_cash`, `working_orders`).
+2. The `CostSchedule` -> `FillCostFn` adapter in `honba-py` (India delivery and intraday), rounding each leg, with a
+   parity test against `nse_equity_delivery_fill_cost` / `nse_equity_intraday_fill_cost`.
+3. Python `NextOpenExecution` delegates to the Rust type with its API unchanged (`make_simulator`, `group_sessions`,
+   `SessionOpen`, `FillCostFn` callables bridged through the binding, error types `ValueError` / `RuntimeError`).
+4. `honba._honba` replays every vector (all chunks) and equals the Python reference, plus a fuzzed scenario comparison
+   over the whole catalog.
+5. Limit and stop fills remain out of scope (Python rejects them; decision 6).

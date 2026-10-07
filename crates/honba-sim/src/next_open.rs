@@ -1,11 +1,13 @@
 //! Deterministic multi-instrument simulator that fills market orders at the next bar open.
 //!
 //! Rust port of `honba.backtest.simulated.NextOpenExecution` (ADR 0016); the Python class is the
-//! reference and `schema/conformance/next_open_sim.json` pins the two together. Implemented so
-//! far (chunk 1): market orders, fill at the open of the instrument's first bar in a later
+//! reference and `schema/conformance/next_open_sim.json` pins the two together. Implemented
+//! (chunks 1 and 2): market orders, fill at the open of the instrument's first bar in a later
 //! session, cancel, the `unsupported_order_type`, `no_position` and `insufficient_funds`
-//! rejections, integer-minor-unit cash, long-only sell caps and lot-sized funding cuts. Not yet:
-//! settlement cycles, transaction costs and the `SessionOpen` event (chunk 2).
+//! rejections, integer-minor-unit cash, long-only sell caps, lot-sized and cost-aware funding
+//! cuts, the settlement cycle (receivables, available cash, buys waiting for pending proceeds),
+//! the injected fill-cost hook ([`FillCostFn`]) and the session-open event path
+//! ([`NextOpenSim::on_session_open`]).
 
 use honba_engine::{AlgoError, EngineOutput, ExecutionEngine, Handler, OrderRejection, Result};
 use honba_entities::{Currency, Money, Trade};
