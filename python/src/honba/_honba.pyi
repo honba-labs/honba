@@ -1,6 +1,7 @@
 """Type stubs for honba._honba native PyO3 extension module."""
 
-from typing import Final, final
+from collections.abc import Callable
+from typing import Any, Final, final
 
 from typing_extensions import Self
 
@@ -11,6 +12,7 @@ __all__ = [
     "Bar",
     "Fill",
     "InstrumentId",
+    "NextOpenSimulator",
     "OrderIntent",
     "QuoteTick",
     "RustSmaCrossover",
@@ -21,6 +23,7 @@ __all__ = [
     "currency_minor_units",
     "get_runtime_handle",
     "initialize_runtime",
+    "next_open_fill_cost",
     "nse_equity_settlement_days",
     "run_strategy",
     "runtime_info",
@@ -107,6 +110,59 @@ def run_strategy(
     ``Trade.costs = flat_cost + quantity * price * cost_bps / 10_000`` (default none).
     Raises ``ValueError`` for an unknown strategy, invalid JSON or invalid costs.
     """
+
+def next_open_fill_cost(pack: str, side: str, quantity: float, price: float) -> int:
+    """Cost in minor units of one fill under a named cost pack (INR).
+
+    ``pack`` is ``"india.equity"`` / ``"india.equity.delivery"``, ``"india.equity.intraday"``
+    or ``"none"`` / ``"zero"``; ``side`` is ``"buy"`` or ``"sell"``. Each charge leg is rounded
+    to paise once and summed, exactly like ``nse_equity_delivery_fill_cost`` /
+    ``nse_equity_intraday_fill_cost``. Raises ``ValueError`` for an unknown pack.
+    """
+
+@final
+class NextOpenSimulator:
+    """Rust ``NextOpenSim`` (ADR 0016): market orders fill at the next session's open.
+
+    Money is integer minor units (ADR 0011); bars and orders are plain dicts. A bar has
+    ``symbol``, ``ts``, ``open``, ``high``, ``low``, ``close`` and optional ``volume`` and
+    ``exchange`` (default ``"NSE"``). An order has ``id``, ``symbol``, ``side`` (``"buy"`` /
+    ``"sell"``), ``qty``, ``ts`` and optional ``type`` (default ``"market"``), ``price``,
+    ``trigger``, ``exchange``. ``costs`` is ``None``, a pack name (see ``next_open_fill_cost``)
+    or a callable ``(side, quantity, price) -> int`` of minor units whose exception propagates
+    unchanged. ``ValueError`` for rule violations (non-monotonic or duplicate bars, a
+    non-advancing session, a duplicate working id, a negative cost); ``RuntimeError`` when
+    ``set_settlement_days`` runs after the first session.
+    """
+
+    cash: int
+    fees: int
+    traded_notional: int
+    unsettled: int
+    available_cash: int
+    settlement_days: int
+    receivables: list[tuple[int, int]]
+    positions: list[tuple[str, str, float]]
+    working_orders: list[str]
+    def __new__(
+        cls,
+        cash: int,
+        currency: str = "INR",
+        *,
+        settlement_days: int = 0,
+        long_only: bool = True,
+        lot_sizes: dict[str, float] | dict[tuple[str, str], float] | None = None,
+        costs: str | Callable[[str, float, float], int] | None = None,
+    ) -> Self: ...
+    def open_session(self, ts: int, bars: list[dict[str, Any]]) -> None: ...
+    def on_session_open(self, ts: int, bars: list[dict[str, Any]]) -> None: ...
+    def on_bar(self, bar: dict[str, Any]) -> None: ...
+    def submit(self, order: dict[str, Any]) -> None: ...
+    def cancel(self, order_id: str, now: int) -> None: ...
+    def set_settlement_days(self, days: int) -> None: ...
+    def set_lot_size(self, symbol: str, lot_size: float, exchange: str = "NSE") -> None: ...
+    def drain_fills(self) -> list[dict[str, Any]]: ...
+    def drain_rejections(self) -> list[dict[str, Any]]: ...
 
 @final
 class InstrumentId:

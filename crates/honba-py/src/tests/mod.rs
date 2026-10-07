@@ -3,6 +3,7 @@
 mod api;
 mod codegen;
 mod manifest;
+mod next_open;
 mod run;
 mod runtime;
 mod wire;

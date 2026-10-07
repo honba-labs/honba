@@ -10,6 +10,7 @@ pub mod api;
 pub mod codegen;
 pub mod domain;
 pub mod manifest;
+pub mod next_open;
 pub mod run;
 pub mod strategy;
 pub mod wire;
@@ -19,6 +20,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     codegen::register(m)?;
     domain::register(m)?;
     manifest::register(m)?;
+    next_open::register(m)?;
     run::register(m)?;
     strategy::register(m)?;
     wire::register(m)?;
