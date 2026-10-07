@@ -181,6 +181,24 @@ class Client:
 
     # -- plumbing ----------------------------------------------------------------------------
 
+    def request_data(
+        self,
+        method: str,
+        path: str,
+        *,
+        query: Mapping[str, Any] | None = None,
+        body: Any = None,
+    ) -> Any:
+        """Send a raw request through the transport and return the envelope's ``data``.
+
+        The method a caller would otherwise build by hand; the argument validation of the
+        typed methods does not apply, so a malformed request is the server's to reject. Used by
+        surfaces (the MCP gateway) that route every tool through one code path.
+        """
+        return self._data(
+            rq.ApiRequest(method, path, query=dict(query) if query else None, body=body)
+        )
+
     def _data(self, request: rq.ApiRequest) -> Any:
         """Send ``request``; return the envelope's ``data`` or raise the mapped error."""
         response = self._transport.request(

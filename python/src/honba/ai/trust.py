@@ -38,14 +38,18 @@ class TrustEnvelope:
     def to_json(self) -> str:
         """Serialize to JSON string."""
         return json.dumps(
-            {
-                "content": self.content,
-                "origin": self.origin,
-                "untrusted": self.untrusted,
-                "content_hash": self.content_hash,
-            },
+            self.to_dict(),
             separators=(",", ":"),
         )
+
+    def to_dict(self) -> dict[str, object]:
+        """The envelope as a JSON-shaped mapping."""
+        return {
+            "content": self.content,
+            "origin": self.origin,
+            "untrusted": self.untrusted,
+            "content_hash": self.content_hash,
+        }
 
     @classmethod
     def from_json(cls, json_str: str) -> TrustEnvelope:

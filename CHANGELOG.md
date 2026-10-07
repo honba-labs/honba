@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Thin Python MCP server over the generated tool schemas (E5-S1)
+
+- New `honba.ai.mcp`: `McpGateway` loads `schema/mcp/mcp_tools.json` (never invents schemas),
+  exposes a selected toolset, routes every call through `honba.client.Client` (so the answer equals
+  the REST response), refuses any tool whose `readOnlyHint` is false while the read-only switch is
+  on, and wraps free-text result fields in a trust envelope. Typed failures carry either an MCP code
+  (`mcp_unknown_tool`, `mcp_read_only`, `mcp_invalid_arguments`) or the REST envelope's code.
+- `honba.client.Client.request_data(method, path, query=..., body=...)`: the raw passthrough the
+  gateway uses; the typed methods are unchanged.
+- The `mcp` SDK adapter (`build_server`, `run_stdio`) imports `mcp` lazily; the package is the
+  optional `ai` extra and the adapter tests skip when it is absent.
+
 ### Trust envelope for untrusted text (E5-S2)
 
 - New `honba.ai.trust`: `wrap_untrusted(content, origin)` returns a `TrustEnvelope` carrying the
