@@ -11,8 +11,16 @@ Deterministic: no wall clock, no randomness.
 
 Scenario schema (``fixture_version`` 1)::
 
-    {"name", "chunk", "config": {"cash", "currency", "long_only", "settlement_days", "lot_sizes"},
+    {"name", "chunk", "config": {"cash", "currency", "long_only", "settlement_days", "lot_sizes",
+                                 "costs"?},
      "steps": [...], "expect": {...}}
+
+``config.costs`` (chunk 2, optional) is a test cost model both runners implement identically:
+``{"flat_buy", "flat_sell", "bps_buy", "bps_sell"}`` (all optional, integers; flats in minor
+units, may be negative to provoke the error path). The cost of a fill is
+``flat + (notional_minor * bps + 5000) // 10000`` where ``notional_minor`` is the fill's
+``mul_qty`` notional. (The real India schedule is not replayed here: it lives above ``honba-sim``,
+ADR 0016 chunk 2 addendum.)
 
 ``cash`` is integer minor units. Steps, replayed in order (symbols are NSE instruments, prices and
 quantities are plain numbers):
@@ -24,11 +32,16 @@ quantities are plain numbers):
 * ``{"op": "cancel", "id", "now"}``: ``now`` is the engine time of the cancel (informational for
   Python, whose session ts is the same value in every vector).
 * ``{"op": "drain"}``: drain fills and rejections; recorded in ``expect.drains``.
+* ``{"op": "session_open", "ts", "bars": [bar, ...]}`` (chunk 2): the ``SessionOpen`` event.
+* ``{"op": "set_settlement_days", "days"}`` (chunk 2): ``set_settlement_days``.
+* ``{"op": "probe"}`` (chunk 2): records ``{"unsettled", "available_cash"}`` (minor units) in
+  ``expect.final.probes``.
 
 A step that raises in the reference gets ``"error": true`` (the exception type is not compared).
 ``expect``: ``drains`` (list of ``{"fills", "rejections"}``) and ``final`` with ``cash``,
 ``positions`` (symbol -> quantity, sorted), ``working`` (order ids), ``fees``,
-``traded_notional`` (minor units). A fill is
+``traded_notional`` (minor units); chunk 2 scenarios add ``unsettled`` and ``available_cash`` (minor
+units) and, when they probe, ``probes``. A fill is
 ``[order_id, symbol, side, quantity, price, ts, costs]`` and a rejection
 ``[order_id, symbol, side, quantity, reason, ts]``.
 """
@@ -40,13 +53,18 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from honba.backtest.simulated import NextOpenExecution
+from honba.backtest.simulated import FillCostFn, NextOpenExecution, SessionOpen
 from honba.domain.money import Currency, Money
 from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
 from honba.entities.order import OrderIntent, OrderSide, OrderType
 
-OUT = Path(__file__).resolve().parents[1] / "schema" / "conformance" / "next_open_sim.json"
+OUT = (
+    Path(__file__).resolve().parents[1]
+    / "schema"
+    / "conformance"
+    / "next_open_sim.json"
+)
 FIXTURE_VERSION = 1
 
 
@@ -75,9 +93,16 @@ def _intent(step: dict[str, Any]) -> OrderIntent:
     if kind == "limit":
         return OrderIntent(iid, side, qty, OrderType.LIMIT, price=step["price"])
     if kind == "stop_market":
-        return OrderIntent(iid, side, qty, OrderType.STOP_MARKET, trigger_price=step["trigger"])
+        return OrderIntent(
+            iid, side, qty, OrderType.STOP_MARKET, trigger_price=step["trigger"]
+        )
     return OrderIntent(
-        iid, side, qty, OrderType.STOP_LIMIT, price=step["price"], trigger_price=step["trigger"]
+        iid,
+        side,
+        qty,
+        OrderType.STOP_LIMIT,
+        price=step["price"],
+        trigger_price=step["trigger"],
     )
 
 
@@ -85,14 +110,32 @@ def _side(side: OrderSide) -> str:
     return "buy" if side is OrderSide.BUY else "sell"
 
 
+def _cost_fn(spec: dict[str, int], currency: Currency) -> FillCostFn:
+    def cost(side: OrderSide, quantity: float, price: float) -> Money:
+        tag = "buy" if side is OrderSide.BUY else "sell"
+        notional = Money.mul_qty(quantity, price, currency).amount
+        minor = (
+            spec.get(f"flat_{tag}", 0)
+            + (notional * spec.get(f"bps_{tag}", 0) + 5000) // 10000
+        )
+        return Money.from_minor(minor, currency)
+
+    return cost
+
+
 def _port(config: dict[str, Any]) -> NextOpenExecution:
-    cash = Money.from_minor(config["cash"], Currency[config["currency"]])
+    currency = Currency[config["currency"]]
+    cash = Money.from_minor(config["cash"], currency)
+    extra: dict[str, Any] = {}
+    if "costs" in config:
+        extra["costs"] = _cost_fn(config["costs"], currency)
     lots = {_iid(s): lot for s, lot in config.get("lot_sizes", {}).items()}
     return NextOpenExecution(
         cash=cash,
         settlement_days=config.get("settlement_days", 0),
         long_only=config.get("long_only", True),
         lot_sizes=lots,
+        **extra,
     )
 
 
@@ -101,6 +144,7 @@ def replay(scenario: dict[str, Any]) -> dict[str, Any]:
     port = _port(scenario["config"])
     steps: list[dict[str, Any]] = []
     drains: list[dict[str, Any]] = []
+    probes: list[dict[str, Any]] = []
     for raw in scenario["steps"]:
         step = {k: v for k, v in raw.items() if k != "error"}
         try:
@@ -109,6 +153,18 @@ def replay(scenario: dict[str, Any]) -> dict[str, Any]:
                 port.on_event(_bar(step), step["ts"])
             elif op == "open_session":
                 port.open_session(step["ts"], [_bar(b) for b in step["bars"]])
+            elif op == "session_open":
+                bars = tuple(_bar(b) for b in step["bars"])
+                port.on_event(SessionOpen(step["ts"], bars), step["ts"])
+            elif op == "set_settlement_days":
+                port.set_settlement_days(step["days"])
+            elif op == "probe":
+                probes.append(
+                    {
+                        "unsettled": port.unsettled.amount,
+                        "available_cash": port.available_cash.amount,
+                    }
+                )
             elif op == "submit":
                 port.submit(step["id"], _intent(step), step["ts"])
             elif op == "cancel":
@@ -143,17 +199,24 @@ def replay(scenario: dict[str, Any]) -> dict[str, Any]:
                 )
             else:
                 raise AssertionError(f"unknown op {op!r}")
-        except ValueError:
+        except (ValueError, RuntimeError):
             step["error"] = True
         steps.append(step)
     expect = {
         "drains": drains,
         "cash": port.cash.amount,
-        "positions": {i.symbol: q for i, q in sorted(port.positions.items(), key=_pos_key)},
+        "positions": {
+            i.symbol: q for i, q in sorted(port.positions.items(), key=_pos_key)
+        },
         "working": port.working_orders,
         "fees": port.fees.amount,
         "traded_notional": port.traded_notional.amount,
     }
+    if scenario["chunk"] >= 2:
+        expect["unsettled"] = port.unsettled.amount
+        expect["available_cash"] = port.available_cash.amount
+        if probes:
+            expect["probes"] = probes
     return {"steps": steps, "expect": expect}
 
 
@@ -180,7 +243,13 @@ def sess(ts: int, *bars: dict[str, Any]) -> dict[str, Any]:
 
 
 def order(
-    oid: str, side: str, symbol: str, qty: float, ts: int, kind: str = "market", **extra: float
+    oid: str,
+    side: str,
+    symbol: str,
+    qty: float,
+    ts: int,
+    kind: str = "market",
+    **extra: float,
 ) -> dict[str, Any]:
     return {
         "op": "submit",
@@ -199,6 +268,15 @@ def cancel(oid: str, now: int) -> dict[str, Any]:
 
 
 DRAIN: dict[str, Any] = {"op": "drain"}
+PROBE: dict[str, Any] = {"op": "probe"}
+
+
+def sopen(ts: int, *bars: dict[str, Any]) -> dict[str, Any]:
+    return {"op": "session_open", "ts": ts, "bars": [{**x, "op": "bar"} for x in bars]}
+
+
+def set_days(days: int) -> dict[str, Any]:
+    return {"op": "set_settlement_days", "days": days}
 
 
 def cfg(cash_rupees: float, **kw: Any) -> dict[str, Any]:
@@ -212,8 +290,37 @@ def cfg(cash_rupees: float, **kw: Any) -> dict[str, Any]:
     }
 
 
-def scenario(name: str, config: dict[str, Any], steps: list[dict[str, Any]], chunk: int = 1):
+def scenario(
+    name: str, config: dict[str, Any], steps: list[dict[str, Any]], chunk: int = 1
+):
     return {"name": name, "chunk": chunk, "config": config, "steps": steps}
+
+
+def scenario2(name: str, config: dict[str, Any], steps: list[dict[str, Any]]):
+    return scenario(name, config, steps, chunk=2)
+
+
+def settlement_steps(extra: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    """Buy 10 A (cash 1000 -> 0), sell them, and queue a buy of 10 B that only the sale funds."""
+
+    def ab(ts: int) -> dict[str, Any]:
+        return sess(ts, b("A", ts, 100.0), b("B", ts, 100.0))
+
+    steps = [
+        ab(1),
+        order("buy-a", "buy", "A", 10, 1),
+        ab(2),
+        order("sell-a", "sell", "A", 10, 2),
+        order("buy-b", "buy", "B", 10, 2),
+        PROBE,
+    ]
+    for ts in range(3, 7):
+        steps += [ab(ts), PROBE, DRAIN]
+    return steps + (extra or [])
+
+
+def costed(**spec: int) -> dict[str, Any]:
+    return {"costs": spec}
 
 
 def scenarios() -> list[dict[str, Any]]:
@@ -310,7 +417,12 @@ def scenarios() -> list[dict[str, Any]]:
         scenario(
             "sell_without_a_position_is_rejected",
             cfg(10_000),
-            [b("AAA", 1, 100.0), order("o-0", "sell", "AAA", 3, 1), b("AAA", 2, 100.0), DRAIN],
+            [
+                b("AAA", 1, 100.0),
+                order("o-0", "sell", "AAA", 3, 1),
+                b("AAA", 2, 100.0),
+                DRAIN,
+            ],
         ),
         scenario(
             "sell_a_hair_over_the_position_is_float_residue",
@@ -357,7 +469,12 @@ def scenarios() -> list[dict[str, Any]]:
         scenario(
             "buy_with_no_cash_for_one_unit_is_rejected_whole",
             cfg(50),
-            [b("AAA", 1, 100.0), order("o-0", "buy", "AAA", 2, 1), b("AAA", 2, 100.0), DRAIN],
+            [
+                b("AAA", 1, 100.0),
+                order("o-0", "buy", "AAA", 2, 1),
+                b("AAA", 2, 100.0),
+                DRAIN,
+            ],
         ),
         scenario(
             "fractional_quantity_notional_rounds_half_away_from_zero",
@@ -389,7 +506,9 @@ def scenarios() -> list[dict[str, Any]]:
                 b("AAA", 1, 100.0),
                 order("o-0", "buy", "AAA", 1, 1, "limit", price=99.0),
                 order("o-1", "sell", "AAA", 1, 1, "stop_market", trigger=95.0),
-                order("o-2", "buy", "AAA", 1, 1, "stop_limit", price=101.0, trigger=100.0),
+                order(
+                    "o-2", "buy", "AAA", 1, 1, "stop_limit", price=101.0, trigger=100.0
+                ),
                 DRAIN,
                 b("AAA", 2, 100.0),
                 DRAIN,
@@ -498,12 +617,22 @@ def scenarios() -> list[dict[str, Any]]:
         scenario(
             "second_bar_for_an_instrument_in_a_session_is_an_error",
             cfg(10_000),
-            [b("AAA", 1, 100.0), b("AAA", 1, 101.0), b("BBB", 1, 50.0), b("AAA", 2, 100.0), DRAIN],
+            [
+                b("AAA", 1, 100.0),
+                b("AAA", 1, 101.0),
+                b("BBB", 1, 50.0),
+                b("AAA", 2, 100.0),
+                DRAIN,
+            ],
         ),
         scenario(
             "open_session_must_advance",
             cfg(10_000),
-            [sess(3, b("AAA", 3, 100.0)), sess(3, b("AAA", 3, 100.0)), sess(2, b("AAA", 2, 1.0))]
+            [
+                sess(3, b("AAA", 3, 100.0)),
+                sess(3, b("AAA", 3, 100.0)),
+                sess(2, b("AAA", 2, 1.0)),
+            ]
             + [order("o-0", "buy", "AAA", 1, 3), sess(4, b("AAA", 4, 100.0)), DRAIN],
         ),
         scenario(
@@ -513,6 +642,282 @@ def scenarios() -> list[dict[str, Any]]:
                 sess(10, b("AAA", 1, 100.0)),
                 order("o-0", "buy", "AAA", 1, 1),
                 sess(20, b("AAA", 2, 101.0)),
+                DRAIN,
+            ],
+        ),
+        # ---- chunk 2: settlement ----
+        scenario2(
+            "settlement_t0_proceeds_fund_the_same_session_buy",
+            cfg(1_000, settlement_days=0),
+            settlement_steps(),
+        ),
+        scenario2(
+            "settlement_t1_waiting_buy_fills_once_proceeds_settle",
+            cfg(1_000, settlement_days=1),
+            settlement_steps(),
+        ),
+        scenario2(
+            "settlement_t2_waiting_buy_fills_once_proceeds_settle",
+            cfg(1_000, settlement_days=2),
+            settlement_steps(),
+        ),
+        scenario2(
+            "waiting_buy_is_cut_once_the_wait_is_over",
+            cfg(1_000, settlement_days=1),
+            [
+                sess(1, b("A", 1, 100.0), b("B", 1, 100.0)),
+                order("buy-a", "buy", "A", 10, 1),
+                sess(2, b("A", 2, 100.0), b("B", 2, 100.0)),
+                order("sell-a", "sell", "A", 10, 2),
+                order("buy-b", "buy", "B", 25, 2),
+                sess(3, b("A", 3, 100.0), b("B", 3, 100.0)),
+                PROBE,
+                sess(4, b("A", 4, 100.0), b("B", 4, 100.0)),
+                PROBE,
+                DRAIN,
+            ],
+        ),
+        scenario2(
+            "waiting_buy_whose_instrument_does_not_print_starts_waiting_when_it_does",
+            cfg(1_000, settlement_days=2),
+            [
+                sess(1, b("A", 1, 100.0)),
+                order("buy-a", "buy", "A", 10, 1),
+                sess(2, b("A", 2, 100.0)),
+                order("sell-a", "sell", "A", 10, 2),
+                order("buy-b", "buy", "B", 5, 2),
+                sess(3, b("A", 3, 100.0)),
+                PROBE,
+                sess(4, b("A", 4, 100.0), b("B", 4, 100.0)),
+                PROBE,
+                sess(5, b("A", 5, 100.0), b("B", 5, 100.0)),
+                PROBE,
+                DRAIN,
+            ],
+        ),
+        scenario2(
+            "sale_proceeds_pending_in_two_sessions_sum_up_and_settle_separately",
+            cfg(2_000, settlement_days=2),
+            [
+                sess(1, b("A", 1, 100.0), b("B", 1, 50.0)),
+                order("buy-a", "buy", "A", 5, 1),
+                order("buy-b", "buy", "B", 10, 1),
+                sess(2, b("A", 2, 100.0), b("B", 2, 50.0)),
+                order("sell-a", "sell", "A", 5, 2),
+                sess(3, b("A", 3, 100.0), b("B", 3, 50.0)),
+                order("sell-b", "sell", "B", 10, 3),
+                PROBE,
+                sess(4, b("A", 4, 100.0), b("B", 4, 50.0)),
+                PROBE,
+                sess(5, b("A", 5, 100.0), b("B", 5, 50.0)),
+                PROBE,
+                sess(6, b("A", 6, 100.0), b("B", 6, 50.0)),
+                PROBE,
+                DRAIN,
+            ],
+        ),
+        scenario2(
+            "short_sell_proceeds_also_settle_later",
+            cfg(100, long_only=False, settlement_days=1),
+            [
+                sess(1, b("A", 1, 100.0)),
+                order("short", "sell", "A", 4, 1),
+                sess(2, b("A", 2, 100.0)),
+                PROBE,
+                sess(3, b("A", 3, 100.0)),
+                PROBE,
+                DRAIN,
+            ],
+        ),
+        scenario2(
+            "set_settlement_days_only_before_the_first_session",
+            cfg(1_000, settlement_days=0),
+            [
+                set_days(1),
+                set_days(-1),
+                sess(1, b("A", 1, 100.0)),
+                set_days(2),
+                order("buy-a", "buy", "A", 10, 1),
+                sess(2, b("A", 2, 100.0)),
+                order("sell-a", "sell", "A", 10, 2),
+                sess(3, b("A", 3, 100.0)),
+                PROBE,
+                DRAIN,
+            ],
+        ),
+        # ---- chunk 2: costs ----
+        scenario2(
+            "costs_are_paid_on_buys_and_taken_from_sell_proceeds",
+            cfg(10_000, **costed(flat_buy=250, flat_sell=300, bps_buy=10, bps_sell=20)),
+            [
+                b("A", 1, 100.0),
+                order("buy-a", "buy", "A", 10, 1),
+                b("A", 2, 100.0),
+                order("sell-a", "sell", "A", 10, 2),
+                b("A", 3, 101.0),
+                DRAIN,
+            ],
+        ),
+        scenario2(
+            "costs_reduce_pending_sale_proceeds",
+            cfg(2_000, settlement_days=1, **costed(flat_sell=5_000, bps_sell=100)),
+            [
+                b("A", 1, 100.0),
+                order("buy-a", "buy", "A", 10, 1),
+                b("A", 2, 100.0),
+                order("sell-a", "sell", "A", 10, 2),
+                b("A", 3, 100.0),
+                PROBE,
+                b("A", 4, 100.0),
+                PROBE,
+                DRAIN,
+            ],
+        ),
+        scenario2(
+            "costs_cut_a_buy_to_what_notional_plus_cost_allows",
+            cfg(1_000, **costed(bps_buy=100)),
+            [
+                b("A", 1, 100.0),
+                order("buy-a", "buy", "A", 20, 1),
+                b("A", 2, 100.0),
+                DRAIN,
+            ],
+        ),
+        scenario2(
+            "a_flat_cost_alone_can_cost_one_more_unit",
+            cfg(1_000, **costed(flat_buy=10_000)),
+            [
+                b("A", 1, 100.0),
+                order("buy-a", "buy", "A", 10, 1),
+                b("A", 2, 100.0),
+                DRAIN,
+            ],
+        ),
+        scenario2(
+            "a_cost_cut_floors_to_whole_lots",
+            cfg(1_000, lot_sizes={"A": 3}, **costed(bps_buy=250)),
+            [
+                b("A", 1, 10.0),
+                order("buy-a", "buy", "A", 90, 1),
+                b("A", 2, 10.0),
+                DRAIN,
+            ],
+        ),
+        scenario2(
+            "a_cost_larger_than_cash_rejects_the_whole_buy",
+            cfg(100, **costed(flat_buy=1_000_000)),
+            [b("A", 1, 10.0), order("buy-a", "buy", "A", 1, 1), b("A", 2, 10.0), DRAIN],
+        ),
+        scenario2(
+            "an_exact_fit_including_cost_fills_in_full",
+            cfg(1_010, **costed(flat_buy=1_000)),
+            [
+                b("A", 1, 100.0),
+                order("buy-a", "buy", "A", 10, 1),
+                b("A", 2, 100.0),
+                DRAIN,
+            ],
+        ),
+        scenario2(
+            "negative_buy_cost_errors_and_leaves_the_order_working",
+            cfg(10_000, **costed(flat_buy=-1)),
+            [
+                b("A", 1, 100.0),
+                order("buy-a", "buy", "A", 1, 1),
+                b("A", 2, 100.0),
+                DRAIN,
+                b("A", 3, 100.0),
+                DRAIN,
+            ],
+        ),
+        scenario2(
+            "negative_sell_cost_errors_and_leaves_the_position",
+            cfg(10_000, **costed(flat_sell=-5)),
+            [
+                b("A", 1, 100.0),
+                order("buy-a", "buy", "A", 2, 1),
+                b("A", 2, 100.0),
+                order("sell-a", "sell", "A", 2, 2),
+                b("A", 3, 100.0),
+                DRAIN,
+            ],
+        ),
+        # ---- chunk 2: the SessionOpen event ----
+        scenario2(
+            "session_open_fills_sells_before_buys_like_open_session",
+            cfg(1_000),
+            [
+                sopen(1, b("A", 1, 100.0), b("B", 1, 100.0)),
+                order("buy-a", "buy", "A", 10, 1),
+                sopen(2, b("A", 2, 100.0), b("B", 2, 100.0)),
+                order("buy-b", "buy", "B", 10, 2),
+                order("sell-a", "sell", "A", 10, 2),
+                sopen(3, b("A", 3, 100.0), b("B", 3, 100.0)),
+                DRAIN,
+            ],
+        ),
+        scenario2(
+            "session_open_ignores_later_earlier_and_repeated_bars",
+            cfg(10_000),
+            [
+                sopen(10, b("A", 10, 100.0)),
+                order("buy-a", "buy", "A", 1, 10),
+                b("A", 20, 120.0),
+                b("A", 5, 90.0),
+                b("A", 10, 95.0),
+                DRAIN,
+                sopen(11, b("A", 11, 101.0)),
+                DRAIN,
+            ],
+        ),
+        scenario2(
+            "a_bar_at_the_session_ts_opens_an_instrument_the_session_open_left_out",
+            cfg(10_000),
+            [
+                sopen(1, b("A", 1, 100.0)),
+                order("buy-b", "buy", "B", 2, 1),
+                sopen(2, b("A", 2, 100.0)),
+                b("A", 2, 100.0),
+                b("B", 2, 7.0),
+                b("B", 2, 8.0),
+                DRAIN,
+            ],
+        ),
+        scenario2(
+            "session_open_key_need_not_be_a_bar_ts_and_bars_never_open_sessions",
+            cfg(10_000),
+            [
+                sopen(10, b("A", 1, 100.0)),
+                order("buy-a", "buy", "A", 1, 1),
+                b("A", 2, 101.0),
+                b("A", 1, 102.0),
+                DRAIN,
+                sopen(20, b("A", 2, 103.0)),
+                DRAIN,
+            ],
+        ),
+        scenario2(
+            "session_open_must_advance",
+            cfg(10_000),
+            [
+                sopen(3, b("A", 3, 100.0)),
+                sopen(3, b("A", 3, 100.0)),
+                sopen(2, b("A", 2, 1.0)),
+                order("buy-a", "buy", "A", 1, 3),
+                sopen(4, b("A", 4, 100.0)),
+                DRAIN,
+            ],
+        ),
+        scenario2(
+            "session_open_after_plain_bars_switches_to_the_lenient_rules",
+            cfg(10_000),
+            [
+                b("A", 1, 100.0),
+                order("buy-a", "buy", "A", 1, 1),
+                sopen(2, b("A", 2, 101.0)),
+                order("buy-b", "buy", "B", 1, 2),
+                b("B", 2, 50.0),
+                b("B", 3, 51.0),
                 DRAIN,
             ],
         ),
