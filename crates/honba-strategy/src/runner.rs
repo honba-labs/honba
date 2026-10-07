@@ -1,8 +1,10 @@
 //! The `StrategyRunner`: glues a strategy to an execution engine.
 
+use std::collections::HashMap;
+
 use honba_engine::{AlgoError, ExecutionEngine, Handler, OrderRejection, Result};
-use honba_entities::Trade;
-use honba_messages::{Event, OrderId, UnixNanos};
+use honba_entities::{ExecutionEvent, Trade};
+use honba_messages::{Event, InstrumentId, OrderEvent, OrderId, OrderState, UnixNanos};
 
 use crate::context::LedgerContext;
 use crate::intent::{IntentError, OrderIntent};
@@ -52,8 +54,14 @@ pub struct IntentRejection {
 ///    not submitted: it is released in the context, recorded as an
 ///    [`IntentRejection`] (see [`Self::rejections`]) and reported through
 ///    [`Strategy::on_intent_rejected`]; the run continues.
-/// 4. Drain fills from the execution engine, book each in the context, then
-///    pass it to [`Strategy::on_fill`].
+/// 4. Drain the execution engine's one ordered event stream
+///    ([`ExecutionEngine::drain_events`], ADR 0019 decision 4) and walk it in
+///    order, keeping an [`OrderState`] per order: a fill is booked in the
+///    context, then passed to [`Strategy::on_fill`]; a rejection, cancellation
+///    or expiry releases the unfilled remainder it carries (for the
+///    instrument and side it names) and is recorded as an
+///    [`OrderRejection`]. A repeated or illegal terminal event for an order
+///    releases nothing, so `filled + released == ordered` per order.
 ///
 /// Intents submitted in [`Strategy::on_stop`] are discarded. Submitted
 /// intents and fills are available via [`Self::submitted`] and [`Self::fills`].
@@ -99,6 +107,8 @@ pub struct StrategyRunner<S: Strategy, E: ExecutionEngine> {
     /// `ts_init` of the latest event: the time a cancel is processed at.
     now: UnixNanos,
     suppressed: Vec<SuppressedIntent>,
+    states: HashMap<String, OrderState>,
+    released: HashMap<InstrumentId, f64>,
 }
 
 impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
@@ -124,6 +134,8 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
             last_bar_ts: None,
             now: UnixNanos::from_u64(0),
             suppressed: Vec::new(),
+            states: HashMap::new(),
+            released: HashMap::new(),
         }
     }
 
@@ -185,25 +197,137 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
         &self.order_rejections
     }
 
-    /// Asks the execution engine to cancel `order_id` and books what it
-    /// reports at once (a cancelled [`OrderRejection`] for the unfilled
-    /// remainder, stamped with the time of the latest event). Cancelling an
-    /// unknown or finished order does nothing.
-    pub fn cancel(&mut self, order_id: &str) -> Result<()> {
-        self.execution.cancel(order_id, self.now)?;
-        self.book_rejections()
+    /// The FSM state the runner tracked for `order_id`, if it submitted it.
+    pub fn order_state(&self, order_id: &str) -> Option<&OrderState> {
+        self.states.get(order_id)
     }
 
-    /// Releases and records what the engine reports as never filling.
-    fn book_rejections(&mut self) -> Result<()> {
-        for r in self.execution.drain_rejections()? {
-            self.adapter
-                .parts_mut()
-                .1
-                .release_remainder(&r.instrument_id, r.side, r.quantity);
-            self.order_rejections.push(r);
+    /// The total quantity released for `instrument_id` so far: the unfilled
+    /// remainders of its rejected, cancelled and expired orders.
+    pub fn released_quantity(&self, instrument_id: &InstrumentId) -> f64 {
+        self.released.get(instrument_id).copied().unwrap_or(0.0)
+    }
+
+    /// Asks the execution engine to cancel `order_id` and books what it
+    /// reports at once (a cancelled [`OrderRejection`] for the unfilled
+    /// remainder, stamped with the time of the latest event, after any fill
+    /// the engine produced first). Cancelling an unknown or finished order
+    /// does nothing.
+    pub fn cancel(&mut self, order_id: &str) -> Result<()> {
+        self.execution.cancel(order_id, self.now)?;
+        if let Some(state) = self.states.get_mut(order_id) {
+            // Duplicate or illegal (finished order): the FSM keeps its state.
+            let _ = state.apply(&OrderEvent::CancelRequested);
         }
-        Ok(())
+        self.book_events()
+    }
+
+    /// Drains the engine once and walks the stream in order. A failure does
+    /// not lose the other events: each is still booked and the first error is
+    /// returned afterwards.
+    fn book_events(&mut self) -> Result<()> {
+        let events = self.execution.drain_events()?;
+        let mut first_error = None;
+        for event in events {
+            match event {
+                ExecutionEvent::Fill { trade, .. } => {
+                    if let Some(state) = self.states.get_mut(trade.order_id().as_str()) {
+                        // An illegal fill (overfill) leaves the FSM unchanged.
+                        let _ = state.apply(&event_fill(&trade, state));
+                    }
+                    let (strategy, ctx) = self.adapter.parts_mut();
+                    if let Err(e) = ctx.apply_fill(&trade) {
+                        first_error
+                            .get_or_insert(AlgoError::Component(format!("booking fill: {e}")));
+                        continue;
+                    }
+                    if let Err(e) = strategy.on_fill(ctx, &trade) {
+                        first_error.get_or_insert(e);
+                    }
+                    self.fills.push(trade);
+                }
+                ExecutionEvent::Rejected {
+                    ref order_id,
+                    ref instrument_id,
+                    side,
+                    quantity,
+                    ref reason,
+                    ts,
+                    ..
+                } => {
+                    let r = OrderRejection::rejected(
+                        order_id.clone(),
+                        instrument_id.clone(),
+                        side,
+                        quantity,
+                        reason.clone(),
+                        ts,
+                    );
+                    self.release(&event, r);
+                }
+                ExecutionEvent::Cancelled {
+                    ref order_id,
+                    ref instrument_id,
+                    side,
+                    quantity,
+                    ts,
+                    ..
+                } => {
+                    let r = OrderRejection::cancelled(
+                        order_id.clone(),
+                        instrument_id.clone(),
+                        side,
+                        quantity,
+                        ts,
+                    );
+                    self.release(&event, r);
+                }
+                ExecutionEvent::Expired {
+                    ref order_id,
+                    ref instrument_id,
+                    side,
+                    quantity,
+                    ts,
+                    ..
+                } => {
+                    let r = OrderRejection::rejected(
+                        order_id.clone(),
+                        instrument_id.clone(),
+                        side,
+                        quantity,
+                        OrderRejection::EXPIRED,
+                        ts,
+                    );
+                    self.release(&event, r);
+                }
+                // Acknowledgements move the FSM only; the rest is synthesised
+                // by a submitter and carries nothing to book.
+                other => {
+                    if let Some(state) = self.states.get_mut(other.order_id().as_str()) {
+                        let _ = state.apply(&other.order_event());
+                    }
+                }
+            }
+        }
+        first_error.map_or(Ok(()), Err)
+    }
+
+    /// Applies a terminal `event` to the order's FSM and, unless it is a
+    /// duplicate or illegal, releases the remainder and records `r`.
+    fn release(&mut self, event: &ExecutionEvent, r: OrderRejection) {
+        if let Some(state) = self.states.get_mut(r.order_id.as_str()) {
+            if !matches!(state.apply(&event.order_event()), Ok(true)) {
+                return;
+            }
+        }
+        self.adapter
+            .parts_mut()
+            .1
+            .release_remainder(&r.instrument_id, r.side, r.quantity);
+        if r.quantity.is_finite() && r.quantity > 0.0 {
+            *self.released.entry(r.instrument_id.clone()).or_insert(0.0) += r.quantity;
+        }
+        self.order_rejections.push(r);
     }
 
     /// Consumes the runner, returning the strategy, execution engine, and fills.
@@ -253,6 +377,11 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
                 self.adapter.parts_mut().1.release(&intent);
                 return Err(e);
             }
+            let mut state = OrderState::new();
+            let _ = state.apply(&OrderEvent::Submitted {
+                quantity: intent.quantity,
+            });
+            self.states.insert(id.as_str().to_string(), state);
             // Recorded only once the execution port accepted it (Python parity).
             self.submitted.push(SubmittedIntent {
                 ts_init,
@@ -303,29 +432,8 @@ impl<S: Strategy, E: ExecutionEngine> Handler for StrategyRunner<S, E> {
             return Err(e);
         }
 
-        // 4. Drain fills, book them, and feed them back to the strategy. A
-        // failure does not lose the other drained fills: each is still booked
-        // and recorded, and the first error is returned afterwards.
-        let new_fills = self.execution.drain_fills()?;
-        let mut first_error = None;
-        for fill in new_fills {
-            let (strategy, ctx) = self.adapter.parts_mut();
-            if let Err(e) = ctx.apply_fill(&fill) {
-                first_error.get_or_insert(AlgoError::Component(format!("booking fill: {e}")));
-                continue;
-            }
-            if let Err(e) = strategy.on_fill(ctx, &fill) {
-                first_error.get_or_insert(e);
-            }
-            self.fills.push(fill);
-        }
-
-        // 5. Drain rejections and release them in the context.
-        let rejections = self.book_rejections();
-        if let Some(e) = first_error {
-            return Err(e);
-        }
-        rejections?;
+        // 4. Drain the one ordered event stream: book fills, release the rest.
+        self.book_events()?;
 
         Ok(honba_engine::EngineOutput::None)
     }
@@ -335,5 +443,14 @@ impl<S: Strategy, E: ExecutionEngine> Handler for StrategyRunner<S, E> {
         // Never executed: the run is over (ADR 008).
         self.adapter.drain_intents();
         Ok(())
+    }
+}
+
+/// The FSM fill event for `trade` against `state`.
+fn event_fill(trade: &Trade, state: &OrderState) -> OrderEvent {
+    let complete = state.filled_qty + trade.quantity() + 1e-9 >= state.quantity;
+    OrderEvent::Fill {
+        last_qty: trade.quantity(),
+        complete,
     }
 }

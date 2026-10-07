@@ -25,7 +25,7 @@ use std::sync::{Arc, Mutex};
 use honba_analytics::{AnalyticsError, EquityStats, RoundTrip, TradeStats};
 use honba_data::{Dataset, DatasetFeed};
 use honba_engine::{Engine, EngineOutput, ExecutionEngine, Handler};
-use honba_entities::{Money, Trade};
+use honba_entities::{ExecutionEvent, Money, Trade};
 use honba_messages::Event;
 use honba_messages::{Order, UnixNanos};
 use honba_sim::BarFillEngine;
@@ -251,13 +251,13 @@ fn take_tape(tape: &Mutex<Vec<Trade>>) -> Vec<Trade> {
 /// buffer. The tape is shared because it crosses that ownership boundary; the
 /// lock it takes guards a vector of results, never an engine.
 #[derive(Clone)]
-struct TrialSink {
+pub(crate) struct TrialSink {
     inner: BarFillEngine,
     tape: Arc<Mutex<Vec<Trade>>>,
 }
 
 impl TrialSink {
-    fn new(tape: Arc<Mutex<Vec<Trade>>>) -> Self {
+    pub(crate) fn new(tape: Arc<Mutex<Vec<Trade>>>) -> Self {
         Self {
             inner: BarFillEngine::new(),
             tape,
@@ -294,6 +294,22 @@ impl ExecutionEngine for TrialSink {
         now: honba_messages::UnixNanos,
     ) -> honba_engine::Result<()> {
         self.inner.cancel(order_id, now)
+    }
+
+    fn drain_events(&mut self) -> honba_engine::Result<Vec<ExecutionEvent>> {
+        let events = self.inner.drain_events()?;
+        self.tape
+            .lock()
+            .expect("the fill tape is not poisoned")
+            .extend(events.iter().filter_map(|e| match e {
+                ExecutionEvent::Fill { trade, .. } => Some(trade.clone()),
+                _ => None,
+            }));
+        Ok(events)
+    }
+
+    fn native_events(&self) -> bool {
+        true
     }
 
     fn drain_fills(&mut self) -> honba_engine::Result<Vec<Trade>> {

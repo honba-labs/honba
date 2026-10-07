@@ -14,7 +14,7 @@
 use std::sync::{Arc, Mutex};
 
 use honba_engine::{AlgoError, ExecutionEngine};
-use honba_entities::{Currency, Money};
+use honba_entities::{Currency, ExecutionEvent, Money};
 use honba_market::india::costs::NseCashEquitySchedule;
 use honba_market::{CostSchedule, MarketSegment};
 use honba_messages::{
@@ -149,6 +149,159 @@ pub struct RejectionOut {
     pub ts: u64,
     /// True for a cancellation.
     pub cancelled: bool,
+}
+
+/// One event of the ordered execution stream (ADR 0019), in the units of the Python
+/// `ExecutionEvent` dataclasses. `kind` is `submitted`, `accepted`, `rejected`, `fill`,
+/// `cancel_requested`, `cancelled` or `expired`; fields that do not apply are `None`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct EventOut {
+    /// The event tag.
+    pub kind: &'static str,
+    /// Order id.
+    pub order_id: String,
+    /// Instrument symbol (empty for `cancel_requested`).
+    pub symbol: String,
+    /// Exchange code (empty for `cancel_requested`).
+    pub exchange: String,
+    /// `buy` or `sell` (`buy` for `cancel_requested`, which names no side).
+    pub side: &'static str,
+    /// Fill quantity, open quantity, or the unfilled remainder released.
+    pub quantity: f64,
+    /// Fill price.
+    pub price: Option<f64>,
+    /// Event time.
+    pub ts: u64,
+    /// Fill cost in minor units.
+    pub costs: Option<i64>,
+    /// Cumulative filled quantity after a fill.
+    pub cum_qty: Option<f64>,
+    /// Whether a fill completes the order.
+    pub complete: Option<bool>,
+    /// Why a `rejected` event was refused.
+    pub reason: Option<String>,
+    /// The venue's id for the order, if known.
+    pub venue_order_id: Option<String>,
+}
+
+impl EventOut {
+    fn from_event(ev: &ExecutionEvent) -> Self {
+        let venue = |v: &Option<honba_messages::VenueOrderId>| v.as_ref().map(|v| v.to_string());
+        let base = |kind,
+                    order_id: &honba_messages::OrderId,
+                    i: &InstrumentId,
+                    side,
+                    q,
+                    ts: &UnixNanos| {
+            Self {
+                kind,
+                order_id: order_id.as_str().to_string(),
+                symbol: i.symbol().to_string(),
+                exchange: i.exchange().as_str().to_string(),
+                side: side_str(side),
+                quantity: q,
+                price: None,
+                ts: ts.as_u64(),
+                costs: None,
+                cum_qty: None,
+                complete: None,
+                reason: None,
+                venue_order_id: None,
+            }
+        };
+        match ev {
+            ExecutionEvent::Submitted {
+                order_id,
+                instrument_id,
+                side,
+                quantity,
+                ts,
+            } => base("submitted", order_id, instrument_id, *side, *quantity, ts),
+            ExecutionEvent::Accepted {
+                order_id,
+                instrument_id,
+                side,
+                quantity,
+                venue_order_id,
+                ts,
+            } => Self {
+                venue_order_id: venue(venue_order_id),
+                ..base("accepted", order_id, instrument_id, *side, *quantity, ts)
+            },
+            ExecutionEvent::Rejected {
+                order_id,
+                instrument_id,
+                side,
+                quantity,
+                reason,
+                venue_order_id,
+                ts,
+            } => Self {
+                reason: Some(reason.clone()),
+                venue_order_id: venue(venue_order_id),
+                ..base("rejected", order_id, instrument_id, *side, *quantity, ts)
+            },
+            ExecutionEvent::Fill {
+                trade,
+                cum_qty,
+                complete,
+                venue_order_id,
+            } => Self {
+                price: Some(trade.price()),
+                costs: Some(trade.costs().minor()),
+                cum_qty: Some(*cum_qty),
+                complete: Some(*complete),
+                venue_order_id: venue(venue_order_id),
+                ..base(
+                    "fill",
+                    trade.order_id(),
+                    trade.instrument_id(),
+                    trade.side(),
+                    trade.quantity(),
+                    &trade.ts_event(),
+                )
+            },
+            ExecutionEvent::CancelRequested { order_id, ts } => Self {
+                kind: "cancel_requested",
+                order_id: order_id.as_str().to_string(),
+                symbol: String::new(),
+                exchange: String::new(),
+                side: "buy",
+                quantity: 0.0,
+                price: None,
+                ts: ts.as_u64(),
+                costs: None,
+                cum_qty: None,
+                complete: None,
+                reason: None,
+                venue_order_id: None,
+            },
+            ExecutionEvent::Cancelled {
+                order_id,
+                instrument_id,
+                side,
+                quantity,
+                venue_order_id,
+                ts,
+            } => Self {
+                venue_order_id: venue(venue_order_id),
+                ..base("cancelled", order_id, instrument_id, *side, *quantity, ts)
+            },
+            ExecutionEvent::Expired {
+                order_id,
+                instrument_id,
+                side,
+                quantity,
+                venue_order_id,
+                ts,
+            } => Self {
+                venue_order_id: venue(venue_order_id),
+                ..base("expired", order_id, instrument_id, *side, *quantity, ts)
+            },
+            // `ExecutionEvent` is non_exhaustive: a future variant has no Python form yet.
+            _ => unreachable!("unmapped ExecutionEvent variant"),
+        }
+    }
 }
 
 /// How fills are costed.
@@ -462,6 +615,15 @@ impl NativeSim {
         self.sim.working_orders()
     }
 
+    /// Returns and clears the ordered execution events (ADR 0019 decision 4).
+    pub fn drain_events(&mut self) -> Vec<EventOut> {
+        ExecutionEngine::drain_events(&mut self.sim)
+            .unwrap_or_default()
+            .iter()
+            .map(EventOut::from_event)
+            .collect()
+    }
+
     /// Returns and clears the fills.
     pub fn drain_fills(&mut self) -> Vec<FillOut> {
         let fills = ExecutionEngine::drain_fills(&mut self.sim).unwrap_or_default();
@@ -712,6 +874,38 @@ impl NextOpenSimulator {
     fn set_position(&mut self, symbol: &str, quantity: f64, exchange: &str) -> PyResult<()> {
         let r = self.core.set_position(symbol, exchange, quantity);
         self.finish(r)
+    }
+
+    /// Returns and clears the ordered execution events (ADR 0019): dicts tagged by `kind`
+    /// (`submitted`, `accepted`, `rejected`, `fill`, `cancel_requested`, `cancelled`, `expired`)
+    /// with order_id, symbol, exchange, side, quantity, ts, venue_order_id and, per kind,
+    /// reason (`rejected`) or price, costs (minor units), cum_qty, complete (`fill`). The
+    /// legacy `drain_fills` / `drain_rejections` stay until 0.3.0 as a buffered shim.
+    fn drain_events<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyList>> {
+        let out = PyList::empty_bound(py);
+        for e in self.core.drain_events() {
+            let d = PyDict::new_bound(py);
+            d.set_item("kind", e.kind)?;
+            d.set_item("order_id", e.order_id)?;
+            d.set_item("symbol", e.symbol)?;
+            d.set_item("exchange", e.exchange)?;
+            d.set_item("side", e.side)?;
+            d.set_item("quantity", e.quantity)?;
+            d.set_item("ts", e.ts)?;
+            d.set_item("venue_order_id", e.venue_order_id)?;
+            match e.kind {
+                "fill" => {
+                    d.set_item("price", e.price)?;
+                    d.set_item("costs", e.costs)?;
+                    d.set_item("cum_qty", e.cum_qty)?;
+                    d.set_item("complete", e.complete)?;
+                }
+                "rejected" => d.set_item("reason", e.reason)?,
+                _ => {}
+            }
+            out.append(d)?;
+        }
+        Ok(out)
     }
 
     /// Returns and clears the fills: dicts with order_id, symbol, exchange, side, quantity,

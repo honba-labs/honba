@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Breaking: one ordered execution-event drain replaces the two drains (E2-S6b, ADR 0019)
+
+- `honba_engine::ExecutionEngine::drain_events()` returns every `ExecutionEvent` in production
+  order; the Rust `StrategyRunner` drains it once, keeps an `OrderState` per order and releases
+  the unfilled remainder (per instrument, from the event) from that one stream, so
+  `filled + released == ordered` holds whichever event is booked first. New accessors:
+  `StrategyRunner::order_state`, `released_quantity`. A repeated or illegal terminal event
+  releases nothing. `TrialSink` and the `honba-py` run engine implement `drain_events` natively.
+- `honba._honba.NextOpenSimulator.drain_events()` returns dicts tagged by `kind`;
+  `honba.strategies.execution.events_from_native` converts them to the `ExecutionEvent`
+  dataclasses.
+- Migration (ADR 0008 decision 7, ADR 0012 rule 5): `drain_fills()` / `drain_rejections()` remain
+  until 0.3.0 as a buffered shim over the same stream (each call drains the events once and
+  splits them; nothing is lost, only the cross-queue order). An engine that implements only the
+  legacy pair keeps working (default `drain_events`, or `LegacyPortEvents` for correct partial
+  fills). Implementers: add `drain_events` and return `true` from `native_events`.
+
 ### Wire `schema_version` 4: order-state events (E2-S6a, ADR 0019)
 
 - `schema_version` 4: `order_filled` now means the completing fill; earlier fills are the new

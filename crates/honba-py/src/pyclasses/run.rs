@@ -10,7 +10,7 @@
 #![allow(clippy::useless_conversion)]
 
 use honba_engine::{AlgoError, ExecutionEngine, Handler};
-use honba_entities::{Currency, Instrument, InstrumentKind, Money, Trade};
+use honba_entities::{Currency, ExecutionEvent, Instrument, InstrumentKind, Money, Trade};
 use honba_messages::{InstrumentId, Message, Order};
 use honba_sim::{BarFillEngine, FillCosts};
 pub use honba_strategy::MAX_SMA_PERIOD;
@@ -105,6 +105,14 @@ impl ExecutionEngine for PricedBarFill {
         now: honba_messages::UnixNanos,
     ) -> honba_engine::Result<()> {
         self.0.cancel(order_id, now)
+    }
+
+    fn drain_events(&mut self) -> honba_engine::Result<Vec<ExecutionEvent>> {
+        self.0.drain_events()
+    }
+
+    fn native_events(&self) -> bool {
+        true
     }
 
     fn drain_fills(&mut self) -> honba_engine::Result<Vec<Trade>> {

@@ -102,7 +102,7 @@ fn build(config: &Value) -> NativeSim {
     NativeSim::new(cfg).unwrap()
 }
 
-fn run(sc: &Value) {
+fn run(sc: &Value, via_events: bool) {
     let name = sc["name"].as_str().unwrap();
     let mut sim = build(&sc["config"]);
     let (mut drains, mut probes) = (Vec::<Value>::new(), Vec::<Value>::new());
@@ -120,6 +120,27 @@ fn run(sc: &Value) {
             }
             "submit" => sim.submit(&order(step)),
             "cancel" => sim.cancel(step["id"].as_str().unwrap(), step["now"].as_u64().unwrap()),
+            "drain" if via_events => {
+                // The ordered stream, split back into the legacy fill / rejection views.
+                let events = sim.drain_events();
+                let fills: Vec<Value> = events
+                    .iter()
+                    .filter(|e| e.kind == "fill")
+                    .map(|f| {
+                        json!([f.order_id, f.symbol, f.side, f.quantity, f.price, f.ts, f.costs])
+                    })
+                    .collect();
+                let rej: Vec<Value> = events
+                    .iter()
+                    .filter(|e| matches!(e.kind, "rejected" | "cancelled" | "expired"))
+                    .map(|r| {
+                        let reason = r.reason.as_deref().unwrap_or(r.kind);
+                        json!([r.order_id, r.symbol, r.side, r.quantity, reason, r.ts])
+                    })
+                    .collect();
+                drains.push(json!({"fills": fills, "rejections": rej}));
+                Ok(())
+            }
             "drain" => {
                 let fills: Vec<Value> = sim
                     .drain_fills()
@@ -196,7 +217,21 @@ fn every_chunk_one_and_two_vector_matches_the_python_reference() {
     let mut replayed = 0;
     for sc in doc["scenarios"].as_array().unwrap() {
         if matches!(sc["chunk"].as_u64().unwrap(), 1 | 2) {
-            run(sc);
+            run(sc, false);
+            replayed += 1;
+        }
+    }
+    assert_eq!(replayed, 52);
+}
+
+#[test]
+fn the_event_stream_splits_into_the_same_52_vector_drains() {
+    // `drain_events` is the one drain; its fill and rejection views equal the legacy drains.
+    let doc = fixture();
+    let mut replayed = 0;
+    for sc in doc["scenarios"].as_array().unwrap() {
+        if matches!(sc["chunk"].as_u64().unwrap(), 1 | 2) {
+            run(sc, true);
             replayed += 1;
         }
     }

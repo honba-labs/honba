@@ -4,6 +4,7 @@ mod error;
 mod fitness;
 mod plan;
 mod report;
+mod trial_sink;
 
 use honba_analytics::{EquityStats, TradeStats};
 use honba_messages::{Exchange, InstrumentId};

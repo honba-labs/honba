@@ -24,10 +24,13 @@ Pure contract: no I/O, no wall clock.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
-from honba.entities.order import OrderIntent
+from honba.domain.money import Currency, Money
+from honba.entities.instrument import InstrumentId
+from honba.entities.order import OrderIntent, OrderSide
 from honba.entities.order_state import OrderEvent
 from honba.entities.trade import Trade
 
@@ -48,6 +51,7 @@ __all__ = [
     "cancel_order",
     "drain_port_rejections",
     "event_order_id",
+    "events_from_native",
     "order_event",
 ]
 
@@ -184,6 +188,65 @@ def order_event(ev: ExecutionEvent) -> OrderEvent:
     if isinstance(ev, Cancelled):
         return OrderEvent.cancelled()
     return OrderEvent.expired()
+
+
+def events_from_native(
+    raw: Iterable[Mapping[str, Any]],
+    *,
+    currency: Currency | str = "INR",
+    user_id: Callable[[str], str] = lambda order_id: order_id,
+    intent_of: Callable[[str, OrderIntent], OrderIntent] | None = None,
+) -> list[ExecutionEvent]:
+    """Map ``honba._honba`` ``drain_events()`` dicts to :data:`ExecutionEvent` dataclasses.
+
+    This is the conversion at the binding boundary (ADR 0019 decision 4). Each dict carries a
+    ``kind`` (``submitted``, ``accepted``, ``rejected``, ``fill``, ``cancel_requested``,
+    ``cancelled``, ``expired``), ``order_id``, ``symbol``, ``exchange``, ``side``, ``quantity``,
+    ``ts`` and ``venue_order_id``; a fill adds ``price``, ``costs`` (minor units),
+    ``cum_qty`` and ``complete``; a rejection adds ``reason``. ``user_id`` maps the engine's
+    order id to the caller's (default identity). ``intent_of(user_order_id, default)`` lets the
+    caller substitute the intent it remembers for the order (order type, prices); ``default`` is
+    the market intent rebuilt from the event, carrying the event's quantity.
+    """
+    cur = currency if isinstance(currency, Currency) else Currency(currency)
+    out: list[ExecutionEvent] = []
+    for d in raw:
+        kind = d["kind"]
+        oid = user_id(d["order_id"])
+        if kind == "cancel_requested":
+            out.append(CancelRequested(oid, d["ts"]))
+            continue
+        side = OrderSide.BUY if d["side"] == "buy" else OrderSide.SELL
+        iid = InstrumentId(d["symbol"], d["exchange"])
+        venue = d.get("venue_order_id")
+        if kind == "fill":
+            trade = Trade(
+                iid,
+                side,
+                d["quantity"],
+                d["price"],
+                d["ts"],
+                oid,
+                costs=Money.from_minor(d["costs"], cur),
+            )
+            out.append(Fill(trade, d["cum_qty"], d["complete"], venue))
+            continue
+        intent = OrderIntent(iid, side, d["quantity"])
+        if intent_of is not None:
+            intent = intent_of(oid, intent)
+        if kind == "submitted":
+            out.append(Submitted(oid, intent, d["ts"]))
+        elif kind == "accepted":
+            out.append(Accepted(oid, intent, d["ts"], venue))
+        elif kind == "rejected":
+            out.append(Rejected(oid, intent, d["reason"], d["ts"], venue))
+        elif kind == "cancelled":
+            out.append(Cancelled(oid, intent, d["ts"], venue))
+        elif kind == "expired":
+            out.append(Expired(oid, intent, d["ts"], venue))
+        else:
+            raise ValueError(f"unknown native execution event kind {kind!r}")
+    return out
 
 
 @runtime_checkable

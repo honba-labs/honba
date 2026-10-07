@@ -201,3 +201,62 @@ fn an_unusable_or_malformed_bar_never_panics_and_never_fills() {
     (b.high, b.low, b.volume) = (90.0, 110.0, -1.0);
     s.on_bar(&b).unwrap();
 }
+
+#[test]
+fn drain_events_is_one_ordered_stream_of_tagged_events() {
+    let mut s = sim(1_000_000);
+    s.on_bar(&bar("AAA", 1, 100.0)).unwrap();
+    s.submit(&market("o-0", "AAA", "buy", 10.0, 1)).unwrap();
+    s.submit(&market("o-1", "AAA", "sell", 99.0, 1)).unwrap(); // no position: rejected at fill
+    s.on_bar(&bar("AAA", 2, 110.0)).unwrap();
+    let ev = s.drain_events();
+    let kinds: Vec<&str> = ev.iter().map(|e| e.kind).collect();
+    // Production order: the sell is refused at submit, the buy fills at the next open.
+    assert_eq!(kinds, ["rejected", "fill"]);
+    let f = &ev[1];
+    assert_eq!(
+        (
+            f.order_id.as_str(),
+            f.symbol.as_str(),
+            f.side,
+            f.quantity,
+            f.price,
+            f.ts
+        ),
+        ("o-0", "AAA", "buy", 10.0, Some(110.0), 2)
+    );
+    assert_eq!(
+        (f.cum_qty, f.complete, f.costs),
+        (Some(10.0), Some(true), Some(0))
+    );
+    assert_eq!(ev[0].reason.as_deref(), Some("no_position"));
+    assert_eq!(ev[0].quantity, 99.0);
+    assert!(s.drain_events().is_empty(), "drained once");
+}
+
+#[test]
+fn a_cancel_is_a_cancelled_event_stamped_with_now() {
+    let mut s = sim(1_000_000);
+    s.submit(&market("o-0", "AAA", "buy", 1.0, 0)).unwrap();
+    s.cancel("o-0", 7).unwrap();
+    let ev = s.drain_events();
+    assert_eq!(ev.len(), 1);
+    assert_eq!(
+        (ev[0].kind, ev[0].ts, ev[0].quantity),
+        ("cancelled", 7, 1.0)
+    );
+    assert_eq!(ev[0].reason, None);
+}
+
+#[test]
+fn the_legacy_drains_remain_a_buffered_shim_over_the_same_stream() {
+    let mut s = sim(1_000_000);
+    s.on_bar(&bar("AAA", 1, 100.0)).unwrap();
+    s.submit(&market("o-0", "AAA", "buy", 1.0, 1)).unwrap();
+    s.cancel("o-0", 1).unwrap();
+    s.submit(&market("o-1", "AAA", "buy", 2.0, 1)).unwrap();
+    s.on_bar(&bar("AAA", 2, 100.0)).unwrap();
+    // Draining one legacy queue does not lose the other.
+    assert_eq!(s.drain_rejections().len(), 1);
+    assert_eq!(s.drain_fills().len(), 1);
+}
