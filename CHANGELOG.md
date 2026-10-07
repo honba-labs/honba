@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Trust envelope for untrusted text (E5-S2)
+
+- New `honba.ai.trust`: `wrap_untrusted(content, origin)` returns a `TrustEnvelope` carrying the
+  origin, a content hash and an explicit `untrusted=True` marker; `render_for_llm` renders it with a
+  length-prefixed delimiter scheme so content (broker messages, LLM output, instrument names) cannot
+  close the envelope, and `extract_from_llm_rendered` round-trips it, rejecting a mismatched hash.
+
 ### Shared table / key-value display (`honba.display`)
 
 - New `honba.display`: `render_table`, `render_kv`, `render(rows, columns, fmt)` with `OutputFormat`
