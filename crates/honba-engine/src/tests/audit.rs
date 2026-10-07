@@ -32,7 +32,7 @@ fn seq_starts_at_zero_and_advances_by_one_per_record() {
     let mut log = AuditLog::new();
     assert_eq!(log.record(AuditKind::EventDispatched { ts_event: 1 }), 0);
     assert_eq!(
-        log.record(AuditKind::OrderCancelled {
+        log.record(AuditKind::CancelRequested {
             order_id: "O-1".to_string()
         }),
         1
@@ -83,7 +83,7 @@ fn records_are_returned_in_insertion_order_with_matching_seq() {
 fn interleaved_kinds_keep_one_monotonic_seq() {
     let mut log = AuditLog::new();
     let kinds = [
-        AuditKind::OrderCancelled {
+        AuditKind::CancelRequested {
             order_id: "A".to_string(),
         },
         AuditKind::EventDispatched { ts_event: 1 },
@@ -92,7 +92,7 @@ fn interleaved_kinds_keep_one_monotonic_seq() {
             reason: "no execution attached".to_string(),
         },
         AuditKind::EventDispatched { ts_event: 2 },
-        AuditKind::OrderCancelled {
+        AuditKind::CancelRequested {
             order_id: "C".to_string(),
         },
     ];

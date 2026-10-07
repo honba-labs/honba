@@ -2,14 +2,15 @@
 
 use std::collections::HashMap;
 
-use honba_engine::{ExecutionEngine, Result};
-use honba_entities::{Currency, Trade};
+use honba_engine::{ExecutionEngine, LegacyDrains, OrderRejection, Result};
+use honba_entities::{Currency, ExecutionEvent, Trade};
 use honba_messages::{Order, OrderId, OrderSide, OrderStatus, UnixNanos};
 
 /// A minimal paper-trading execution engine.
 ///
 /// Fills every order immediately at the price the caller specifies. No
-/// slippage, no partial fills, no rejection. Enough to drive a strategy
+/// slippage, no partial fills, no rejection, no acknowledgement: each order
+/// produces one complete [`ExecutionEvent::Fill`]. Enough to drive a strategy
 /// through the kernel and collect trades; real fill simulation belongs in
 /// a dedicated adapter.
 ///
@@ -38,7 +39,8 @@ use honba_messages::{Order, OrderId, OrderSide, OrderStatus, UnixNanos};
 pub struct PaperExecution {
     price: f64,
     pending: Vec<Order>,
-    fills: Vec<Trade>,
+    events: Vec<ExecutionEvent>,
+    legacy: LegacyDrains,
     next_ts: u64,
     /// The currency fills settle in. See [`BarFillEngine`](crate::BarFillEngine)
     /// for why the engine — not the `Order` — declares it.
@@ -51,7 +53,8 @@ impl PaperExecution {
         Self {
             price,
             pending: Vec::new(),
-            fills: Vec::new(),
+            events: Vec::new(),
+            legacy: LegacyDrains::new(),
             next_ts: 1,
             currency: Currency::Inr,
         }
@@ -91,16 +94,21 @@ impl ExecutionEngine for PaperExecution {
         } else {
             OrderSide::Buy
         };
-        self.fills.push(Trade::new(
-            order_id,
-            instrument,
-            side,
-            qty,
-            self.price,
-            self.currency,
-            t,
-            t,
-        ));
+        self.events.push(ExecutionEvent::Fill {
+            trade: Trade::new(
+                order_id,
+                instrument,
+                side,
+                qty,
+                self.price,
+                self.currency,
+                t,
+                t,
+            ),
+            cum_qty: qty,
+            complete: true,
+            venue_order_id: None,
+        });
         Ok(())
     }
 
@@ -109,8 +117,24 @@ impl ExecutionEngine for PaperExecution {
         Ok(())
     }
 
+    fn drain_events(&mut self) -> Result<Vec<ExecutionEvent>> {
+        Ok(std::mem::take(&mut self.events))
+    }
+
+    fn native_events(&self) -> bool {
+        true
+    }
+
     fn drain_fills(&mut self) -> Result<Vec<Trade>> {
-        Ok(std::mem::take(&mut self.fills))
+        let events = std::mem::take(&mut self.events);
+        self.legacy.absorb(events);
+        Ok(self.legacy.take_fills())
+    }
+
+    fn drain_rejections(&mut self) -> Result<Vec<OrderRejection>> {
+        let events = std::mem::take(&mut self.events);
+        self.legacy.absorb(events);
+        Ok(self.legacy.take_rejections())
     }
 }
 

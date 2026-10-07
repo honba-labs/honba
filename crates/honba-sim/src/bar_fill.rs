@@ -2,8 +2,8 @@
 
 use std::sync::{Arc, Mutex};
 
-use honba_engine::{AlgoError, ExecutionEngine, Handler, Result};
-use honba_entities::{Currency, Money, Trade};
+use honba_engine::{AlgoError, ExecutionEngine, Handler, LegacyDrains, OrderRejection, Result};
+use honba_entities::{Currency, ExecutionEvent, Money, Trade};
 use honba_messages::{Event, Order, OrderId, UnixNanos};
 
 /// Largest accepted flat cost per fill.
@@ -80,13 +80,15 @@ impl FillCosts {
 #[derive(Default)]
 struct Inner {
     last_price: Option<f64>,
-    fills: Vec<Trade>,
+    events: Vec<ExecutionEvent>,
+    legacy: LegacyDrains,
     next_ts: u64,
 }
 
 /// An execution engine that records the most recent bar close (as a
 /// [`Handler`]) and fills every order at that price (as an
-/// [`ExecutionEngine`]).
+/// [`ExecutionEngine`]). Each order produces one complete
+/// [`ExecutionEvent::Fill`]; it never acknowledges (L1).
 ///
 /// Cheap to clone — clones share the same underlying state. Register one
 /// clone with the engine to observe bars, and pass another to the runner to
@@ -195,19 +197,23 @@ impl ExecutionEngine for BarFillEngine {
         let costs = self.costs.of(order.quantity(), price, self.currency)?;
         let ts = UnixNanos::from_u64(inner.next_ts.max(order.ts_event().as_u64()));
         inner.next_ts = ts.as_u64() + 1;
-        inner.fills.push(
-            Trade::new(
-                OrderId::new(order.order_id().as_str()),
-                order.instrument_id().clone(),
-                order.side(),
-                order.quantity(),
-                price,
-                self.currency,
-                ts,
-                ts,
-            )
-            .with_costs(costs),
-        );
+        let trade = Trade::new(
+            OrderId::new(order.order_id().as_str()),
+            order.instrument_id().clone(),
+            order.side(),
+            order.quantity(),
+            price,
+            self.currency,
+            ts,
+            ts,
+        )
+        .with_costs(costs);
+        inner.events.push(ExecutionEvent::Fill {
+            trade,
+            cum_qty: order.quantity(),
+            complete: true,
+            venue_order_id: None,
+        });
         Ok(())
     }
 
@@ -215,7 +221,25 @@ impl ExecutionEngine for BarFillEngine {
         Ok(())
     }
 
+    fn drain_events(&mut self) -> Result<Vec<ExecutionEvent>> {
+        Ok(std::mem::take(&mut self.inner.lock().unwrap().events))
+    }
+
+    fn native_events(&self) -> bool {
+        true
+    }
+
     fn drain_fills(&mut self) -> Result<Vec<Trade>> {
-        Ok(std::mem::take(&mut self.inner.lock().unwrap().fills))
+        let mut inner = self.inner.lock().unwrap();
+        let events = std::mem::take(&mut inner.events);
+        inner.legacy.absorb(events);
+        Ok(inner.legacy.take_fills())
+    }
+
+    fn drain_rejections(&mut self) -> Result<Vec<OrderRejection>> {
+        let mut inner = self.inner.lock().unwrap();
+        let events = std::mem::take(&mut inner.events);
+        inner.legacy.absorb(events);
+        Ok(inner.legacy.take_rejections())
     }
 }

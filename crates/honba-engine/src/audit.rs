@@ -1,5 +1,7 @@
 //! The engine's audit trail.
 
+use honba_messages::{IllegalTransition, OrderEventKind, VenueOrderId};
+
 use crate::state::TradingState;
 
 /// One entry of an [`AuditLog`].
@@ -36,20 +38,58 @@ pub enum AuditKind {
         /// The side, rendered as `"buy"`, `"sell"` or `"no_order_side"`.
         side: String,
     },
-    /// The engine refused to submit an order.
+    /// The engine refused to submit an order (a pre-gate refusal, ADR 0019
+    /// decision 5); `reason` is the `ErrorCode` wire spelling, also carried by
+    /// the `ExecutionEvent::Rejected` the engine enqueues.
     OrderRejected {
         /// The client order identifier.
         order_id: String,
         /// Why it was refused.
         reason: String,
     },
-    /// A cancel was routed to the execution sink.
-    OrderCancelled {
+    /// A cancel was asked for and routed to the execution sink (formerly
+    /// `OrderCancelled`, which never meant the venue had cancelled). Recorded
+    /// once per order: repeated cancels are no-ops (ADR 0019 decision 6).
+    CancelRequested {
         /// The client order identifier.
         order_id: String,
     },
+    /// The execution sink reported a non-fill lifecycle event (accepted,
+    /// rejected, cancelled, expired) that the engine applied and translated.
+    /// Fills are [`AuditKind::FillProduced`]; the submitter's own
+    /// `Submitted`/`CancelRequested` and pre-gate rejections have their own
+    /// records.
+    OrderLifecycle {
+        /// The client order identifier.
+        order_id: String,
+        /// What happened.
+        event: OrderEventKind,
+        /// The kernel clock value stamped on the translated message.
+        ts_event: u64,
+    },
+    /// An event the order-state machine refused: the state was not changed
+    /// and no message was emitted (an illegal fill is still booked into the
+    /// position map). In sims and tests this is a bug; live, it is flagged for
+    /// reconciliation (E2-S7).
+    IllegalTransition {
+        /// The client order identifier.
+        order_id: String,
+        /// Why the transition was refused.
+        error: IllegalTransition,
+    },
+    /// An event named a different venue order id than the one first recorded
+    /// for the order; the recorded one is kept (ADR 0019 decision 3).
+    VenueOrderIdDrift {
+        /// The client order identifier.
+        order_id: String,
+        /// The id recorded first.
+        recorded: VenueOrderId,
+        /// The different id the event carried.
+        received: VenueOrderId,
+    },
     /// The execution sink produced a fill, which the engine turned back into
-    /// an [`Event::OrderFilled`](honba_messages::Event::OrderFilled) message.
+    /// an [`Event::OrderPartiallyFilled`](honba_messages::Event::OrderPartiallyFilled)
+    /// or [`Event::OrderFilled`](honba_messages::Event::OrderFilled) message.
     FillProduced {
         /// The client order identifier.
         order_id: String,

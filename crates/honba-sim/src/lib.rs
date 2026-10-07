@@ -12,7 +12,7 @@ pub mod scripted;
 pub use bar_fill::{BarFillEngine, FillCosts, FillCostsError};
 pub use next_open::{FillCostFn, NextOpenSim};
 pub use paper::{OrderLedger, PaperExecution};
-pub use scripted::{Behavior, ScriptedExecution};
+pub use scripted::{Behavior, ScriptedExecution, VenueAction};
 
 #[cfg(test)]
 mod tests;

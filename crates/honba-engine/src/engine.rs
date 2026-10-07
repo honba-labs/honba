@@ -1,13 +1,18 @@
 //! The event loop.
 
-use honba_entities::Trade;
-use honba_messages::{Event, Message, Order, OrderId, OrderSide, UnixNanos};
+use std::collections::HashMap;
+
+use honba_entities::{ExecutionEvent, Trade};
+use honba_messages::{
+    ErrorCode, Event, InstrumentId, Message, Order, OrderEventKind, OrderId, OrderSide, OrderState,
+    OrderStatus, UnixNanos, VenueOrderId,
+};
 
 use crate::audit::{AuditKind, AuditLog, AuditRecord};
 use crate::clock::Clock;
 use crate::data::DataFeed;
 use crate::error::Result;
-use crate::execution::ExecutionEngine;
+use crate::execution::{ExecutionEngine, LegacyPortEvents};
 use crate::handler::{EngineOutput, Handler};
 use crate::queue::EventQueue;
 use crate::state::TradingState;
@@ -18,6 +23,30 @@ use crate::state::TradingState;
 /// reduce latency for live streams. Set to `1` when the feed guarantees
 /// non-decreasing `ts_event` and you want immediate dispatch.
 pub const DEFAULT_BATCH_SIZE: usize = 1024;
+
+/// What the engine knows about one order it submitted or refused (ADR 0019
+/// decision 5). Entries are never removed during a run: a terminal entry
+/// answers "what happened to `O-7`".
+#[derive(Clone, Debug, PartialEq)]
+pub struct TrackedOrder {
+    /// The order's lifecycle state.
+    pub state: OrderState,
+    /// The instrument.
+    pub instrument_id: InstrumentId,
+    /// The side.
+    pub side: OrderSide,
+    /// The first venue order id any event named, if any.
+    pub venue_order_id: Option<VenueOrderId>,
+}
+
+impl TrackedOrder {
+    fn is_working(&self) -> bool {
+        matches!(
+            self.state.status,
+            OrderStatus::Submitted | OrderStatus::Accepted | OrderStatus::PartiallyFilled
+        )
+    }
+}
 
 /// Drives events from a [`DataFeed`] through a set of [`Handler`]s.
 ///
@@ -33,7 +62,10 @@ pub struct Engine {
     execution: Option<Box<dyn ExecutionEngine>>,
     trading_state: TradingState,
     audit: AuditLog,
-    pending_fills: Vec<Trade>,
+    /// Every execution event acknowledged and not yet drained, in order.
+    observed: Vec<ExecutionEvent>,
+    orders: HashMap<String, TrackedOrder>,
+    positions: HashMap<InstrumentId, f64>,
     started: bool,
     finished: bool,
 }
@@ -55,7 +87,9 @@ impl Engine {
             execution: None,
             trading_state: TradingState::Active,
             audit: AuditLog::new(),
-            pending_fills: Vec::new(),
+            observed: Vec::new(),
+            orders: HashMap::new(),
+            positions: HashMap::new(),
             started: false,
             finished: false,
         }
@@ -72,6 +106,43 @@ impl Engine {
         self
     }
 
+    /// Seeds the position map (net signed quantity per instrument) that fills
+    /// then move (ADR 0018 decision 7). A later entry for the same instrument
+    /// replaces the earlier one.
+    pub fn with_positions(mut self, seed: impl IntoIterator<Item = (InstrumentId, f64)>) -> Self {
+        self.positions.extend(seed);
+        self
+    }
+
+    /// The net signed position in `instrument` (0 when never traded).
+    pub fn position(&self, instrument: &InstrumentId) -> f64 {
+        self.positions.get(instrument).copied().unwrap_or(0.0)
+    }
+
+    /// The tracked state of order `order_id`, if the engine submitted or
+    /// refused it.
+    pub fn order(&self, order_id: &str) -> Option<&TrackedOrder> {
+        self.orders.get(order_id)
+    }
+
+    /// The signed open quantity (`+` buy, `-` sell) of the working orders on
+    /// `instrument` and `side`: the sum of `quantity - filled_qty` over orders
+    /// that are `Submitted`, `Accepted` or `PartiallyFilled` (ADR 0019
+    /// decision 5). A reduce-only check uses `position + working_exposure`.
+    pub fn working_exposure(&self, instrument: &InstrumentId, side: OrderSide) -> f64 {
+        let sign = match side {
+            OrderSide::Buy => 1.0,
+            OrderSide::Sell => -1.0,
+            _ => return 0.0,
+        };
+        sign * self
+            .orders
+            .values()
+            .filter(|o| o.is_working() && o.side == side && &o.instrument_id == instrument)
+            .map(|o| o.state.quantity - o.state.filled_qty)
+            .sum::<f64>()
+    }
+
     /// Returns the current clock value.
     pub fn now(&self) -> UnixNanos {
         self.clock.now()
@@ -84,9 +155,17 @@ impl Engine {
 
     /// Attaches an execution sink. [`EngineOutput::Orders`] / `Cancels` are routed here.
     ///
-    /// Replacing a sink drops the old one; its fills already collected by the
-    /// engine stay available through [`Engine::drain_fills`].
+    /// A sink that implements only the legacy drains
+    /// ([`ExecutionEngine::native_events`] is `false`) is wrapped in a
+    /// [`LegacyPortEvents`], so its partial fills are reported correctly.
+    /// Replacing a sink drops the old one; the events already acknowledged
+    /// stay available through [`Engine::drain_events`].
     pub fn set_execution(&mut self, execution: Box<dyn ExecutionEngine>) {
+        let execution: Box<dyn ExecutionEngine> = if execution.native_events() {
+            execution
+        } else {
+            Box::new(LegacyPortEvents::new(execution))
+        };
         self.execution = Some(execution);
     }
 
@@ -144,9 +223,10 @@ impl Engine {
     /// clock is advanced to the message's `ts_event`, the dispatch is audited,
     /// and each handler in registration order is asked for an
     /// [`EngineOutput`] whose commands are applied before the next handler
-    /// runs. After every handler the execution sink is drained and each fill
-    /// is turned back into a queued [`Event::OrderFilled`], so a caller that
-    /// pumps until `false` closes the command/ack loop in one queue.
+    /// runs. After every handler the execution sink is drained through
+    /// [`Engine::acknowledge_events`], which turns each event back into a
+    /// queued lifecycle message, so a caller that pumps until `false` closes
+    /// the command/ack loop in one queue.
     ///
     /// Errors are returned verbatim: an event earlier than one already
     /// dispatched yields [`AlgoError::ClockRegression`](crate::AlgoError::ClockRegression).
@@ -162,7 +242,7 @@ impl Engine {
         for i in 0..self.handlers.len() {
             let output = self.handlers[i].on_event(msg.event(), msg.ts_init())?;
             self.apply_output(output)?;
-            self.acknowledge_fills()?;
+            self.acknowledge_events()?;
         }
         Ok(true)
     }
@@ -212,84 +292,325 @@ impl Engine {
         previous
     }
 
-    /// Drains fills produced since the last call, in production order.
+    /// Drains every execution event acknowledged since the last call, in the
+    /// one queue order (ADR 0019 decision 4): the submitter's `Submitted` and
+    /// `CancelRequested`, pre-gate `Rejected`, and the sink's events.
     ///
-    /// Fills the engine already observed during a run come first, in the
-    /// order it saw them, followed by whatever the sink has produced since.
-    /// Calling it twice in a row returns an empty second batch.
-    pub fn drain_fills(&mut self) -> Result<Vec<Trade>> {
-        self.pull_fills()?;
-        Ok(std::mem::take(&mut self.pending_fills))
+    /// Events the engine already acknowledged during a run come first, then
+    /// whatever the sink has produced since, which this call acknowledges
+    /// (and so enqueues as lifecycle messages). Calling it twice in a row
+    /// returns an empty second batch.
+    pub fn drain_events(&mut self) -> Result<Vec<ExecutionEvent>> {
+        self.acknowledge_events()?;
+        Ok(std::mem::take(&mut self.observed))
     }
 
-    fn pull_fills(&mut self) -> Result<Vec<Trade>> {
-        let Some(execution) = self.execution.as_deref_mut() else {
-            return Ok(Vec::new());
-        };
-        let fills = execution.drain_fills()?;
-        self.pending_fills.extend(fills.iter().cloned());
+    /// Legacy: drains the fills acknowledged since the last call, in
+    /// production order, leaving every other event for
+    /// [`Engine::drain_events`]. Kept until 0.3.0 (ADR 0019 decision 4).
+    pub fn drain_fills(&mut self) -> Result<Vec<Trade>> {
+        self.acknowledge_events()?;
+        let mut fills = Vec::new();
+        self.observed.retain(|ev| match ev {
+            ExecutionEvent::Fill { trade, .. } => {
+                fills.push(trade.clone());
+                false
+            }
+            _ => true,
+        });
         Ok(fills)
     }
 
-    fn acknowledge_fills(&mut self) -> Result<()> {
-        for fill in self.pull_fills()? {
-            let order_id = fill.order_id().clone();
-            let quantity = fill.quantity();
-            let price = fill.price();
-            let ts = self.clock.now();
-            self.audit.record(AuditKind::FillProduced {
-                order_id: order_id.as_str().to_string(),
-                quantity,
-                price,
-                ts_event: ts.as_u64(),
-            });
-            self.queue.push_event(
-                Event::OrderFilled {
-                    order_id,
-                    last_qty: quantity,
-                    last_px: price,
-                    ts_event: ts,
-                },
-                ts,
-            );
+    /// Drains the execution sink and applies each event to its order's
+    /// [`OrderState`] (ADR 0019 decision 5).
+    ///
+    /// A legal transition produces exactly one lifecycle message on the
+    /// queue, stamped with the kernel clock; a fill also moves the position
+    /// map. A duplicate terminal event is a no-op. An illegal one is recorded
+    /// as [`AuditKind::IllegalTransition`] and changes nothing, except that an
+    /// illegal fill is still booked into the position map: money moved at the
+    /// venue. Never panics on venue input.
+    pub fn acknowledge_events(&mut self) -> Result<()> {
+        let Some(execution) = self.execution.as_deref_mut() else {
+            return Ok(());
+        };
+        for ev in execution.drain_events()? {
+            self.translate(ev);
         }
         Ok(())
+    }
+
+    /// Applies one event to the order store and emits its message.
+    fn translate(&mut self, ev: ExecutionEvent) {
+        let order_id = ev.order_id().as_str().to_string();
+        let now = self.clock.now();
+        let kind = ev.order_event().kind();
+        if let ExecutionEvent::Fill { trade, .. } = &ev {
+            let signed = match trade.side() {
+                OrderSide::Sell => -trade.quantity(),
+                _ => trade.quantity(),
+            };
+            *self
+                .positions
+                .entry(trade.instrument_id().clone())
+                .or_insert(0.0) += signed;
+        }
+        let Some(tracked) = self.orders.get_mut(&order_id) else {
+            // Nothing was sent under this id: every event is illegal for it.
+            self.audit.record(AuditKind::IllegalTransition {
+                order_id,
+                error: honba_messages::IllegalTransition::Transition {
+                    status: OrderStatus::Initialized,
+                    cancel_requested: false,
+                    event: kind,
+                },
+            });
+            self.observed.push(ev);
+            return;
+        };
+        if let Some(received) = venue_order_id(&ev) {
+            match &tracked.venue_order_id {
+                None => tracked.venue_order_id = Some(received.clone()),
+                Some(recorded) if recorded != received => {
+                    let recorded = recorded.clone();
+                    self.audit.record(AuditKind::VenueOrderIdDrift {
+                        order_id: order_id.clone(),
+                        recorded,
+                        received: received.clone(),
+                    });
+                }
+                Some(_) => {}
+            }
+        }
+        let from = tracked.state.status;
+        match tracked.state.apply(&ev.order_event()) {
+            Err(error) => {
+                self.audit
+                    .record(AuditKind::IllegalTransition { order_id, error });
+            }
+            Ok(false) => {}
+            Ok(true) => {
+                let state = tracked.state.clone();
+                let message = self.message_for(&ev, &state, now);
+                match &ev {
+                    ExecutionEvent::Fill { trade, .. } => {
+                        self.audit.record(AuditKind::FillProduced {
+                            order_id,
+                            quantity: trade.quantity(),
+                            price: trade.price(),
+                            ts_event: now.as_u64(),
+                        });
+                    }
+                    ExecutionEvent::Submitted { .. } | ExecutionEvent::CancelRequested { .. } => {}
+                    ExecutionEvent::Rejected { .. } if from == OrderStatus::Initialized => {}
+                    _ => {
+                        self.audit.record(AuditKind::OrderLifecycle {
+                            order_id,
+                            event: kind,
+                            ts_event: now.as_u64(),
+                        });
+                    }
+                }
+                if let Some(message) = message {
+                    self.queue.push_event(message, now);
+                }
+            }
+        }
+        self.observed.push(ev);
+    }
+
+    /// The wire message for a legal transition; `Submitted` is built by
+    /// [`Engine::submit`], which has the order.
+    fn message_for(
+        &self,
+        ev: &ExecutionEvent,
+        state: &OrderState,
+        now: UnixNanos,
+    ) -> Option<Event> {
+        let order_id = ev.order_id().clone();
+        Some(match ev {
+            ExecutionEvent::Submitted { .. } => return None,
+            ExecutionEvent::Accepted { venue_order_id, .. } => Event::OrderAccepted {
+                order_id,
+                venue_order_id: venue_order_id.clone(),
+                ts_event: now,
+            },
+            ExecutionEvent::Rejected { reason, .. } => Event::OrderRejected {
+                order_id,
+                reason: reason.clone(),
+                ts_event: now,
+            },
+            ExecutionEvent::Fill { trade, .. } if state.status == OrderStatus::Filled => {
+                Event::OrderFilled {
+                    order_id,
+                    last_qty: trade.quantity(),
+                    last_px: trade.price(),
+                    ts_event: now,
+                }
+            }
+            ExecutionEvent::Fill { trade, .. } => Event::OrderPartiallyFilled {
+                order_id,
+                last_qty: trade.quantity(),
+                last_px: trade.price(),
+                cum_qty: state.filled_qty,
+                ts_event: now,
+            },
+            ExecutionEvent::CancelRequested { .. } => Event::OrderCancelRequested {
+                order_id,
+                ts_event: now,
+            },
+            ExecutionEvent::Cancelled { .. } => Event::OrderCancelled {
+                order_id,
+                ts_event: now,
+            },
+            ExecutionEvent::Expired { .. } => Event::OrderExpired {
+                order_id,
+                ts_event: now,
+            },
+            _ => return None,
+        })
+    }
+
+    /// Refuses `order` before it reaches the sink (ADR 0019 decision 5):
+    /// `Initialized -> Rejected`, audited, and an `ExecutionEvent::Rejected`
+    /// on the one event queue.
+    fn refuse(&mut self, order: &Order, code: ErrorCode) {
+        let order_id = order.order_id().as_str().to_string();
+        let reason = code.as_str().to_string();
+        self.audit.record(AuditKind::OrderRejected {
+            order_id: order_id.clone(),
+            reason: reason.clone(),
+        });
+        self.orders.insert(
+            order_id,
+            TrackedOrder {
+                state: OrderState::new(),
+                instrument_id: order.instrument_id().clone(),
+                side: order.side(),
+                venue_order_id: None,
+            },
+        );
+        self.translate(ExecutionEvent::Rejected {
+            order_id: order.order_id().clone(),
+            instrument_id: order.instrument_id().clone(),
+            side: order.side(),
+            quantity: order.quantity(),
+            reason,
+            venue_order_id: None,
+            ts: self.clock.now(),
+        });
     }
 
     fn submit(&mut self, order: Order) -> Result<()> {
         let order_id = order.order_id().as_str().to_string();
-        if !self.trading_state.accepts_orders() {
-            self.audit.record(AuditKind::OrderRejected {
-                order_id,
-                reason: "trading halted".to_string(),
-            });
+        // Whatever the sink produced earlier is ahead of this order.
+        self.acknowledge_events()?;
+        if let Some(existing) = self.orders.get(&order_id) {
+            // An id is submitted once per run; reusing it is a submitter bug.
+            let error = honba_messages::IllegalTransition::Transition {
+                status: existing.state.status,
+                cancel_requested: existing.state.cancel_requested,
+                event: OrderEventKind::Submitted,
+            };
+            self.audit
+                .record(AuditKind::IllegalTransition { order_id, error });
             return Ok(());
         }
-        let Some(execution) = self.execution.as_deref_mut() else {
-            self.audit.record(AuditKind::OrderRejected {
-                order_id,
-                reason: "no execution attached".to_string(),
-            });
+        if self.execution.is_none() {
+            self.refuse(&order, ErrorCode::OrderExecutionUnavailable);
             return Ok(());
-        };
+        }
+        if !self.trading_state.accepts_orders() {
+            self.refuse(&order, ErrorCode::RiskTradingHalted);
+            return Ok(());
+        }
         let instrument = order.instrument_id().to_string();
         let side = side_label(order.side());
-        execution.submit(order)?;
+        let submitted = self.submitted_message(&order);
+        let execution = self
+            .execution
+            .as_deref_mut()
+            .expect("checked above: an execution is attached");
+        execution.submit(order.clone())?;
         self.audit.record(AuditKind::OrderSubmitted {
-            order_id,
+            order_id: order_id.clone(),
             instrument,
             side,
         });
-        Ok(())
+        self.orders.insert(
+            order_id,
+            TrackedOrder {
+                state: OrderState::new(),
+                instrument_id: order.instrument_id().clone(),
+                side: order.side(),
+                venue_order_id: None,
+            },
+        );
+        // Enqueued ahead of anything the sink can drain for this order.
+        self.queue.push_event(submitted, self.clock.now());
+        self.translate(ExecutionEvent::Submitted {
+            order_id: order.order_id().clone(),
+            instrument_id: order.instrument_id().clone(),
+            side: order.side(),
+            quantity: order.quantity(),
+            ts: self.clock.now(),
+        });
+        self.acknowledge_events()
     }
 
+    /// `Event::Order` for `order` as submitted, never earlier than the clock
+    /// (a message earlier than the clock could not be dispatched).
+    fn submitted_message(&self, order: &Order) -> Event {
+        let now = self.clock.now();
+        let order = if order.ts_event() < now {
+            let mut o = Order::new(
+                order.order_id().clone(),
+                order.instrument_id().clone(),
+                order.side(),
+                order.order_type(),
+                order.quantity(),
+                order.price(),
+                order.time_in_force(),
+                now,
+                order.ts_init(),
+            );
+            if let Some(trigger) = order.trigger_price() {
+                o = o.with_trigger_price(trigger);
+            }
+            o
+        } else {
+            order.clone()
+        };
+        Event::Order(order.with_status(OrderStatus::Submitted))
+    }
+
+    /// Requests a cancel (ADR 0019 decision 6): a no-op that emits nothing for
+    /// an unknown, un-submitted or terminal order, or one whose cancel is
+    /// already pending; otherwise `CancelRequested` once, then the sink's
+    /// cancel at the engine time.
     fn cancel(&mut self, id: OrderId) -> Result<()> {
+        // A fill the sink already produced beats this cancel.
+        self.acknowledge_events()?;
         let order_id = id.as_str().to_string();
-        if let Some(execution) = self.execution.as_deref_mut() {
-            execution.cancel(&order_id, self.clock.now())?;
+        let pending = match self.orders.get(&order_id) {
+            Some(o) => !o.is_working() || o.state.cancel_requested,
+            None => true,
+        };
+        if pending {
+            return Ok(());
         }
-        self.audit.record(AuditKind::OrderCancelled { order_id });
-        Ok(())
+        let now = self.clock.now();
+        self.audit.record(AuditKind::CancelRequested {
+            order_id: order_id.clone(),
+        });
+        self.translate(ExecutionEvent::CancelRequested {
+            order_id: id,
+            ts: now,
+        });
+        if let Some(execution) = self.execution.as_deref_mut() {
+            execution.cancel(&order_id, now)?;
+        }
+        self.acknowledge_events()
     }
 
     fn apply_output(&mut self, output: EngineOutput) -> Result<()> {
@@ -321,11 +642,12 @@ impl Engine {
     /// whose commands are applied before the next handler runs.
     ///
     /// After every handler the engine drains the execution sink and turns each
-    /// fill into an [`Event::OrderFilled`] message stamped with the kernel
-    /// clock, so the command/ack loop is closed in one queue and a replay
-    /// stays deterministic. That loop needs no iteration cap: `drain_fills`
-    /// takes the sink's buffer, so a handler that submits nothing produces no
-    /// fills and therefore no new messages.
+    /// event into a lifecycle message (`order_partially_filled`,
+    /// `order_filled`, `order_cancelled`, ...) stamped with the kernel clock,
+    /// so the command/ack loop is closed in one queue and a replay stays
+    /// deterministic. That loop needs no iteration cap: `drain_events` takes
+    /// the sink's buffer, so a handler that submits nothing produces no events
+    /// and therefore no new messages.
     ///
     /// If the feed produces events earlier than ones already dispatched, the
     /// clock returns [`AlgoError::ClockRegression`](crate::AlgoError::ClockRegression)
@@ -352,6 +674,17 @@ impl Engine {
         }
 
         self.finish()
+    }
+}
+
+fn venue_order_id(ev: &ExecutionEvent) -> Option<&VenueOrderId> {
+    match ev {
+        ExecutionEvent::Accepted { venue_order_id, .. }
+        | ExecutionEvent::Rejected { venue_order_id, .. }
+        | ExecutionEvent::Fill { venue_order_id, .. }
+        | ExecutionEvent::Cancelled { venue_order_id, .. }
+        | ExecutionEvent::Expired { venue_order_id, .. } => venue_order_id.as_ref(),
+        _ => None,
     }
 }
 

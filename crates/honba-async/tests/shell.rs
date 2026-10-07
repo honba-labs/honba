@@ -388,7 +388,8 @@ async fn state_command_halts_the_engine() {
         order_verdicts(&audit),
         vec![
             "submitted O-1".to_string(),
-            "rejected O-2 (trading halted)".to_string(),
+            // ADR 0018 decision 5: the pre-gate reason is the ErrorCode spelling.
+            "rejected O-2 (risk_trading_halted)".to_string(),
         ],
         "Halted must refuse orders instead of routing them"
     );
@@ -564,14 +565,16 @@ async fn run_one(close: f64, timestamps: &[u64]) -> Vec<AuditRecord> {
 async fn one_handle_is_one_engine() {
     let (audit_a, audit_b) = tokio::join!(run_one(101.0, &[1, 2, 3]), run_one(201.0, &[11, 12]));
 
+    // ADR 0019 decision 1/5: each bar, then the submitter's `order` and the
+    // fill's `order_filled`, all stamped with the bar's ts_event.
     assert_eq!(
         dispatched(&audit_a),
-        vec![1, 1, 2, 2, 3, 3],
-        "each bar is dispatched and then its own fill ack, stamped with the same ts_event"
+        vec![1, 1, 1, 2, 2, 2, 3, 3, 3],
+        "each bar is dispatched and then its own order and fill acks, stamped with the same ts_event"
     );
     assert_eq!(
         dispatched(&audit_b),
-        vec![11, 11, 12, 12],
+        vec![11, 11, 11, 12, 12, 12],
         "the second engine sees only its own feed"
     );
     let contiguous = |audit: &[AuditRecord]| {

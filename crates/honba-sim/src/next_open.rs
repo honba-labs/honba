@@ -9,8 +9,10 @@
 //! the injected fill-cost hook ([`FillCostFn`]) and the session-open event path
 //! ([`NextOpenSim::on_session_open`]).
 
-use honba_engine::{AlgoError, EngineOutput, ExecutionEngine, Handler, OrderRejection, Result};
-use honba_entities::{Currency, Money, Trade};
+use honba_engine::{
+    AlgoError, EngineOutput, ExecutionEngine, Handler, LegacyDrains, OrderRejection, Result,
+};
+use honba_entities::{Currency, ExecutionEvent, Money, Trade};
 use honba_messages::{Bar, Event, InstrumentId, Order, OrderId, OrderSide, OrderType, UnixNanos};
 
 /// Quantities closer than this are equal (float residue from fractional fills).
@@ -41,6 +43,9 @@ struct Open {
 /// An order submitted in session *k* fills at the open of its instrument's first usable bar in a
 /// later session and waits while the instrument does not print. Within one opening, sells fill
 /// before buys, each side in submission order. All cash is integer minor units (ADR 0011).
+///
+/// Events come out of one ordered queue ([`ExecutionEngine::drain_events`]): a fill that
+/// leaves a remainder is followed by the remainder's `Rejected`. It never acknowledges (L1).
 pub struct NextOpenSim {
     cash: i64,
     currency: Currency,
@@ -59,8 +64,8 @@ pub struct NextOpenSim {
     from_open: bool,
     opened: Vec<InstrumentId>,
     working: Vec<Working>,
-    fills: Vec<Trade>,
-    rejections: Vec<OrderRejection>,
+    events: Vec<ExecutionEvent>,
+    legacy: LegacyDrains,
 }
 
 fn err(msg: String) -> AlgoError {
@@ -93,8 +98,8 @@ impl NextOpenSim {
             from_open: false,
             opened: Vec::new(),
             working: Vec::new(),
-            fills: Vec::new(),
-            rejections: Vec::new(),
+            events: Vec::new(),
+            legacy: LegacyDrains::new(),
         })
     }
 
@@ -416,16 +421,19 @@ impl NextOpenSim {
             .checked_add(proceeds)
             .ok_or_else(|| err("cash overflow".into()))?;
         self.working.remove(idx);
+        // The fill, then the remainder's rejection: one queue, in that order.
+        let booked = if qty > 0.0 {
+            self.cash = cash;
+            self.receivables
+                .push((self.session + self.settlement_days, proceeds));
+            self.book(&order, open, qty, notional, cost, qty >= want)
+        } else {
+            Ok(())
+        };
         if qty < want {
             self.reject(&order, want - qty, "no_position");
         }
-        if qty <= 0.0 {
-            return Ok(());
-        }
-        self.cash = cash;
-        self.receivables
-            .push((self.session + self.settlement_days, proceeds));
-        self.book(&order, open, qty, notional, cost)
+        booked
     }
 
     fn fill_buy(&mut self, idx: usize, open: &Open) -> Result<()> {
@@ -456,14 +464,17 @@ impl NextOpenSim {
             .and_then(|o| self.cash.checked_sub(o))
             .ok_or_else(|| err("cash overflow".into()))?;
         self.working.remove(idx);
+        // The fill, then the remainder's rejection: one queue, in that order.
+        let booked = if qty > 0.0 {
+            self.cash = outlay;
+            self.book(&order, open, qty, notional, cost, qty >= want)
+        } else {
+            Ok(())
+        };
         if qty < want {
             self.reject(&order, want - qty, "insufficient_funds");
         }
-        if qty <= 0.0 {
-            return Ok(());
-        }
-        self.cash = outlay;
-        self.book(&order, open, qty, notional, cost)
+        booked
     }
 
     fn lot_size(&self, instrument: &InstrumentId) -> f64 {
@@ -501,6 +512,7 @@ impl NextOpenSim {
         qty: f64,
         notional: i64,
         cost: i64,
+        complete: bool,
     ) -> Result<()> {
         let signed = if order.side() == OrderSide::Buy {
             qty
@@ -520,19 +532,24 @@ impl NextOpenSim {
             .traded_notional
             .checked_add(notional)
             .ok_or_else(|| err("traded notional overflow".into()))?;
-        self.fills.push(
-            Trade::new(
-                OrderId::new(order.order_id().as_str()),
-                order.instrument_id().clone(),
-                order.side(),
-                qty,
-                open.price,
-                self.currency,
-                open.ts,
-                open.ts,
-            )
-            .with_costs(Money::new(cost, self.currency)),
-        );
+        let trade = Trade::new(
+            OrderId::new(order.order_id().as_str()),
+            order.instrument_id().clone(),
+            order.side(),
+            qty,
+            open.price,
+            self.currency,
+            open.ts,
+            open.ts,
+        )
+        .with_costs(Money::new(cost, self.currency));
+        // One fill per order: its cumulative quantity is its own.
+        self.events.push(ExecutionEvent::Fill {
+            trade,
+            cum_qty: qty,
+            complete,
+            venue_order_id: None,
+        });
         Ok(())
     }
 
@@ -542,14 +559,15 @@ impl NextOpenSim {
     }
 
     fn push_rejection(&mut self, order: &Order, qty: f64, reason: &str, ts: UnixNanos) {
-        self.rejections.push(OrderRejection::rejected(
-            order.order_id().clone(),
-            order.instrument_id().clone(),
-            order.side(),
-            qty,
-            reason,
+        self.events.push(ExecutionEvent::Rejected {
+            order_id: order.order_id().clone(),
+            instrument_id: order.instrument_id().clone(),
+            side: order.side(),
+            quantity: qty,
+            reason: reason.to_string(),
+            venue_order_id: None,
             ts,
-        ));
+        });
     }
 }
 
@@ -588,23 +606,36 @@ impl ExecutionEngine for NextOpenSim {
             .position(|w| w.order.order_id().as_str() == order_id)
         {
             let w = self.working.remove(i);
-            self.rejections.push(OrderRejection::cancelled(
-                w.order.order_id().clone(),
-                w.order.instrument_id().clone(),
-                w.order.side(),
-                w.order.quantity(),
-                now,
-            ));
+            self.events.push(ExecutionEvent::Cancelled {
+                order_id: w.order.order_id().clone(),
+                instrument_id: w.order.instrument_id().clone(),
+                side: w.order.side(),
+                quantity: w.order.quantity(),
+                venue_order_id: None,
+                ts: now,
+            });
         }
         Ok(())
     }
 
+    fn drain_events(&mut self) -> Result<Vec<ExecutionEvent>> {
+        Ok(std::mem::take(&mut self.events))
+    }
+
+    fn native_events(&self) -> bool {
+        true
+    }
+
     fn drain_fills(&mut self) -> Result<Vec<Trade>> {
-        Ok(std::mem::take(&mut self.fills))
+        let events = std::mem::take(&mut self.events);
+        self.legacy.absorb(events);
+        Ok(self.legacy.take_fills())
     }
 
     fn drain_rejections(&mut self) -> Result<Vec<OrderRejection>> {
-        Ok(std::mem::take(&mut self.rejections))
+        let events = std::mem::take(&mut self.events);
+        self.legacy.absorb(events);
+        Ok(self.legacy.take_rejections())
     }
 }
 

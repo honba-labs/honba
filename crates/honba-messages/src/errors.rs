@@ -110,8 +110,12 @@ crate::enum_with_all! {
         RiskMaxPositionExceeded,
         /// Account drawdown exceeded the configured maximum.
         RiskMaxDrawdownExceeded,
+        /// The submitter refused an order because trading is halted (ADR 0018).
+        RiskTradingHalted,
         /// The exchange or gateway rejected the order.
         OrderRejected,
+        /// No execution engine is attached to receive the order (ADR 0018).
+        OrderExecutionUnavailable,
         /// The referenced order does not exist.
         OrderNotFound,
         /// The referenced instrument does not exist.
@@ -146,8 +150,9 @@ impl ErrorCode {
             Self::RateLimited => ErrorCategory::RateLimit,
             Self::RiskMaxNotionalExceeded
             | Self::RiskMaxPositionExceeded
-            | Self::RiskMaxDrawdownExceeded => ErrorCategory::Risk,
-            Self::OrderRejected => ErrorCategory::Order,
+            | Self::RiskMaxDrawdownExceeded
+            | Self::RiskTradingHalted => ErrorCategory::Risk,
+            Self::OrderRejected | Self::OrderExecutionUnavailable => ErrorCategory::Order,
             Self::MarketDataUnavailable => ErrorCategory::MarketData,
             Self::Timeout | Self::TransportError => ErrorCategory::Transport,
             Self::InternalError => ErrorCategory::Internal,
@@ -180,7 +185,9 @@ impl ErrorCode {
             Self::RiskMaxNotionalExceeded => "risk_max_notional_exceeded",
             Self::RiskMaxPositionExceeded => "risk_max_position_exceeded",
             Self::RiskMaxDrawdownExceeded => "risk_max_drawdown_exceeded",
+            Self::RiskTradingHalted => "risk_trading_halted",
             Self::OrderRejected => "order_rejected",
+            Self::OrderExecutionUnavailable => "order_execution_unavailable",
             Self::OrderNotFound => "order_not_found",
             Self::InstrumentNotFound => "instrument_not_found",
             Self::MarketDataUnavailable => "market_data_unavailable",

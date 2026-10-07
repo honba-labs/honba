@@ -830,9 +830,23 @@
             "type": "string"
           },
           {
+            "description": "The submitter refused an order because trading is halted (ADR 0018).",
+            "enum": [
+              "risk_trading_halted"
+            ],
+            "type": "string"
+          },
+          {
             "description": "The exchange or gateway rejected the order.",
             "enum": [
               "order_rejected"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "No execution engine is attached to receive the order (ADR 0018).",
+            "enum": [
+              "order_execution_unavailable"
             ],
             "type": "string"
           },

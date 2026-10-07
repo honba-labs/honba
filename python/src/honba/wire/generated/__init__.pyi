@@ -111,7 +111,7 @@ class DepthResponse:
 
 ErrorCategory = Literal["validation", "not_found", "auth", "rate_limit", "risk", "order", "market_data", "transport", "internal", "unsupported"]
 
-ErrorCode = Literal["validation_invalid_request", "not_found", "unauthorized", "forbidden", "rate_limited", "risk_max_notional_exceeded", "risk_max_position_exceeded", "risk_max_drawdown_exceeded", "order_rejected", "order_not_found", "instrument_not_found", "market_data_unavailable", "timeout", "transport_error", "internal_error", "unsupported", "not_implemented"]
+ErrorCode = Literal["validation_invalid_request", "not_found", "unauthorized", "forbidden", "rate_limited", "risk_max_notional_exceeded", "risk_max_position_exceeded", "risk_max_drawdown_exceeded", "risk_trading_halted", "order_rejected", "order_execution_unavailable", "order_not_found", "instrument_not_found", "market_data_unavailable", "timeout", "transport_error", "internal_error", "unsupported", "not_implemented"]
 
 class ErrorDetail:
     code: ErrorCode

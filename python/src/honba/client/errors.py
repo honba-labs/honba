@@ -92,11 +92,11 @@ class RateLimitedApiError(ApiError):
 
 
 class RiskApiError(ApiError):
-    """A ``risk_max_*`` refusal."""
+    """A ``risk_*`` refusal (HTTP 422)."""
 
 
 class OrderRejectedApiError(ApiError):
-    """``order_rejected``."""
+    """``order_rejected`` or ``order_execution_unavailable``."""
 
 
 class MarketDataUnavailableApiError(ApiError):
@@ -139,7 +139,9 @@ CATEGORY_OF_CODE: Mapping[str, str] = {
     "risk_max_notional_exceeded": "risk",
     "risk_max_position_exceeded": "risk",
     "risk_max_drawdown_exceeded": "risk",
+    "risk_trading_halted": "risk",
     "order_rejected": "order",
+    "order_execution_unavailable": "order",
     "market_data_unavailable": "market_data",
     "timeout": "transport",
     "transport_error": "transport",
@@ -160,7 +162,9 @@ ERROR_CLASS_OF_CODE: Mapping[str, type[ApiError]] = {
     "risk_max_notional_exceeded": RiskApiError,
     "risk_max_position_exceeded": RiskApiError,
     "risk_max_drawdown_exceeded": RiskApiError,
+    "risk_trading_halted": RiskApiError,
     "order_rejected": OrderRejectedApiError,
+    "order_execution_unavailable": OrderRejectedApiError,
     "market_data_unavailable": MarketDataUnavailableApiError,
     "timeout": TransportApiError,
     "transport_error": TransportApiError,

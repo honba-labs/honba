@@ -431,24 +431,28 @@ fn cancels_and_state_changes_are_applied_and_audited() {
     });
     engine.run(&mut feed).unwrap();
 
-    assert_eq!(*sink.cancelled.lock().unwrap(), vec!["O-9".to_string()]);
+    // ADR 0019 decision 6: cancelling an order the engine never submitted is a
+    // no-op that reaches no sink and records nothing.
+    assert!(sink.cancelled.lock().unwrap().is_empty());
     assert!(sink.submitted.lock().unwrap().is_empty());
     assert_eq!(engine.trading_state(), TradingState::Halted);
-    assert_eq!(
-        seen.lock().unwrap().len(),
-        3,
-        "the run must continue after the rejection"
+    let seen = seen.lock().unwrap().clone();
+    assert_eq!(seen.len(), 4, "the run must continue after the rejection");
+    assert!(
+        matches!(&seen[3], Event::OrderRejected { order_id, reason, .. }
+            if order_id.as_str() == "O-1" && reason == "risk_trading_halted"),
+        "the refusal reaches the handlers as an order_rejected: {:?}",
+        seen[3]
     );
     assert_eq!(engine.now(), ts(3));
 
+    // ADR 0018 decision 5 / ADR 0019 decision 5: the pre-gate reason is the
+    // `ErrorCode` wire spelling, and the refusal is a dispatched event.
     let kinds: Vec<AuditKind> = engine.audit().iter().map(|r| r.kind.clone()).collect();
     assert_eq!(
         kinds,
         vec![
             AuditKind::EventDispatched { ts_event: 1 },
-            AuditKind::OrderCancelled {
-                order_id: "O-9".to_string(),
-            },
             AuditKind::EventDispatched { ts_event: 2 },
             AuditKind::StateChanged {
                 from: TradingState::Active,
@@ -457,8 +461,9 @@ fn cancels_and_state_changes_are_applied_and_audited() {
             AuditKind::EventDispatched { ts_event: 3 },
             AuditKind::OrderRejected {
                 order_id: "O-1".to_string(),
-                reason: "trading halted".to_string(),
+                reason: "risk_trading_halted".to_string(),
             },
+            AuditKind::EventDispatched { ts_event: 3 },
         ]
     );
 }
@@ -485,7 +490,8 @@ fn orders_without_an_execution_sink_are_rejected_not_fatal() {
     engine.run(&mut feed).unwrap();
 
     assert_eq!(engine.now(), ts(2));
-    assert_eq!(seen.lock().unwrap().len(), 2);
+    // Two bars and, for each refusal, its `order_rejected` (ADR 0019 decision 5).
+    assert_eq!(seen.lock().unwrap().len(), 4);
     let kinds: Vec<AuditKind> = engine.audit().iter().map(|r| r.kind.clone()).collect();
     assert_eq!(
         kinds,
@@ -493,13 +499,15 @@ fn orders_without_an_execution_sink_are_rejected_not_fatal() {
             AuditKind::EventDispatched { ts_event: 1 },
             AuditKind::OrderRejected {
                 order_id: "O-1".to_string(),
-                reason: "no execution attached".to_string(),
+                reason: "order_execution_unavailable".to_string(),
             },
+            AuditKind::EventDispatched { ts_event: 1 },
             AuditKind::EventDispatched { ts_event: 2 },
             AuditKind::OrderRejected {
                 order_id: "O-2".to_string(),
-                reason: "no execution attached".to_string(),
+                reason: "order_execution_unavailable".to_string(),
             },
+            AuditKind::EventDispatched { ts_event: 2 },
         ]
     );
 }
@@ -552,11 +560,11 @@ fn two_runs_with_the_same_feed_produce_identical_audit_records() {
                 price: 101.0,
                 ts_event: 1,
             },
+            // `order` (the submitter's Event::Order), then `order_filled`.
+            &AuditKind::EventDispatched { ts_event: 1 },
             &AuditKind::EventDispatched { ts_event: 1 },
             &AuditKind::EventDispatched { ts_event: 2 },
-            &AuditKind::OrderCancelled {
-                order_id: "O-9".to_string(),
-            },
+            // The cancel of the never-submitted O-9 is a no-op (ADR 0019 decision 6).
             &AuditKind::EventDispatched { ts_event: 3 },
             &AuditKind::StateChanged {
                 from: TradingState::Active,

@@ -86,3 +86,25 @@ fn not_implemented_is_an_unsupported_category_code_that_is_not_retryable() {
     );
     assert!(!ErrorCode::NotImplemented.is_retryable());
 }
+
+#[test]
+fn pre_gate_refusal_codes_have_their_adr_0018_spelling_and_category() {
+    // ADR 0018 decision 5 / ADR 0019 decision 5: the pre-gate `Rejected.reason`.
+    for (code, wire, category) in [
+        (
+            ErrorCode::RiskTradingHalted,
+            "risk_trading_halted",
+            ErrorCategory::Risk,
+        ),
+        (
+            ErrorCode::OrderExecutionUnavailable,
+            "order_execution_unavailable",
+            ErrorCategory::Order,
+        ),
+    ] {
+        assert_eq!(serde_json::to_value(code).unwrap(), json!(wire));
+        assert_eq!(code.as_str(), wire);
+        assert_eq!(code.category(), category);
+        assert!(!code.is_retryable(), "{wire} must not be retryable");
+    }
+}

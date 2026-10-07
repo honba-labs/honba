@@ -4,6 +4,7 @@ mod audit;
 mod clock;
 mod engine;
 mod execution;
+mod order_store;
 mod queue;
 mod state;
 
