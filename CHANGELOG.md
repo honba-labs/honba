@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Rust next-open simulator, chunk 3a: bindings (E3-S1a, ADR 0016)
+
+- New `honba._honba.NextOpenSimulator` (PyO3 binding of `honba_sim::NextOpenSim`, stub in `_honba.pyi`): sessions,
+  bars, submit/cancel, settlement, lot sizes, long-only, named or callable fill costs, integer-minor-unit accessors,
+  drained fills and rejections as dicts. `ValueError` for rule violations, `RuntimeError` for the settlement guard,
+  a cost callable's exception propagates unchanged. New `honba._honba.next_open_fill_cost`.
+- New `honba_market::india::costs::NseCashEquitySchedule` (delivery, intraday) carrying the Python fill-cost legs, and
+  the `CostSchedule` -> `FillCostFn` adapter in `honba-py` (each leg rounded to paise once). Equal to
+  `nse_equity_delivery_fill_cost` / `nse_equity_intraday_fill_cost` over a grid and a 200,000-case sweep.
+- All 52 chunk 1 and 2 vectors replay through the binding (Rust core test and `test_next_open_sim_native.py`). The
+  Python `NextOpenExecution` is unchanged; delegation is chunk 3b.
+
 ### Rust next-open simulator, chunk 2 (E3-S1a, ADR 0016)
 
 - `honba_sim::NextOpenSim` gains the settlement cycle (`with_settlement_days`, `set_settlement_days`, `unsettled`,

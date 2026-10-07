@@ -181,3 +181,55 @@ Python.
 4. `honba._honba` replays every vector (all chunks) and equals the Python reference, plus a fuzzed scenario comparison
    over the whole catalog.
 5. Limit and stop fills remain out of scope (Python rejects them; decision 6).
+
+## Chunk 3a addendum (bindings, cost adapter, native replay)
+
+Implemented in `honba-py` (`crates/honba-py/src/pyclasses/next_open.rs`) and `honba-market`; the Python
+`NextOpenExecution` is untouched (delegation is chunk 3b).
+
+- **Class.** `honba._honba.NextOpenSimulator(cash, currency="INR", *, settlement_days=0, long_only=True, lot_sizes=None,
+  costs=None)` wraps `honba_sim::NextOpenSim`. Methods: `open_session(ts, bars)`, `on_session_open(ts, bars)`,
+  `on_bar(bar)`, `submit(order)`, `cancel(order_id, now)`, `set_settlement_days`, `set_lot_size(symbol, lot, exchange)`,
+  `drain_fills()`, `drain_rejections()`; properties `cash`, `fees`, `traded_notional`, `unsettled`, `available_cash`,
+  `settlement_days`, `receivables`, `positions` (`(symbol, exchange, qty)` in first-opened order), `working_orders`.
+  Money is integer minor units on the boundary (ADR 0011). Bars and orders are plain dicts in the vector step shapes
+  (`symbol, ts, open, high, low, close[, volume, exchange]`; `id, symbol, side, qty, ts[, type, price, trigger,
+  exchange]`). Drained fills are dicts (`order_id, symbol, exchange, side, quantity, price, ts, costs`), rejections
+  likewise plus `reason` and `cancelled`.
+- **Structure.** An interpreter-free core (`NativeSim`, `BarIn`, `OrderIn`, `SimError`, `CostSpec`) carries the logic
+  and is what Rust tests drive (the crate links no libpython in tests); the `#[pyclass]` is a thin dict shell.
+- **Errors.** `AlgoError::Component` is `ValueError`. The settlement-cycle guard (`set_settlement_days` after the first
+  session) is `RuntimeError`, a negative value `ValueError`, like the Python reference.
+- **Costs.** `costs` is `None`, a pack name resolved like `resolve_fill_costs` (`none|zero`, `india.equity[.delivery]`,
+  `india.equity.intraday`) or a Python callable `(side: "buy"|"sell", quantity, price) -> int` of minor units. The
+  callable runs under the GIL of the calling method; its exception is stored and re-raised unchanged by that method
+  (the order stays working, as for a Rust-side cost error); a negative result is a `ValueError`, a non-int a
+  `TypeError`. `honba._honba.next_open_fill_cost(pack, side, qty, price)` exposes the pack function for parity checks.
+- **Adapter and schedule.** `honba_py::pyclasses::next_open::schedule_cost_fn` adapts any `CostSchedule` to
+  `FillCostFn`: notional `abs(qty * price)`, each charge leg rounded once to minor units (half away from zero), legs
+  summed. The existing India `CostModel` cannot reproduce the Python functions (delivery STT on both sides, a flat
+  brokerage with no percentage cap, no IPFT leg, GST on exchange plus brokerage only), so `honba-market` gained
+  `india::costs::NseCashEquitySchedule::{delivery, intraday}` with the Python legs, rates and cap (it is a new type;
+  `CostModel` is unchanged).
+- **Parity.** Over a grid of 2 sides x 14 quantities x 9 prices per pack, and a 200,000-case random sweep, the Rust
+  adapter equals `nse_equity_delivery_fill_cost` / `nse_equity_intraday_fill_cost` exactly: no rounding mismatches.
+- **Replay.** `crates/honba-py/tests/next_open_native.rs` (Rust core) and
+  `python/tests/integration/test_next_open_sim_native.py` (through `honba._honba`, the cost model of the vectors as a
+  Python callable) replay all 52 chunk 1 and 2 vectors and equal the committed expectations.
+
+### Remaining for chunk 3b
+
+1. `NextOpenExecution` delegates to `honba._honba.NextOpenSimulator` with its API unchanged: `submit(order_id, intent,
+   ts)` to order dicts, `SessionOpen`/`Bar` events to `on_session_open`/`on_bar`, drained dicts back to `Trade` /
+   `OrderRejection` (with `intent` rebuilt from the order, `cancelled=True`), `cash`/`fees`/`traded_notional`/
+   `unsettled`/`available_cash` as `Money`, `positions` as a dict keyed by `InstrumentId`, `settlement_days` and
+   `set_lot_size`.
+2. `FillCostFn` bridge: a Python cost function returns `Money`, the binding takes minor-unit ints, so the wrapper
+   converts and keeps the currency check (a non-zero cost in another currency raised in Python after dequeuing a
+   sell, in Rust before; see chunk 2 addendum). `resolve_fill_costs` / `make_simulator` may pass the pack name
+   straight to the native class for the India packs.
+3. Fallback when the extension is missing or stale (the Python class is also used without the extension): decide
+   between keeping the pure-Python implementation as the fallback (then both stay under the vectors) and requiring
+   the extension.
+4. Fuzzed scenario comparison between the reference implementation and the native class over the whole catalog.
+5. Limit and stop fills remain out of scope (decision 6).
