@@ -2,6 +2,7 @@
 
 mod bar_fill;
 mod next_open;
+mod next_open_costs;
 mod next_open_settlement;
 mod paper;
 mod scripted;

@@ -14,6 +14,11 @@ use honba_messages::{Bar, Event, InstrumentId, Order, OrderId, OrderSide, OrderT
 /// Quantities closer than this are equal (float residue from fractional fills).
 const QTY_EPS: f64 = 1e-9;
 
+/// `(side, quantity, price) -> cost` of one fill, in the simulator's currency and never
+/// negative (a negative value is an error that leaves the order working). Injected so that market
+/// cost schedules stay above `honba-sim`; the Python counterpart is `FillCostFn`.
+pub type FillCostFn = Box<dyn Fn(OrderSide, f64, f64) -> Result<Money> + Send>;
+
 struct Working {
     order: Order,
     /// Index of the session the order was submitted in (-1 before the first).
@@ -42,6 +47,7 @@ pub struct NextOpenSim {
     settlement_days: i64,
     /// `(session the proceeds become available, amount in minor units)`.
     receivables: Vec<(i64, i64)>,
+    cost_fn: FillCostFn,
     long_only: bool,
     lot_sizes: Vec<(InstrumentId, f64)>,
     positions: Vec<(InstrumentId, f64)>,
@@ -74,6 +80,7 @@ impl NextOpenSim {
             traded_notional: 0,
             settlement_days: 0,
             receivables: Vec::new(),
+            cost_fn: Box::new(|_, _, _| Ok(Money::new(0, Currency::Inr))),
             long_only: true,
             lot_sizes: Vec::new(),
             positions: Vec::new(),
@@ -84,6 +91,14 @@ impl NextOpenSim {
             fills: Vec::new(),
             rejections: Vec::new(),
         })
+    }
+
+    /// Sets the fill cost function (default: no costs). Funding cuts include its cost, so it
+    /// should be non-decreasing in quantity.
+    #[must_use]
+    pub fn with_costs(mut self, cost_fn: FillCostFn) -> Self {
+        self.cost_fn = cost_fn;
+        self
     }
 
     /// Sets whether a sell is capped at the position held (default true).
@@ -293,6 +308,36 @@ impl NextOpenSim {
             .map_err(|e| err(format!("notional: {e}")))
     }
 
+    /// Cost of one fill in minor units; errors when negative or in another currency (a zero
+    /// cost is currency-neutral).
+    fn costs(&self, side: OrderSide, qty: f64, price: f64) -> Result<i64> {
+        let cost = (self.cost_fn)(side, qty, price)?;
+        if cost.minor() == 0 {
+            return Ok(0);
+        }
+        if cost.currency() != self.currency {
+            return Err(err(format!(
+                "fill cost currency {:?} differs from the cash currency {:?}",
+                cost.currency(),
+                self.currency
+            )));
+        }
+        if cost.minor() < 0 {
+            return Err(err(format!(
+                "fill cost must not be negative, got {}",
+                cost.minor()
+            )));
+        }
+        Ok(cost.minor())
+    }
+
+    /// Notional plus cost of buying `qty` at `px`.
+    fn buy_cost(&self, qty: f64, px: f64) -> Result<i64> {
+        self.notional(qty, px)?
+            .checked_add(self.costs(OrderSide::Buy, qty, px)?)
+            .ok_or_else(|| err("buy cost overflow".into()))
+    }
+
     fn fill_sell(&mut self, idx: usize, open: &Open) -> Result<()> {
         let order = self.working[idx].order.clone();
         let mut want = order.quantity();
@@ -304,14 +349,21 @@ impl NextOpenSim {
                 want = qty; // a hair over the position is float residue: sell it all
             }
         }
-        let notional = if qty > 0.0 {
-            self.notional(qty, open.price)? // before dequeuing: a failure leaves the order working
+        let (notional, cost) = if qty > 0.0 {
+            // before dequeuing: a failure leaves the order working
+            (
+                self.notional(qty, open.price)?,
+                self.costs(OrderSide::Sell, qty, open.price)?,
+            )
         } else {
-            0
+            (0, 0)
         };
+        let proceeds = notional
+            .checked_sub(cost)
+            .ok_or_else(|| err("proceeds overflow".into()))?;
         let cash = self
             .cash
-            .checked_add(notional)
+            .checked_add(proceeds)
             .ok_or_else(|| err("cash overflow".into()))?;
         self.working.remove(idx);
         if qty < want {
@@ -322,8 +374,8 @@ impl NextOpenSim {
         }
         self.cash = cash;
         self.receivables
-            .push((self.session + self.settlement_days, notional));
-        self.book(&order, open, qty, notional)
+            .push((self.session + self.settlement_days, proceeds));
+        self.book(&order, open, qty, notional, cost)
     }
 
     fn fill_buy(&mut self, idx: usize, open: &Open) -> Result<()> {
@@ -333,18 +385,26 @@ impl NextOpenSim {
         let want = order.quantity();
         let px = open.price;
         let available = self.cash - self.unsettled_minor();
-        let qty = if self.notional(want, px)? <= available {
+        let qty = if self.buy_cost(want, px)? <= available {
             want
         } else if self.unsettled_minor() > 0 && session - first_try < self.settlement_days {
             return Ok(()); // wait for pending sale proceeds to settle
         } else {
             self.affordable(want, px, available, self.lot_size(order.instrument_id()))?
         };
-        let notional = if qty > 0.0 {
-            self.notional(qty, px)?
+        let (notional, cost) = if qty > 0.0 {
+            // before dequeuing: a failure leaves the order working
+            (
+                self.notional(qty, px)?,
+                self.costs(OrderSide::Buy, qty, px)?,
+            )
         } else {
-            0
+            (0, 0)
         };
+        let outlay = notional
+            .checked_add(cost)
+            .and_then(|o| self.cash.checked_sub(o))
+            .ok_or_else(|| err("cash overflow".into()))?;
         self.working.remove(idx);
         if qty < want {
             self.reject(&order, want - qty, "insufficient_funds");
@@ -352,8 +412,8 @@ impl NextOpenSim {
         if qty <= 0.0 {
             return Ok(());
         }
-        self.cash -= notional;
-        self.book(&order, open, qty, notional)
+        self.cash = outlay;
+        self.book(&order, open, qty, notional, cost)
     }
 
     fn lot_size(&self, instrument: &InstrumentId) -> f64 {
@@ -375,7 +435,7 @@ impl NextOpenSim {
         let (mut lo, mut hi) = (0_i64, hi as i64);
         while lo < hi {
             let mid = (lo + hi + 1) / 2;
-            if self.notional(mid as f64 * lot, px)? <= available {
+            if self.buy_cost(mid as f64 * lot, px)? <= available {
                 lo = mid;
             } else {
                 hi = mid - 1;
@@ -384,7 +444,14 @@ impl NextOpenSim {
         Ok(lo as f64 * lot)
     }
 
-    fn book(&mut self, order: &Order, open: &Open, qty: f64, notional: i64) -> Result<()> {
+    fn book(
+        &mut self,
+        order: &Order,
+        open: &Open,
+        qty: f64,
+        notional: i64,
+        cost: i64,
+    ) -> Result<()> {
         let signed = if order.side() == OrderSide::Buy {
             qty
         } else {
@@ -395,20 +462,27 @@ impl NextOpenSim {
         if held.abs() > QTY_EPS {
             self.positions.push((order.instrument_id().clone(), held));
         }
+        self.fees = self
+            .fees
+            .checked_add(cost)
+            .ok_or_else(|| err("fees overflow".into()))?;
         self.traded_notional = self
             .traded_notional
             .checked_add(notional)
             .ok_or_else(|| err("traded notional overflow".into()))?;
-        self.fills.push(Trade::new(
-            OrderId::new(order.order_id().as_str()),
-            order.instrument_id().clone(),
-            order.side(),
-            qty,
-            open.price,
-            self.currency,
-            open.ts,
-            open.ts,
-        ));
+        self.fills.push(
+            Trade::new(
+                OrderId::new(order.order_id().as_str()),
+                order.instrument_id().clone(),
+                order.side(),
+                qty,
+                open.price,
+                self.currency,
+                open.ts,
+                open.ts,
+            )
+            .with_costs(Money::new(cost, self.currency)),
+        );
         Ok(())
     }
 
