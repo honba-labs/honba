@@ -7,17 +7,17 @@
 
 use std::path::PathBuf;
 
-use honba_engine::ExecutionEngine;
+use honba_engine::{AlgoError, ExecutionEngine};
 use honba_entities::{Currency, Money};
 use honba_messages::{
     Bar, BarAggregation, BarSpecification, BarType, Exchange, InstrumentId, Order, OrderId,
     OrderSide, OrderType, PriceType, TimeInForce, UnixNanos,
 };
-use honba_sim::NextOpenSim;
+use honba_sim::{FillCostFn, NextOpenSim};
 use serde_json::Value;
 
 /// Vector chunks (ADR 0016) the Rust simulator implements so far.
-const IMPLEMENTED_CHUNKS: &[u64] = &[1];
+const IMPLEMENTED_CHUNKS: &[u64] = &[1, 2];
 
 fn fixture() -> Value {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -107,13 +107,39 @@ fn side_str(s: OrderSide) -> &'static str {
     }
 }
 
+/// The vectors' test cost model: `flat + (notional * bps + 5000) / 10000` per side, in minor
+/// units (the generator documents it; the real India schedule lives above `honba-sim`).
+fn cost_fn(spec: &Value) -> FillCostFn {
+    let get = |k: &str| spec[k].as_i64().unwrap_or(0);
+    let (flat_buy, flat_sell) = (get("flat_buy"), get("flat_sell"));
+    let (bps_buy, bps_sell) = (get("bps_buy"), get("bps_sell"));
+    Box::new(move |side, qty, price| {
+        let notional = Money::mul_qty(qty, price, Currency::Inr)
+            .map_err(|e| AlgoError::Component(e.to_string()))?
+            .minor();
+        let (flat, bps) = if side == OrderSide::Buy {
+            (flat_buy, bps_buy)
+        } else {
+            (flat_sell, bps_sell)
+        };
+        Ok(Money::new(
+            flat + (notional * bps + 5000).div_euclid(10_000),
+            Currency::Inr,
+        ))
+    })
+}
+
 fn build(config: &Value) -> NextOpenSim {
     assert_eq!(config["currency"], "INR");
-    assert_eq!(config["settlement_days"], 0, "settlement is chunk 2");
     let cash = Money::new(config["cash"].as_i64().unwrap(), Currency::Inr);
     let mut sim = NextOpenSim::new(cash)
         .unwrap()
+        .with_settlement_days(config["settlement_days"].as_i64().unwrap())
+        .unwrap()
         .with_long_only(config["long_only"].as_bool().unwrap());
+    if config.get("costs").is_some() {
+        sim = sim.with_costs(cost_fn(&config["costs"]));
+    }
     for (symbol, lot) in config["lot_sizes"].as_object().unwrap() {
         sim.set_lot_size(&iid(symbol), lot.as_f64().unwrap())
             .unwrap();
@@ -125,6 +151,7 @@ fn run(sc: &Value) {
     let name = sc["name"].as_str().unwrap();
     let mut sim = build(&sc["config"]);
     let mut drains: Vec<Value> = Vec::new();
+    let mut probes: Vec<Value> = Vec::new();
     for step in sc["steps"].as_array().unwrap() {
         let op = step["op"].as_str().unwrap();
         let result = match op {
@@ -132,6 +159,18 @@ fn run(sc: &Value) {
             "open_session" => {
                 let bars: Vec<Bar> = step["bars"].as_array().unwrap().iter().map(bar).collect();
                 sim.open_session(ts(&step["ts"]), &bars)
+            }
+            "session_open" => {
+                let bars: Vec<Bar> = step["bars"].as_array().unwrap().iter().map(bar).collect();
+                sim.on_session_open(ts(&step["ts"]), &bars)
+            }
+            "set_settlement_days" => sim.set_settlement_days(step["days"].as_i64().unwrap()),
+            "probe" => {
+                probes.push(serde_json::json!({
+                    "unsettled": sim.unsettled().minor(),
+                    "available_cash": sim.available_cash().minor(),
+                }));
+                Ok(())
             }
             "submit" => ExecutionEngine::submit(&mut sim, order(step)),
             "cancel" => {
@@ -210,6 +249,21 @@ fn run(sc: &Value) {
         fin["working"],
         "{name}: working orders"
     );
+    if fin.get("unsettled").is_some() {
+        assert_eq!(
+            sim.unsettled().minor(),
+            fin["unsettled"].as_i64().unwrap(),
+            "{name}: unsettled"
+        );
+        assert_eq!(
+            sim.available_cash().minor(),
+            fin["available_cash"].as_i64().unwrap(),
+            "{name}: available cash"
+        );
+    }
+    if let Some(want) = fin.get("probes") {
+        assert_eq!(&Value::Array(probes), want, "{name}: probes");
+    }
     let mut positions = sim.positions();
     positions.sort_by(|a, b| a.0.cmp(&b.0));
     let positions: serde_json::Map<String, Value> = positions
