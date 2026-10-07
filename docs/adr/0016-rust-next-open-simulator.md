@@ -233,3 +233,59 @@ Implemented in `honba-py` (`crates/honba-py/src/pyclasses/next_open.rs`) and `ho
    the extension.
 4. Fuzzed scenario comparison between the reference implementation and the native class over the whole catalog.
 5. Limit and stop fills remain out of scope (decision 6).
+
+## Chunk 3b addendum (delegation, backend selection)
+
+`honba.backtest.simulated.NextOpenExecution` is now a thin port over one of two implementations with the same
+surface: `_PythonSim` (the former class body, the reference) and `_NativeSim` (a wrapper over
+`honba._honba.NextOpenSimulator`). Its public API, `make_simulator`, `group_sessions`, `SessionOpen` and
+`resolve_fill_costs` are unchanged apart from the new `backend` argument and `backend` property.
+
+- **Selection (decision).** The pure-Python implementation stays as the fallback and stays under the vectors; the
+  extension is not required. `NextOpenExecution(..., backend=None)` resolves at construction through
+  `resolve_backend`: the argument, else `HONBA_SIM_BACKEND`, else `auto` (`python` | `native` | `auto`). `auto` is
+  `native` when `honba._native.native_attr("NextOpenSimulator")` works and the class has the methods the wrapper needs
+  (`set_position`, `session_ts`, ...), otherwise `python` (extension missing: `ImportError`, stale: `RuntimeError` or a
+  missing member). Forcing `native` without a usable extension re-raises that error with the backend named; an unknown
+  value is a `ValueError`. `port.backend` reports the choice.
+- **Money and costs.** The wrapper converts `Money` to and from integer minor units. A cost function carrying the marker
+  attribute `native_cost_pack` (`zero_costs`: `none`, `nse_equity_delivery_fill_cost`: `india.equity.delivery`,
+  `nse_equity_intraday_fill_cost`: `india.equity.intraday`) is passed to the native class by pack name, on INR ports
+  only (the packs charge rupees); any other callable is bridged: `(side, qty, price) -> Money` becomes minor units, a zero
+  cost is currency-neutral, a negative one is a `ValueError` from the simulator, a cost in another currency a
+  `ValueError` from the bridge. A cost function's own exception propagates unchanged.
+- **Deviation resolved (currency).** A non-zero cost in another currency used to fail in Python only after a sell was
+  dequeued (at the proceeds sum) and in Rust before dequeuing. Resolved by aligning the Python reference with the
+  failure-leaves-the-order-working rule its own comments state: `_PythonSim._costs` now raises before any dequeue, on both
+  sides. Regression test `test_a_cost_in_another_currency_fails_before_the_order_is_dequeued`, run on both backends.
+  No chunk 1/2 vector covers it, so the vectors are unchanged.
+- **Rust additions.** `NextOpenSim::set_position` (seed or overwrite a holding; Python `positions[iid] = qty`, which
+  existing code and tests use) and `session_ts()` (the cancel stamp, `session_ts or 0`), bound as
+  `NextOpenSimulator.set_position(symbol, quantity, exchange="NSE")` and `.session_ts`. The binding no longer panics on
+  an unvalidated bar (NaN or infinite open, crossed high/low, negative volume: Python `Bar` validates nothing); the
+  simulator reads only the identity, `ts` and `open`, and a non-positive or non-finite open is "does not print", exactly as
+  in Python.
+- **`positions`.** On the native backend `positions` is a `MutableMapping[InstrumentId, float]` view (reads take a
+  snapshot, `positions[iid] = qty` seeds a holding, zero removes it) that compares equal to a dict. Two small differences
+  from a plain dict: iteration order is the native one (the order a position was last opened) and assigning `0.0` drops the
+  key instead of keeping it. Neither changes a fill.
+- **Rejections.** Native ids are made unique per accepted order (`"<seq>:<order_id>"`, hidden from callers) so a reused
+  id cannot confuse the intent kept for an undrained rejection; the intent (order type, price, trigger) is rebuilt from it
+  with the rejected remainder as quantity, `cancelled=True` for cancels.
+- **Tests.** `test_next_open_sim_conformance.py` replays all vectors (every chunk) on both backends;
+  `test_next_open_backend_parity.py` drives 400 seeded random scenarios (seeds 0..399, 1 to 4 instruments on NSE and BSE,
+  4 to 12 sessions, plain bars, `open_session` and `SessionOpen` feeds, seeded holdings, lot sizes, settlement changes,
+  all cost kinds including raising, negative and foreign-currency costs, duplicate and non-monotonic bar errors, duplicate
+  ids, cancels, non-market orders, NaN and zero opens) through both and requires every step to match: exception type,
+  fills, rejections, cash, fees, traded notional, unsettled, available cash, positions, working orders. A corpus test
+  guards against a vacuous fuzz. A one-off run over seeds 400..5999 also found no divergence. `test_next_open_backend_selection.py`
+  covers selection. `tests/unit/test_next_open_execution.py` and the backtest suites run under both backends
+  (`HONBA_SIM_BACKEND=python|native`).
+
+### Remaining
+
+1. Limit and stop fills remain out of scope on both backends (decision 6): they are rejected as
+   `unsupported_order_type`. Supporting them needs a product decision (fill price rule, gap handling, time in force)
+   before either implementation changes.
+2. Once the native backend has been the default for a release, decide whether the Python implementation stays as a
+   fallback or becomes test-only.

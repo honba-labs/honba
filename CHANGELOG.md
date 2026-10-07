@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Rust next-open simulator, chunk 3b: delegation (E3-S1a, ADR 0016)
+
+- `NextOpenExecution` runs on the native `honba._honba.NextOpenSimulator` when the extension is usable and on the
+  pure-Python reference otherwise; API and results unchanged. New `backend=` argument (`auto` | `python` | `native`),
+  `HONBA_SIM_BACKEND` environment variable, `backend` property and `resolve_backend`. India cost functions go to Rust by
+  pack name (`native_cost_pack` marker), other cost callables through a Money bridge.
+- Fix: a fill cost in another currency now fails before an order is dequeued for sells too (it used to drop the order).
+- `NextOpenSimulator.set_position` and `.session_ts`; the binding no longer panics on a bar with a NaN open or crossed
+  prices (such an open is "does not print").
+- Tests: all vectors on both backends, a 400-scenario seeded parity fuzz (`test_next_open_backend_parity.py`), backend
+  selection tests.
+
 ### Rust next-open simulator, chunk 3a: bindings (E3-S1a, ADR 0016)
 
 - New `honba._honba.NextOpenSimulator` (PyO3 binding of `honba_sim::NextOpenSim`, stub in `_honba.pyi`): sessions,
