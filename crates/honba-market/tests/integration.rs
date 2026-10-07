@@ -239,3 +239,22 @@ fn india_equity_settlement_is_t_plus_two_before_2023_01_27() {
 fn india_profile_reports_equity_settlement_days() {
     assert_eq!(IndiaMarketProfile::equity_settlement_days(), 1);
 }
+
+#[test]
+fn nse_cash_equity_schedules_work_as_boxed_cost_schedules() {
+    use honba_market::india::costs::NseCashEquitySchedule;
+    use honba_market::{CostSchedule, MarketSegment};
+
+    let schedules: Vec<Box<dyn CostSchedule>> = vec![
+        Box::new(NseCashEquitySchedule::delivery()),
+        Box::new(NseCashEquitySchedule::intraday()),
+    ];
+    let totals: Vec<f64> = schedules
+        .iter()
+        .map(|s| {
+            s.compute_costs(&MarketSegment::from("equity"), OrderSide::Sell, 29_500.0)
+                .total()
+        })
+        .collect();
+    assert!(totals[0] > totals[1], "delivery STT is higher: {totals:?}");
+}

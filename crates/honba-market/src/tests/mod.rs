@@ -4,6 +4,8 @@ mod calendar;
 mod costs;
 mod expiry;
 #[cfg(feature = "india")]
+mod india_costs;
+#[cfg(feature = "india")]
 mod india_exchange;
 mod rules;
 mod settlement;

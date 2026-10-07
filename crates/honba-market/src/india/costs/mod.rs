@@ -1,9 +1,11 @@
 //! Transaction cost models for Indian markets.
 
+pub mod cash_equity;
 pub mod model;
 pub mod source;
 pub mod stt;
 
+pub use cash_equity::NseCashEquitySchedule;
 pub use model::{CostBreakdown, CostModel, Segment};
 pub use source::CostModelSource;
 pub use stt::SttRates;
@@ -20,3 +22,5 @@ pub const CHARGE_STAMP_DUTY: &str = "stamp_duty";
 pub const CHARGE_SEBI_FEE: &str = "sebi_fee";
 /// Named charge constant for broker commissions.
 pub const CHARGE_BROKERAGE: &str = "brokerage";
+/// Named charge constant for the investor protection fund contribution.
+pub const CHARGE_IPFT: &str = "ipft";
