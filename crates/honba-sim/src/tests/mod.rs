@@ -3,6 +3,7 @@
 mod bar_fill;
 mod next_open;
 mod next_open_costs;
+mod next_open_session_open;
 mod next_open_settlement;
 mod paper;
 mod scripted;
@@ -56,4 +57,20 @@ fn market(id: &str, side: OrderSide, qty: f64, ts: u64) -> Order {
 
 fn limit(id: &str, side: OrderSide, qty: f64, price: f64, ts: u64) -> Order {
     order(id, side, OrderType::Limit, qty, Some(price), ts)
+}
+
+/// A day market order for `symbol` on the `TEST` exchange stamped at `ts`.
+fn market_for(id: &str, symbol: &str, side: OrderSide, qty: f64, ts: u64) -> Order {
+    let t = UnixNanos::from_u64(ts);
+    Order::new(
+        OrderId::new(id),
+        InstrumentId::new(symbol, Exchange::new("TEST")),
+        side,
+        OrderType::Market,
+        qty,
+        None,
+        TimeInForce::Day,
+        t,
+        t,
+    )
 }

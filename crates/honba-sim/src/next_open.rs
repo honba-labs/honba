@@ -53,6 +53,8 @@ pub struct NextOpenSim {
     positions: Vec<(InstrumentId, f64)>,
     session: i64,
     session_ts: Option<u64>,
+    /// The current session came from a session-open event (see [`Self::on_session_open`]).
+    from_open: bool,
     opened: Vec<InstrumentId>,
     working: Vec<Working>,
     fills: Vec<Trade>,
@@ -86,6 +88,7 @@ impl NextOpenSim {
             positions: Vec::new(),
             session: -1,
             session_ts: None,
+            from_open: false,
             opened: Vec::new(),
             working: Vec::new(),
             fills: Vec::new(),
@@ -227,10 +230,30 @@ impl NextOpenSim {
         self.fill_at(bars)
     }
 
+    /// The session-open event (Python `SessionOpen`): opens session `ts` like
+    /// [`Self::open_session`], then switches to the lenient bar rules for good.
+    ///
+    /// The key `ts` need not be a bar timestamp, so afterwards a bar never opens or orders a
+    /// session: it only opens an instrument the event left out, when it carries the session's
+    /// `ts`; every other bar is ignored. When opening fails (bad key, or an error while filling)
+    /// the mode does not change.
+    pub fn on_session_open(&mut self, ts: UnixNanos, bars: &[Bar]) -> Result<()> {
+        self.open_session(ts, bars)?;
+        self.from_open = true;
+        Ok(())
+    }
+
     /// Observes one bar: it opens a session when its ts is later than the current one, opens its
     /// own instrument when it shares the ts, and is an error when earlier or repeated.
     pub fn on_bar(&mut self, bar: &Bar) -> Result<()> {
         let ts = bar.ts_event().as_u64();
+        if self.from_open {
+            if Some(ts) == self.session_ts && !self.opened.contains(bar.bar_type().instrument_id())
+            {
+                return self.fill_at(std::slice::from_ref(bar));
+            }
+            return Ok(());
+        }
         match self.session_ts {
             Some(cur) if ts < cur => Err(err(format!(
                 "non-monotonic bar: ts {ts} is before session {cur}"
