@@ -28,16 +28,27 @@ from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 from honba.entities.order import OrderIntent
+from honba.entities.order_state import OrderEvent
 from honba.entities.trade import Trade
 
 __all__ = [
     "CANCELLED_REASON",
+    "Accepted",
     "BaseExecutionPort",
+    "CancelRequested",
+    "Cancelled",
+    "ExecutionEvent",
     "ExecutionPort",
+    "Expired",
+    "Fill",
     "OrderRejection",
+    "Rejected",
     "RejectingExecutionPort",
+    "Submitted",
     "cancel_order",
     "drain_port_rejections",
+    "event_order_id",
+    "order_event",
 ]
 
 
@@ -71,6 +82,108 @@ class OrderRejection:
                 f"OrderRejection.cancelled={self.cancelled} contradicts reason={self.reason!r}: "
                 f"cancelled must be true exactly when the reason is {CANCELLED_REASON!r}"
             )
+
+
+# --- Port events (ADR 0019 decision 4): the reference for Rust ``ExecutionEvent`` ---------
+# ``intent`` carries instrument, side and quantity: the order quantity on ``Submitted``, the
+# open quantity on ``Accepted``, the unfilled remainder released on the terminal events.
+
+
+@dataclass(frozen=True, slots=True)
+class Submitted:
+    """Submitter-synthesised: the order was handed to the gateway."""
+
+    order_id: str
+    intent: OrderIntent
+    ts: int
+
+
+@dataclass(frozen=True, slots=True)
+class Accepted:
+    """The venue acknowledged the order."""
+
+    order_id: str
+    intent: OrderIntent
+    ts: int
+    venue_order_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Rejected:
+    """The order was rejected (pre-gate or venue)."""
+
+    order_id: str
+    intent: OrderIntent
+    reason: str
+    ts: int
+    venue_order_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Fill:
+    """A fill; ``complete`` is the producer's claim that it completes the order."""
+
+    trade: Trade
+    cum_qty: float
+    complete: bool
+    venue_order_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CancelRequested:
+    """Submitter-synthesised: a cancel was asked for."""
+
+    order_id: str
+    ts: int
+
+
+@dataclass(frozen=True, slots=True)
+class Cancelled:
+    """The order was cancelled."""
+
+    order_id: str
+    intent: OrderIntent
+    ts: int
+    venue_order_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Expired:
+    """The order expired by time-in-force."""
+
+    order_id: str
+    intent: OrderIntent
+    ts: int
+    venue_order_id: str | None = None
+
+
+ExecutionEvent = Submitted | Accepted | Rejected | Fill | CancelRequested | Cancelled | Expired
+
+
+def event_order_id(ev: ExecutionEvent) -> str:
+    """The client order id ``ev`` concerns (a ``Fill`` reads it from its trade)."""
+    if isinstance(ev, Fill):
+        if not ev.trade.order_id:
+            raise ValueError("Fill.trade.order_id must be set to identify the order")
+        return ev.trade.order_id
+    return ev.order_id
+
+
+def order_event(ev: ExecutionEvent) -> OrderEvent:
+    """Project ``ev`` onto the quantity-only FSM vocabulary (Rust ``order_event``)."""
+    if isinstance(ev, Submitted):
+        return OrderEvent.submitted(ev.intent.quantity)
+    if isinstance(ev, Accepted):
+        return OrderEvent.accepted()
+    if isinstance(ev, Rejected):
+        return OrderEvent.rejected()
+    if isinstance(ev, Fill):
+        return OrderEvent.fill(ev.trade.quantity, ev.complete)
+    if isinstance(ev, CancelRequested):
+        return OrderEvent.cancel_requested()
+    if isinstance(ev, Cancelled):
+        return OrderEvent.cancelled()
+    return OrderEvent.expired()
 
 
 @runtime_checkable
