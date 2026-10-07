@@ -1,6 +1,7 @@
 //! Unit tests for this crate, one file per area.
 
 mod currency;
+mod execution;
 mod instrument;
 mod money;
 mod position;

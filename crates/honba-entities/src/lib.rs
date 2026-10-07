@@ -34,6 +34,7 @@
 //! ```
 
 pub mod error;
+pub mod execution;
 pub mod instrument;
 pub mod portfolio;
 pub mod position;
@@ -41,6 +42,7 @@ pub mod screener;
 pub mod trade;
 
 pub use error::{EntitiesError, Result};
+pub use execution::ExecutionEvent;
 pub use instrument::{Currency, Instrument, InstrumentKind, MinorUnit, Money, MoneyError};
 pub use portfolio::{Account, Portfolio};
 pub use position::{Position, PositionSide};
