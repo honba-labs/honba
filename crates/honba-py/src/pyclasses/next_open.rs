@@ -277,18 +277,27 @@ fn iid(symbol: &str, exchange: &str) -> InstrumentId {
     InstrumentId::new(symbol, Exchange::new(exchange))
 }
 
+/// The simulator reads a bar's instrument, `ts` and `open` only, and ignores one whose open is
+/// not a positive finite price (Python bars are unvalidated). `Bar::new` asserts its invariants
+/// in debug builds, so the other prices are set to the (sanitized) open and the volume to zero:
+/// any input is accepted without a panic, and an unusable open becomes `0.0`.
 fn to_bar(b: &BarIn) -> Bar {
     let ts = UnixNanos::from_u64(b.ts);
+    let open = if b.open.is_finite() && b.open > 0.0 {
+        b.open
+    } else {
+        0.0
+    };
     Bar::new(
         BarType::new(
             iid(&b.symbol, &b.exchange),
             BarSpecification::new(1, BarAggregation::Day, PriceType::Last),
         ),
-        b.open,
-        b.high,
-        b.low,
-        b.close,
-        b.volume,
+        open,
+        open,
+        open,
+        open,
+        0.0,
         ts,
         ts,
     )
@@ -388,6 +397,16 @@ impl NativeSim {
     /// Sets the funding-cut lot size of an instrument.
     pub fn set_lot_size(&mut self, symbol: &str, exchange: &str, lot: f64) -> Res<()> {
         Ok(self.sim.set_lot_size(&iid(symbol, exchange), lot)?)
+    }
+
+    /// The key of the current session, `None` before the first one opens.
+    pub fn session_ts(&self) -> Option<u64> {
+        self.sim.session_ts()
+    }
+
+    /// Seeds or overwrites the position in an instrument (zero removes it).
+    pub fn set_position(&mut self, symbol: &str, exchange: &str, quantity: f64) -> Res<()> {
+        Ok(self.sim.set_position(&iid(symbol, exchange), quantity)?)
     }
 
     /// Settlement cycle in sessions.
@@ -687,6 +706,14 @@ impl NextOpenSimulator {
         self.finish(r)
     }
 
+    /// Seeds or overwrites the position in `symbol` (default exchange `NSE`); zero removes it.
+    /// `ValueError` for a non-finite quantity.
+    #[pyo3(signature = (symbol, quantity, exchange="NSE"))]
+    fn set_position(&mut self, symbol: &str, quantity: f64, exchange: &str) -> PyResult<()> {
+        let r = self.core.set_position(symbol, exchange, quantity);
+        self.finish(r)
+    }
+
     /// Returns and clears the fills: dicts with order_id, symbol, exchange, side, quantity,
     /// price, ts, costs (minor units).
     fn drain_fills<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyList>> {
@@ -753,6 +780,12 @@ impl NextOpenSimulator {
     #[getter]
     fn available_cash(&self) -> i64 {
         self.core.available_cash()
+    }
+
+    /// The key (`ts`) of the current session, `None` before the first one opens.
+    #[getter]
+    fn session_ts(&self) -> Option<u64> {
+        self.core.session_ts()
     }
 
     /// The settlement cycle in sessions.

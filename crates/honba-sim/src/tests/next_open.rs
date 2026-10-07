@@ -141,3 +141,42 @@ fn lot_size_must_be_positive_and_finite() {
     }
     assert!(s.set_lot_size(&any_instrument(), 5.0).is_ok());
 }
+
+#[test]
+fn set_position_seeds_a_holding_a_sell_can_use() {
+    let mut s = sim(0);
+    s.set_position(&any_instrument(), 4.0).unwrap();
+    assert_eq!(s.position(&any_instrument()), 4.0);
+    feed(&mut s, 10.0, 1);
+    s.submit(market("S-1", OrderSide::Sell, 6.0, 1)).unwrap();
+    feed(&mut s, 10.0, 2);
+    let fills = s.drain_fills().unwrap();
+    assert_eq!(fills.len(), 1);
+    assert_eq!(fills[0].quantity(), 4.0);
+    assert_eq!(s.cash(), inr(40));
+    assert!(s.positions().is_empty());
+}
+
+#[test]
+fn set_position_replaces_in_place_and_flat_or_non_finite_values_are_handled() {
+    let mut s = sim(0);
+    let a = any_instrument();
+    s.set_position(&a, 4.0).unwrap();
+    s.set_position(&a, 9.0).unwrap();
+    assert_eq!(s.positions(), vec![(a.clone(), 9.0)]);
+    s.set_position(&a, 0.0).unwrap();
+    assert!(s.positions().is_empty());
+    assert!(s.set_position(&a, f64::NAN).is_err());
+    assert!(s.set_position(&a, f64::INFINITY).is_err());
+    assert!(s.positions().is_empty());
+}
+
+#[test]
+fn session_ts_is_none_until_a_session_opens_then_follows_it() {
+    let mut s = sim(100);
+    assert_eq!(s.session_ts(), None);
+    feed(&mut s, 10.0, 5);
+    assert_eq!(s.session_ts(), Some(5));
+    feed(&mut s, 10.0, 9);
+    assert_eq!(s.session_ts(), Some(9));
+}

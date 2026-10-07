@@ -157,3 +157,47 @@ fn a_named_cost_pack_is_charged_on_fills() {
     assert_eq!(s.fees(), 1598);
     assert_eq!(s.cash(), 100_000_000 - 2_950_000 - 1598);
 }
+
+#[test]
+fn set_position_seeds_a_holding_by_symbol_and_exchange() {
+    let mut s = sim(0);
+    s.set_position("AAA", "NSE", 4.0).unwrap();
+    s.set_position("AAA", "BSE", 2.0).unwrap();
+    assert_eq!(
+        s.positions(),
+        vec![
+            ("AAA".into(), "NSE".into(), 4.0),
+            ("AAA".into(), "BSE".into(), 2.0)
+        ]
+    );
+    s.set_position("AAA", "NSE", 0.0).unwrap();
+    assert_eq!(s.positions(), vec![("AAA".into(), "BSE".into(), 2.0)]);
+    assert!(s.set_position("AAA", "NSE", f64::NAN).is_err());
+}
+
+#[test]
+fn session_ts_follows_the_open_session() {
+    let mut s = sim(0);
+    assert_eq!(s.session_ts(), None);
+    s.on_bar(&bar("AAA", 5, 10.0)).unwrap();
+    assert_eq!(s.session_ts(), Some(5));
+}
+
+#[test]
+fn an_unusable_or_malformed_bar_never_panics_and_never_fills() {
+    for open in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 0.0, -5.0] {
+        let mut s = sim(1_000_000);
+        s.on_bar(&bar("AAA", 1, 100.0)).unwrap();
+        s.submit(&market("o", "AAA", "buy", 1.0, 1)).unwrap();
+        s.on_bar(&bar("AAA", 2, open)).unwrap(); // the session opens, the order keeps waiting
+        assert_eq!(s.working_orders(), vec!["o".to_string()], "open {open}");
+        assert!(s.drain_fills().is_empty());
+        s.on_bar(&bar("AAA", 3, 100.0)).unwrap();
+        assert_eq!(s.drain_fills().len(), 1);
+    }
+    // crossed high/low, negative volume: only the open matters to this simulator
+    let mut s = sim(1_000_000);
+    let mut b = bar("AAA", 1, 100.0);
+    (b.high, b.low, b.volume) = (90.0, 110.0, -1.0);
+    s.on_bar(&b).unwrap();
+}

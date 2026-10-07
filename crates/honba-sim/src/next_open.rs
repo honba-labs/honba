@@ -201,6 +201,31 @@ impl NextOpenSim {
             .map_or(0.0, |(_, q)| *q)
     }
 
+    /// The key of the current session (`None` before the first one opens).
+    pub fn session_ts(&self) -> Option<u64> {
+        self.session_ts
+    }
+
+    /// Seeds or overwrites the net signed position in `instrument` (a starting holding; the
+    /// Python `positions[iid] = qty`). A value within the quantity epsilon of zero removes it;
+    /// a non-finite value is an error with the state unchanged. An existing entry keeps its
+    /// place in [`Self::positions`].
+    pub fn set_position(&mut self, instrument: &InstrumentId, quantity: f64) -> Result<()> {
+        if !quantity.is_finite() {
+            return Err(err(format!("position must be finite, got {quantity}")));
+        }
+        let flat = quantity.abs() <= QTY_EPS;
+        match self.positions.iter().position(|(i, _)| i == instrument) {
+            Some(n) if flat => {
+                self.positions.remove(n);
+            }
+            Some(n) => self.positions[n].1 = quantity,
+            None if !flat => self.positions.push((instrument.clone(), quantity)),
+            None => {}
+        }
+        Ok(())
+    }
+
     /// Every non-flat position, in the order first opened.
     pub fn positions(&self) -> Vec<(InstrumentId, f64)> {
         self.positions.clone()

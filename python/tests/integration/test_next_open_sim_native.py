@@ -263,3 +263,19 @@ def test_rust_cost_adapter_equals_the_python_fill_cost_function_over_a_grid(
                 if got != want:
                     mismatches.append((name, qty, price, got, want))
     assert mismatches == []
+
+
+# -- seeded holdings ---------------------------------------------------------------------------
+def test_set_position_seeds_a_holding_a_sell_can_use() -> None:
+    sim = _sim()
+    sim.set_position("AAA", 4.0)
+    sim.set_position("AAA", 2.0, "BSE")
+    assert sorted(sim.positions) == [("AAA", "BSE", 2.0), ("AAA", "NSE", 4.0)]
+    sim.on_bar(_bar_d(1))
+    sim.submit({"id": "s", "symbol": "AAA", "side": "sell", "qty": 6, "ts": 1})
+    sim.on_bar(_bar_d(2))
+    assert sim.drain_fills()[0]["quantity"] == 4.0
+    sim.set_position("AAA", 0.0, "BSE")
+    assert sim.positions == []
+    with pytest.raises(ValueError, match="finite"):
+        sim.set_position("AAA", float("nan"))
