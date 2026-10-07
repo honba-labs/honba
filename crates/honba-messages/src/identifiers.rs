@@ -117,6 +117,31 @@ impl fmt::Display for OrderId {
     }
 }
 
+/// A venue-assigned order identifier (the exchange or broker's id, as opposed to the
+/// client-assigned [`OrderId`]).
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
+pub struct VenueOrderId(String);
+
+impl VenueOrderId {
+    /// Creates a venue order id.
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    /// Returns the venue order id as a string slice.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for VenueOrderId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
 /// A exchange-assigned trade identifier.
 #[derive(
     Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,

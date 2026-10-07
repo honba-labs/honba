@@ -110,7 +110,8 @@ crate::enum_with_all! {
 ///
 /// Invariants (checked by [`Order::validate`] and on deserialization):
 /// `quantity` is finite and `> 0`; `price` and `trigger_price` are finite
-/// when present. An order is a record (it may come back from an exchange), so
+/// when present; `cancel_requested` is `true` only while the order is
+/// `Submitted`, `Accepted` or `PartiallyFilled`. An order is a record (it may come back from an exchange), so
 /// `side` may be `no_order_side`; intents are stricter.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(try_from = "OrderRepr")]
@@ -130,6 +131,14 @@ pub struct Order {
     pub(crate) time_in_force: TimeInForce,
     pub(crate) ts_event: UnixNanos,
     pub(crate) ts_init: UnixNanos,
+    /// A cancel was asked for and not yet answered (ADR 0019); only valid
+    /// while the order is working.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub(crate) cancel_requested: bool,
+}
+
+fn is_false(v: &bool) -> bool {
+    !*v
 }
 
 /// The raw wire form, validated into an [`Order`].
@@ -146,6 +155,8 @@ struct OrderRepr {
     time_in_force: TimeInForce,
     ts_event: UnixNanos,
     ts_init: UnixNanos,
+    #[serde(default)]
+    cancel_requested: bool,
 }
 
 impl TryFrom<OrderRepr> for Order {
@@ -164,6 +175,7 @@ impl TryFrom<OrderRepr> for Order {
             time_in_force: r.time_in_force,
             ts_event: r.ts_event,
             ts_init: r.ts_init,
+            cancel_requested: r.cancel_requested,
         };
         order.validate()?;
         Ok(order)
@@ -196,6 +208,7 @@ impl Order {
             time_in_force,
             ts_event,
             ts_init,
+            cancel_requested: false,
         };
         debug_assert!(
             order.validate().is_ok(),
@@ -210,6 +223,16 @@ impl Order {
         positive("quantity", self.quantity)?;
         finite_opt("price", self.price)?;
         finite_opt("trigger_price", self.trigger_price)?;
+        if self.cancel_requested
+            && !matches!(
+                self.status,
+                OrderStatus::Submitted | OrderStatus::Accepted | OrderStatus::PartiallyFilled
+            )
+        {
+            return Err(InvariantError::NotAllowed {
+                field: "cancel_requested",
+            });
+        }
         Ok(())
     }
 
@@ -297,6 +320,17 @@ impl Order {
     /// Sets the status, returning `self` for chaining.
     pub fn with_status(mut self, status: OrderStatus) -> Self {
         self.status = status;
+        self
+    }
+
+    /// Returns whether a cancel is pending.
+    pub fn cancel_requested(&self) -> bool {
+        self.cancel_requested
+    }
+
+    /// Sets the pending-cancel flag, returning `self` for chaining.
+    pub fn with_cancel_requested(mut self, cancel_requested: bool) -> Self {
+        self.cancel_requested = cancel_requested;
         self
     }
 }

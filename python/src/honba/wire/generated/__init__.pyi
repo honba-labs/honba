@@ -151,6 +151,7 @@ class EventBar(TypedDict):
     volume: float
 
 class EventOrder(TypedDict):
+    cancel_requested: NotRequired[bool]
     instrument_id: InstrumentId
     order_id: OrderId
     order_type: OrderType
@@ -262,6 +263,7 @@ class Money:
     currency: str
 
 class Order:
+    cancel_requested: bool | None = None
     instrument_id: InstrumentId
     order_id: OrderId
     order_type: OrderType

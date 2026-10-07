@@ -81,12 +81,13 @@ pub use endpoints::{
 };
 pub use errors::{ErrorCategory, ErrorCode, ErrorDetail};
 pub use events::{timestamp::UnixNanos, Event, Message, SCHEMA_VERSION};
-pub use identifiers::{Exchange, InstrumentId, OrderId, TradeId};
+pub use identifiers::{Exchange, InstrumentId, OrderId, TradeId, VenueOrderId};
 pub use market_data::{
     bar::{Bar, BarAggregation, BarSpecification, BarType, PriceType},
     tick::{AggressorSide, QuoteTick, Tick, TradeTick},
 };
 pub use orders::order::{Order, OrderSide, OrderStatus, OrderType, TimeInForce};
+pub use orders::state::{IllegalTransition, OrderEvent, OrderEventKind, OrderState};
 pub use validation::InvariantError;
 
 #[cfg(test)]

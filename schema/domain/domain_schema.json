@@ -1074,6 +1074,10 @@
         {
           "description": "A new order that has been submitted.",
           "properties": {
+            "cancel_requested": {
+              "description": "A cancel was asked for and not yet answered (ADR 0019); only valid while the order is working.",
+              "type": "boolean"
+            },
             "instrument_id": {
               "$ref": "#/$defs/InstrumentId"
             },
@@ -1861,8 +1865,12 @@
       "type": "object"
     },
     "Order": {
-      "description": "A client order.\n\n``` use honba_messages::{ InstrumentId, Order, OrderId, OrderSide, OrderStatus, OrderType, TimeInForce, UnixNanos, Exchange, };\n\nlet order = Order::new( OrderId::new(\"O-1\"), InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), OrderSide::Buy, OrderType::Limit, 75.0, Some(22_000.0), TimeInForce::Day, UnixNanos::from_u64(1), UnixNanos::from_u64(1), ); assert_eq!(order.status(), OrderStatus::Initialized); assert_eq!(order.quantity(), 75.0); ```\n\nInvariants (checked by [`Order::validate`] and on deserialization): `quantity` is finite and `> 0`; `price` and `trigger_price` are finite when present. An order is a record (it may come back from an exchange), so `side` may be `no_order_side`; intents are stricter.",
+      "description": "A client order.\n\n``` use honba_messages::{ InstrumentId, Order, OrderId, OrderSide, OrderStatus, OrderType, TimeInForce, UnixNanos, Exchange, };\n\nlet order = Order::new( OrderId::new(\"O-1\"), InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), OrderSide::Buy, OrderType::Limit, 75.0, Some(22_000.0), TimeInForce::Day, UnixNanos::from_u64(1), UnixNanos::from_u64(1), ); assert_eq!(order.status(), OrderStatus::Initialized); assert_eq!(order.quantity(), 75.0); ```\n\nInvariants (checked by [`Order::validate`] and on deserialization): `quantity` is finite and `> 0`; `price` and `trigger_price` are finite when present; `cancel_requested` is `true` only while the order is `Submitted`, `Accepted` or `PartiallyFilled`. An order is a record (it may come back from an exchange), so `side` may be `no_order_side`; intents are stricter.",
       "properties": {
+        "cancel_requested": {
+          "description": "A cancel was asked for and not yet answered (ADR 0019); only valid while the order is working.",
+          "type": "boolean"
+        },
         "instrument_id": {
           "$ref": "#/$defs/InstrumentId"
         },

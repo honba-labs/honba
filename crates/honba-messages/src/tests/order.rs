@@ -70,3 +70,39 @@ fn non_finite_prices_never_serialize_as_null() {
         serde_json::Value::Null
     );
 }
+
+#[test]
+fn cancel_requested_defaults_false_and_is_skipped_when_false() {
+    let o = order();
+    assert!(!o.cancel_requested());
+    let json = serde_json::to_value(&o).unwrap();
+    assert!(json.get("cancel_requested").is_none());
+    let back: Order = serde_json::from_value(json).unwrap();
+    assert_eq!(back, o);
+}
+
+#[test]
+fn cancel_requested_invariant_only_for_working_statuses() {
+    use OrderStatus::*;
+    for status in OrderStatus::ALL {
+        let o = order().with_status(*status).with_cancel_requested(true);
+        let working = matches!(status, Submitted | Accepted | PartiallyFilled);
+        if working {
+            assert_eq!(o.validate(), Ok(()), "{status:?}");
+            assert!(o.cancel_requested());
+            let json = serde_json::to_value(&o).unwrap();
+            assert_eq!(json["cancel_requested"], true);
+            assert_eq!(serde_json::from_value::<Order>(json).unwrap(), o);
+        } else {
+            assert_eq!(
+                o.validate(),
+                Err(NotAllowed {
+                    field: "cancel_requested"
+                }),
+                "{status:?}"
+            );
+            let json = serde_json::to_value(&o).unwrap();
+            assert!(serde_json::from_value::<Order>(json).is_err(), "{status:?}");
+        }
+    }
+}
