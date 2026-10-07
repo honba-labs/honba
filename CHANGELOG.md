@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Wire `schema_version` 4: order-state events (E2-S6a, ADR 0019)
+
+- `schema_version` 4: `order_filled` now means the completing fill; earlier fills are the new
+  `order_partially_filled` (additive); `order_cancel_requested`, `order_expired`,
+  `OrderAccepted.venue_order_id` and `Order.cancel_requested` are additive.
+- Migration (ADR 0012 rule 5): a v3 reader rejects a v4 stream and a v4 reader rejects v3
+  journals (exact-version check); there is no upcaster, because a v3 `order_filled` cannot be split
+  into partial/complete without the order quantity. Regenerate research journals, and re-export
+  generated artifacts (`schema/domain`, `schema/openapi`, `python/src/honba/wire/generated`;
+  the frontend TypeScript with `make schema`). Consumers that sum `order_filled.last_qty` must
+  also sum `order_partially_filled.last_qty`. `Event` is `#[non_exhaustive]`; the Python
+  `honba.wire` union gains `OrderPartiallyFilled`, `OrderCancelRequested`, `OrderExpired`.
+- Golden vectors under `schema/golden/` and the `schema_version` in `schema/conformance/*.json`
+  move to 4; the golden "future version" case in `message.json` is now version 5.
+
 ### Monotonic-deque indicators (E6 batch 3)
 
 - New `honba_indicators::Donchian` (channel over `period` bars: `upper`/`lower`/`middle`),

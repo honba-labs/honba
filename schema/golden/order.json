@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "type": "Order",
   "cases": [
     {
@@ -103,6 +103,32 @@
       }
     },
     {
+      "name": "limit_buy_accepted_cancel_requested",
+      "value": {
+        "order_id": "O-6",
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "exchange": "NSE"
+        },
+        "side": "buy",
+        "order_type": "limit",
+        "quantity": 50.0,
+        "price": 22000.05,
+        "trigger_price": null,
+        "status": "accepted",
+        "time_in_force": "day",
+        "ts_event": {
+          "iso": "2023-11-14T22:14:20.000000000Z",
+          "unix_nanos": "1700000060000000000"
+        },
+        "ts_init": {
+          "iso": "2023-11-14T22:14:20.000000000Z",
+          "unix_nanos": "1700000060000000000"
+        },
+        "cancel_requested": true
+      }
+    },
+    {
       "name": "gtd_expired_no_side",
       "value": {
         "order_id": "O-5",
@@ -146,6 +172,32 @@
         "time_in_force": "day",
         "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"},
         "ts_init": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}
+      }
+    },
+    {
+      "name": "filled_with_cancel_requested",
+      "value": {
+        "order_id": "O-7",
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "exchange": "NSE"
+        },
+        "side": "sell",
+        "order_type": "limit",
+        "quantity": 50.0,
+        "price": 22000.05,
+        "trigger_price": null,
+        "status": "filled",
+        "time_in_force": "gtc",
+        "ts_event": {
+          "iso": "2023-11-14T22:14:20.000000000Z",
+          "unix_nanos": "1700000060000000000"
+        },
+        "ts_init": {
+          "iso": "2023-11-14T22:14:20.000000000Z",
+          "unix_nanos": "1700000060000000000"
+        },
+        "cancel_requested": true
       }
     },
     {

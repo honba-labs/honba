@@ -4,13 +4,17 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::events::timestamp::UnixNanos;
-use crate::identifiers::OrderId;
+use crate::identifiers::{OrderId, VenueOrderId};
 use crate::market_data::{Bar, QuoteTick, TradeTick};
 use crate::orders::Order;
 use crate::validation::{deserialize_positive, finite, serialize_finite};
 
 fn last_qty<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
     deserialize_positive("last_qty", d)
+}
+
+fn cum_qty<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
+    deserialize_positive("cum_qty", d)
 }
 
 fn last_px<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
@@ -26,8 +30,10 @@ fn last_px<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
 ///
 /// History: 1 initial contract (E0-S2); 2 instrument exchange semantics; 3
 /// timestamps as `{iso, unix_nanos}` and money as integer minor units (ADR
-/// 0011, E11-S2). Only the current version is read; see CHANGELOG.md.
-pub const SCHEMA_VERSION: u32 = 3;
+/// 0011, E11-S2); 4 `order_filled` means the completing fill, earlier fills are
+/// `order_partially_filled` (ADR 0019). Only the current version is read; see
+/// CHANGELOG.md.
+pub const SCHEMA_VERSION: u32 = 4;
 
 /// Any typed event that can flow through the Honba event kernel.
 ///
@@ -56,6 +62,9 @@ pub enum Event {
     OrderAccepted {
         /// The client order identifier.
         order_id: OrderId,
+        /// The venue's own id for the order, when the acknowledgement names one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        venue_order_id: Option<VenueOrderId>,
         /// The exchange timestamp at which acceptance occurred.
         ts_event: UnixNanos,
     },
@@ -68,7 +77,24 @@ pub enum Event {
         /// The exchange timestamp at which rejection occurred.
         ts_event: UnixNanos,
     },
-    /// An order received a (possibly partial) fill.
+    /// An order received a fill that left a remainder (ADR 0019).
+    OrderPartiallyFilled {
+        /// The client order identifier.
+        order_id: OrderId,
+        /// The quantity filled in this event (finite, `> 0`).
+        #[serde(serialize_with = "serialize_finite", deserialize_with = "last_qty")]
+        last_qty: f64,
+        /// The price at which this fill occurred (finite).
+        #[serde(serialize_with = "serialize_finite", deserialize_with = "last_px")]
+        last_px: f64,
+        /// The cumulative filled quantity after this fill (finite, `> 0`).
+        #[serde(serialize_with = "serialize_finite", deserialize_with = "cum_qty")]
+        cum_qty: f64,
+        /// The exchange timestamp at which the fill occurred.
+        ts_event: UnixNanos,
+    },
+    /// An order received the fill that completed it (since schema version 4;
+    /// earlier fills are [`Event::OrderPartiallyFilled`]).
     OrderFilled {
         /// The client order identifier.
         order_id: OrderId,
@@ -81,11 +107,25 @@ pub enum Event {
         /// The exchange timestamp at which the fill occurred.
         ts_event: UnixNanos,
     },
+    /// A cancel was asked for and not yet answered (ADR 0019).
+    OrderCancelRequested {
+        /// The client order identifier.
+        order_id: OrderId,
+        /// The timestamp at which the cancel was processed.
+        ts_event: UnixNanos,
+    },
     /// An order was cancelled.
     OrderCancelled {
         /// The client order identifier.
         order_id: OrderId,
         /// The exchange timestamp at which cancellation occurred.
+        ts_event: UnixNanos,
+    },
+    /// An order expired (time-in-force expiry, ADR 0019).
+    OrderExpired {
+        /// The client order identifier.
+        order_id: OrderId,
+        /// The exchange timestamp at which expiry occurred.
         ts_event: UnixNanos,
     },
 }
@@ -100,8 +140,11 @@ impl Event {
             Event::Order(o) => o.ts_event(),
             Event::OrderAccepted { ts_event, .. }
             | Event::OrderRejected { ts_event, .. }
+            | Event::OrderPartiallyFilled { ts_event, .. }
             | Event::OrderFilled { ts_event, .. }
-            | Event::OrderCancelled { ts_event, .. } => *ts_event,
+            | Event::OrderCancelRequested { ts_event, .. }
+            | Event::OrderCancelled { ts_event, .. }
+            | Event::OrderExpired { ts_event, .. } => *ts_event,
         }
     }
 
@@ -114,7 +157,7 @@ impl Event {
 /// The envelope that carries an [`Event`] plus Honba-side metadata.
 ///
 /// This is the versioned unit of the wire contract: its JSON form is
-/// `{"schema_version": 3, "event": {...}, "ts_init": {...}}`, and deserializing a
+/// `{"schema_version": 4, "event": {...}, "ts_init": {...}}`, and deserializing a
 /// message with any other `schema_version` fails. Unknown fields, in the
 /// envelope or the event, are ignored (ADR 0012 rule 1): a newer producer's
 /// additive fields never break this reader, while a reshaped wire bumps the

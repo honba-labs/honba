@@ -34,7 +34,7 @@ fn run_strategy_matches_every_conformance_scenario() {
     }
 }
 
-const BAR: &str = r#"[{"schema_version": 3, "event": {"type": "bar", "bar_type": {"instrument_id": {"symbol": "RELIANCE", "exchange": "NSE"}, "spec": {"step": 1, "aggregation": "minute", "price_type": "last"}}, "open": 2945.0, "high": 2955.0, "low": 2940.0, "close": 2950.0, "volume": 1000.0, "ts_event": {"iso": "1970-01-01T00:00:00.000001000Z", "unix_nanos": "1000"}, "ts_init": {"iso": "1970-01-01T00:00:00.000001000Z", "unix_nanos": "1000"}}, "ts_init": {"iso": "1970-01-01T00:00:00.000001000Z", "unix_nanos": "1000"}}]"#;
+const BAR: &str = r#"[{"schema_version": 4, "event": {"type": "bar", "bar_type": {"instrument_id": {"symbol": "RELIANCE", "exchange": "NSE"}, "spec": {"step": 1, "aggregation": "minute", "price_type": "last"}}, "open": 2945.0, "high": 2955.0, "low": 2940.0, "close": 2950.0, "volume": 1000.0, "ts_event": {"iso": "1970-01-01T00:00:00.000001000Z", "unix_nanos": "1000"}, "ts_init": {"iso": "1970-01-01T00:00:00.000001000Z", "unix_nanos": "1000"}}, "ts_init": {"iso": "1970-01-01T00:00:00.000001000Z", "unix_nanos": "1000"}}]"#;
 const BUY_AND_HOLD: &str =
     r#"{"instrument_id": {"symbol": "RELIANCE", "exchange": "NSE"}, "quantity": QTY}"#;
 

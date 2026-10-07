@@ -21,6 +21,7 @@ from pydantic import (
     Strict,
     TypeAdapter,
     field_validator,
+    model_serializer,
     model_validator,
 )
 
@@ -241,6 +242,11 @@ class TradeTick(_Wire):
     ts_init: UnixNanos
 
 
+_WORKING_STATUSES: Final = frozenset(
+    {OrderStatus.SUBMITTED, OrderStatus.ACCEPTED, OrderStatus.PARTIALLY_FILLED}
+)
+
+
 class Order(_Wire):
     """A client order record; ``quantity > 0`` (``side`` may be ``no_order_side``)."""
 
@@ -255,6 +261,21 @@ class Order(_Wire):
     time_in_force: WireTimeInForce
     ts_event: UnixNanos
     ts_init: UnixNanos
+    cancel_requested: bool = False
+
+    @model_validator(mode="after")
+    def _check_cancel_requested(self) -> Order:
+        # A cancel can be pending only while the order is working (ADR 0019).
+        if self.cancel_requested and self.status not in _WORKING_STATUSES:
+            raise ValueError("cancel_requested is only allowed on a working order")
+        return self
+
+    @model_serializer(mode="wrap")
+    def _omit_false_cancel_requested(self, handler: Any) -> Any:
+        data = handler(self)
+        if isinstance(data, dict) and not data.get("cancel_requested", False):
+            data.pop("cancel_requested", None)
+        return data
 
 
 class OrderIntent(_Command):
@@ -370,13 +391,32 @@ class OrderEvent(Order):
 class OrderAccepted(_Wire):
     type: Literal["order_accepted"] = "order_accepted"
     order_id: Str
+    venue_order_id: Str | None = None
     ts_event: UnixNanos
+
+    @model_serializer(mode="wrap")
+    def _omit_absent_venue_order_id(self, handler: Any) -> Any:
+        data = handler(self)
+        if isinstance(data, dict) and data.get("venue_order_id") is None:
+            data.pop("venue_order_id", None)
+        return data
 
 
 class OrderRejected(_Wire):
     type: Literal["order_rejected"] = "order_rejected"
     order_id: Str
     reason: Str
+    ts_event: UnixNanos
+
+
+class OrderPartiallyFilled(_Wire):
+    """A fill that left a remainder (ADR 0019); the completing fill is ``order_filled``."""
+
+    type: Literal["order_partially_filled"] = "order_partially_filled"
+    order_id: Str
+    last_qty: PositiveFloat
+    last_px: Float
+    cum_qty: PositiveFloat
     ts_event: UnixNanos
 
 
@@ -388,8 +428,20 @@ class OrderFilled(_Wire):
     ts_event: UnixNanos
 
 
+class OrderCancelRequested(_Wire):
+    type: Literal["order_cancel_requested"] = "order_cancel_requested"
+    order_id: Str
+    ts_event: UnixNanos
+
+
 class OrderCancelled(_Wire):
     type: Literal["order_cancelled"] = "order_cancelled"
+    order_id: Str
+    ts_event: UnixNanos
+
+
+class OrderExpired(_Wire):
+    type: Literal["order_expired"] = "order_expired"
     order_id: Str
     ts_event: UnixNanos
 
@@ -401,8 +453,11 @@ Event = Annotated[
     | OrderEvent
     | OrderAccepted
     | OrderRejected
+    | OrderPartiallyFilled
     | OrderFilled
-    | OrderCancelled,
+    | OrderCancelRequested
+    | OrderCancelled
+    | OrderExpired,
     Field(discriminator="type"),
 ]
 """Any event, discriminated by its ``type`` field."""

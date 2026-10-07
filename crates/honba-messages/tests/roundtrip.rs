@@ -105,6 +105,7 @@ fn event_ts_matches_source() {
 
     let order_ev = Event::OrderAccepted {
         order_id: "O-1".into(),
+        venue_order_id: None,
         ts_event: ts(150),
     };
     assert_eq!(order_ev.ts_event().as_u64(), 150);

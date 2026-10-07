@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "type": "UnixNanos",
   "description": "E11-S2 timestamps cross JSON as {iso, unix_nanos}: unix_nanos is a decimal u64 string (the value; pre-epoch and > u64::MAX are unrepresentable and rejected), iso is RFC 3339 UTC with 9 fractional digits and informational on read (writers always derive it from unix_nanos). Values past 2^53 must survive exactly, so a JSON number is rejected.",
   "cases": [

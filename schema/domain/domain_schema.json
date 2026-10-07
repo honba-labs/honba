@@ -1166,6 +1166,17 @@
                 "order_accepted"
               ],
               "type": "string"
+            },
+            "venue_order_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/VenueOrderId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The venue's own id for the order, when the acknowledgement names one."
             }
           },
           "required": [
@@ -1214,7 +1225,58 @@
           "type": "object"
         },
         {
-          "description": "An order received a (possibly partial) fill.",
+          "description": "An order received a fill that left a remainder (ADR 0019).",
+          "properties": {
+            "cum_qty": {
+              "description": "The cumulative filled quantity after this fill (finite, `> 0`).",
+              "format": "double",
+              "type": "number"
+            },
+            "last_px": {
+              "description": "The price at which this fill occurred (finite).",
+              "format": "double",
+              "type": "number"
+            },
+            "last_qty": {
+              "description": "The quantity filled in this event (finite, `> 0`).",
+              "format": "double",
+              "type": "number"
+            },
+            "order_id": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/OrderId"
+                }
+              ],
+              "description": "The client order identifier."
+            },
+            "ts_event": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/UnixNanos"
+                }
+              ],
+              "description": "The exchange timestamp at which the fill occurred."
+            },
+            "type": {
+              "enum": [
+                "order_partially_filled"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "cum_qty",
+            "last_px",
+            "last_qty",
+            "order_id",
+            "ts_event",
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "An order received the fill that completed it (since schema version 4; earlier fills are [`Event::OrderPartiallyFilled`]).",
           "properties": {
             "last_px": {
               "description": "The price at which this fill occurred (finite).",
@@ -1259,6 +1321,39 @@
           "type": "object"
         },
         {
+          "description": "A cancel was asked for and not yet answered (ADR 0019).",
+          "properties": {
+            "order_id": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/OrderId"
+                }
+              ],
+              "description": "The client order identifier."
+            },
+            "ts_event": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/UnixNanos"
+                }
+              ],
+              "description": "The timestamp at which the cancel was processed."
+            },
+            "type": {
+              "enum": [
+                "order_cancel_requested"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "order_id",
+            "ts_event",
+            "type"
+          ],
+          "type": "object"
+        },
+        {
           "description": "An order was cancelled.",
           "properties": {
             "order_id": {
@@ -1280,6 +1375,39 @@
             "type": {
               "enum": [
                 "order_cancelled"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "order_id",
+            "ts_event",
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "An order expired (time-in-force expiry, ADR 0019).",
+          "properties": {
+            "order_id": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/OrderId"
+                }
+              ],
+              "description": "The client order identifier."
+            },
+            "ts_event": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/UnixNanos"
+                }
+              ],
+              "description": "The exchange timestamp at which expiry occurred."
+            },
+            "type": {
+              "enum": [
+                "order_expired"
               ],
               "type": "string"
             }
@@ -1586,7 +1714,7 @@
       "type": "object"
     },
     "Message": {
-      "description": "The envelope that carries an [`Event`] plus Honba-side metadata.\n\nThis is the versioned unit of the wire contract: its JSON form is `{\"schema_version\": 3, \"event\": {...}, \"ts_init\": {...}}`, and deserializing a message with any other `schema_version` fails. Unknown fields, in the envelope or the event, are ignored (ADR 0012 rule 1): a newer producer's additive fields never break this reader, while a reshaped wire bumps the version and is rejected.\n\n``` use honba_messages::{Event, Message, UnixNanos, QuoteTick, InstrumentId, Exchange};\n\nlet quote = QuoteTick::new( InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), 22_000.0, 22_001.0, 50.0, 75.0, UnixNanos::from_u64(1), UnixNanos::from_u64(1), ); let msg = Message::new(Event::Quote(quote), UnixNanos::from_u64(2)); assert!(msg.event().is_market_data()); assert_eq!(msg.schema_version(), honba_messages::SCHEMA_VERSION); ```",
+      "description": "The envelope that carries an [`Event`] plus Honba-side metadata.\n\nThis is the versioned unit of the wire contract: its JSON form is `{\"schema_version\": 4, \"event\": {...}, \"ts_init\": {...}}`, and deserializing a message with any other `schema_version` fails. Unknown fields, in the envelope or the event, are ignored (ADR 0012 rule 1): a newer producer's additive fields never break this reader, while a reshaped wire bumps the version and is rejected.\n\n``` use honba_messages::{Event, Message, UnixNanos, QuoteTick, InstrumentId, Exchange};\n\nlet quote = QuoteTick::new( InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), 22_000.0, 22_001.0, 50.0, 75.0, UnixNanos::from_u64(1), UnixNanos::from_u64(1), ); let msg = Message::new(Event::Quote(quote), UnixNanos::from_u64(2)); assert!(msg.event().is_market_data()); assert_eq!(msg.schema_version(), honba_messages::SCHEMA_VERSION); ```",
       "properties": {
         "event": {
           "$ref": "#/$defs/Event"
@@ -3444,6 +3572,10 @@
           "type": "string"
         }
       ]
+    },
+    "VenueOrderId": {
+      "description": "A venue-assigned order identifier (the exchange or broker's id, as opposed to the client-assigned [`OrderId`]).",
+      "type": "string"
     }
   },
   "$id": "https://honba.dev/schema/domain.json",
@@ -3503,7 +3635,7 @@
       "$ref": "#/$defs/Trade"
     }
   },
-  "schema_version": 3,
+  "schema_version": 4,
   "title": "HonbaDomainBundle",
   "type": "object"
 }

@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "type": "StrategyConformance",
   "description": "Scripted event streams run through the same strategy in Python and Rust (ADR 008). events are wire Messages; intents carry the ts_init they were submitted at; fills are wire Trades; observations are what contract_probe read from its context on each hook.",
   "fill_model": "bar_close",
@@ -29,7 +29,7 @@
       ],
       "events": [
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {
@@ -63,7 +63,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "quote",
             "instrument_id": {
@@ -89,7 +89,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "trade",
             "instrument_id": {
@@ -115,7 +115,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {
@@ -149,7 +149,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "quote",
             "instrument_id": {
@@ -175,7 +175,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "trade",
             "instrument_id": {
@@ -201,7 +201,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "trade",
             "instrument_id": {
@@ -227,7 +227,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {
@@ -261,7 +261,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {
@@ -295,7 +295,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {
@@ -1019,7 +1019,7 @@
       "instruments": [],
       "events": [
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {
@@ -1053,7 +1053,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "trade",
             "instrument_id": {
@@ -1079,7 +1079,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {
@@ -1382,7 +1382,7 @@
       "instruments": [],
       "events": [
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {
@@ -1416,7 +1416,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {
@@ -1450,7 +1450,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {
@@ -1562,7 +1562,7 @@
       "instruments": [],
       "events": [
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {
@@ -1596,7 +1596,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {
@@ -1630,7 +1630,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {
@@ -1664,7 +1664,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {
@@ -1698,7 +1698,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {
@@ -1732,7 +1732,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {
@@ -1766,7 +1766,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {
@@ -1800,7 +1800,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {
@@ -1941,7 +1941,7 @@
       "instruments": [],
       "events": [
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {
@@ -1975,7 +1975,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "trade",
             "instrument_id": {
@@ -2001,7 +2001,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "trade",
             "instrument_id": {
@@ -2295,7 +2295,7 @@
       "instruments": [],
       "events": [
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {
@@ -2329,7 +2329,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "trade",
             "instrument_id": {
@@ -2355,7 +2355,7 @@
           }
         },
         {
-          "schema_version": 3,
+          "schema_version": 4,
           "event": {
             "type": "bar",
             "bar_type": {

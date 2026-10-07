@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use honba_messages::{
     AggressorSide, Bar, BarAggregation, BarSpecification, BarType, Event, Exchange, InstrumentId,
     Message, Order, OrderId, OrderSide, OrderStatus, OrderType, PriceType, QuoteTick, TimeInForce,
-    TradeId, TradeTick, UnixNanos, SCHEMA_VERSION,
+    TradeId, TradeTick, UnixNanos, VenueOrderId, SCHEMA_VERSION,
 };
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -282,6 +282,20 @@ fn order_golden() {
                 ),
             ),
             (
+                "limit_buy_accepted_cancel_requested",
+                order(
+                    "O-6",
+                    Buy,
+                    Limit,
+                    50.0,
+                    Some(22_000.05),
+                    None,
+                    Accepted,
+                    Day,
+                )
+                .with_cancel_requested(true),
+            ),
+            (
                 "gtd_expired_no_side",
                 order(
                     "O-5",
@@ -331,6 +345,47 @@ fn event_golden_uses_order_id() {
                 "order_accepted",
                 Event::OrderAccepted {
                     order_id: OrderId::new("O-1"),
+                    venue_order_id: None,
+                    ts_event: ts(TS),
+                },
+            ),
+            (
+                "order_accepted_with_venue_id",
+                Event::OrderAccepted {
+                    order_id: OrderId::new("O-1"),
+                    venue_order_id: Some(VenueOrderId::new("V-100")),
+                    ts_event: ts(TS),
+                },
+            ),
+            (
+                "order_accepted_without_venue_id",
+                Event::OrderAccepted {
+                    order_id: OrderId::new("O-6"),
+                    venue_order_id: None,
+                    ts_event: ts(TS),
+                },
+            ),
+            (
+                "order_partially_filled",
+                Event::OrderPartiallyFilled {
+                    order_id: OrderId::new("O-1"),
+                    last_qty: 25.0,
+                    last_px: 22_000.05,
+                    cum_qty: 25.0,
+                    ts_event: ts(TS),
+                },
+            ),
+            (
+                "order_cancel_requested",
+                Event::OrderCancelRequested {
+                    order_id: OrderId::new("O-3"),
+                    ts_event: ts(TS),
+                },
+            ),
+            (
+                "order_expired",
+                Event::OrderExpired {
+                    order_id: OrderId::new("O-5"),
                     ts_event: ts(TS),
                 },
             ),

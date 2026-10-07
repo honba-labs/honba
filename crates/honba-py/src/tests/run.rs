@@ -17,7 +17,7 @@ fn ts_obj(nanos: u64) -> Value {
 
 fn bar(close: f64, ts: u64) -> Value {
     json!({
-        "schema_version": 3,
+        "schema_version": 4,
         "event": {
             "type": "bar",
             "bar_type": {
@@ -86,7 +86,7 @@ fn rejects_bad_input() {
 #[test]
 fn refuses_an_order_before_any_bar_instead_of_filling_at_zero() {
     let quote = json!({
-        "schema_version": 3,
+        "schema_version": 4,
         "event": {
             "type": "quote", "instrument_id": {"symbol": "X", "exchange": "NSE"},
             "bid_price": 1.0, "ask_price": 1.5, "bid_size": 1.0, "ask_size": 1.0,

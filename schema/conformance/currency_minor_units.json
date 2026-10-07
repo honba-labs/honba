@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "type": "CurrencyMinorUnits",
   "cases": [
     {"name": "inr", "value": {"currency": "INR", "minor_exponent": 2, "singular": "paisa", "plural": "paise"}},

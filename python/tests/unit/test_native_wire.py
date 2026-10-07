@@ -13,7 +13,8 @@ def test_schema_version_is_exported():
     from honba.entities import wire
 
     # v3: integer Money and {iso, unix_nanos} timestamps (ADR 0011, E11-S2).
-    assert _honba.SCHEMA_VERSION == 3
+    # v4: order_filled is the completing fill; order_partially_filled etc. (ADR 0019).
+    assert _honba.SCHEMA_VERSION == 4
     assert wire.SCHEMA_VERSION == _honba.SCHEMA_VERSION
 
 

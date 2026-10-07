@@ -9,7 +9,7 @@ from typing_extensions import NotRequired
 
 T = TypeVar("T")
 
-SCHEMA_VERSION: int = 3
+SCHEMA_VERSION: int = 4
 API_VERSION: str = "1.0.0"
 CORE_VERSION: str = "0.1.0"
 
@@ -169,12 +169,21 @@ class EventOrderAccepted(TypedDict):
     order_id: OrderId
     ts_event: UnixNanos
     type: Literal["order_accepted"]
+    venue_order_id: NotRequired[VenueOrderId | None]
 
 class EventOrderRejected(TypedDict):
     order_id: OrderId
     reason: str
     ts_event: UnixNanos
     type: Literal["order_rejected"]
+
+class EventOrderPartiallyFilled(TypedDict):
+    cum_qty: float
+    last_px: float
+    last_qty: float
+    order_id: OrderId
+    ts_event: UnixNanos
+    type: Literal["order_partially_filled"]
 
 class EventOrderFilled(TypedDict):
     last_px: float
@@ -183,12 +192,22 @@ class EventOrderFilled(TypedDict):
     ts_event: UnixNanos
     type: Literal["order_filled"]
 
+class EventOrderCancelRequested(TypedDict):
+    order_id: OrderId
+    ts_event: UnixNanos
+    type: Literal["order_cancel_requested"]
+
 class EventOrderCancelled(TypedDict):
     order_id: OrderId
     ts_event: UnixNanos
     type: Literal["order_cancelled"]
 
-Event = EventQuote | EventTrade | EventBar | EventOrder | EventOrderAccepted | EventOrderRejected | EventOrderFilled | EventOrderCancelled
+class EventOrderExpired(TypedDict):
+    order_id: OrderId
+    ts_event: UnixNanos
+    type: Literal["order_expired"]
+
+Event = EventQuote | EventTrade | EventBar | EventOrder | EventOrderAccepted | EventOrderRejected | EventOrderPartiallyFilled | EventOrderFilled | EventOrderCancelRequested | EventOrderCancelled | EventOrderExpired
 
 Exchange = str
 
@@ -476,3 +495,5 @@ class UnixNanos:
     unix_nanos: str
 
 ValueType = Literal["NUMBER", "STRING", "ENUM", "BOOL", "DATE", "MONEY"]
+
+VenueOrderId = str

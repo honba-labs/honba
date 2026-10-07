@@ -117,6 +117,7 @@ fn hooks_dispatch_by_event_type_with_the_clock_at_ts_init() {
     );
     let accepted = Event::OrderAccepted {
         order_id: "O-1".into(),
+        venue_order_id: None,
         ts_event: UnixNanos::from_u64(40),
     };
     send(&mut runner, accepted, 40); // not market data: no hook

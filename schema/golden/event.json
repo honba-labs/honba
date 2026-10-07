@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "type": "Event",
   "cases": [
     {
@@ -107,6 +107,65 @@
       "value": {
         "type": "order_accepted",
         "order_id": "O-1",
+        "ts_event": {
+          "iso": "2023-11-14T22:14:20.000000000Z",
+          "unix_nanos": "1700000060000000000"
+        }
+      }
+    },
+    {
+      "name": "order_accepted_with_venue_id",
+      "value": {
+        "type": "order_accepted",
+        "order_id": "O-1",
+        "venue_order_id": "V-100",
+        "ts_event": {
+          "iso": "2023-11-14T22:14:20.000000000Z",
+          "unix_nanos": "1700000060000000000"
+        }
+      }
+    },
+    {
+      "name": "order_accepted_without_venue_id",
+      "value": {
+        "type": "order_accepted",
+        "order_id": "O-6",
+        "ts_event": {
+          "iso": "2023-11-14T22:14:20.000000000Z",
+          "unix_nanos": "1700000060000000000"
+        }
+      }
+    },
+    {
+      "name": "order_partially_filled",
+      "value": {
+        "type": "order_partially_filled",
+        "order_id": "O-1",
+        "last_qty": 25.0,
+        "last_px": 22000.05,
+        "cum_qty": 25.0,
+        "ts_event": {
+          "iso": "2023-11-14T22:14:20.000000000Z",
+          "unix_nanos": "1700000060000000000"
+        }
+      }
+    },
+    {
+      "name": "order_cancel_requested",
+      "value": {
+        "type": "order_cancel_requested",
+        "order_id": "O-3",
+        "ts_event": {
+          "iso": "2023-11-14T22:14:20.000000000Z",
+          "unix_nanos": "1700000060000000000"
+        }
+      }
+    },
+    {
+      "name": "order_expired",
+      "value": {
+        "type": "order_expired",
+        "order_id": "O-5",
         "ts_event": {
           "iso": "2023-11-14T22:14:20.000000000Z",
           "unix_nanos": "1700000060000000000"
@@ -257,6 +316,20 @@
         "time_in_force": "day",
         "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"},
         "ts_init": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}
+      }
+    },
+    {
+      "name": "order_partially_filled_zero_cum_qty",
+      "value": {
+        "type": "order_partially_filled",
+        "order_id": "O-1",
+        "last_qty": 25.0,
+        "last_px": 22000.05,
+        "cum_qty": 0.0,
+        "ts_event": {
+          "iso": "2023-11-14T22:14:20.000000000Z",
+          "unix_nanos": "1700000060000000000"
+        }
       }
     },
     {
