@@ -33,18 +33,26 @@ The settlement cycle and the cost schedule are market rules and are injected:
 one bar, so the cycle counts bars: that equals trading days only for daily-or-longer
 timeframes, and :func:`make_simulator` therefore requires an explicit ``settlement_days``
 for intraday timeframes. Pure: no I/O and no wall clock.
+
+**Backends.** :class:`NextOpenExecution` runs on the native Rust simulator
+(``honba._honba.NextOpenSimulator``) when the extension is usable and on the pure-Python
+reference otherwise; the two are interchangeable (shared conformance vectors, seeded parity
+test). Pick one with ``backend="python" | "native" | "auto"`` or ``HONBA_SIM_BACKEND``
+(ADR 0016, chunk 3b).
 """
 
 from __future__ import annotations
 
 import dataclasses
 import math
+import os
 import re
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any, Literal
 
+from honba import _native
 from honba.domain.money import Currency, Money
 from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
@@ -53,6 +61,7 @@ from honba.entities.trade import Trade
 from honba.strategies.execution import BaseExecutionPort, ExecutionPort, OrderRejection
 
 __all__ = [
+    "BACKEND_ENV",
     "FillCostFn",
     "FillModel",
     "NextOpenExecution",
@@ -61,12 +70,22 @@ __all__ = [
     "group_sessions",
     "is_intraday",
     "make_simulator",
+    "resolve_backend",
     "resolve_fill_costs",
     "session_date",
     "zero_costs",
 ]
 
 FillModel = Literal["bar_close", "next_open"]
+
+Backend = Literal["python", "native"]
+"""The implementation behind a :class:`NextOpenExecution`."""
+
+BackendChoice = Literal["auto", "python", "native"]
+"""``backend=`` values: ``auto`` takes native when the extension is usable, else Python."""
+
+BACKEND_ENV = "HONBA_SIM_BACKEND"
+"""Environment variable giving the default :data:`BackendChoice` (``auto`` when unset)."""
 
 FillCostFn = Callable[[OrderSide, float, float], Money]
 """``(side, quantity, price) -> cost`` of one fill, never negative, in the port's currency."""
@@ -75,6 +94,12 @@ FillCostFn = Callable[[OrderSide, float, float], Money]
 def zero_costs(side: OrderSide, quantity: float, price: float) -> Money:
     """No transaction costs."""
     return Money.zero(Currency.INR)
+
+
+zero_costs.native_cost_pack = "none"  # type: ignore[attr-defined]
+# ^ Cost functions that equal a named native cost pack carry its name in ``native_cost_pack``;
+# the native backend then costs fills inside Rust instead of calling back into Python (only
+# for INR ports: the packs charge rupees). See ``markets.india.costs`` for the India packs.
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,8 +122,13 @@ class _Working:
     first_try: int | None = None  # first session it was eligible and considered
 
 
-class NextOpenExecution(BaseExecutionPort):
-    """``ExecutionPort`` filling market orders at the next session's open (see module docs)."""
+class _PythonSim:
+    """The pure-Python next-open simulator: the reference implementation (ADR 0016).
+
+    Behind :class:`NextOpenExecution` when the native extension is unavailable or the
+    ``python`` backend is forced; the conformance vectors and the backend parity test keep it
+    and the native simulator identical.
+    """
 
     def __init__(
         self,
@@ -240,6 +270,10 @@ class NextOpenExecution(BaseExecutionPort):
             return Money.zero(self._currency)  # a zero schedule is currency-neutral
         if cost.amount < 0:
             raise ValueError(f"fill cost must not be negative, got {cost}")
+        if cost.currency is not self._currency:
+            # Checked here, before an order is dequeued, so a failing cost leaves the order
+            # working and the state unchanged (a sell used to fail only at the proceeds sum).
+            raise ValueError(f"currency mismatch: fill cost {cost}, port {self._currency}")
         return cost
 
     def _now(self) -> int:
@@ -356,6 +390,385 @@ _QTY_EPS = 1e-9  # quantities closer than this are equal (float residue from fra
 
 def _usable_open(price: float) -> bool:
     return math.isfinite(price) and price > 0
+
+
+# -- backend selection ---------------------------------------------------------------------------
+_NATIVE_METHODS = ("set_position", "set_lot_size", "on_session_open")
+_NATIVE_PROPERTIES = ("session_ts", "available_cash", "unsettled")
+
+
+def _native_simulator() -> Any:
+    """The native ``NextOpenSimulator`` class, or ``ImportError`` / ``RuntimeError`` if unusable."""
+    cls = _native.native_attr("NextOpenSimulator")
+    missing = [n for n in (*_NATIVE_METHODS, *_NATIVE_PROPERTIES) if not hasattr(cls, n)]
+    if missing:
+        raise RuntimeError(
+            f"honba._honba.NextOpenSimulator lacks {missing}: the compiled extension is stale, "
+            "rebuild it (maturin develop)"
+        )
+    return cls
+
+
+def resolve_backend(requested: BackendChoice | None = None) -> Backend:
+    """The backend a :class:`NextOpenExecution` built now would run on.
+
+    ``requested`` (``"auto"``, ``"python"``, ``"native"``) wins over the ``HONBA_SIM_BACKEND``
+    environment variable, which wins over the default ``"auto"``. ``auto`` is ``native`` when
+    ``honba._honba`` is importable and current, else ``python``; ``native`` raises the
+    ``ImportError`` / ``RuntimeError`` of the unusable extension, with the backend named.
+    """
+    if requested is None:
+        raw = os.environ.get(BACKEND_ENV, "").strip().lower() or "auto"
+        origin = f"{BACKEND_ENV}={os.environ.get(BACKEND_ENV)!r}"
+    else:
+        raw, origin = str(requested).strip().lower(), f"backend={requested!r}"
+    if raw not in ("auto", "python", "native"):
+        raise ValueError(f"{origin}: backend must be 'auto', 'python' or 'native'")
+    if raw == "python":
+        return "python"
+    try:
+        _native_simulator()
+    except ImportError as exc:
+        if raw == "native":
+            raise ImportError(f"the native simulator backend was requested: {exc}") from exc
+        return "python"
+    except RuntimeError as exc:
+        if raw == "native":
+            raise RuntimeError(f"the native simulator backend was requested: {exc}") from exc
+        return "python"
+    return "native"
+
+
+class _NativePositions(MutableMapping[InstrumentId, float]):
+    """Live view of the native simulator's positions with the ``dict`` the Python port exposes.
+
+    Reading takes a snapshot; ``positions[iid] = qty`` seeds a holding (zero removes it) and
+    ``del positions[iid]`` flattens one.
+    """
+
+    def __init__(self, sim: Any) -> None:
+        self._sim = sim
+
+    def _snapshot(self) -> dict[InstrumentId, float]:
+        return {InstrumentId(s, e): q for s, e, q in self._sim.positions}
+
+    def __getitem__(self, key: InstrumentId) -> float:
+        return self._snapshot()[key]
+
+    def __setitem__(self, key: InstrumentId, value: float) -> None:
+        self._sim.set_position(key.symbol, float(value), key.exchange)
+
+    def __delitem__(self, key: InstrumentId) -> None:
+        if key not in self._snapshot():
+            raise KeyError(key)
+        self._sim.set_position(key.symbol, 0.0, key.exchange)
+
+    def __iter__(self) -> Iterator[InstrumentId]:
+        return iter(self._snapshot())
+
+    def __len__(self) -> int:
+        return len(self._sim.positions)
+
+    def __repr__(self) -> str:
+        return repr(self._snapshot())
+
+
+def _native_costs(costs: FillCostFn, currency: Currency) -> Any:
+    """The ``costs=`` argument of the native class for a Python ``FillCostFn``.
+
+    A function marked with ``native_cost_pack`` goes in by name (INR only). Any other callable
+    is bridged: Rust passes ``(side, quantity, price)`` and takes minor units back; the bridge
+    keeps :meth:`_PythonSim._costs` rules: a zero cost is currency-neutral, a negative one is
+    refused by the simulator, a non-zero cost in another currency is a ``ValueError``.
+    """
+    pack = getattr(costs, "native_cost_pack", None)
+    if pack is not None and currency is Currency.INR:
+        return pack
+
+    def bridge(side: str, quantity: float, price: float) -> int:
+        cost = costs(OrderSide.BUY if side == "buy" else OrderSide.SELL, quantity, price)
+        if cost.amount == 0:
+            return 0
+        if cost.amount > 0 and cost.currency is not currency:
+            raise ValueError(f"currency mismatch: fill cost {cost}, port {currency}")
+        return cost.amount  # a negative amount is a ValueError in the simulator
+
+    return bridge
+
+
+def _user_id(native_id: str) -> str:
+    """The caller's order id from a native id ``"<seq>:<order_id>"``."""
+    return native_id.partition(":")[2]
+
+
+def _bar_dict(bar: Bar) -> dict[str, Any]:
+    iid = bar.instrument_id
+    return {
+        "symbol": iid.symbol,
+        "exchange": iid.exchange,
+        "ts": bar.ts,
+        "open": bar.open,
+        "high": bar.high,
+        "low": bar.low,
+        "close": bar.close,
+        "volume": bar.volume,
+    }
+
+
+class _NativeSim:
+    """The :class:`_PythonSim` surface on top of ``honba._honba.NextOpenSimulator``.
+
+    Converts ``Money`` to and from integer minor units, ``Bar`` / ``OrderIntent`` to the
+    binding's dicts and its drained dicts back to ``Trade`` / ``OrderRejection``. Rebuilding a
+    rejection's intent needs the original (order type, price, trigger). An id may be reused once
+    its order is done while that order's rejection is still undrained, so every accepted order
+    gets a unique native id ``"<seq>:<order_id>"``, and the intent is kept under it until the
+    rejections are drained.
+    """
+
+    def __init__(
+        self,
+        *,
+        cash: Money,
+        settlement_days: int,
+        costs: FillCostFn,
+        long_only: bool,
+        lot_sizes: Mapping[InstrumentId, float] | None,
+    ) -> None:
+        if settlement_days < 0:
+            raise ValueError("settlement_days must be >= 0")
+        if cash.amount < 0:
+            raise ValueError("cash must be >= 0")
+        self._currency = cash.currency
+        self._sim = _native_simulator()(
+            cash.amount,
+            cash.currency.value,
+            settlement_days=settlement_days,
+            long_only=long_only,
+            costs=_native_costs(costs, cash.currency),
+        )
+        self._intents: dict[str, OrderIntent] = {}  # by native id
+        self._seq = 0
+        self.positions: MutableMapping[InstrumentId, float] = _NativePositions(self._sim)
+        for iid, lot in (lot_sizes or {}).items():
+            self.set_lot_size(iid, lot)
+
+    def _money(self, minor: int) -> Money:
+        return Money.from_minor(minor, self._currency)
+
+    @property
+    def settlement_days(self) -> int:
+        return int(self._sim.settlement_days)
+
+    @property
+    def cash(self) -> Money:
+        return self._money(self._sim.cash)
+
+    @property
+    def fees(self) -> Money:
+        return self._money(self._sim.fees)
+
+    @property
+    def traded_notional(self) -> Money:
+        return self._money(self._sim.traded_notional)
+
+    @property
+    def unsettled(self) -> Money:
+        return self._money(self._sim.unsettled)
+
+    @property
+    def available_cash(self) -> Money:
+        return self._money(self._sim.available_cash)
+
+    @property
+    def working_orders(self) -> list[str]:
+        return [_user_id(w) for w in self._sim.working_orders]
+
+    def submit(self, order_id: str, intent: OrderIntent, ts: int) -> None:
+        if intent.side not in (OrderSide.BUY, OrderSide.SELL):
+            raise ValueError(f"order {order_id} has no side: it must be buy or sell")
+        if any(_user_id(w) == order_id for w in self._sim.working_orders):
+            raise ValueError(f"order id {order_id} is already working")
+        iid = intent.instrument_id
+        native_id = f"{self._seq}:{order_id}"
+        self._sim.submit(
+            {
+                "id": native_id,
+                "symbol": iid.symbol,
+                "exchange": iid.exchange,
+                "side": intent.side.value,
+                "type": intent.order_type.value,
+                "qty": intent.quantity,
+                "price": intent.price,
+                "trigger": intent.trigger_price,
+                "ts": ts,
+            }
+        )
+        self._seq += 1
+        self._intents[native_id] = intent
+
+    def cancel(self, order_id: str) -> None:
+        for native_id in self._sim.working_orders:
+            if _user_id(native_id) == order_id:
+                self._sim.cancel(native_id, self._sim.session_ts or 0)
+                return
+
+    def drain_fills(self) -> list[Trade]:
+        return [
+            Trade(
+                InstrumentId(f["symbol"], f["exchange"]),
+                OrderSide.BUY if f["side"] == "buy" else OrderSide.SELL,
+                f["quantity"],
+                f["price"],
+                f["ts"],
+                _user_id(f["order_id"]),
+                costs=self._money(f["costs"]),
+            )
+            for f in self._sim.drain_fills()
+        ]
+
+    def drain_rejections(self) -> list[OrderRejection]:
+        out: list[OrderRejection] = []
+        for r in self._sim.drain_rejections():
+            intent = self._intents.get(r["order_id"])
+            if intent is None:  # pragma: no cover - every accepted order is remembered
+                side = OrderSide.BUY if r["side"] == "buy" else OrderSide.SELL
+                intent = OrderIntent(InstrumentId(r["symbol"], r["exchange"]), side, r["quantity"])
+            if intent.quantity != r["quantity"]:
+                intent = dataclasses.replace(intent, quantity=r["quantity"])
+            out.append(
+                OrderRejection(
+                    _user_id(r["order_id"]), intent, r["reason"], r["ts"], r["cancelled"]
+                )
+            )
+        working = set(self._sim.working_orders)
+        self._intents = {k: v for k, v in self._intents.items() if k in working}
+        return out
+
+    def on_event(self, event: Any, ts_init: int) -> None:
+        if isinstance(event, SessionOpen):
+            self._sim.on_session_open(event.ts, [_bar_dict(b) for b in event.bars])
+        elif isinstance(event, Bar):
+            self._sim.on_bar(_bar_dict(event))
+
+    def open_session(self, ts: int, bars: Sequence[Bar]) -> None:
+        self._sim.open_session(ts, [_bar_dict(b) for b in bars])
+
+    def set_settlement_days(self, settlement_days: int) -> None:
+        self._sim.set_settlement_days(settlement_days)
+
+    def set_lot_size(self, instrument_id: InstrumentId, lot_size: float) -> None:
+        if not (math.isfinite(lot_size) and lot_size > 0):
+            raise ValueError(f"lot_size must be positive, got {lot_size}")
+        self._sim.set_lot_size(instrument_id.symbol, lot_size, instrument_id.exchange)
+
+
+class NextOpenExecution(BaseExecutionPort):
+    """``ExecutionPort`` filling market orders at the next session's open (see module docs).
+
+    Runs on the native ``honba._honba.NextOpenSimulator`` when the extension is usable and on
+    the pure-Python reference otherwise; both give identical results (ADR 0016, shared
+    conformance vectors and a seeded parity test). ``backend`` (``"auto"`` by default, or the
+    ``HONBA_SIM_BACKEND`` environment variable) forces one; :attr:`backend` reports the choice.
+    """
+
+    def __init__(
+        self,
+        *,
+        cash: Money,
+        settlement_days: int = 0,
+        costs: FillCostFn = zero_costs,
+        long_only: bool = True,
+        lot_sizes: Mapping[InstrumentId, float] | None = None,
+        backend: BackendChoice | None = None,
+    ) -> None:
+        self._backend: Backend = resolve_backend(backend)
+        impl: type[_PythonSim | _NativeSim] = (
+            _NativeSim if self._backend == "native" else _PythonSim
+        )
+        self._impl = impl(
+            cash=cash,
+            settlement_days=settlement_days,
+            costs=costs,
+            long_only=long_only,
+            lot_sizes=lot_sizes,
+        )
+
+    @property
+    def backend(self) -> Backend:
+        """``"native"`` or ``"python"``: the implementation this port runs on."""
+        return self._backend
+
+    # -- state ---------------------------------------------------------------------------
+    @property
+    def settlement_days(self) -> int:
+        """Sessions after a sale before its proceeds are available."""
+        return self._impl.settlement_days
+
+    @property
+    def cash(self) -> Money:
+        """Booked cash (sale proceeds count at once, see :attr:`available_cash`)."""
+        return self._impl.cash
+
+    @property
+    def fees(self) -> Money:
+        """Transaction costs paid so far."""
+        return self._impl.fees
+
+    @property
+    def traded_notional(self) -> Money:
+        """Sum of the notional of every fill."""
+        return self._impl.traded_notional
+
+    @property
+    def positions(self) -> MutableMapping[InstrumentId, float]:
+        """Net quantity per instrument; assigning an entry seeds a holding."""
+        return self._impl.positions
+
+    @property
+    def unsettled(self) -> Money:
+        """Sale proceeds booked but not yet available."""
+        return self._impl.unsettled
+
+    @property
+    def available_cash(self) -> Money:
+        """Cash that may fund a buy now: booked cash less unsettled sale proceeds."""
+        return self._impl.available_cash
+
+    @property
+    def working_orders(self) -> list[str]:
+        """Ids of orders not yet filled, rejected or cancelled, in submission order."""
+        return self._impl.working_orders
+
+    # -- ExecutionPort -------------------------------------------------------------------
+    def submit(self, order_id: str, intent: OrderIntent, ts: int) -> None:
+        self._impl.submit(order_id, intent, ts)
+
+    def drain_fills(self) -> list[Trade]:
+        return self._impl.drain_fills()
+
+    def drain_rejections(self) -> list[OrderRejection]:
+        return self._impl.drain_rejections()
+
+    def cancel(self, order_id: str) -> None:
+        self._impl.cancel(order_id)
+
+    # -- session driver ------------------------------------------------------------------
+    def on_event(self, event: Any, ts_init: int) -> None:
+        """Observe the runner's event stream (called before the strategy sees it)."""
+        self._impl.on_event(event, ts_init)
+
+    def open_session(self, ts: int, bars: Sequence[Bar]) -> None:
+        """Start session ``ts``: settle due proceeds, then fill eligible orders at the opens."""
+        self._impl.open_session(ts, bars)
+
+    def set_settlement_days(self, settlement_days: int) -> None:
+        """Change the settlement cycle before the first session opens."""
+        self._impl.set_settlement_days(settlement_days)
+
+    def set_lot_size(self, instrument_id: InstrumentId, lot_size: float) -> None:
+        """Quantity step a funding cut floors to for ``instrument_id`` (default 1)."""
+        self._impl.set_lot_size(instrument_id, lot_size)
 
 
 def group_sessions(

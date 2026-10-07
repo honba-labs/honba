@@ -339,7 +339,10 @@ def test_session_open_with_non_ts_keys_ignores_the_following_bars() -> None:
     p = port()
     for event, ts in group_sessions(bars, key=lambda b: b.ts // day):
         p.on_event(event, ts)  # must not raise "does not follow session"
-    assert p._session == 2
+    if p.backend == "python":
+        assert p._impl._session == 2
+    else:  # the native simulator keeps the key of the current session
+        assert p._impl._sim.session_ts == bars[-1].ts // day
 
 
 def test_ordinal_session_keys_keep_sells_before_buys_across_instruments() -> None:

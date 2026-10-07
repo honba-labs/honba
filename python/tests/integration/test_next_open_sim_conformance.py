@@ -27,9 +27,31 @@ gen = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(gen)
 
 
+def _native_available() -> bool:
+    try:
+        from honba._native import native_attr
+
+        return hasattr(native_attr("NextOpenSimulator"), "set_position")
+    except (ImportError, RuntimeError):
+        return False
+
+
+BACKENDS = [
+    "python",
+    pytest.param(
+        "native",
+        marks=pytest.mark.skipif(not _native_available(), reason="native extension not built"),
+    ),
+]
+
+
+@pytest.mark.parametrize("backend", BACKENDS)
 @pytest.mark.parametrize("scenario", DOC["scenarios"], ids=lambda s: s["name"])
-def test_next_open_vector_matches_the_python_reference(scenario: dict[str, Any]) -> None:
-    got = gen.replay(scenario)
+def test_next_open_vector_matches_the_python_reference(
+    scenario: dict[str, Any], backend: str
+) -> None:
+    """Every vector (all chunks) replays identically through ``NextOpenExecution`` per backend."""
+    got = gen.replay(scenario, backend)
     assert got["steps"] == scenario["steps"]
     assert got["expect"]["drains"] == scenario["expect"]["drains"]
     final = {k: v for k, v in got["expect"].items() if k != "drains"}

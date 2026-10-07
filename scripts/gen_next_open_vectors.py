@@ -123,13 +123,15 @@ def _cost_fn(spec: dict[str, int], currency: Currency) -> FillCostFn:
     return cost
 
 
-def _port(config: dict[str, Any]) -> NextOpenExecution:
+def _port(config: dict[str, Any], backend: str | None = None) -> NextOpenExecution:
     currency = Currency[config["currency"]]
     cash = Money.from_minor(config["cash"], currency)
     extra: dict[str, Any] = {}
     if "costs" in config:
         extra["costs"] = _cost_fn(config["costs"], currency)
     lots = {_iid(s): lot for s, lot in config.get("lot_sizes", {}).items()}
+    if backend is not None:  # None: the class default (HONBA_SIM_BACKEND, else auto)
+        extra["backend"] = backend
     return NextOpenExecution(
         cash=cash,
         settlement_days=config.get("settlement_days", 0),
@@ -139,9 +141,13 @@ def _port(config: dict[str, Any]) -> NextOpenExecution:
     )
 
 
-def replay(scenario: dict[str, Any]) -> dict[str, Any]:
-    """Runs ``scenario`` through the Python reference; returns its steps (errors flagged) + expect."""
-    port = _port(scenario["config"])
+def replay(scenario: dict[str, Any], backend: str | None = None) -> dict[str, Any]:
+    """Runs ``scenario`` through ``NextOpenExecution``; returns its steps (errors flagged) + expect.
+
+    ``backend`` is ``"python"`` (the reference, what ``build`` uses to author the vectors),
+    ``"native"`` or ``"auto"``; ``None`` leaves the choice to the class (ADR 0016, chunk 3b).
+    """
+    port = _port(scenario["config"], backend)
     steps: list[dict[str, Any]] = []
     drains: list[dict[str, Any]] = []
     probes: list[dict[str, Any]] = []
@@ -927,7 +933,7 @@ def scenarios() -> list[dict[str, Any]]:
 def build() -> dict[str, Any]:
     out = []
     for sc in scenarios():
-        res = replay(sc)
+        res = replay(sc, "python")
         out.append({**sc, "steps": res["steps"], "expect": res["expect"]})
     return {
         "fixture_version": FIXTURE_VERSION,

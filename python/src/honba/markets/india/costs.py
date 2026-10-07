@@ -243,3 +243,10 @@ def nse_equity_delivery_fill_cost(side: OrderSide, quantity: float, price: float
 def nse_equity_intraday_fill_cost(side: OrderSide, quantity: float, price: float) -> Money:
     """NSE equity intraday (MIS) cost of one fill as INR ``Money``, each leg rounded once."""
     return _fill_cost_money(_intraday_legs(side, quantity, price))
+
+
+# The simulator's native backend costs fills inside Rust under these pack names (ADR 0016,
+# chunk 3b); it finds them through this marker. The Rust schedules are checked equal to the
+# two functions above over a grid and a random sweep (``test_next_open_sim_native``).
+nse_equity_delivery_fill_cost.native_cost_pack = "india.equity.delivery"  # type: ignore[attr-defined]
+nse_equity_intraday_fill_cost.native_cost_pack = "india.equity.intraday"  # type: ignore[attr-defined]
