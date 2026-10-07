@@ -332,11 +332,11 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 
 | # | Question | Needed for | Recommendation |
 |---|---|---|---|
-| D1 | **Run lifecycle and `run_id`**: a `Run` is a server-side object (`queued/running/completed/failed/cancelled`), journal addressable by id, retention, restart behaviour. Types exist (`BacktestResponse`, `RunStatus`); routes are 501 | E4-S3, E11-S3/S4, E9-S6 | ADR before R2; in-memory plus on-disk journal first |
-| D2 | **Cancel timestamp rule**: DECIDED 2026-10-06 (ADR 0008 decision 13 addendum, commit 1c50fc7): a cancel is stamped with the time of the cancel (`ExecutionEngine::cancel(order_id, now)`), identical in Rust and Python. Still open: L2 and live may need the venue-ack time | E2-S6, E3-S1b | State the per-fidelity rule for L2/live in the FSM ADR |
+| D1 | **Run lifecycle and `run_id`**: a `Run` is a server-side object (`queued/running/completed/failed/cancelled`), journal addressable by id, retention, restart behaviour. Types exist (`BacktestResponse`, `RunStatus`); routes are 501 — **decided 2026-10-07 (ADR 0017)** | E4-S3, E11-S3/S4, E9-S6 | ADR before R2; in-memory plus on-disk journal first |
+| D2 | **Cancel timestamp rule**: DECIDED 2026-10-06 (ADR 0008 decision 13 addendum, commit 1c50fc7): a cancel is stamped with the time of the cancel (`ExecutionEngine::cancel(order_id, now)`), identical in Rust and Python. L2/live per-fidelity rule: **decided 2026-10-07 (ADR 0019 decision 6)** — `cancel_requested` at `now`, `cancelled` at `now` (L1/L2-v1) or venue-ack time (live) | E2-S6, E3-S1b | State the per-fidelity rule for L2/live in the FSM ADR |
 | D3 | Journal schema v1 and cache key | E4-S1 | ADR with golden journal |
-| D4 | Risk stage: crate placement (`honba-risk` at L2), Reducing semantics, rule config schema | E2-S2 | ADR before code |
-| D5 | `OrderState` FSM, event set, `drain_*` replacement (breaking for adapters, Python ports, bindings) | E2-S6 | ADR, then split stories |
+| D4 | Risk stage: crate placement (`honba-risk` at L2), Reducing semantics, rule config schema — **decided 2026-10-07 (ADR 0018)** | E2-S2 | ADR before code |
+| D5 | `OrderState` FSM, event set, `drain_*` replacement (breaking for adapters, Python ports, bindings) — **decided 2026-10-07 (ADR 0019)** | E2-S6 | ADR, then split stories |
 | D6 | Streaming protocol: SSE vs WS, sequence and resume | E11-S4 | SSE first |
 | D7 | Verifier sandbox strength: subprocess rlimits vs container | E5-S5 | Subprocess; revisit for hosted |
 | D8 | Holdout policy: fixed ranges, who resets consumption | E4-S6 | ADR with E4-S6 |
@@ -351,7 +351,8 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 | D17 | NSE settlement default and intraday cycle (counts bars, not sessions) in simulators | E3-S1a | Settle in the port ADR |
 
 Already decided: pyo3 single cdylib (ADR 0014 decision, `honba-py`), Strategy ABC with shim (ADR 0008), schema from Rust (ADR 0014),
-integer money (0011), versioning and nanosecond strings (0012), REST read ports (0013), explicit runtime (0015, implemented in E10-S7), next-open Rust port split into three chunks (0016, chunk 1 done).
+integer money (0011), versioning and nanosecond strings (0012), REST read ports (0013), explicit runtime (0015, implemented in E10-S7), next-open Rust port split into three chunks (0016, chunk 1 done),
+run lifecycle and `run_id` (0017, D1), risk stage (0018, D4), `OrderState` FSM and client order ids (0019, D5/D2).
 
 ---
 
