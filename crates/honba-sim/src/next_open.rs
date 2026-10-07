@@ -18,6 +18,8 @@ struct Working {
     order: Order,
     /// Index of the session the order was submitted in (-1 before the first).
     session: i64,
+    /// First session the order was eligible and considered for funding.
+    first_try: Option<i64>,
 }
 
 struct Open {
@@ -37,6 +39,9 @@ pub struct NextOpenSim {
     currency: Currency,
     fees: i64,
     traded_notional: i64,
+    settlement_days: i64,
+    /// `(session the proceeds become available, amount in minor units)`.
+    receivables: Vec<(i64, i64)>,
     long_only: bool,
     lot_sizes: Vec<(InstrumentId, f64)>,
     positions: Vec<(InstrumentId, f64)>,
@@ -67,6 +72,8 @@ impl NextOpenSim {
             currency: cash.currency(),
             fees: 0,
             traded_notional: 0,
+            settlement_days: 0,
+            receivables: Vec::new(),
             long_only: true,
             lot_sizes: Vec::new(),
             positions: Vec::new(),
@@ -86,6 +93,33 @@ impl NextOpenSim {
         self
     }
 
+    /// Sets the settlement cycle: sale proceeds become available that many sessions after the
+    /// sale (default 0). Errors when negative.
+    pub fn with_settlement_days(mut self, days: i64) -> Result<Self> {
+        self.set_settlement_days(days)?;
+        Ok(self)
+    }
+
+    /// Changes the settlement cycle. Errors (state unchanged) when `days` is negative or the
+    /// first session has already opened.
+    pub fn set_settlement_days(&mut self, days: i64) -> Result<()> {
+        if days < 0 {
+            return Err(err("settlement_days must be >= 0".into()));
+        }
+        if self.session_ts.is_some() {
+            return Err(err(
+                "settlement_days can only change before the first session".into(),
+            ));
+        }
+        self.settlement_days = days;
+        Ok(())
+    }
+
+    /// The settlement cycle in sessions.
+    pub fn settlement_days(&self) -> i64 {
+        self.settlement_days
+    }
+
     /// Sets the quantity step a funding cut floors to for `instrument` (default 1).
     pub fn set_lot_size(&mut self, instrument: &InstrumentId, lot_size: f64) -> Result<()> {
         if !(lot_size.is_finite() && lot_size > 0.0) {
@@ -101,6 +135,32 @@ impl NextOpenSim {
     /// Booked cash.
     pub fn cash(&self) -> Money {
         Money::new(self.cash, self.currency)
+    }
+
+    /// Sale proceeds booked but not yet available.
+    pub fn unsettled(&self) -> Money {
+        Money::new(self.unsettled_minor(), self.currency)
+    }
+
+    /// Cash that may fund a buy now: booked cash less unsettled sale proceeds.
+    pub fn available_cash(&self) -> Money {
+        Money::new(self.cash - self.unsettled_minor(), self.currency)
+    }
+
+    /// Pending sale proceeds as `(session index they become available, amount)`.
+    pub fn receivables(&self) -> Vec<(i64, Money)> {
+        self.receivables
+            .iter()
+            .map(|&(due, a)| (due, Money::new(a, self.currency)))
+            .collect()
+    }
+
+    fn unsettled_minor(&self) -> i64 {
+        self.receivables
+            .iter()
+            .filter(|(due, _)| *due > self.session)
+            .map(|(_, a)| a)
+            .sum()
     }
 
     /// Transaction costs paid so far.
@@ -147,6 +207,8 @@ impl NextOpenSim {
         self.session += 1;
         self.session_ts = Some(ts);
         self.opened.clear();
+        let session = self.session;
+        self.receivables.retain(|(due, _)| *due > session);
         self.fill_at(bars)
     }
 
@@ -259,17 +321,24 @@ impl NextOpenSim {
             return Ok(());
         }
         self.cash = cash;
+        self.receivables
+            .push((self.session + self.settlement_days, notional));
         self.book(&order, open, qty, notional)
     }
 
     fn fill_buy(&mut self, idx: usize, open: &Open) -> Result<()> {
+        let session = self.session;
+        let first_try = *self.working[idx].first_try.get_or_insert(session);
         let order = self.working[idx].order.clone();
         let want = order.quantity();
         let px = open.price;
-        let qty = if self.notional(want, px)? <= self.cash {
+        let available = self.cash - self.unsettled_minor();
+        let qty = if self.notional(want, px)? <= available {
             want
+        } else if self.unsettled_minor() > 0 && session - first_try < self.settlement_days {
+            return Ok(()); // wait for pending sale proceeds to settle
         } else {
-            self.affordable(want, px, self.lot_size(order.instrument_id()))?
+            self.affordable(want, px, available, self.lot_size(order.instrument_id()))?
         };
         let notional = if qty > 0.0 {
             self.notional(qty, px)?
@@ -295,18 +364,18 @@ impl NextOpenSim {
     }
 
     /// Largest whole number of lots (<= `want`) whose notional fits the cash, by bisection.
-    fn affordable(&self, want: f64, px: f64, lot: f64) -> Result<f64> {
-        if px <= 0.0 || self.cash <= 0 {
+    fn affordable(&self, want: f64, px: f64, available: i64, lot: f64) -> Result<f64> {
+        if px <= 0.0 || available <= 0 {
             return Ok(0.0);
         }
-        let avail_major = Money::new(self.cash, self.currency).to_major_f64();
+        let avail_major = Money::new(available, self.currency).to_major_f64();
         let hi = (want / lot + QTY_EPS)
             .floor()
             .min((avail_major / px / lot + QTY_EPS).floor());
         let (mut lo, mut hi) = (0_i64, hi as i64);
         while lo < hi {
             let mid = (lo + hi + 1) / 2;
-            if self.notional(mid as f64 * lot, px)? <= self.cash {
+            if self.notional(mid as f64 * lot, px)? <= available {
                 lo = mid;
             } else {
                 hi = mid - 1;
@@ -383,6 +452,7 @@ impl ExecutionEngine for NextOpenSim {
         self.working.push(Working {
             order,
             session: self.session,
+            first_try: None,
         });
         Ok(())
     }
