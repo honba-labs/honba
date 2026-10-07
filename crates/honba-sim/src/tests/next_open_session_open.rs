@@ -91,7 +91,7 @@ fn open_session_alone_keeps_the_strict_bar_rules() {
 #[test]
 fn a_failed_session_open_does_not_enter_the_lenient_mode() {
     let mut s = sim().with_costs(Box::new(|_, _, _| Ok(Money::new(-1, Currency::Inr))));
-    s.on_session_open(t(1), &[bar("A", 1, 10.0)]).unwrap();
+    s.open_session(t(1), &[bar("A", 1, 10.0)]).unwrap();
     s.submit(market_for("O", "A", OrderSide::Buy, 1.0, 1))
         .unwrap();
     assert!(s.on_session_open(t(2), &[bar("A", 2, 10.0)]).is_err());
