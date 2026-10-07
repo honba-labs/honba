@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from typing import Annotated
+
 import typer
 from rich.console import Console
-from rich.table import Table
 
+from honba.cli._output import FORMAT_HELP, parse_format
+from honba.display import Column, render, render_kv
 from honba.entities.instrument import InstrumentId
 from honba.entities.screener import (
     MetricKeySpec,
@@ -30,25 +33,34 @@ err_console = Console(stderr=True)
 
 
 @metrics_app.command("list")
-def list_metrics() -> None:
+def list_metrics(
+    format: Annotated[str, typer.Option("--format", "-f", help=FORMAT_HELP)] = "table",
+) -> None:
     """List all available metrics in the catalog."""
+    fmt = parse_format(format)
     catalog = load_catalog()
-    table = Table(title="Screener Metric Catalog")
-    table.add_column("Key", style="cyan", no_wrap=True)
-    table.add_column("Group", style="magenta")
-    table.add_column("Type", style="green")
-    table.add_column("Unit", style="yellow")
-    table.add_column("Aliases", style="white")
-
-    for m in catalog:
-        table.add_row(
-            m.key,
-            m.group,
-            m.value_type.value,
-            m.unit.value if m.unit else "-",
-            ", ".join(m.aliases),
-        )
-    console.print(table)
+    rows = [
+        {
+            "key": m.key,
+            "group": m.group,
+            "type": m.value_type.value,
+            "unit": m.unit.value if m.unit else "-",
+            "aliases": ", ".join(m.aliases),
+        }
+        for m in catalog
+    ]
+    render(
+        rows,
+        [
+            Column("key", "Key", style="cyan"),
+            Column("group", "Group", style="magenta"),
+            Column("type", "Type", style="green"),
+            Column("unit", "Unit", style="yellow"),
+            Column("aliases", "Aliases"),
+        ],
+        fmt,
+        title="Screener Metric Catalog",
+    )
 
 
 @metrics_app.command("show")
@@ -61,38 +73,48 @@ def show_metric(phrase: str) -> None:
         err_console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(code=1)
 
-    table = Table(title=f"Metric: {m.key}")
-    table.add_column("Field", style="cyan")
-    table.add_column("Value", style="white")
-
-    table.add_row("Key", m.key)
-    table.add_row("UI Id", m.ui_id or "-")
-    table.add_row("Label", m.label)
-    table.add_row("Group", m.group)
-    table.add_row("Value Type", m.value_type.value)
-    table.add_row("Unit", m.unit.value if m.unit else "-")
-    table.add_row("Has Timeframe", str(m.has_timeframe))
-    table.add_row("Has Period", str(m.has_period))
-    table.add_row("Aliases", ", ".join(m.aliases))
+    pairs = [
+        ("Key", m.key),
+        ("UI Id", m.ui_id or "-"),
+        ("Label", m.label),
+        ("Group", m.group),
+        ("Value Type", m.value_type.value),
+        ("Unit", m.unit.value if m.unit else "-"),
+        ("Has Timeframe", str(m.has_timeframe)),
+        ("Has Period", str(m.has_period)),
+        ("Aliases", ", ".join(m.aliases)),
+    ]
     if m.description:
-        table.add_row("Description", m.description)
-
-    console.print(table)
+        pairs.append(("Description", m.description))
+    render_kv(pairs, title=f"Metric: {m.key}")
 
 
 @presets_app.command("list")
-def list_presets_cmd() -> None:
+def list_presets_cmd(
+    format: Annotated[str, typer.Option("--format", "-f", help=FORMAT_HELP)] = "table",
+) -> None:
     """List all named screener criteria presets."""
-    presets = list_presets()
-    table = Table(title="Screener Presets")
-    table.add_column("Key", style="cyan", no_wrap=True)
-    table.add_column("Label", style="green")
-    table.add_column("Target Metric", style="yellow")
-    table.add_column("Aliases", style="white")
-
-    for p in presets.values():
-        table.add_row(p.key, p.label, p.target_metric, ", ".join(p.aliases))
-    console.print(table)
+    fmt = parse_format(format)
+    rows = [
+        {
+            "key": p.key,
+            "label": p.label,
+            "target_metric": p.target_metric,
+            "aliases": ", ".join(p.aliases),
+        }
+        for p in list_presets().values()
+    ]
+    render(
+        rows,
+        [
+            Column("key", "Key", style="cyan"),
+            Column("label", "Label", style="green"),
+            Column("target_metric", "Target Metric", style="yellow"),
+            Column("aliases", "Aliases"),
+        ],
+        fmt,
+        title="Screener Presets",
+    )
 
 
 @presets_app.command("show")
@@ -103,18 +125,17 @@ def show_preset_cmd(name: str) -> None:
         err_console.print(f"[red]Error:[/red] unknown preset {name!r}")
         raise typer.Exit(code=1)
 
-    table = Table(title=f"Preset: {p.key}")
-    table.add_column("Field", style="cyan")
-    table.add_column("Value", style="white")
-
-    table.add_row("Key", p.key)
-    table.add_row("Label", p.label)
-    table.add_row("Target Metric", p.target_metric)
-    table.add_row("Lookback Bars", str(p.lookback_bars))
-    table.add_row("Aliases", ", ".join(p.aliases))
-    table.add_row("Description", p.description)
-
-    console.print(table)
+    render_kv(
+        [
+            ("Key", p.key),
+            ("Label", p.label),
+            ("Target Metric", p.target_metric),
+            ("Lookback Bars", str(p.lookback_bars)),
+            ("Aliases", ", ".join(p.aliases)),
+            ("Description", p.description),
+        ],
+        title=f"Preset: {p.key}",
+    )
 
 
 def _build_scan_request(
@@ -178,9 +199,6 @@ def _build_scan_request(
         sort=sort_spec,
         range=(offset, limit),
     )
-
-
-from typing import Annotated
 
 
 @app.command("explain")
@@ -253,7 +271,7 @@ def scan_cmd(
         bool, typer.Option("--print-request", "-P", help="Emit resolved request JSON and exit")
     ] = False,
     format: Annotated[
-        str, typer.Option("--format", "-f", help="Output format: table, json")
+        str, typer.Option("--format", "-f", help="Output format: table, json, csv, plain")
     ] = "table",
     fetch: Annotated[
         str, typer.Option("--fetch", "-F", help="Missing-data policy: auto, never, force")
@@ -304,25 +322,28 @@ def scan_cmd(
 
     response = source.scan(req)
 
-    if format == "json":
+    if format.strip().lower() == "json":
         typer.echo(response.model_dump_json(by_alias=True, indent=2))
         return
 
-    # Render table
-    table = Table(title=f"Screener Results ({response.total} matched)")
-    table.add_column("Symbol", style="cyan", no_wrap=True)
-    table.add_column("Name", style="white")
-    for col in response.columns:
-        table.add_column(col, justify="right", style="green")
-
-    for row in response.rows:
-        row_vals = [row.full_symbol, row.name]
-        for col in response.columns:
-            val = row.values.get(col)
-            row_vals.append("-" if val is None else str(val))
-        table.add_row(*row_vals)
-
-    console.print(table)
+    rows = [
+        {
+            "symbol": row.full_symbol,
+            "name": row.name,
+            **{c: row.values.get(c) for c in response.columns},
+        }
+        for row in response.rows
+    ]
+    render(
+        rows,
+        [
+            Column("symbol", "Symbol", style="cyan"),
+            Column("name", "Name"),
+            *(Column(c, c, align="right", style="green") for c in response.columns),
+        ],
+        parse_format(format),
+        title=f"Screener Results ({response.total} matched)",
+    )
 
 
 @app.command("ask")
@@ -340,7 +361,7 @@ def ask_cmd(
         bool, typer.Option("--yes", "-y", help="Execute scan without interactive confirmation")
     ] = False,
     format: Annotated[
-        str, typer.Option("--format", "-f", help="Output format: table, json")
+        str, typer.Option("--format", "-f", help="Output format: table, json, csv, plain")
     ] = "table",
 ) -> None:
     """Translate natural language into validated filters and run the scan (Design.md Section 13)."""

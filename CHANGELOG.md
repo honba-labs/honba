@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Shared table / key-value display (`honba.display`)
+
+- New `honba.display`: `render_table`, `render_kv`, `render(rows, columns, fmt)` with `OutputFormat`
+  (`table` | `plain` | `json` | `csv`), `Column`, and cell helpers (`format_money`, `format_percent`,
+  `format_timestamp_ns`). Rich is imported lazily; without Rich (or with `plain`) the same columns render as
+  aligned plain text. No ANSI when the stream is not a TTY or `NO_COLOR` is set; fixed `width` gives
+  deterministic output. json/csv carry raw values under stable column keys.
+- `honba.report`: the table report is rendered through it (one layout for Rich and plain; fills/rejection counts
+  in the header block, fills table with dates and a Costs column). New report formats `plain` and `csv`
+  (fills as rows) and a `width` argument.
+- CLI: `data coverage|gaps`, `screener metrics list`, `screener presets list`, `screener scan|ask` accept
+  `--format table|json|csv|plain` (scan keeps its `json` payload); `metrics show` / `presets show` use `render_kv`.
+- Tests: `tests/unit/test_display.py`, `tests/unit/test_cli_display_formats.py`,
+  `tests/integration/test_display_report_e2e.py` with snapshots in `tests/fixtures/display/`
+  (`HONBA_BLESS=1` rewrites them).
+
 ### Rust next-open simulator, chunk 3b: delegation (E3-S1a, ADR 0016)
 
 - `NextOpenExecution` runs on the native `honba._honba.NextOpenSimulator` when the extension is usable and on the

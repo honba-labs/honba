@@ -7,9 +7,10 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
-from rich.table import Table
 
+from honba.cli._output import FORMAT_HELP, parse_format
 from honba.data.loaders.yfinance import YFinanceProvider
+from honba.display import Column, OutputFormat, render
 from honba.entities.instrument import InstrumentId
 from honba.research.data_loader.nse import NseBhavcopyProvider
 from honba.screener.coverage import DateInterval
@@ -48,15 +49,11 @@ def coverage_cmd(
     timeframe: Annotated[
         str, typer.Option("--timeframe", "-t", help="Timeframe [default: 1D]")
     ] = "1D",
+    format: Annotated[str, typer.Option("--format", "-f", help=FORMAT_HELP)] = "table",
 ) -> None:
     """Show covered ranges in the data store."""
-    table = Table(title="Data Store Coverage")
-    table.add_column("Exchange", style="cyan")
-    table.add_column("Symbol", style="green")
-    table.add_column("Timeframe", style="magenta")
-    table.add_column("Interval", style="yellow")
-    table.add_column("Status", style="white")
-    table.add_column("Rows", justify="right")
+    fmt = parse_format(format)
+    rows: list[dict[str, object]] = []
 
     instruments = (
         [InstrumentId(symbol, exchange)]
@@ -67,24 +64,35 @@ def coverage_cmd(
         ]
     )
 
-    found = False
     for inst in instruments:
-        records = _STORE.coverage(inst, timeframe)
-        for r in records:
-            found = True
-            table.add_row(
-                r.exchange,
-                r.symbol,
-                r.timeframe,
-                f"{r.interval.start}..{r.interval.end}",
-                r.status.value,
-                str(r.row_count),
+        for r in _STORE.coverage(inst, timeframe):
+            rows.append(
+                {
+                    "exchange": r.exchange,
+                    "symbol": r.symbol,
+                    "timeframe": r.timeframe,
+                    "interval": f"{r.interval.start}..{r.interval.end}",
+                    "status": r.status.value,
+                    "rows": r.row_count,
+                }
             )
 
-    if not found:
+    if not rows and fmt is OutputFormat.TABLE:
         console.print(f"[yellow]No covered intervals found for {symbol or 'all symbols'}[/yellow]")
-    else:
-        console.print(table)
+        return
+    render(
+        rows,
+        [
+            Column("exchange", "Exchange", style="cyan"),
+            Column("symbol", "Symbol", style="green"),
+            Column("timeframe", "Timeframe", style="magenta"),
+            Column("interval", "Interval", style="yellow"),
+            Column("status", "Status"),
+            Column("rows", "Rows"),
+        ],
+        fmt,
+        title="Data Store Coverage",
+    )
 
 
 @app.command("gaps")
@@ -105,8 +113,10 @@ def gaps_cmd(
     end: Annotated[
         str | None, typer.Option("--end", "-d", help="End date YYYY-MM-DD", show_default="today")
     ] = None,
+    format: Annotated[str, typer.Option("--format", "-f", help=FORMAT_HELP)] = "table",
 ) -> None:
     """Show missing ranges that a request would fetch."""
+    fmt = parse_format(format)
     inst = InstrumentId(symbol, exchange)
     start_date = dt.date.fromisoformat(start)
     end_date = dt.date.fromisoformat(end) if end else dt.date.today() + dt.timedelta(days=1)  # noqa: DTZ011 - CLI default 'today' is the user's local calendar date
@@ -115,18 +125,19 @@ def gaps_cmd(
     plan = _DATA_SERVICE.plan([inst], timeframe, req_interval)
     gaps = plan.gaps_by_instrument.get(inst, [])
 
-    if not gaps:
+    if not gaps and fmt is OutputFormat.TABLE:
         console.print(f"[green]No gaps found for {symbol} ({start_date}..{end_date})[/green]")
         return
 
-    table = Table(title=f"Missing Gaps for {symbol}.{exchange} ({timeframe})")
-    table.add_column("Gap Start", style="yellow")
-    table.add_column("Gap End", style="yellow")
-
-    for g in gaps:
-        table.add_row(str(g.start), str(g.end))
-
-    console.print(table)
+    render(
+        [{"gap_start": str(g.start), "gap_end": str(g.end)} for g in gaps],
+        [
+            Column("gap_start", "Gap Start", style="yellow"),
+            Column("gap_end", "Gap End", style="yellow"),
+        ],
+        fmt,
+        title=f"Missing Gaps for {symbol}.{exchange} ({timeframe})",
+    )
 
 
 @app.command("fetch")
