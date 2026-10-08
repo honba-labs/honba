@@ -31,6 +31,14 @@ Example::
 from honba.algo_analytics.deflated_sharpe import deflated_sharpe
 from honba.algo_analytics.folds import FoldWindow, Window, add_months, plan_folds
 from honba.algo_analytics.metrics import sharpe_ratio
+from honba.algo_analytics.monte_carlo import (
+    MonteCarloResult,
+    StartDateConfig,
+    StartDateResult,
+    monte_carlo,
+    offsets_to_ranges,
+    summarise_start_dates,
+)
 from honba.algo_analytics.walk_forward import (
     MIN_OOS_IS_RATIO,
     BacktestStrategy,
@@ -51,16 +59,22 @@ __all__ = [
     "Fold",
     "FoldStats",
     "FoldWindow",
+    "MonteCarloResult",
+    "StartDateConfig",
+    "StartDateResult",
     "WalkForwardGates",
     "WalkForwardResult",
     "Window",
     "add_months",
     "deflated_sharpe",
+    "monte_carlo",
+    "offsets_to_ranges",
     "oos_is_ratio",
     "passes_oos_is_gate",
     "plan_folds",
     "sharpe_ratio",
     "stats_from_result",
+    "summarise_start_dates",
     "train_test_split",
     "walk_forward",
 ]
