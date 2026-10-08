@@ -8,6 +8,7 @@ use std::sync::Mutex;
 use crate::transport::{HttpRequest, HttpResponse, HttpTransport, TransportError};
 
 mod client;
+mod gateway;
 mod mapping;
 mod rate_limit;
 mod ticker;
