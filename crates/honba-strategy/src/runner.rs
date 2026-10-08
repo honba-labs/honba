@@ -120,6 +120,8 @@ pub struct StrategyRunner<S: Strategy, E: ExecutionEngine> {
     risk: Option<RiskStage>,
     trading_state: TradingState,
     audit: AuditLog,
+    /// Audit kinds not yet handed to the hosting engine ([`Handler::drain_audit`]).
+    pending_audit: Vec<AuditKind>,
     /// Instrument and side per order id: what working exposure needs.
     sides: HashMap<String, (InstrumentId, OrderSide)>,
     /// Last bar close or trade price per instrument: the stage's `reference_price`.
@@ -156,6 +158,7 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
             risk: None,
             trading_state: TradingState::Active,
             audit: AuditLog::new(),
+            pending_audit: Vec::new(),
             sides: HashMap::new(),
             last_px: HashMap::new(),
             pre_gate: Vec::new(),
@@ -177,9 +180,10 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
         self
     }
 
-    /// The runner's own audit trail: one [`AuditKind::RiskRefused`] and one
-    /// [`AuditKind::OrderRejected`] per order it refused before submit. The `Engine`'s log
-    /// does not include them (the runner bypasses `Engine::submit`).
+    /// The runner's own cumulative audit trail: one [`AuditKind::RiskRefused`] and one
+    /// [`AuditKind::OrderRejected`] per order it refused before submit. It is never drained, so
+    /// it stays complete for standalone use. A hosting `Engine` receives the same records
+    /// (once each, in order) through [`Handler::drain_audit`] and appends them to its log.
     pub fn audit(&self) -> &AuditLog {
         &self.audit
     }
@@ -259,14 +263,18 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
     fn refuse(&mut self, order: &Order, refusal: RiskRefusal, ts_init: UnixNanos) {
         let order_id = order.order_id().as_str().to_string();
         let reason = refusal.error_code().as_str().to_string();
-        self.audit.record(AuditKind::RiskRefused {
+        let refused = AuditKind::RiskRefused {
             order_id: order_id.clone(),
             refusal,
-        });
-        self.audit.record(AuditKind::OrderRejected {
+        };
+        let rejected = AuditKind::OrderRejected {
             order_id: order_id.clone(),
             reason: reason.clone(),
-        });
+        };
+        self.pending_audit.push(refused.clone());
+        self.pending_audit.push(rejected.clone());
+        self.audit.record(refused);
+        self.audit.record(rejected);
         self.states.insert(order_id.clone(), OrderState::new());
         self.sides
             .insert(order_id, (order.instrument_id().clone(), order.side()));
@@ -568,6 +576,10 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
 }
 
 impl<S: Strategy, E: ExecutionEngine> Handler for StrategyRunner<S, E> {
+    fn drain_audit(&mut self) -> Vec<AuditKind> {
+        std::mem::take(&mut self.pending_audit)
+    }
+
     fn on_start(&mut self) -> Result<()> {
         self.adapter.on_start()?;
         Ok(())

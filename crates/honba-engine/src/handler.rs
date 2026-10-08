@@ -2,6 +2,7 @@
 
 use honba_messages::{Event, UnixNanos};
 
+use crate::audit::AuditKind;
 use crate::error::Result;
 use crate::state::TradingState;
 
@@ -28,6 +29,16 @@ pub trait Handler: Send {
     /// [`AlgoError::DuplicateRiskStage`](crate::AlgoError::DuplicateRiskStage) otherwise.
     fn holds_risk_stage(&self) -> bool {
         false
+    }
+
+    /// Hands over the audit records this handler produced since the last call, oldest first
+    /// (ADR 0018 decision 6: a handler that refuses orders itself, before they reach the
+    /// engine, reports the refusal here). Drain semantics: returned records are moved, so a
+    /// second call returns only what is new. The [`Engine`](crate::Engine) calls it after
+    /// every `on_event` and state-change dispatch and appends the records, in order, to its
+    /// own [`AuditLog`](crate::AuditLog). Default: nothing to report.
+    fn drain_audit(&mut self) -> Vec<AuditKind> {
+        Vec::new()
     }
 
     /// Called once at the end of a run.

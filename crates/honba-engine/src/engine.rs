@@ -278,11 +278,22 @@ impl Engine {
         });
         self.observe_price(msg.event());
         for i in 0..self.handlers.len() {
-            let output = self.handlers[i].on_event(msg.event(), msg.ts_init())?;
+            let output = self.handlers[i].on_event(msg.event(), msg.ts_init());
+            // Merge first, even on error: what the handler already refused stays audited.
+            self.merge_handler_audit(i);
+            let output = output?;
             self.apply_output(output)?;
             self.acknowledge_events()?;
         }
         Ok(true)
+    }
+
+    /// Appends the records handler `i` reports through [`Handler::drain_audit`] to the audit
+    /// log, in the order given, so a refusal the handler made itself is in the engine's trail.
+    fn merge_handler_audit(&mut self, i: usize) {
+        for kind in self.handlers[i].drain_audit() {
+            self.audit.record(kind);
+        }
     }
 
     /// Remembers the last bar close or trade price per instrument for the risk request.
@@ -341,8 +352,9 @@ impl Engine {
                 from: previous,
                 to: next,
             });
-            for h in &mut self.handlers {
-                h.on_trading_state(next);
+            for i in 0..self.handlers.len() {
+                self.handlers[i].on_trading_state(next);
+                self.merge_handler_audit(i);
             }
         }
         previous

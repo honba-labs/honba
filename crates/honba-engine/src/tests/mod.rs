@@ -4,6 +4,7 @@ mod audit;
 mod clock;
 mod engine;
 mod execution;
+mod handler_audit;
 mod order_store;
 mod queue;
 mod risk_gate;

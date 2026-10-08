@@ -81,6 +81,9 @@ impl Handler for Hosted {
     fn holds_risk_stage(&self) -> bool {
         self.0.lock().unwrap().holds_risk_stage()
     }
+    fn drain_audit(&mut self) -> Vec<AuditKind> {
+        self.0.lock().unwrap().drain_audit()
+    }
     fn on_stop(&mut self) -> Result<()> {
         self.0.lock().unwrap().on_stop()
     }
@@ -161,6 +164,21 @@ fn strategy_engine_risk_fills_refusal_in_audit() {
             rejected("s-0", "risk_instrument_unknown"),
         ]
     );
+    // The ENGINE's audit shows the refusal, RiskRefused strictly before OrderRejected.
+    let engine_risk: Vec<AuditKind> = engine
+        .audit()
+        .iter()
+        .map(|a| a.kind.clone())
+        .filter(|k| {
+            matches!(
+                k,
+                AuditKind::RiskRefused { .. } | AuditKind::OrderRejected { .. }
+            )
+        })
+        .collect();
+    assert_eq!(engine_risk, kinds(&hosted));
+    let seqs: Vec<u64> = engine.audit().iter().map(|a| a.seq).collect();
+    assert_eq!(seqs, (0..seqs.len() as u64).collect::<Vec<_>>());
     // The strategy side sees the rejection with the ErrorCode spelling, and the order is Rejected.
     assert_eq!(reasons(&hosted), vec!["risk_instrument_unknown"]);
     hosted.with(|r| {
