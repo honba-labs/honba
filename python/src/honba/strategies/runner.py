@@ -17,6 +17,19 @@ Per event ``(event, ts_init)`` (ADR 008, decision 5):
 
 Intents submitted in ``on_stop`` are never executed.
 
+Risk gate (ADR 0018 decisions 6-7, mirrors ``StrategyRunner::with_risk`` in Rust): the runner is
+its own submitter, so with ``risk=<RiskStage>`` every order passes the stage right before the
+port's ``submit``. The request carries ``position`` = the context position plus this runner's
+working exposure on the same side (``working_exposure``), ``reference_price`` = the last bar
+close or trade price seen (updated before the strategy sees the event), ``trading_state`` (see
+``set_trading_state``) and ``ts`` = ``ts_init`` in ns. A refusal never reaches the port and
+consumes its order id; it is audited (``audit``: :class:`~honba.risk.RiskRefused`, then
+:class:`~honba.risk.OrderRejected`), applies ``Initialized -> Rejected`` and queues a
+``Rejected`` event, reason = the ``ErrorCode`` wire spelling (``risk_*``), ahead of the next
+drain, so the strategy and ``order_rejections`` see it like a venue reject. Without a stage the
+runner still enforces ``Halted`` and reduce-only (:func:`~honba.risk.check_state`). A stage
+serves one runner, and a runner whose port already gates (``holds_risk_stage``) takes none.
+
 Warm-up gate (``StrategyManifest.warmup_bars``): a *driving bar* is a ``Bar`` event whose
 ``ts_init`` differs from the previous ``Bar`` event's (bars of several instruments at one
 time are one driving bar). While at most ``warmup_bars`` driving bars have been seen (and
@@ -38,17 +51,20 @@ from __future__ import annotations
 
 import logging
 import math
+import weakref
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import honba.log as _honba_log  # noqa: F401 — triggers auto-init from HONBA_LOG_EVENTS
+from honba._native import native_attr
 from honba.domain.order_state import IllegalTransition, OrderEvent, OrderState
 from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
-from honba.entities.order import OrderIntent, validate_intent
+from honba.entities.order import OrderIntent, OrderSide, OrderStatus, validate_intent
 from honba.entities.tick import QuoteTick, TradeTick
 from honba.entities.trade import Trade
+from honba.risk import OrderRejected, RiskRefusal, RiskRefused, check_state
 from honba.strategies.base import Strategy
 from honba.strategies.context import LedgerContext
 from honba.strategies.execution import (
@@ -57,11 +73,15 @@ from honba.strategies.execution import (
     ExecutionPortLike,
     Fill,
     OrderRejection,
+    Rejected,
     adapt_port,
     event_order_id,
     order_event,
     rejection_from_event,
 )
+
+if TYPE_CHECKING:
+    from honba._honba import RiskLimits, RiskStage, TradingState
 
 __all__ = [
     "ExecutionPort",
@@ -115,6 +135,17 @@ class RunResult:
 
 _QTY_EPS = 1e-9  # ADR 0016 tolerance, as in ``OrderState``
 
+# ``RiskStage`` is a native object (no weakref, no attributes), so owners are keyed by ``id``;
+# an entry is stale once its runner is gone (the runner holds the stage, so ids cannot be reused
+# while it lives).
+_STAGE_OWNERS: dict[int, weakref.ReferenceType[StrategyRunner]] = {}
+
+_WORKING = (OrderStatus.SUBMITTED, OrderStatus.ACCEPTED, OrderStatus.PARTIALLY_FILLED)
+
+
+def _active() -> TradingState:
+    return native_attr("TradingState").ACTIVE
+
 
 def _overrides(strategy: Strategy, method: str) -> bool:
     return getattr(type(strategy), method) is not getattr(Strategy, method)
@@ -124,6 +155,10 @@ class StrategyRunner:
     """Binds ``ctx`` (a fresh ``LedgerContext`` by default) to ``strategy`` and runs it.
 
     ``warmup_bars`` defaults to the strategy's ``warmup_bars`` class attribute (0).
+
+    ``risk`` puts a :class:`~honba.risk.RiskStage` in front of the port (see the module docs).
+    The native stage does not expose its limits, so ``risk_limits`` (the ``RiskLimits`` it was
+    built with) is what :meth:`require_live_limits` checks; omitted, it counts as no limits.
     """
 
     def __init__(
@@ -133,6 +168,8 @@ class StrategyRunner:
         ctx: LedgerContext | None = None,
         *,
         warmup_bars: int | None = None,
+        risk: RiskStage | None = None,
+        risk_limits: RiskLimits | None = None,
     ) -> None:
         if warmup_bars is None:
             warmup_bars = getattr(strategy, "warmup_bars", 0)
@@ -145,6 +182,23 @@ class StrategyRunner:
         self._last_bar_ts: int | None = None
         self.strategy = strategy
         self.execution = execution
+        if risk is not None:
+            owner = _STAGE_OWNERS.get(id(risk))
+            if (owner is not None and owner() is not None) or getattr(
+                execution, "holds_risk_stage", False
+            ):
+                raise ValueError(
+                    "a run holds at most one risk stage: this stage already serves another "
+                    "runner, or the execution port gates orders itself"
+                )
+            _STAGE_OWNERS[id(risk)] = weakref.ref(self)
+        self._risk = risk
+        self._risk_limits = risk_limits
+        self._trading_state: TradingState | None = None  # None: Active (needs no extension)
+        self._audit: list[RiskRefused | OrderRejected] = []
+        self._orders: dict[str, tuple[InstrumentId, OrderSide]] = {}
+        self._last_px: dict[InstrumentId, float] = {}
+        self._pre_gate: list[Rejected] = []
         self._port = adapt_port(execution)  # event stream + cancel(order_id, now), bound once
         self._now = 0
         self._states: dict[str, OrderState] = {}
@@ -161,6 +215,52 @@ class StrategyRunner:
         self.order_rejections: list[OrderRejection] = []
         self.suppressed: list[SuppressedIntent] = []
 
+    @property
+    def audit(self) -> tuple[RiskRefused | OrderRejected, ...]:
+        """The runner's cumulative audit trail: ``RiskRefused`` then ``OrderRejected`` per
+        order it refused before submit (Rust ``StrategyRunner::audit``)."""
+        return tuple(self._audit)
+
+    @property
+    def trading_state(self) -> TradingState:
+        """The trading state the runner enforces: ``ACTIVE`` until :meth:`set_trading_state`."""
+        return self._trading_state if self._trading_state is not None else _active()
+
+    def set_trading_state(self, state: TradingState) -> None:
+        """Tell the runner the host's trading state (``Halted`` / ``Reducing`` / ``Active``).
+
+        Rust: ``Handler::on_trading_state``. Orders already sent are not affected.
+        """
+        if not isinstance(state, native_attr("TradingState")):
+            raise TypeError(f"expected a TradingState, got {state!r}")
+        self._trading_state = state
+
+    @property
+    def holds_risk_stage(self) -> bool:
+        """True if this runner was built with its own stage (Rust ``holds_risk_stage``)."""
+        return self._risk is not None
+
+    def require_live_limits(self) -> None:
+        """The live-run guard (ADR 0018 decision 8): ``ValueError`` unless the runner's stage
+        was built with both ``max_notional`` and ``order_rate`` (see ``risk_limits``)."""
+        limits = self._risk_limits if self._risk is not None else None
+        (limits if limits is not None else native_attr("RiskLimits")()).require_live()
+
+    def working_exposure(self, instrument_id: InstrumentId, side: OrderSide) -> float:
+        """Signed open quantity (``+`` buy, ``-`` sell) of this runner's working orders on
+        ``instrument_id`` and ``side`` (ADR 0019 decision 5)."""
+        total = 0.0
+        for order_id, (iid, order_side) in self._orders.items():
+            state = self._states.get(order_id)
+            if (
+                iid == instrument_id
+                and order_side is side
+                and state is not None
+                and state.status in _WORKING
+            ):
+                total += state.quantity - state.filled_qty
+        return total if side is OrderSide.BUY else -total
+
     def start(self) -> None:
         self.strategy.on_start()
 
@@ -172,6 +272,10 @@ class StrategyRunner:
     def on_event(self, event: Any, ts_init: int) -> None:
         self.ctx.set_now(ts_init)
         self._now = ts_init
+        if isinstance(event, Bar):
+            self._last_px[event.instrument_id] = event.close
+        elif isinstance(event, TradeTick):
+            self._last_px[event.instrument_id] = event.price
         if isinstance(event, Bar) and ts_init != self._last_bar_ts:
             self._bars_seen += 1
             self._last_bar_ts = ts_init
@@ -283,16 +387,22 @@ class StrategyRunner:
             order_id = f"{self.strategy.name}-{self._seq}"
             self._seq += 1
             try:
-                self._port.submit(order_id, intent, ts_init)
+                refusal = self._gate(order_id, intent, ts_init)
+                if refusal is None:
+                    self._port.submit(order_id, intent, ts_init)
             except BaseException:
                 # Terminal for the run, but the intents that were drained and never
                 # sent (this one and the rest) must not leave their instruments busy.
                 for unsent in drained[index:]:
                     self._release(unsent)
                 raise
+            if refusal is not None:
+                self._refuse(order_id, intent, refusal, ts_init)
+                continue
             state = OrderState()
             state.apply(OrderEvent.submitted(intent.quantity))
             self._states[order_id] = state
+            self._orders[order_id] = (intent.instrument_id, intent.side)
             self.intents.append(SubmittedIntent(ts_init, intent, order_id))
             # Wire type: order (DEBUG — not emitted unless level <= DEBUG)
             self.logger.debug(
@@ -310,11 +420,50 @@ class StrategyRunner:
                 },
             )
 
+    def _gate(self, order_id: str, intent: OrderIntent, ts_init: int) -> RiskRefusal | None:
+        """The stage (or, without one, the state rules) over the order about to be submitted."""
+        iid = intent.instrument_id
+        position = self.ctx.position(iid) + self.working_exposure(iid, intent.side)
+        if self._risk is None:
+            return check_state(intent.side, intent.quantity, position, self.trading_state)
+        request: dict[str, Any] = {
+            "order_id": order_id,
+            "instrument_id": f"{iid.symbol}.{iid.exchange}",
+            "side": intent.side.value,
+            "quantity": intent.quantity,
+            "position": position,
+            "trading_state": str(self.trading_state),
+            "ts": ts_init,
+        }
+        if intent.price is not None:
+            request["price"] = intent.price
+        if intent.trigger_price is not None:
+            request["trigger_price"] = intent.trigger_price
+        if iid in self._last_px:
+            request["reference_price"] = self._last_px[iid]
+        decision = self._risk.check(request)
+        if decision.approved:
+            return None
+        return RiskRefusal(str(decision.code), str(decision.rule), dict(decision.context))
+
+    def _refuse(
+        self, order_id: str, intent: OrderIntent, refusal: RiskRefusal, ts_init: int
+    ) -> None:
+        """Audit a refusal and queue its ``Rejected`` event ahead of the next drain."""
+        self._audit.append(
+            RiskRefused(order_id, ts_init, refusal.code, refusal.rule, refusal.context)
+        )
+        self._audit.append(OrderRejected(order_id, ts_init, refusal.code))
+        self._states[order_id] = OrderState()
+        self._orders[order_id] = (intent.instrument_id, intent.side)
+        self._pre_gate.append(Rejected(order_id, intent, refusal.code, ts_init))
+
     def _book_events(self) -> None:
         # A failing hook does not lose the other drained events: each is still booked
         # and recorded, and the first error is raised afterwards.
         first_error: Exception | None = None
-        for ev in self._port.drain_events():
+        pre_gate, self._pre_gate = self._pre_gate, []
+        for ev in [*pre_gate, *self._port.drain_events()]:
             try:
                 self._book_event(ev)
             except Exception as error:  # noqa: BLE001 - the first one is re-raised below
