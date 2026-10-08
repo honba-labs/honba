@@ -1,16 +1,12 @@
 //! Unit tests for `crate::rules`.
 
-use crate::{
-    InstrumentRules, MarketError, NullSymbolGrammar, PriceBand, QuantityViolation, SymbolGrammar,
-};
+use honba_entities::{Currency, Instrument, InstrumentKind};
+use honba_messages::{Exchange, InstrumentId};
 
-/// Price validation is still string-typed (typed `PriceViolation` is chunk r2 of E2-S2).
-fn violation(r: crate::Result<()>) -> String {
-    match r {
-        Err(MarketError::RuleViolation(msg)) => msg,
-        other => panic!("expected RuleViolation, got {other:?}"),
-    }
-}
+use crate::{
+    InstrumentRules, MarketError, NullSymbolGrammar, PriceBand, PriceViolation, QuantityViolation,
+    SymbolGrammar,
+};
 
 #[test]
 fn new_rules_default_min_quantity_to_one_lot() {
@@ -81,8 +77,76 @@ fn quantity_violation_displays_todays_prose_and_converts_to_market_error() {
 fn price_must_be_positive_and_on_tick() {
     let r = InstrumentRules::new(1.0, 0.05);
     assert_eq!(r.validate_price(100.05), Ok(()));
-    assert!(violation(r.validate_price(0.0)).contains("must be positive"));
-    assert!(violation(r.validate_price(100.03)).contains("tick size"));
+    assert_eq!(
+        r.validate_price(0.0),
+        Err(PriceViolation::NonPositive { price: 0.0 })
+    );
+    assert_eq!(
+        r.validate_price(-1.0),
+        Err(PriceViolation::NonPositive { price: -1.0 })
+    );
+    assert_eq!(
+        r.validate_price(100.03),
+        Err(PriceViolation::OffTick {
+            price: 100.03,
+            tick: 0.05
+        })
+    );
+}
+
+#[test]
+fn nan_and_infinite_prices_are_refused() {
+    let r = InstrumentRules::new(1.0, 0.05);
+    assert!(matches!(
+        r.validate_price(f64::NAN),
+        Err(PriceViolation::NonPositive { .. })
+    ));
+    assert!(matches!(
+        r.validate_price(f64::INFINITY),
+        Err(PriceViolation::OffTick { .. })
+    ));
+}
+
+#[test]
+fn price_violation_displays_todays_prose_and_converts_to_market_error() {
+    let np = PriceViolation::NonPositive { price: 0.0 };
+    assert_eq!(np.to_string(), "price 0 must be positive");
+    let off = PriceViolation::OffTick {
+        price: 100.03,
+        tick: 0.05,
+    };
+    assert_eq!(
+        off.to_string(),
+        "price 100.03 does not conform to tick size 0.05"
+    );
+    assert_eq!(
+        MarketError::from(off),
+        MarketError::RuleViolation(off.to_string())
+    );
+}
+
+#[test]
+fn validate_price_tolerance_matches_is_on_tick() {
+    let inst = Instrument::new(
+        InstrumentId::new("TEST", Exchange::new("NSE")),
+        InstrumentKind::Equity,
+        Currency::Inr,
+        1.0,
+        0.05,
+    );
+    let rules = InstrumentRules::new(1.0, 0.05);
+    // Offsets in ticks around a tick boundary, straddling the 1e-6 tolerance.
+    let offsets = [0.0, 5e-7, -5e-7, 2e-6, -2e-6, 1e-5, -1e-5, 5e-5, 1e-4, 0.5];
+    for base in [100.0_f64, 100.05, 2500.5, 0.05] {
+        for off in offsets {
+            let price = base + off * 0.05;
+            assert_eq!(
+                rules.validate_price(price).is_ok(),
+                inst.is_on_tick(price),
+                "price {price} (offset {off} ticks)"
+            );
+        }
+    }
 }
 
 #[test]

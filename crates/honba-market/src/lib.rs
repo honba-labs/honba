@@ -50,7 +50,8 @@ pub use null::{
 };
 pub use profile::{MarketProfile, MarketRegistry};
 pub use rules::{
-    InstrumentRules, InstrumentRulesProvider, PriceBand, QuantityViolation, SymbolGrammar,
+    InstrumentRules, InstrumentRulesProvider, PriceBand, PriceViolation, QuantityViolation,
+    SymbolGrammar,
 };
 pub use settlement::{
     MarginModel, MarginRequirement, SettlementRules, SettlementSchedule, SettlementType,

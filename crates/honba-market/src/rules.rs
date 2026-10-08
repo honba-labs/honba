@@ -81,6 +81,46 @@ impl From<QuantityViolation> for MarketError {
     }
 }
 
+/// Ticks of float noise tolerated around a tick boundary; equals `honba-entities`'
+/// `LOT_TICK_TOLERANCE` so `Instrument::is_on_tick` and the rules agree.
+const PRICE_TICK_TOLERANCE: f64 = 1e-6;
+
+/// Why an order price breaks an instrument's rules (ADR 0018 decision 4a).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum PriceViolation {
+    /// The price is zero, negative or not a number.
+    NonPositive {
+        /// The offending price.
+        price: f64,
+    },
+    /// The price is not on a multiple of the tick size.
+    OffTick {
+        /// The offending price.
+        price: f64,
+        /// The tick size it must be a multiple of.
+        tick: f64,
+    },
+}
+
+impl std::fmt::Display for PriceViolation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NonPositive { price } => write!(f, "price {price} must be positive"),
+            Self::OffTick { price, tick } => {
+                write!(f, "price {price} does not conform to tick size {tick}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for PriceViolation {}
+
+impl From<PriceViolation> for MarketError {
+    fn from(v: PriceViolation) -> Self {
+        MarketError::RuleViolation(v.to_string())
+    }
+}
+
 /// Trading rules governing lot sizes, tick sizes, freeze quantities, and price limits.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct InstrumentRules {
@@ -143,22 +183,21 @@ impl InstrumentRules {
         Ok(())
     }
 
-    /// Validates whether an order price complies with the tick size.
-    pub fn validate_price(&self, price: f64) -> Result<()> {
-        if price <= 0.0 {
-            return Err(MarketError::RuleViolation(format!(
-                "price {} must be positive",
-                price
-            )));
+    /// Validates whether an order price is positive and on the tick grid.
+    ///
+    /// The tick tolerance (1e-6 ticks) matches `Instrument::is_on_tick` in
+    /// `honba-entities`, so the two agree on every price.
+    pub fn validate_price(&self, price: f64) -> std::result::Result<(), PriceViolation> {
+        if price.is_nan() || price <= 0.0 {
+            return Err(PriceViolation::NonPositive { price });
         }
 
         let ticks = price / self.tick_size;
-        let rem = ticks.fract();
-        if rem.abs() > 1e-4 && (1.0 - rem.abs()) > 1e-4 {
-            return Err(MarketError::RuleViolation(format!(
-                "price {} does not conform to tick size {}",
-                price, self.tick_size
-            )));
+        if !price.is_finite() || (ticks - ticks.round()).abs() >= PRICE_TICK_TOLERANCE {
+            return Err(PriceViolation::OffTick {
+                price,
+                tick: self.tick_size,
+            });
         }
 
         Ok(())

@@ -20,7 +20,7 @@ import tomllib
 
 # L0: honba-messages
 # L1: honba-entities
-# L2: honba-market, honba-ports
+# L2: honba-market, honba-ports, honba-risk
 # L3: honba-engine, honba-indicators, honba-async
 # L4: honba-sim, honba-strategy
 # L5: honba-analytics, honba-data, honba-sweep, honba-codegen, honba-config
@@ -32,7 +32,10 @@ ALLOWED_PROD = {
     "honba-entities": {"honba-messages"},
     "honba-market": {"honba-entities", "honba-messages"},
     "honba-ports": {"honba-messages", "honba-entities", "honba-market"},
-    "honba-engine": {"honba-messages", "honba-entities"},
+    # Pure pre-trade risk stage (ADR 0018). Reads honba-market's rules (default features only:
+    # never the `india` pack, rule 4 below) and must stay tokio-free.
+    "honba-risk": {"honba-messages", "honba-entities", "honba-market"},
+    "honba-engine": {"honba-messages", "honba-entities", "honba-risk"},  # Engine::submit gate
     "honba-indicators": {"honba-messages", "honba-entities"},
     "honba-async": {"honba-messages", "honba-engine", "honba-ports"},
     "honba-sim": {"honba-messages", "honba-entities", "honba-engine"},
@@ -41,6 +44,7 @@ ALLOWED_PROD = {
         "honba-indicators",
         "honba-messages",
         "honba-entities",
+        "honba-risk",  # StrategyRunner gate
     },
     "honba-analytics": {"honba-messages", "honba-entities"},
     "honba-data": {
@@ -59,7 +63,7 @@ ALLOWED_PROD = {
         "honba-data",
         "honba-analytics",
     },
-    "honba-config": {"honba-messages", "honba-strategy"},
+    "honba-config": {"honba-messages", "honba-strategy", "honba-risk"},  # RiskLimits re-export
     "honba-codegen": {
         "honba-messages",
         "honba-entities",
@@ -85,6 +89,7 @@ ALLOWED_PROD = {
         "honba-codegen",
         # The in-process SDK transport drives the served router (no handler is reimplemented).
         "honba-api-rest",
+        "honba-risk",  # bindings (ADR 0018 decision 10)
     },
     "honba-cli": {
         "honba-messages",
@@ -99,6 +104,7 @@ ALLOWED_PROD = {
         "honba-codegen",
         "honba-api",
         "honba-api-rest",
+        "honba-risk",  # CLI backtest assembler
     },
     "honba-api-rest": {
         "honba-api",
@@ -107,6 +113,7 @@ ALLOWED_PROD = {
         "honba-data",
         "honba-market",
         "honba-ports",
+        "honba-risk",  # write-route gate
     },
     # Plan 4.4: pure L0-L4 only. The wasm surface computes indicators, screener
     # predicates, and replay; it has no filesystem and must stay replay-only.
@@ -121,6 +128,7 @@ ALLOWED_DEV = {
     "honba-entities": set(),
     "honba-market": set(),
     "honba-ports": {"honba-testing"},
+    "honba-risk": set(),
     "honba-engine": {"honba-sim"},
     "honba-indicators": set(),
     "honba-sim": set(),
@@ -143,6 +151,7 @@ ALLOWED_DEV = {
 CORE_CRATES = {
     "honba-messages",
     "honba-entities",
+    "honba-risk",
     "honba-engine",
     "honba-indicators",
     "honba-sim",
@@ -157,6 +166,7 @@ CORE_CRATES = {
 SYNC_KERNEL_CRATES = {
     "honba-messages",
     "honba-entities",
+    "honba-risk",
     "honba-engine",
     "honba-indicators",
     "honba-sim",
