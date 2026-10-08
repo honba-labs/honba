@@ -244,6 +244,7 @@ fn reference_price_comes_from_the_last_bar_close() {
     let limits = RiskLimits {
         max_notional: Some(500.0),
         order_rate: None,
+        ..RiskLimits::default()
     };
     let venue = Sink::default();
     let mut engine = Engine::new().with_risk(stage(limits));

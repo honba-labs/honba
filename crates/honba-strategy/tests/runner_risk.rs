@@ -313,6 +313,7 @@ fn live_run_without_limits_refused() {
     let only_notional = RiskLimits {
         max_notional: Some(500_000.0),
         order_rate: None,
+        ..RiskLimits::default()
     };
     let full = RiskLimits {
         max_notional: Some(500_000.0),
@@ -320,6 +321,7 @@ fn live_run_without_limits_refused() {
             max_orders: 30,
             window_ms: 1000,
         }),
+        ..RiskLimits::default()
     };
 
     // No stage, default limits, partial limits: refused.

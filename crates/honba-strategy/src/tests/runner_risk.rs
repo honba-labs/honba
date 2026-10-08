@@ -218,6 +218,7 @@ fn reference_price_is_the_last_bar_close_seen_before_the_order() {
     let limits = RiskLimits {
         max_notional: Some(500.0),
         order_rate: None,
+        ..RiskLimits::default()
     };
     // 100 x close 10 = 1000 > 500, priced from the bar that triggered the order.
     let (r, _) = runner(vec![(1, vec![buy(100.0)])]);
@@ -253,6 +254,7 @@ fn order_rate_window_runs_on_event_time() {
             max_orders: 1,
             window_ms: 1000,
         }),
+        ..RiskLimits::default()
     };
     let plan = vec![
         (MS, vec![buy(1.0)]),
@@ -289,6 +291,7 @@ fn require_live_limits_needs_a_stage_with_both_limits() {
     let notional_only = RiskLimits {
         max_notional: Some(1000.0),
         order_rate: None,
+        ..RiskLimits::default()
     };
     assert_eq!(
         r.with_risk(stage(notional_only, true))
@@ -301,6 +304,7 @@ fn require_live_limits_needs_a_stage_with_both_limits() {
             max_orders: 5,
             window_ms: 1000,
         }),
+        ..RiskLimits::default()
     };
     let (r, _) = runner(vec![]);
     assert_eq!(r.with_risk(stage(full, true)).require_live_limits(), Ok(()));

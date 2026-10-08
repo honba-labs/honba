@@ -142,9 +142,7 @@ impl RiskStage {
     /// Runs after price rules (so ADV is available in the request) and before notional,
     /// so a market-absorption refusal wins over an account-value refusal.
     fn max_participation_rule(&self, req: &RiskRequest) -> Option<RiskRefusal> {
-        let Some(participation) = self.limits.max_participation else {
-            return None;
-        };
+        let participation = self.limits.max_participation?;
         let Some(adv) = req.adv else {
             return Some(RiskRefusal::MaxParticipation {
                 quantity: req.quantity,

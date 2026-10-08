@@ -228,6 +228,7 @@ fn order_rate_refused_in_event_time() {
             max_orders: 2,
             window_ms: 1000,
         }),
+        ..RiskLimits::default()
     };
     let venue = ScriptedExecution::new(10.0);
     let steps = [(1, "A"), (2, "B"), (3, "C"), (1002, "D")]
@@ -309,10 +310,12 @@ fn live_run_without_limits_refused() {
             max_orders: 30,
             window_ms: 1000,
         }),
+        ..RiskLimits::default()
     };
     let only_notional = RiskLimits {
         max_notional: Some(500_000.0),
         order_rate: None,
+        ..RiskLimits::default()
     };
     let refused = Err(AlgoError::RiskConfig(RiskConfigError::LiveRunWithoutLimit));
 

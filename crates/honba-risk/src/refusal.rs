@@ -245,10 +245,12 @@ impl RiskRefusal {
                     "participation": participation,
                 });
                 if let Some(r) = reason {
-                    obj.as_object_mut().unwrap().insert("reason".to_string(), json!(r));
+                    obj.as_object_mut()
+                        .unwrap()
+                        .insert("reason".to_string(), json!(r));
                 }
                 obj
-            },
+            }
         }
     }
 }
