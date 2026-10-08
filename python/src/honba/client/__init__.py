@@ -26,8 +26,12 @@ Failures are typed (:class:`ApiError` and subclasses, built from the ``ErrorDeta
 
 Served today: ``health``, ``capabilities``, ``schema``, ``instruments``, ``instrument``, ``bars``,
 ``quotes``, ``depth``, ``verify_strategy``, ``strategies``, ``compile_strategy`` and
-``screener_scan``. Every other route answers 501 (``NotImplementedApiError``) and has no client
-method yet. Money (ADR 0011) does not appear: these endpoints carry prices as ``f64``.
+``screener_scan``, plus the run routes (ADR 0017): ``submit_backtest``, ``backtest``,
+``backtest_journal``, ``wait`` and ``run_backtest``. A run needs a journals root: pass
+``journals_dir=`` to :meth:`Client.inproc` (or serve with ``--journals-dir``). A failed run is a
+normal result with a typed ``error``; ``result.assumptions.not_modelled`` lists what the Rust
+executor does not model. Every other route answers 501 (``NotImplementedApiError``) and has no
+client method yet. Money (ADR 0011) does not appear: these endpoints carry prices as ``f64``.
 """
 
 from honba.client.client import Client
@@ -43,18 +47,24 @@ from honba.client.errors import (
     RateLimitedApiError,
     RequestValidationError,
     RiskApiError,
+    RunTimeoutError,
     TransportApiError,
     UnsupportedApiError,
     ValidationApiError,
     error_from_envelope,
 )
 from honba.client.models import (
+    Assumptions,
+    BacktestMetrics,
+    BacktestResult,
     CapabilityManifest,
     CompiledStrategy,
     Depth,
     DepthLevel,
+    ErrorDetail,
     Health,
     InstrumentInfo,
+    RunStatus,
     ScreenerResultRow,
 )
 from honba.client.requests import ApiRequest, TimeLike
@@ -63,12 +73,16 @@ from honba.client.transport import HttpTransport, InprocTransport, Response, Ret
 __all__ = [
     "ApiError",
     "ApiRequest",
+    "Assumptions",
     "AuthApiError",
+    "BacktestMetrics",
+    "BacktestResult",
     "CapabilityManifest",
     "Client",
     "CompiledStrategy",
     "Depth",
     "DepthLevel",
+    "ErrorDetail",
     "Health",
     "HttpTransport",
     "InprocTransport",
@@ -84,6 +98,8 @@ __all__ = [
     "Response",
     "RetryPolicy",
     "RiskApiError",
+    "RunStatus",
+    "RunTimeoutError",
     "ScreenerResultRow",
     "TimeLike",
     "Transport",

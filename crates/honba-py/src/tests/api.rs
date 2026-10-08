@@ -46,3 +46,35 @@ fn bad_arguments_are_dispatch_errors() {
     let err = request(&dir, "BAD METHOD", "/health", None, None).unwrap_err();
     assert!(matches!(err, ApiRequestError::Dispatch(_)), "{err}");
 }
+
+#[test]
+fn run_options_are_part_of_the_state_key() {
+    use crate::pyclasses::api::{request_with, RunsOptions};
+    let dir = empty_dir("keyed");
+    let on = RunsOptions {
+        journals_dir: Some(format!("{dir}/journals")),
+        ..RunsOptions::default()
+    };
+    // Same data dir, runs off: still 503; runs on: not 503. Neither poisons the other.
+    let body = r#"{"strategy":"buy_and_hold","universe":"TCS.NSE","start":"2024-01-01","end":"2024-02-01","seed":7}"#;
+    let (off, _) = request_with(
+        &dir,
+        &RunsOptions::default(),
+        "POST",
+        "/backtests",
+        None,
+        Some(body),
+    )
+    .unwrap();
+    let (with, _) = request_with(&dir, &on, "POST", "/backtests", None, Some(body)).unwrap();
+    let (off_again, _) = request_with(
+        &dir,
+        &RunsOptions::default(),
+        "POST",
+        "/backtests",
+        None,
+        Some(body),
+    )
+    .unwrap();
+    assert_eq!((off, with, off_again), (503, 200, 503));
+}

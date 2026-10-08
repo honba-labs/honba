@@ -8,18 +8,24 @@ carries money, so ADR 0011's ``Money`` is not engaged.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from honba.wire.base import Str, _Wire
 from honba.wire.wire import Currency, Float, InstrumentId, NonNegativeFloat
 
 __all__ = [
+    "TERMINAL_STATUSES",
+    "Assumptions",
+    "BacktestMetrics",
+    "BacktestResult",
     "CapabilityManifest",
     "CompiledStrategy",
     "Depth",
     "DepthLevel",
+    "ErrorDetail",
     "Health",
     "InstrumentInfo",
+    "RunStatus",
     "ScreenerResultRow",
 ]
 
@@ -84,3 +90,69 @@ class ScreenerResultRow(_Wire):
     instrument_id: InstrumentId
     metrics: dict[str, float | None]
     """Latest value of every metric the filter reads, by key as written; ``None`` while warming up."""
+
+
+RunStatus = Literal["pending", "running", "completed", "failed", "cancelled"]
+"""Lifecycle of a run (ADR 0017 decision 1); the last three are terminal and final."""
+
+TERMINAL_STATUSES: frozenset[str] = frozenset({"completed", "failed", "cancelled"})
+
+
+class ErrorDetail(_Wire):
+    """The envelope's ``ErrorDetail`` as a value: why a run failed (``status == "failed"``).
+
+    A failed run is a successful poll, so the cause comes back as data, not as an exception.
+    ``code`` is the Rust ``ErrorCode`` string (``internal_error``, ``market_data_unavailable``,
+    ...); ``context`` carries ``reason`` (``journal_write``, ``panic``, ``interrupted``, ...).
+    """
+
+    code: Str
+    message: Str
+    retryable: bool = False
+    context: Any = None
+
+
+class BacktestMetrics(_Wire):
+    """Headline metrics of a completed Rust-executor run.
+
+    Basis (see :class:`Assumptions`): closed round trips only, no mark-to-market, Sharpe
+    annualised at ``periods_per_year``. These are *not* ``BacktestSession`` metrics.
+    """
+
+    trades: int
+    """Closed round trips (a position returning to flat)."""
+    net_pnl: Float
+    sharpe: Float
+    max_drawdown: Float
+    total_return: Float
+
+
+class Assumptions(_Wire):
+    """What the run did not model, and how it timed fills (ADR 0017 decision 7)."""
+
+    not_modelled: tuple[Str, ...] = ()
+    """Stable snake_case names of the effects the executor ignores (``slippage``, ...)."""
+    timing: Str = ""
+    """When orders fill relative to the decision bar."""
+    fill_model: Str | None = None
+    metrics_basis: Str | None = None
+    periods_per_year: Float | None = None
+
+
+class BacktestResult(_Wire):
+    """``BacktestResponse``: the state of one backtest run.
+
+    ``metrics`` only when ``completed``, ``assumptions`` only once terminal, ``error`` only
+    when ``failed``.
+    """
+
+    run_id: Str
+    status: RunStatus
+    metrics: BacktestMetrics | None = None
+    assumptions: Assumptions | None = None
+    error: ErrorDetail | None = None
+
+    @property
+    def is_terminal(self) -> bool:
+        """``True`` once the run can no longer change."""
+        return self.status in TERMINAL_STATUSES

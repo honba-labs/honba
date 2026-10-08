@@ -189,13 +189,41 @@ class InprocTransport:
     The directory is loaded once per process on first use and cached (``honba serve`` also
     loads once), so files added later are not seen. Answers are the served API's, status and
     envelope included.
+
+    ``journals_dir`` turns on the run routes (``/backtests``, ``/journals``): runs are executed
+    by the Rust run service in this process and journaled there (created if missing). Without
+    it a valid submit answers 503 ``unsupported`` (``context.reason == "no_journals_dir"``).
+    ``max_concurrent_runs`` and ``max_queued_runs`` bound the worker pool and the pending
+    queue (a full queue answers 429); ``None`` keeps the server defaults. The service lives
+    for the process, keyed by these four settings, so runs outlive any one transport object;
+    they do not survive interpreter exit (ADR 0017 decision 5).
     """
 
-    def __init__(self, data_dir: str | Path) -> None:
+    def __init__(
+        self,
+        data_dir: str | Path,
+        *,
+        journals_dir: str | Path | None = None,
+        max_concurrent_runs: int | None = None,
+        max_queued_runs: int | None = None,
+    ) -> None:
         path = Path(data_dir)
         if not path.is_dir():
             raise NotADirectoryError(f"data directory {str(path)!r} is not a directory")
+        for name, value in (
+            ("max_concurrent_runs", max_concurrent_runs),
+            ("max_queued_runs", max_queued_runs),
+        ):
+            if value is not None and value < 1:
+                raise ValueError(f"{name} must be >= 1")
         self._data_dir = str(path)
+        self._journals_dir: str | None = None
+        if journals_dir is not None:
+            journals = Path(journals_dir)
+            journals.mkdir(parents=True, exist_ok=True)
+            self._journals_dir = str(journals)
+        self._max_concurrent_runs = max_concurrent_runs
+        self._max_queued_runs = max_queued_runs
 
     def request(
         self,
@@ -205,6 +233,13 @@ class InprocTransport:
         query: Mapping[str, Any] | None = None,
         body: Any = None,
     ) -> Response:
+        extra: dict[str, Any] = {}
+        if self._journals_dir is not None:
+            extra["journals_dir"] = self._journals_dir
+            if self._max_concurrent_runs is not None:
+                extra["max_concurrent_runs"] = self._max_concurrent_runs
+            if self._max_queued_runs is not None:
+                extra["max_queued_runs"] = self._max_queued_runs
         try:
             status, text = native_attr("api_request")(
                 self._data_dir,
@@ -212,6 +247,7 @@ class InprocTransport:
                 path,
                 _dumps(dict(query)) if query else None,
                 _dumps(body) if body is not None else None,
+                **extra,
             )
         except (OSError, ValueError) as exc:
             # Same type and code HTTP uses when no answer arrived; not retryable: a data

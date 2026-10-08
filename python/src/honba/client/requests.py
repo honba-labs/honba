@@ -12,6 +12,7 @@ string you pass is validated and sent verbatim).
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -27,10 +28,12 @@ __all__ = [
     "MAX_SCREENER_UNIVERSE",
     "ApiRequest",
     "TimeLike",
+    "backtest_journal",
     "bars",
     "capabilities",
     "compile_strategy",
     "depth",
+    "get_backtest",
     "health",
     "instrument",
     "instruments",
@@ -38,6 +41,7 @@ __all__ = [
     "schema",
     "screener_scan",
     "strategies",
+    "submit_backtest",
     "verify_strategy",
 ]
 
@@ -379,3 +383,70 @@ def screener_scan(
     if as_of is not None:
         query["as_of"] = _to_ns("as_of", as_of)[0]
     return ApiRequest("GET", "/screener/scan", query)
+
+
+def _run_id_segment(run_id: object) -> str:
+    """A run id as one path segment. Only emptiness is checked here: an ill-formed id is a
+    404 from the server (ADR 0017 decision 7), and nothing can escape the segment."""
+    if not isinstance(run_id, str) or not run_id.strip():
+        raise RequestValidationError("run_id", "invalid_value", "run_id must be a non-empty string")
+    return quote(run_id, safe="")
+
+
+def _when(field: str, value: object) -> str:
+    """A start/end bound as the server's text: ``date`` -> ``YYYY-MM-DD``, ``datetime`` ->
+    RFC 3339 (naive means UTC), a string is passed through (the server validates it)."""
+    if isinstance(value, datetime):
+        return (value if value.tzinfo else value.replace(tzinfo=timezone.utc)).isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    return _non_empty(field, value)
+
+
+def submit_backtest(
+    *,
+    strategy: str,
+    universe: str | InstrumentId,
+    start: str | date | datetime,
+    end: str | date | datetime,
+    seed: int,
+    bar_spec: str | None = None,
+    initial_capital: float | None = None,
+) -> ApiRequest:
+    """``POST /backtests``. ``seed`` is required and non-zero (ADR 0017 decision 6); unset
+    optional fields are left out so the server's defaults apply."""
+    if isinstance(seed, bool) or not isinstance(seed, int) or not 0 < seed < 2**64:
+        raise RequestValidationError("seed", "invalid_value", "seed must be an integer >= 1")
+    body: dict[str, Any] = {
+        "strategy": _non_empty("strategy", strategy),
+        "universe": _non_empty("universe", universe)
+        if isinstance(universe, str)
+        else _id_text(universe, "universe"),
+        "start": _when("start", start),
+        "end": _when("end", end),
+        "seed": seed,
+    }
+    if bar_spec is not None:
+        body["bar_spec"] = _non_empty("bar_spec", bar_spec)
+    if initial_capital is not None:
+        if (
+            isinstance(initial_capital, bool)
+            or not isinstance(initial_capital, (int, float))
+            or not math.isfinite(initial_capital)
+            or initial_capital <= 0
+        ):
+            raise RequestValidationError(
+                "initial_capital", "invalid_value", "initial_capital must be a positive number"
+            )
+        body["initial_capital"] = float(initial_capital)
+    return ApiRequest("POST", "/backtests", body=body)
+
+
+def get_backtest(run_id: str) -> ApiRequest:
+    """``GET /backtests/{id}``."""
+    return ApiRequest("GET", f"/backtests/{_run_id_segment(run_id)}")
+
+
+def backtest_journal(run_id: str) -> ApiRequest:
+    """``GET /backtests/{id}/journal``."""
+    return ApiRequest("GET", f"/backtests/{_run_id_segment(run_id)}/journal")

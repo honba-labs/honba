@@ -47,15 +47,24 @@ def api_request(
     path: str,
     query_json: str | None = None,
     body_json: str | None = None,
+    journals_dir: str | None = None,
+    max_concurrent_runs: int | None = None,
+    max_queued_runs: int | None = None,
 ) -> tuple[int, str]:
-    """Send one request through the REST read API's router, in process (no socket).
+    """Send one request through the REST API's router, in process (no socket).
 
     Builds the router ``honba serve`` serves over the ``SYMBOL.EXCHANGE.parquet`` files in
-    ``data_dir`` (loaded once per process and cached) and returns ``(status, body_json)``.
-    ``query_json`` is a flat JSON object of scalars. A request the API rejects (404, 422,
-    501) is a normal return carrying the error envelope. Raises ``OSError`` when ``data_dir``
-    cannot be loaded and ``ValueError`` for a malformed request (bad method, relative path,
-    non-flat query). Wrapped by ``honba.client.InprocTransport``.
+    ``data_dir`` and returns ``(status, body_json)``. The state is loaded once per process
+    and cached, keyed by ``data_dir`` and the run settings. ``query_json`` is a flat JSON
+    object of scalars. A request the API rejects (404, 422, 429, 501, 503) is a normal return
+    carrying the error envelope.
+
+    ``journals_dir`` starts the run service over that directory (created if missing), which
+    enables ``/backtests`` and ``/journals``; without it a valid submit is 503 ``unsupported``
+    (``no_journals_dir``). ``max_concurrent_runs`` / ``max_queued_runs`` size its worker pool
+    and pending queue (``None``: server defaults). Raises ``OSError`` when ``data_dir`` or
+    ``journals_dir`` cannot be loaded and ``ValueError`` for a malformed request (bad method,
+    relative path, non-flat query). Wrapped by ``honba.client.InprocTransport``.
     """
 
 def canonical_json(kind: str, payload: str) -> str: ...

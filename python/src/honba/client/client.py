@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+import math
+import time
+from collections.abc import Callable, Mapping, Sequence
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -11,8 +14,14 @@ from typing_extensions import Self
 
 from honba._native import native_attr
 from honba.client import requests as rq
-from honba.client.errors import InvalidResponseError, error_from_envelope
+from honba.client.errors import (
+    InvalidResponseError,
+    RequestValidationError,
+    RunTimeoutError,
+    error_from_envelope,
+)
 from honba.client.models import (
+    BacktestResult,
     CapabilityManifest,
     CompiledStrategy,
     Depth,
@@ -21,11 +30,16 @@ from honba.client.models import (
     ScreenerResultRow,
 )
 from honba.client.transport import HttpTransport, InprocTransport, Transport
-from honba.wire.wire import Bar, InstrumentId, QuoteTick
+from honba.wire.wire import Bar, InstrumentId, QuoteTick, Trade
 
 __all__ = ["Client"]
 
 _M = TypeVar("_M", bound=BaseModel)
+
+
+def _positive(field: str, value: float) -> None:
+    if isinstance(value, bool) or not math.isfinite(value) or value <= 0:
+        raise RequestValidationError(field, "invalid_value", f"{field} must be > 0 seconds")
 
 
 class Client:
@@ -46,9 +60,11 @@ class Client:
         return cls(HttpTransport(base_url, **options))
 
     @classmethod
-    def inproc(cls, data_dir: str | Path) -> Client:
-        """A client that runs the Rust router in process over a Parquet directory."""
-        return cls(InprocTransport(data_dir))
+    def inproc(cls, data_dir: str | Path, **options: Any) -> Client:
+        """A client that runs the Rust router in process over a Parquet directory;
+        ``options`` (``journals_dir``, ``max_concurrent_runs``, ``max_queued_runs``) go to
+        :class:`InprocTransport` and ``journals_dir`` is what enables the run methods."""
+        return cls(InprocTransport(data_dir, **options))
 
     @property
     def transport(self) -> Transport:
@@ -178,6 +194,114 @@ class Client:
         """
         data = self._data(rq.screener_scan(universe, filters, tf=tf, as_of=as_of))
         return self._parse_list(data, "rows", ScreenerResultRow)
+
+    # -- runs (ADR 0017 decision 9) -------------------------------------------------------------
+
+    def submit_backtest(
+        self,
+        *,
+        strategy: str,
+        universe: str | InstrumentId,
+        start: str | date | datetime,
+        end: str | date | datetime,
+        seed: int,
+        bar_spec: str | None = None,
+        initial_capital: float | None = None,
+    ) -> BacktestResult:
+        """``POST /backtests``: queue a run and return it (``status == "pending"``, with its
+        ``run_id``). It does not wait; see :meth:`wait` and :meth:`run_backtest`.
+
+        ``strategy`` must be a Rust-registered name (``buy_and_hold``, ``rsi_reversal``,
+        ``sma_crossover``) or a compiled manifest id; anything else is a
+        :class:`ValidationApiError` (422, ``context["field"] == "strategy"``). ``seed`` is
+        required and non-zero. A full queue is a :class:`RateLimitedApiError` (429,
+        ``context["reason"]``), a server without a journals root an
+        :class:`UnsupportedApiError` (503, ``reason == "no_journals_dir"``).
+        """
+        return self._call(
+            rq.submit_backtest(
+                strategy=strategy,
+                universe=universe,
+                start=start,
+                end=end,
+                seed=seed,
+                bar_spec=bar_spec,
+                initial_capital=initial_capital,
+            ),
+            BacktestResult,
+        )
+
+    def backtest(self, run_id: str) -> BacktestResult:
+        """``GET /backtests/{id}``: the run's current state. ``NotFoundApiError`` for an
+        unknown, evicted or ill-formed id. A failed run is returned, with ``error`` set."""
+        return self._call(rq.get_backtest(run_id), BacktestResult)
+
+    def backtest_journal(self, run_id: str) -> list[Trade]:
+        """``GET /backtests/{id}/journal``: the run's fills in journal order. For a pending or
+        running run it is a prefix of the final answer; read ``backtest(run_id).status`` for
+        completeness."""
+        data = self._data(rq.backtest_journal(run_id))
+        return self._parse_list(data, "trades", Trade)
+
+    def wait(
+        self,
+        run_id: str,
+        *,
+        timeout: float = 300.0,
+        poll_interval: float = 0.1,
+        sleep: Callable[[float], None] = time.sleep,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> BacktestResult:
+        """Poll :meth:`backtest` until the run is terminal and return it.
+
+        A ``failed`` or ``cancelled`` run is returned, not raised: check ``status`` and
+        ``error``. After ``timeout`` seconds :class:`RunTimeoutError` carries the last state;
+        the run keeps going on the server. ``sleep`` and ``clock`` are test seams.
+        """
+        _positive("timeout", timeout)
+        _positive("poll_interval", poll_interval)
+        deadline = clock() + timeout
+        while True:
+            result = self.backtest(run_id)
+            if result.is_terminal:
+                return result
+            remaining = deadline - clock()
+            if remaining <= 0:
+                raise RunTimeoutError(run_id, result, timeout)
+            sleep(min(poll_interval, remaining))
+
+    def run_backtest(
+        self,
+        *,
+        strategy: str,
+        universe: str | InstrumentId,
+        start: str | date | datetime,
+        end: str | date | datetime,
+        seed: int,
+        bar_spec: str | None = None,
+        initial_capital: float | None = None,
+        timeout: float = 300.0,
+        poll_interval: float = 0.1,
+        sleep: Callable[[float], None] = time.sleep,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> BacktestResult:
+        """:meth:`submit_backtest` then :meth:`wait`: the terminal result of one run."""
+        submitted = self.submit_backtest(
+            strategy=strategy,
+            universe=universe,
+            start=start,
+            end=end,
+            seed=seed,
+            bar_spec=bar_spec,
+            initial_capital=initial_capital,
+        )
+        return self.wait(
+            submitted.run_id,
+            timeout=timeout,
+            poll_interval=poll_interval,
+            sleep=sleep,
+            clock=clock,
+        )
 
     # -- plumbing ----------------------------------------------------------------------------
 

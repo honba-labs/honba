@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use honba::pyclasses::api::request;
+use honba::pyclasses::api::{request, request_with, ApiRequestError, RunsOptions};
 use serde_json::{json, Value};
 
 /// A fresh data directory owned by one test. Each test passes its own `label`, so tests running in
@@ -90,4 +90,69 @@ fn a_post_body_reaches_the_handler() {
     let (status, body) = call(&dir, "POST", "/strategies/verify", None, Some("{}"));
     assert_eq!(status, 422);
     assert_eq!(body["error"]["code"], "validation_invalid_request");
+}
+
+const SUBMIT: &str = r#"{"strategy":"buy_and_hold","universe":"TCS.NSE","start":"2024-01-01","end":"2024-02-01","seed":7}"#;
+
+fn journals(label: &str) -> String {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+        .join("honba-py-api-request-journals")
+        .join(label);
+    let _ = std::fs::remove_dir_all(&dir);
+    dir.to_str().unwrap().to_owned()
+}
+
+#[test]
+fn without_a_journals_dir_a_valid_submit_is_503_unsupported() {
+    let dir = data_dir("runs_off");
+    let (status, body) = call(&dir, "POST", "/backtests", None, Some(SUBMIT));
+    assert_eq!(status, 503, "{body}");
+    assert_eq!(body["error"]["context"]["reason"], "no_journals_dir");
+}
+
+#[test]
+fn with_a_journals_dir_a_valid_submit_is_accepted_and_pollable() {
+    let dir = data_dir("runs_on");
+    let runs = RunsOptions {
+        journals_dir: Some(journals("runs_on")),
+        max_concurrent: Some(1),
+        max_queued: Some(4),
+    };
+    let post = |method: &str, path: &str, body: Option<&str>| {
+        let (status, text) = request_with(&dir, &runs, method, path, None, body).unwrap();
+        (status, serde_json::from_str::<Value>(&text).unwrap())
+    };
+    let (status, body) = post("POST", "/backtests", Some(SUBMIT));
+    assert_eq!(status, 200, "{body}");
+    let id = body["data"]["run_id"].as_str().unwrap().to_owned();
+    assert_eq!(body["data"]["status"], "pending");
+    // No bars for TCS.NSE in the empty directory: the run reaches a terminal state, failed.
+    let mut last = Value::Null;
+    for _ in 0..2000 {
+        let (status, got) = post("GET", &format!("/backtests/{id}"), None);
+        assert_eq!(status, 200, "{got}");
+        last = got;
+        if matches!(
+            last["data"]["status"].as_str(),
+            Some("completed" | "failed")
+        ) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    let status = last["data"]["status"].as_str().unwrap_or("?");
+    assert!(matches!(status, "completed" | "failed"), "{last}");
+}
+
+#[test]
+fn an_uncreatable_journals_dir_is_an_error_not_a_503() {
+    let dir = data_dir("runs_bad_root");
+    let blocker = PathBuf::from(&dir).join("file");
+    std::fs::write(&blocker, "x").unwrap();
+    let runs = RunsOptions {
+        journals_dir: Some(blocker.join("sub").to_str().unwrap().to_owned()),
+        ..RunsOptions::default()
+    };
+    let err = request_with(&dir, &runs, "GET", "/health", None, None).unwrap_err();
+    assert!(matches!(err, ApiRequestError::Runs(_)), "{err}");
 }

@@ -33,6 +33,7 @@ __all__ = [
     "RateLimitedApiError",
     "RequestValidationError",
     "RiskApiError",
+    "RunTimeoutError",
     "TransportApiError",
     "UnsupportedApiError",
     "ValidationApiError",
@@ -126,6 +127,20 @@ class InvalidResponseError(ApiError):
 
     def __init__(self, message: str, *, status: int | None = None) -> None:
         super().__init__("invalid_response", message, status=status, category="internal")
+
+
+class RunTimeoutError(Exception):
+    """``Client.wait`` gave up before the run reached a terminal status.
+
+    The run itself is untouched and still addressable: ``run_id`` and the last polled state
+    (``last``, a :class:`~honba.client.BacktestResult`) are kept so the caller can poll on.
+    """
+
+    def __init__(self, run_id: str, last: Any, timeout: float) -> None:
+        super().__init__(f"run {run_id} still {last.status} after {timeout:g}s")
+        self.run_id = run_id
+        self.last = last
+        self.timeout = timeout
 
 
 CATEGORY_OF_CODE: Mapping[str, str] = {

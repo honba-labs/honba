@@ -3,6 +3,7 @@
 import typer
 
 from honba.cli.ai import app as ai_app
+from honba.cli.backtest import backtest
 from honba.cli.data import app as data_app
 from honba.cli.indicators import app as indicators_app
 from honba.cli.schema import app as schema_app
@@ -16,6 +17,7 @@ app.add_typer(data_app, name="data")
 app.add_typer(indicators_app, name="indicators")
 app.add_typer(schema_app, name="schema")
 app.add_typer(screener_app, name="screener")
+app.command("backtest")(backtest)
 app.command("verify")(verify)
 
 
