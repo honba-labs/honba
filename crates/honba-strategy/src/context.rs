@@ -124,6 +124,12 @@ impl LedgerContext {
         self.instruments.insert(instrument.id().clone(), instrument);
     }
 
+    /// Sets the signed position of `instrument_id` without booking a fill: no cash moves.
+    /// For runs that start from an existing portfolio (for example a reduce-only run).
+    pub fn seed_position(&mut self, instrument_id: &InstrumentId, quantity: f64) {
+        self.positions.insert(instrument_id.clone(), quantity);
+    }
+
     /// Returns and clears submitted intents, in submission order.
     pub fn drain_intents(&mut self) -> Vec<OrderIntent> {
         std::mem::take(&mut self.outbox)

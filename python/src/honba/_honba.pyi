@@ -15,7 +15,11 @@ __all__ = [
     "NextOpenSimulator",
     "OrderIntent",
     "QuoteTick",
+    "RiskDecision",
+    "RiskLimits",
+    "RiskStage",
     "RustSmaCrossover",
+    "TradingState",
     "api_request",
     "canonical_json",
     "codegen_artifacts",
@@ -97,10 +101,13 @@ def run_strategy(
     initial_cash: float = 0.0,
     flat_cost: float = 0.0,
     cost_bps: float = 0.0,
+    risk: str | dict[str, Any] | None = None,
 ) -> str:
     """Run a Rust reference strategy over JSON wire messages (ADR 008).
 
-    ``strategy`` is ``"contract_probe"``, ``"buy_and_hold"`` or ``"sma_crossover"``;
+    ``strategy`` is ``"contract_probe"``, ``"buy_and_hold"``, ``"sma_crossover"`` or
+    ``"scripted_orders"`` (params ``{"orders": [{"bar", "instrument_id", "side", "quantity",
+    "price"?}]}``: submits each order on the given zero-based bar index, in list order);
     ``params``, ``events`` (a list of wire ``Message``) and ``instruments`` are JSON.
     Orders fill at the last bar close (``BarFillEngine``). Returns JSON with
     ``intents``, ``rejections`` (intents refused for breaking an invariant, each
@@ -108,7 +115,18 @@ def run_strategy(
     ``observations``, ``positions`` and ``cash``.
     ``flat_cost`` (``0..=1e9``) and ``cost_bps`` (``0..=10_000``) set the per-fill costs:
     ``Trade.costs = flat_cost + quantity * price * cost_bps / 10_000`` (default none).
-    Raises ``ValueError`` for an unknown strategy, invalid JSON or invalid costs.
+
+    ``risk`` (a dict or JSON text) puts the Rust ``RiskStage`` in front of the run's execution
+    (ADR 0018). Every key is optional: ``limits`` (the ``[risk]`` table shape, or a
+    ``RiskLimits``), ``market`` (``"null"`` default, or ``"nse_bse"``), ``positions`` (seed
+    positions, ``[{"instrument_id", "quantity"}]``), ``trading_state`` (initial, ``"active"``
+    default) and ``state_changes`` (``[{"ts_init": ns, "state"}]``, applied in event time before
+    the first event at or after ``ts_init``). Orders for instruments missing from
+    ``instruments`` are refused (``risk_instrument_unknown``). The result then also has
+    ``order_rejections`` (``order_id``, ``instrument_id``, ``side``, ``quantity``, ``reason``,
+    ``ts_init``) and ``risk_refusals`` (``order_id``, ``code``, ``rule``, ``context``).
+    Raises ``ValueError`` for an unknown strategy, invalid JSON, invalid costs or an invalid
+    ``risk`` spec.
     """
 
 def next_open_fill_cost(pack: str, side: str, quantity: float, price: float) -> int:
@@ -290,6 +308,68 @@ class OrderIntent:
         limit_price: float,
         exchange: str = "NSE",
     ) -> OrderIntent: ...
+
+@final
+class TradingState:
+    """The engine's trading state; ``str()`` is the wire spelling."""
+
+    ACTIVE: TradingState
+    REDUCING: TradingState
+    HALTED: TradingState
+    def __hash__(self) -> int: ...
+    def __eq__(self, other: object, /) -> bool: ...
+    def __int__(self) -> int: ...
+
+@final
+class RiskLimits:
+    """Per-run risk limits; ``None`` switches a rule off. Raises ``ValueError`` if invalid."""
+
+    def __new__(
+        cls,
+        max_notional: float | None = None,
+        order_rate: tuple[int, int] | None = None,
+        max_participation: float | None = None,
+    ) -> Self: ...
+    @staticmethod
+    def from_dict(d: dict[str, Any] | str) -> RiskLimits:
+        """Parse a ``[risk]`` table (``order_rate`` as ``{max_orders, window_ms}``)."""
+    def to_dict(self) -> dict[str, Any]: ...
+    @property
+    def max_notional(self) -> float | None: ...
+    @property
+    def order_rate(self) -> tuple[int, int] | None: ...
+    @property
+    def max_participation(self) -> float | None: ...
+    def require_live(self) -> None:
+        """Raise ``ValueError`` unless both limits are set (the live-run guard)."""
+    def __eq__(self, other: object, /) -> bool: ...
+
+@final
+class RiskDecision:
+    """The outcome of ``RiskStage.check``; ``code``/``rule`` are ``None`` when approved."""
+
+    @property
+    def approved(self) -> bool: ...
+    @property
+    def code(self) -> str | None: ...
+    @property
+    def rule(self) -> str | None: ...
+    @property
+    def context(self) -> dict[str, Any]: ...
+
+@final
+class RiskStage:
+    """Pre-trade rules in a fixed order, first refusal wins (``check`` consumes a rate slot)."""
+
+    def __new__(
+        cls,
+        limits: RiskLimits,
+        currency: str,
+        market: str,
+        instruments: list[dict[str, Any]],
+    ) -> Self: ...
+    def check(self, request: dict[str, Any]) -> RiskDecision:
+        """Check one order request; raises ``ValueError`` for a malformed request."""
 
 @final
 class RustSmaCrossover:

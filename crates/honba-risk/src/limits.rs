@@ -16,6 +16,10 @@ pub struct RiskLimits {
     /// Orders-per-window ceiling in event time. `None` = no rate rule.
     #[serde(default)]
     pub order_rate: Option<OrderRateLimit>,
+    /// Maximum order quantity as a fraction of ADV.
+    /// `None` = no participation rule; `Some` must be in `(0, 1]`.
+    #[serde(default)]
+    pub max_participation: Option<f64>,
 }
 
 /// At most `max_orders` approved orders in any `window_ms` of event time.
@@ -30,7 +34,7 @@ pub struct OrderRateLimit {
 
 impl RiskLimits {
     /// Checks every set limit: `max_notional` finite and `> 0`, `max_orders` and `window_ms`
-    /// `>= 1`. The default (no limits) is valid.
+    /// `>= 1`, `max_participation` in `(0, 1]`. The default (no limits) is valid.
     pub fn validate(&self) -> Result<(), RiskConfigError> {
         if let Some(v) = self.max_notional {
             if !(v.is_finite() && v > 0.0) {
@@ -40,6 +44,11 @@ impl RiskLimits {
         if let Some(rate) = self.order_rate {
             if rate.max_orders == 0 || rate.window_ms == 0 {
                 return Err(RiskConfigError::InvalidOrderRate);
+            }
+        }
+        if let Some(p) = self.max_participation {
+            if !(p.is_finite() && p > 0.0 && p <= 1.0) {
+                return Err(RiskConfigError::InvalidMaxParticipation(p));
             }
         }
         Ok(())

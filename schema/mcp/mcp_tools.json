@@ -249,6 +249,15 @@
                   "null"
                 ]
               },
+              "max_participation": {
+                "default": null,
+                "description": "Maximum order quantity as a fraction of ADV. `None` = no participation rule; `Some` must be in `(0, 1]`.",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
               "order_rate": {
                 "anyOf": [
                   {
@@ -497,6 +506,7 @@
                 ],
                 "default": {
                   "max_notional": null,
+                  "max_participation": null,
                   "order_rate": null
                 },
                 "description": "Pre-trade risk limits (ADR 0018). Absent means no limits."

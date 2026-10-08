@@ -29,6 +29,7 @@ fn req() -> RiskRequest {
         price: Some(2500.05),
         trigger_price: None,
         reference_price: Some(2500.0),
+        adv: None,
         position: 0.0,
         trading_state: TradingState::Active,
         ts: UnixNanos::new(1),
@@ -132,6 +133,7 @@ fn notional_limit_with_reference_price_fallback() {
     let mut s = stage(RiskLimits {
         max_notional: Some(20_000.0),
         order_rate: None,
+        max_participation: None,
     });
     // Market order: priced from the reference (10 * 2500 = 25_000 > 20_000).
     let market = RiskRequest {
@@ -168,6 +170,7 @@ fn india_order_rate_limit_enforced_in_event_time() {
             max_orders: 2,
             window_ms: 1000,
         }),
+        max_participation: None,
     });
     let at = |ts: u64| RiskRequest {
         ts: UnixNanos::new(ts),

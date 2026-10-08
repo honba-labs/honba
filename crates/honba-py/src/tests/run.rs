@@ -99,3 +99,57 @@ fn refuses_an_order_before_any_bar_instead_of_filling_at_zero() {
     let err = run_strategy_json("contract_probe", params, &events, "[]", 0.0).unwrap_err();
     assert!(err.contains("before any bar"), "{err}");
 }
+
+#[test]
+fn scripted_orders_with_risk_report_refusals_and_plain_runs_do_not() {
+    let params = json!({"orders": [
+        {"bar": 0, "instrument_id": {"symbol": "X", "exchange": "NSE"}, "side": "buy", "quantity": 1.0}
+    ]})
+    .to_string();
+    let events = json!([bar(10.0, 1)]).to_string();
+    let inst = json!([{
+        "instrument_id": {"symbol": "X", "exchange": "NSE"}, "kind": "equity",
+        "currency": "INR", "lot_size": 1.0, "tick_size": 0.05
+    }])
+    .to_string();
+    let plain: Value = serde_json::from_str(
+        &run_strategy_json("scripted_orders", &params, &events, &inst, 1000.0).unwrap(),
+    )
+    .unwrap();
+    assert!(plain.get("order_rejections").is_none() && plain.get("risk_refusals").is_none());
+    assert_eq!(plain["fills"].as_array().unwrap().len(), 1);
+
+    let risk = json!({"trading_state": "halted"}).to_string();
+    let halted: Value = serde_json::from_str(
+        &run_strategy_risk_json(
+            "scripted_orders",
+            &params,
+            &events,
+            &inst,
+            1000.0,
+            0.0,
+            0.0,
+            Some(&risk),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(halted["fills"], json!([]));
+    assert_eq!(halted["risk_refusals"][0]["code"], "risk_trading_halted");
+    assert_eq!(
+        halted["order_rejections"][0]["reason"],
+        "risk_trading_halted"
+    );
+}
+
+#[test]
+fn scripted_orders_rejects_bad_params() {
+    let events = json!([bar(10.0, 1)]).to_string();
+    for bad in [
+        r#"{"orders": [{"bar": 0, "instrument_id": {"symbol": "X", "exchange": "NSE"}, "side": "hold", "quantity": 1.0}]}"#,
+        r#"{"orders": [{"bar": 0}]}"#,
+        r#"{"orders": 3}"#,
+    ] {
+        assert!(run_strategy_json("scripted_orders", bad, &events, "[]", 0.0).is_err());
+    }
+}

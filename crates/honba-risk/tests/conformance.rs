@@ -86,6 +86,7 @@ fn limits(v: &Value) -> RiskLimits {
                     .expect("max_orders fits u32"),
                 window_ms: r["window_ms"].as_u64().expect("window_ms"),
             }),
+        max_participation: opt_f(v, "max_participation"),
     }
 }
 
@@ -115,6 +116,7 @@ fn request(v: &Value) -> RiskRequest {
         price: opt_f(v, "price"),
         trigger_price: opt_f(v, "trigger_price"),
         reference_price: opt_f(v, "reference_price"),
+        adv: opt_f(v, "adv"),
         position: f(v, "position"),
         trading_state: state(v["trading_state"].as_str().expect("trading_state")),
         ts: UnixNanos::new(v["ts"].as_u64().expect("ts is an integer of nanoseconds")),

@@ -128,6 +128,8 @@ crate::enum_with_all! {
         RiskReduceOnlyViolation,
         /// No trading rules exist for the order's instrument (ADR 0018).
         RiskInstrumentUnknown,
+        /// Order quantity exceeds the configured participation fraction of ADV (ADR 0018).
+        RiskMaxParticipationExceeded,
         /// The exchange or gateway rejected the order.
         OrderRejected,
         /// No execution engine is attached to receive the order (ADR 0018).
@@ -175,7 +177,8 @@ impl ErrorCode {
             | Self::RiskTickSizeViolation
             | Self::RiskPriceBandExceeded
             | Self::RiskReduceOnlyViolation
-            | Self::RiskInstrumentUnknown => ErrorCategory::Risk,
+            | Self::RiskInstrumentUnknown
+            | Self::RiskMaxParticipationExceeded => ErrorCategory::Risk,
             Self::OrderRejected | Self::OrderExecutionUnavailable => ErrorCategory::Order,
             Self::MarketDataUnavailable => ErrorCategory::MarketData,
             Self::Timeout | Self::TransportError => ErrorCategory::Transport,
@@ -218,6 +221,7 @@ impl ErrorCode {
             Self::RiskPriceBandExceeded => "risk_price_band_exceeded",
             Self::RiskReduceOnlyViolation => "risk_reduce_only_violation",
             Self::RiskInstrumentUnknown => "risk_instrument_unknown",
+            Self::RiskMaxParticipationExceeded => "risk_max_participation_exceeded",
             Self::OrderRejected => "order_rejected",
             Self::OrderExecutionUnavailable => "order_execution_unavailable",
             Self::OrderNotFound => "order_not_found",

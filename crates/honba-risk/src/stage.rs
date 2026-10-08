@@ -20,6 +20,9 @@ pub enum RiskConfigError {
     /// `order_rate` needs `max_orders >= 1` and `window_ms >= 1`.
     #[error("order_rate needs max_orders >= 1 and window_ms >= 1")]
     InvalidOrderRate,
+    /// `max_participation` must be in (0, 1].
+    #[error("max_participation must be in (0, 1], got {0}")]
+    InvalidMaxParticipation(f64),
     /// A live run needs both `max_notional` and `order_rate` set.
     #[error("a live run requires both max_notional and order_rate to be set")]
     LiveRunWithoutLimit,
@@ -135,6 +138,44 @@ impl RiskStage {
 }
 
 impl RiskStage {
+    /// Participation rule: order quantity must not exceed `max_participation * ADV`.
+    /// Runs after price rules (so ADV is available in the request) and before notional,
+    /// so a market-absorption refusal wins over an account-value refusal.
+    fn max_participation_rule(&self, req: &RiskRequest) -> Option<RiskRefusal> {
+        let Some(participation) = self.limits.max_participation else {
+            return None;
+        };
+        let Some(adv) = req.adv else {
+            return Some(RiskRefusal::MaxParticipation {
+                quantity: req.quantity,
+                max_quantity: 0.0,
+                adv: 0.0,
+                participation,
+                reason: Some("missing_adv".to_string()),
+            });
+        };
+        if adv <= 0.0 {
+            return Some(RiskRefusal::MaxParticipation {
+                quantity: req.quantity,
+                max_quantity: 0.0,
+                adv,
+                participation,
+                reason: Some("non_positive_adv".to_string()),
+            });
+        }
+        let max_quantity = participation * adv;
+        if req.quantity > max_quantity {
+            return Some(RiskRefusal::MaxParticipation {
+                quantity: req.quantity,
+                max_quantity,
+                adv,
+                participation,
+                reason: None,
+            });
+        }
+        None
+    }
+
     /// Rule 9: the notional is priced from `price`, else `trigger_price`, else `reference_price`.
     fn max_notional_rule(&self, req: &RiskRequest) -> Option<RiskRefusal> {
         let limit = self.max_notional?;
@@ -208,6 +249,9 @@ impl RiskCheck for RiskStage {
             });
         }
         if let Some(refusal) = price_rules(req, &rules, band) {
+            return RiskDecision::Refused(refusal);
+        }
+        if let Some(refusal) = self.max_participation_rule(req) {
             return RiskDecision::Refused(refusal);
         }
         if let Some(refusal) = self.max_notional_rule(req) {

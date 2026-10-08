@@ -28,6 +28,7 @@ fn full_risk_section_round_trips_through_toml() {
                 max_orders: 30,
                 window_ms: 1000
             }),
+            max_participation: None,
         }
     );
     cfg.validate().unwrap();

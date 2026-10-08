@@ -580,6 +580,7 @@ impl Engine {
             price: order.price(),
             trigger_price: order.trigger_price(),
             reference_price: self.last_px.get(instrument).copied(),
+            adv: None,
             position: self.position(instrument) + self.working_exposure(instrument, order.side()),
             trading_state: self.trading_state,
             ts: self.clock.now(),

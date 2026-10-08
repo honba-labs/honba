@@ -9,14 +9,17 @@
 // (same allowance as `domain.rs` and `wire.rs`).
 #![allow(clippy::useless_conversion)]
 
-use honba_engine::{AlgoError, ExecutionEngine, Handler};
+use super::risk::{build_stage, json_text, parse_run_risk, RunRisk};
+use honba_engine::{AlgoError, AuditKind, ExecutionEngine, Handler};
 use honba_entities::{Currency, ExecutionEvent, Instrument, InstrumentKind, Money, Trade};
+use honba_messages::OrderSide;
 use honba_messages::{InstrumentId, Message, Order};
+use honba_risk::RiskStage;
 use honba_sim::{BarFillEngine, FillCosts};
 pub use honba_strategy::MAX_SMA_PERIOD;
 use honba_strategy::{
-    BuyAndHold, ContractProbe, IntentError, LedgerContext, SmaCrossover, Strategy, StrategyContext,
-    StrategyRunner,
+    BuyAndHold, ContractProbe, IntentError, LedgerContext, OrderIntent, SmaCrossover, Strategy,
+    StrategyContext, StrategyRunner,
 };
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -26,7 +29,12 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 /// Strategy names accepted by [`run_strategy_json`].
-pub const STRATEGIES: [&str; 3] = ["contract_probe", "buy_and_hold", "sma_crossover"];
+pub const STRATEGIES: [&str; 4] = [
+    "contract_probe",
+    "buy_and_hold",
+    "sma_crossover",
+    "scripted_orders",
+];
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -48,6 +56,57 @@ struct SmaParams {
     fast: usize,
     slow: usize,
     quantity: f64,
+}
+
+/// `scripted_orders`: submits the listed market (or, with `price`, limit) orders on the given
+/// bar indices, in list order. A driver for risk and execution scenarios, not a trading idea.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ScriptedParams {
+    orders: Vec<ScriptedOrder>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ScriptedOrder {
+    /// Zero-based index of the bar the order is submitted on.
+    bar: usize,
+    instrument_id: InstrumentId,
+    side: OrderSide,
+    quantity: f64,
+    #[serde(default)]
+    price: Option<f64>,
+}
+
+struct ScriptedOrders {
+    orders: Vec<ScriptedOrder>,
+    bars_seen: usize,
+}
+
+impl Strategy for ScriptedOrders {
+    fn name(&self) -> &str {
+        "scripted_orders"
+    }
+
+    fn on_bar(
+        &mut self,
+        ctx: &mut dyn StrategyContext,
+        _bar: &honba_messages::Bar,
+    ) -> honba_engine::Result<()> {
+        let index = self.bars_seen;
+        self.bars_seen += 1;
+        for o in self.orders.iter().filter(|o| o.bar == index) {
+            let id = o.instrument_id.clone();
+            let intent = match (o.side, o.price) {
+                (OrderSide::Buy, None) => OrderIntent::market_buy(id, o.quantity),
+                (OrderSide::Buy, Some(px)) => OrderIntent::limit_buy(id, o.quantity, px),
+                (_, None) => OrderIntent::market_sell(id, o.quantity),
+                (_, Some(px)) => OrderIntent::limit_sell(id, o.quantity, px),
+            };
+            ctx.submit(intent);
+        }
+        Ok(())
+    }
 }
 
 fn parse<T: DeserializeOwned>(what: &str, text: &str) -> Result<T, String> {
@@ -134,17 +193,39 @@ fn intent_error_kind(e: &IntentError) -> &'static str {
     }
 }
 
+/// A built risk stage and the run-level parts of its spec.
+type RunGate = (RiskStage, RunRisk);
+
 fn drive<S: Strategy>(
     strategy: S,
-    ctx: LedgerContext,
+    mut ctx: LedgerContext,
     messages: &[Message],
     costs: FillCosts,
+    gate: Option<RunGate>,
 ) -> Result<(S, Value), String> {
     let err = |e: AlgoError| e.to_string();
     let mut execution = BarFillEngine::with_costs(costs);
+    let mut changes = Vec::new();
+    let mut staged = None;
+    if let Some((stage, spec)) = gate {
+        for (id, qty) in &spec.positions {
+            ctx.seed_position(id, *qty);
+        }
+        changes = spec.state_changes.clone();
+        staged = Some((stage, spec.trading_state));
+    }
     let mut runner = StrategyRunner::with_context(strategy, PricedBarFill(execution.clone()), ctx);
+    let risk_run = staged.is_some();
+    if let Some((stage, state)) = staged {
+        runner = runner.with_risk(stage);
+        runner.on_trading_state(state);
+    }
+    let mut changes = changes.into_iter().peekable();
     runner.on_start().map_err(err)?;
     for msg in messages {
+        while let Some((_, state)) = changes.next_if(|(at, _)| *at <= msg.ts_init().as_u64()) {
+            runner.on_trading_state(state);
+        }
         execution
             .on_event(msg.event(), msg.ts_init())
             .map_err(err)?;
@@ -175,7 +256,7 @@ fn drive<S: Strategy>(
         .into_iter()
         .map(|(id, q)| json!({"instrument_id": id, "quantity": q}))
         .collect();
-    let outcome = json!({
+    let mut outcome = json!({
         "intents": intents,
         "rejections": rejections,
         "fills": fills,
@@ -183,6 +264,38 @@ fn drive<S: Strategy>(
         "positions": positions,
         "cash": runner.context().cash(),
     });
+    if risk_run {
+        // Only runs with a risk spec carry these keys, so the strategy conformance fixture's
+        // shape is unchanged for plain runs.
+        outcome["order_rejections"] = runner
+            .order_rejections()
+            .iter()
+            .map(|o| {
+                json!({
+                    "order_id": o.order_id,
+                    "instrument_id": o.instrument_id,
+                    "side": o.side,
+                    "quantity": o.quantity,
+                    "reason": o.reason,
+                    "ts_init": o.ts.as_u64(),
+                })
+            })
+            .collect();
+        outcome["risk_refusals"] = runner
+            .audit()
+            .records()
+            .iter()
+            .filter_map(|r| match &r.kind {
+                AuditKind::RiskRefused { order_id, refusal } => Some(json!({
+                    "order_id": order_id,
+                    "code": refusal.error_code().as_str(),
+                    "rule": refusal.rule(),
+                    "context": refusal.context(),
+                })),
+                _ => None,
+            })
+            .collect();
+    }
     let (strategy, _, _) = runner.into_parts();
     Ok((strategy, outcome))
 }
@@ -222,6 +335,34 @@ pub fn run_strategy_costed_json(
     flat_cost: f64,
     cost_bps: f64,
 ) -> Result<String, String> {
+    run_strategy_risk_json(
+        strategy,
+        params,
+        events,
+        instruments,
+        initial_cash,
+        flat_cost,
+        cost_bps,
+        None,
+    )
+}
+
+/// [`run_strategy_costed_json`] with an optional risk gate (ADR 0018 decision 10). `risk` is a
+/// JSON object `{"limits": {..}, "market": "null", "positions": [{"instrument_id", "quantity"}],
+/// "trading_state": "active", "state_changes": [{"ts_init", "state"}]}` (every key optional).
+/// The runner then submits through a `RiskStage` over `instruments`, and the outcome gains
+/// `order_rejections` and `risk_refusals`.
+#[allow(clippy::too_many_arguments)]
+pub fn run_strategy_risk_json(
+    strategy: &str,
+    params: &str,
+    events: &str,
+    instruments: &str,
+    initial_cash: f64,
+    flat_cost: f64,
+    cost_bps: f64,
+    risk: Option<&str>,
+) -> Result<String, String> {
     let costs = FillCosts::new(flat_cost, cost_bps).map_err(|e| e.to_string())?;
     let messages: Vec<Message> = parse("events", events)?;
     let raw_instruments: Vec<Value> = parse("instruments", instruments)?;
@@ -232,11 +373,29 @@ pub fn run_strategy_costed_json(
         ctx.add_instrument(parse_instrument(raw)?);
     }
 
+    let gate: Option<RunGate> = match risk {
+        None => None,
+        Some(text) => {
+            let spec = parse_run_risk(text)?;
+            let stage = build_stage(
+                spec.limits.clone(),
+                Currency::Inr.code(),
+                &spec.market,
+                &raw_instruments,
+            )?;
+            Some((stage, spec))
+        }
+    };
     let outcome = match strategy {
         "contract_probe" => {
             let p: ProbeParams = parse("contract_probe params", params)?;
-            let (probe, mut outcome) =
-                drive(ContractProbe::new(p.instrument_id), ctx, &messages, costs)?;
+            let (probe, mut outcome) = drive(
+                ContractProbe::new(p.instrument_id),
+                ctx,
+                &messages,
+                costs,
+                gate,
+            )?;
             outcome["observations"] =
                 serde_json::to_value(probe.observations()).map_err(|e| e.to_string())?;
             outcome
@@ -248,6 +407,7 @@ pub fn run_strategy_costed_json(
                 ctx,
                 &messages,
                 costs,
+                gate,
             )?
             .1
         }
@@ -263,7 +423,15 @@ pub fn run_strategy_costed_json(
                 ));
             }
             let s = SmaCrossover::new(p.instrument_id, p.fast, p.slow, p.quantity);
-            drive(s, ctx, &messages, costs)?.1
+            drive(s, ctx, &messages, costs, gate)?.1
+        }
+        "scripted_orders" => {
+            let p: ScriptedParams = parse("scripted_orders params", params)?;
+            let s = ScriptedOrders {
+                orders: p.orders,
+                bars_seen: 0,
+            };
+            drive(s, ctx, &messages, costs, gate)?.1
         }
         other => {
             return Err(format!(
@@ -280,10 +448,17 @@ pub fn run_strategy_costed_json(
 /// with a typed `error`), `fills`, `observations`, `positions` and `cash`. Raises `ValueError` for an unknown strategy, invalid JSON or a
 /// failed run or invalid costs. `flat_cost` and `cost_bps` set the per-fill
 /// costs (default none); see ADR 008.
+///
+/// `risk` (a dict or JSON text, optional) puts the Rust `RiskStage` in front of the run's
+/// execution: `{"limits": {..}, "market": "null", "positions": [{"instrument_id", "quantity"}],
+/// "trading_state": "active", "state_changes": [{"ts_init", "state"}]}`. The outcome then also
+/// has `order_rejections` and `risk_refusals`. Raises `ValueError` for an invalid spec.
 #[pyfunction]
 #[pyo3(signature = (
-    strategy, params, events, instruments="[]", initial_cash=0.0, flat_cost=0.0, cost_bps=0.0
+    strategy, params, events, instruments="[]", initial_cash=0.0, flat_cost=0.0, cost_bps=0.0,
+    risk=None
 ))]
+#[allow(clippy::too_many_arguments)]
 pub fn run_strategy(
     strategy: &str,
     params: &str,
@@ -292,8 +467,10 @@ pub fn run_strategy(
     initial_cash: f64,
     flat_cost: f64,
     cost_bps: f64,
+    risk: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<String> {
-    run_strategy_costed_json(
+    let risk = risk.map(json_text).transpose()?;
+    run_strategy_risk_json(
         strategy,
         params,
         events,
@@ -301,6 +478,7 @@ pub fn run_strategy(
         initial_cash,
         flat_cost,
         cost_bps,
+        risk.as_deref(),
     )
     .map_err(PyValueError::new_err)
 }

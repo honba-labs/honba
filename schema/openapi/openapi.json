@@ -254,6 +254,7 @@
             ],
             "default": {
               "max_notional": null,
+              "max_participation": null,
               "order_rate": null
             },
             "description": "Pre-trade risk limits (ADR 0018). Absent means no limits."
@@ -901,6 +902,13 @@
             "description": "No trading rules exist for the order's instrument (ADR 0018).",
             "enum": [
               "risk_instrument_unknown"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Order quantity exceeds the configured participation fraction of ADV (ADR 0018).",
+            "enum": [
+              "risk_max_participation_exceeded"
             ],
             "type": "string"
           },
@@ -2676,6 +2684,15 @@
           "max_notional": {
             "default": null,
             "description": "Per-order notional ceiling in major units of the account currency. `None` = no notional rule; `Some` must be finite and `> 0`.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "max_participation": {
+            "default": null,
+            "description": "Maximum order quantity as a fraction of ADV. `None` = no participation rule; `Some` must be in `(0, 1]`.",
             "format": "double",
             "type": [
               "number",

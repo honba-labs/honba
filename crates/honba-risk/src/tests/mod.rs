@@ -64,6 +64,7 @@ pub(crate) fn req() -> RiskRequest {
         price: Some(100.0),
         trigger_price: None,
         reference_price: None,
+        adv: None,
         position: 0.0,
         trading_state: TradingState::Active,
         ts: UnixNanos::new(1),

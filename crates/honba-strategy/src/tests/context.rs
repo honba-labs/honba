@@ -56,3 +56,15 @@ fn a_custom_context_works_as_a_trait_object() {
     assert_eq!(view.positions(), vec![(any_instrument(), 3.0)]);
     assert_eq!(view.cash().minor(), 10000);
 }
+
+#[test]
+fn seed_position_sets_the_position_without_touching_cash() {
+    let id = any_instrument();
+    let mut ctx = crate::LedgerContext::with_cash(Money::new(500, Currency::Inr));
+    ctx.seed_position(&id, 100.0);
+    assert_eq!(ctx.position(&id), 100.0);
+    assert_eq!(ctx.positions(), vec![(id.clone(), 100.0)]);
+    assert_eq!(ctx.cash(), Money::new(500, Currency::Inr));
+    ctx.seed_position(&id, 0.0);
+    assert!(ctx.positions().is_empty());
+}

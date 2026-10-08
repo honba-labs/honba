@@ -22,6 +22,7 @@ chrono.workspace = true
 honba-engine.workspace = true
 honba-strategy.workspace = true
 honba-sim.workspace = true
+honba-risk.workspace = true
 honba-codegen.workspace = true
 honba-api-rest.workspace = true
 serde.workspace = true

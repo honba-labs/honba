@@ -104,6 +104,19 @@ pub enum RiskRefusal {
         /// The window length in milliseconds.
         window_ms: u64,
     },
+    /// Order quantity exceeds the configured participation fraction of ADV.
+    MaxParticipation {
+        /// The order quantity.
+        quantity: f64,
+        /// The maximum allowed quantity (max_participation * ADV).
+        max_quantity: f64,
+        /// The ADV used for the calculation.
+        adv: f64,
+        /// The participation fraction limit.
+        participation: f64,
+        /// Reason when ADV is missing or non-positive.
+        reason: Option<String>,
+    },
 }
 
 impl RiskRefusal {
@@ -120,6 +133,7 @@ impl RiskRefusal {
             Self::PriceBand { .. } => "price_band",
             Self::MaxNotional { .. } | Self::MaxNotionalUnpriceable { .. } => "max_notional",
             Self::OrderRate { .. } => "order_rate",
+            Self::MaxParticipation { .. } => "max_participation",
         }
     }
 
@@ -138,6 +152,7 @@ impl RiskRefusal {
                 ErrorCode::RiskMaxNotionalExceeded
             }
             Self::OrderRate { .. } => ErrorCode::RiskOrderRateExceeded,
+            Self::MaxParticipation { .. } => ErrorCode::RiskMaxParticipationExceeded,
         }
     }
 
@@ -215,6 +230,25 @@ impl RiskRefusal {
                 "max_orders": max_orders,
                 "window_ms": window_ms,
             }),
+            Self::MaxParticipation {
+                quantity,
+                max_quantity,
+                adv,
+                participation,
+                reason,
+            } => {
+                let mut obj = json!({
+                    "rule": rule,
+                    "quantity": quantity,
+                    "max_quantity": max_quantity,
+                    "adv": adv,
+                    "participation": participation,
+                });
+                if let Some(r) = reason {
+                    obj.as_object_mut().unwrap().insert("reason".to_string(), json!(r));
+                }
+                obj
+            },
         }
     }
 }

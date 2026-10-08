@@ -21,6 +21,9 @@ pub struct RiskRequest {
     pub trigger_price: Option<f64>,
     /// Last observed price, supplied by the submitter; used to price the notional.
     pub reference_price: Option<f64>,
+    /// Average daily volume for the instrument; `None` means the participation
+    /// rule cannot evaluate and fails closed.
+    pub adv: Option<f64>,
     /// Signed position plus the signed working remainder on the order's side
     /// (ADR 0019 `working_exposure(instrument, side)`).
     pub position: f64,

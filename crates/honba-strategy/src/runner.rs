@@ -243,6 +243,7 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
             price: order.price(),
             trigger_price: order.trigger_price(),
             reference_price: self.last_px.get(instrument).copied(),
+            adv: None,
             position: self.adapter.context().position(instrument)
                 + self.working_exposure(instrument, order.side()),
             trading_state: self.trading_state,
