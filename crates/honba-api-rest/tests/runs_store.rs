@@ -399,3 +399,56 @@ fn shutdown_cancels_every_non_terminal_run_and_stops_admitting() {
         before
     );
 }
+
+#[test]
+fn staged_shutdown_cancels_pending_first_and_running_after_the_grace() {
+    let scratch = Scratch::new("staged-shutdown");
+    let clock = FakeClock::at(T0);
+    let store = store(scratch.journals(), &clock);
+    let pending = submit_backtest(&store, 1);
+    let running = submit_backtest(&store, 2);
+    store
+        .transition(&running.run_id, |m, at| m.start(at))
+        .unwrap();
+
+    // Phase one: admission stops, pending is cancelled, running is untouched.
+    assert_eq!(store.begin_shutdown(), 1);
+    let status = |id: &honba_api::RunId| store.load(id.as_str(), RunKind::Backtest).unwrap().status;
+    assert_eq!(status(&pending.run_id), RunStatus::Cancelled);
+    assert_eq!(status(&running.run_id), RunStatus::Running);
+    // A run that finishes within the grace completes normally.
+    store
+        .transition(&running.run_id, |m, at| {
+            m.complete_backtest(metrics(), json!({}), at)
+        })
+        .unwrap();
+    assert_eq!(status(&running.run_id), RunStatus::Completed);
+
+    // Nothing is left running, so phase two cancels nothing.
+    assert_eq!(store.cancel_running(), 0);
+}
+
+#[test]
+fn cancel_running_cancels_a_run_that_outlived_the_grace() {
+    let scratch = Scratch::new("cancel-running");
+    let clock = FakeClock::at(T0);
+    let store = store(scratch.journals(), &clock);
+    let running = submit_backtest(&store, 2);
+    store
+        .transition(&running.run_id, |m, at| m.start(at))
+        .unwrap();
+    assert_eq!(store.begin_shutdown(), 0);
+    clock.advance(10_000);
+    assert_eq!(store.cancel_running(), 1);
+    let m = store
+        .load(running.run_id.as_str(), RunKind::Backtest)
+        .unwrap();
+    assert_eq!(m.status, RunStatus::Cancelled);
+    assert_eq!(m.finished_at.as_deref(), Some("2026-10-08T00:00:10.000Z"));
+    // The late worker cannot overwrite it.
+    assert!(store
+        .transition(&running.run_id, |m, at| {
+            m.complete_backtest(metrics(), json!({}), at)
+        })
+        .is_err());
+}

@@ -29,18 +29,27 @@ use tower_http::{
 };
 
 mod dispatch;
+mod executor;
 mod journal;
 mod market;
+mod registry;
 mod retention;
 mod run_store;
 mod screener;
+mod service;
 mod state;
 
 pub use dispatch::{build_target, dispatch, DispatchError};
-pub use journal::{JournalWriter, NdjsonJournal};
+pub use executor::BacktestExecutor;
+pub use honba_api::JournalWriter;
+pub use journal::NdjsonJournal;
 pub use market::{ApiQuery, ApiQueryRejection, MAX_BAR_ROWS};
+pub use registry::StrategyRegistry;
 pub use retention::{evictions, RetentionPolicy};
 pub use run_store::{OsEntropy, RecoveryReport, RunClock, RunEntropy, RunStore, SystemClock};
+pub use service::{
+    RunService, RunServiceConfig, ShutdownReport, DEFAULT_MAX_QUEUED, DEFAULT_SHUTDOWN_GRACE,
+};
 pub use state::AppState;
 
 /// JSON body extractor whose rejections are the standard error envelope

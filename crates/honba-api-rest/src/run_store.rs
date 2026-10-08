@@ -12,7 +12,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use chrono::{DateTime, SecondsFormat};
-use honba_api::{ResolvedRequest, RunId, RunIdGenerator, RunKind, RunManifest, MANIFEST_VERSION};
+use honba_api::{
+    ResolvedRequest, RunId, RunIdGenerator, RunKind, RunManifest, RunStatus, MANIFEST_VERSION,
+};
 use honba_messages::{ErrorCode, ErrorDetail, Message, SCHEMA_VERSION};
 use honba_strategy::StrategyIr;
 use serde_json::json;
@@ -280,16 +282,23 @@ impl RunStore {
             .collect()
     }
 
-    /// Graceful shutdown: stop admitting and write `cancelled` (with `finished_at`) for every
-    /// non-terminal run. Returns how many were cancelled.
+    /// Graceful shutdown in one step: stop admitting and write `cancelled` (with
+    /// `finished_at`) for every non-terminal run. Returns how many were cancelled. A service
+    /// that grants running runs a grace period uses [`RunStore::begin_shutdown`] and
+    /// [`RunStore::cancel_running`] instead.
     pub fn shutdown(&self) -> usize {
         let mut inner = self.lock();
         inner.accepting = false;
+        self.cancel_matching(&mut inner, |_| true)
+    }
+
+    /// Cancels, under the held lock, every non-terminal run `select` accepts.
+    fn cancel_matching(&self, inner: &mut Inner, select: impl Fn(RunStatus) -> bool) -> usize {
         let at = self.now().1;
         let mut open: Vec<RunId> = inner
             .runs
             .values()
-            .filter(|m| !m.status.is_terminal())
+            .filter(|m| !m.status.is_terminal() && select(m.status))
             .map(|m| m.run_id.clone())
             .collect();
         open.sort();
@@ -308,6 +317,22 @@ impl RunStore {
             }
         }
         cancelled
+    }
+
+    /// Phase one of a graceful shutdown: stop admitting and write `cancelled` for every
+    /// `pending` run. `running` runs are left to finish on their own. Returns how many were
+    /// cancelled.
+    pub fn begin_shutdown(&self) -> usize {
+        let mut inner = self.lock();
+        inner.accepting = false;
+        self.cancel_matching(&mut inner, |s| s == RunStatus::Pending)
+    }
+
+    /// Phase two: write `cancelled` for every run still `running` (after the grace period).
+    /// Returns how many were cancelled.
+    pub fn cancel_running(&self) -> usize {
+        let mut inner = self.lock();
+        self.cancel_matching(&mut inner, |s| s == RunStatus::Running)
     }
 
     /// Start-up scan: loads manifests, closes non-terminal ones as `failed` /
@@ -337,7 +362,7 @@ impl RunStore {
             };
             if !manifest.status.is_terminal() {
                 let closed = (|| {
-                    if manifest.status == honba_api::RunStatus::Pending {
+                    if manifest.status == RunStatus::Pending {
                         manifest.start(&now)?;
                     }
                     manifest.fail(

@@ -18,6 +18,7 @@ pub mod market;
 pub mod requests;
 pub mod responses;
 pub mod run_id;
+pub mod run_ports;
 pub mod run_resolve;
 pub mod runs;
 pub mod screener;
@@ -44,6 +45,7 @@ pub use responses::{
     StrategiesResponse, SweepReportResponse, SweepResponse, SweepStatus, TradesResponse,
 };
 pub use run_id::{RunId, RunIdError, RunIdGenerator};
+pub use run_ports::{JournalWriter, RunExecutor, RunJob, RunOutcome};
 pub use run_resolve::{
     unknown_strategy, ResolvedBacktest, ResolvedRequest, ResolvedSweep, DEFAULT_BAR_SPEC,
     DEFAULT_INITIAL_CAPITAL,

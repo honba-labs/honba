@@ -1,22 +1,11 @@
-//! The run journal port and its NDJSON implementation (ADR 0017 decisions 3 and 8).
+//! The NDJSON implementation of the run journal port (`honba_api::JournalWriter`) (ADR 0017 decisions 3 and 8).
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
+use honba_api::JournalWriter;
 use honba_messages::{ErrorCode, ErrorDetail, Message};
-
-/// Synchronous, append-only, per-run journal.
-///
-/// Same contract as `honba_ports::Sink` (append-only, explicit flush, a failure is kept), but
-/// sync: the worker is a plain thread. ADR 0017 decision 8 places this trait in `honba-api`;
-/// until the executor chunk needs it there it lives beside its only implementation.
-pub trait JournalWriter: Send {
-    /// Appends one message as one record.
-    fn append(&mut self, msg: &Message) -> Result<(), ErrorDetail>;
-    /// Pushes buffered records to the underlying file.
-    fn flush(&mut self) -> Result<(), ErrorDetail>;
-}
 
 /// `events.ndjson`: one wire [`Message`] per line, in append order.
 pub struct NdjsonJournal<W: Write + Send = File> {
