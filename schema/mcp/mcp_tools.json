@@ -784,7 +784,7 @@
                 "description": "Parameter ranges, as a JSON object of name to [low, high, step]."
               },
               "seed": {
-                "description": "Seed. Required for a reproducible sweep.",
+                "description": "Seed; required and non-zero on submit.",
                 "format": "uint64",
                 "minimum": 0.0,
                 "type": [

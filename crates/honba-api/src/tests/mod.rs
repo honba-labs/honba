@@ -2,6 +2,9 @@
 
 mod endpoints;
 mod market;
+mod run_id;
+mod run_requests;
+mod runs;
 mod screener;
 mod strategies;
 
@@ -97,3 +100,22 @@ fn api_error_codes_reach_callers_through_the_re_export() {
 mod capabilities;
 mod unknown_fields;
 mod verify;
+
+/// A minimal verifiable strategy manifest shared by the run tests.
+pub(crate) fn tests_manifest() -> honba_strategy::StrategyManifest {
+    use honba_messages::{BarAggregation, Exchange, InstrumentId};
+    use honba_strategy::{StrategyManifest, Subscriptions, TimeframeSpec, Universe};
+    let tcs = InstrumentId::new("TCS", Exchange::new("NSE"));
+    StrategyManifest::new(
+        "sma",
+        "sha256:abc",
+        Universe::Explicit(vec![tcs.clone()]),
+        TimeframeSpec::new(1, BarAggregation::Day),
+    )
+    .with_subscriptions(Subscriptions {
+        instruments: vec![tcs],
+        quotes: false,
+        trades: false,
+    })
+    .with_warmup_bars(20)
+}

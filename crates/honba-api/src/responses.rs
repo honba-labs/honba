@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use honba_entities::{Position, Trade};
 use std::collections::BTreeMap;
 
-use honba_messages::{Bar, InstrumentId, Order, QuoteTick};
+use honba_messages::{Bar, ErrorDetail, InstrumentId, Order, QuoteTick};
 use honba_strategy::StrategyIr;
 
 use crate::capabilities::Capabilities;
@@ -89,6 +89,11 @@ pub struct StrategiesResponse {
 }
 
 /// Lifecycle of an asynchronous job.
+///
+/// `pending -> running -> completed | failed | cancelled`, plus `pending -> cancelled`.
+/// The three terminal states are final (ADR 0017 decision 1; the transition table is
+/// `RunStatus::next`). `Cancelled` was added within `/api/v1` (ADR 0012 rule 2); exhaustive
+/// decoders must be regenerated (rule 3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -99,8 +104,10 @@ pub enum RunStatus {
     Running,
     /// Finished successfully.
     Completed,
-    /// Finished with a failure; see the envelope error.
+    /// Finished with a failure; see `error` on the response.
     Failed,
+    /// Stopped before completing (ADR 0017: reachable only through graceful shutdown in v1).
+    Cancelled,
 }
 
 /// Lifecycle of a backtest run or sweep job.
@@ -143,6 +150,9 @@ pub struct BacktestResponse {
     /// What the run did *not* model, stated explicitly.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub assumptions: Option<serde_json::Value>,
+    /// Why the run failed; present only when `status` is `failed`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<ErrorDetail>,
 }
 
 /// Sweep response.
@@ -155,6 +165,9 @@ pub struct SweepResponse {
     /// Present once `status` is `completed`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub report: Option<SweepReportResponse>,
+    /// Why the job failed; present only when `status` is `failed`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<ErrorDetail>,
 }
 
 /// Sweep results: best trials plus the ranking, in a deterministic order.

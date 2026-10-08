@@ -41,6 +41,7 @@ class BacktestRequest:
 
 class BacktestResponse:
     assumptions: Any = None
+    error: ErrorDetail | None = None
     metrics: BacktestMetrics | None = None
     run_id: str
     status: RunStatus
@@ -373,7 +374,7 @@ class RiskLimits:
     max_participation: float | None = None
     order_rate: OrderRateLimit | None = None
 
-RunStatus = Literal["pending", "running", "completed", "failed"]
+RunStatus = Literal["pending", "running", "completed", "failed", "cancelled"]
 
 class ScreenerFilterGroup:
     items: list[Any]
@@ -469,6 +470,7 @@ class SweepRequest:
     trials: int | None = None
 
 class SweepResponse:
+    error: ErrorDetail | None = None
     job_id: str
     report: SweepReportResponse | None = None
     status: RunStatus

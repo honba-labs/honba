@@ -95,7 +95,10 @@ pub struct StrategiesRequest {
 }
 
 /// Backtest request.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+///
+/// Every field is optional on the wire, but `BacktestRequest::resolve` requires `seed`
+/// (non-zero), `strategy`, `universe`, `start` and `end` (ADR 0017 decision 6).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct BacktestRequest {
     /// Strategy name or manifest id, as returned by `POST /strategies`.
@@ -116,13 +119,17 @@ pub struct BacktestRequest {
     /// Initial capital.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub initial_capital: Option<f64>,
-    /// Seed, for reproducibility. Same seed and data give a byte-identical journal.
+    /// Seed, for reproducibility; required and non-zero on submit. Same seed and data give a
+    /// byte-identical journal.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seed: Option<u64>,
 }
 
 /// Sweep request.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+///
+/// Every field is optional on the wire, but `SweepRequest::resolve` requires `seed`
+/// (non-zero), `strategy`, `params` and `trials` (ADR 0017 decision 6).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SweepRequest {
     /// Strategy name or manifest id.
@@ -134,7 +141,7 @@ pub struct SweepRequest {
     /// Number of trials.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trials: Option<u64>,
-    /// Seed. Required for a reproducible sweep.
+    /// Seed; required and non-zero on submit.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seed: Option<u64>,
 }

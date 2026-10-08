@@ -17,6 +17,9 @@ pub mod capabilities;
 pub mod market;
 pub mod requests;
 pub mod responses;
+pub mod run_id;
+pub mod run_resolve;
+pub mod runs;
 pub mod screener;
 pub mod strategies;
 pub mod verify;
@@ -40,6 +43,12 @@ pub use responses::{
     PositionsResponse, QuotesResponse, RunStatus, ScreenerResponse, ScreenerResultRow,
     StrategiesResponse, SweepReportResponse, SweepResponse, SweepStatus, TradesResponse,
 };
+pub use run_id::{RunId, RunIdError, RunIdGenerator};
+pub use run_resolve::{
+    unknown_strategy, ResolvedBacktest, ResolvedRequest, ResolvedSweep, DEFAULT_BAR_SPEC,
+    DEFAULT_INITIAL_CAPITAL,
+};
+pub use runs::{RunEvent, RunKind, RunManifest, TransitionError, MANIFEST_VERSION};
 pub use screener::{
     check_scan_budget, check_screener_rows, ResolvedScreenerQuery, DEFAULT_SCREENER_TIMEFRAME,
     MAX_SCREENER_BARS, MAX_SCREENER_ROWS, MAX_SCREENER_UNIVERSE,

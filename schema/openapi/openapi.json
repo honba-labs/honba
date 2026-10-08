@@ -110,7 +110,7 @@
       },
       "BacktestRequest": {
         "additionalProperties": false,
-        "description": "Backtest request.",
+        "description": "Backtest request.\n\nEvery field is optional on the wire, but `BacktestRequest::resolve` requires `seed` (non-zero), `strategy`, `universe`, `start` and `end` (ADR 0017 decision 6).",
         "properties": {
           "bar_spec": {
             "description": "Bar specification as a string (e.g. \"1d\").",
@@ -135,7 +135,7 @@
             ]
           },
           "seed": {
-            "description": "Seed, for reproducibility. Same seed and data give a byte-identical journal.",
+            "description": "Seed, for reproducibility; required and non-zero on submit. Same seed and data give a byte-identical journal.",
             "format": "uint64",
             "minimum": 0.0,
             "type": [
@@ -172,6 +172,17 @@
         "properties": {
           "assumptions": {
             "description": "What the run did *not* model, stated explicitly."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the run failed; present only when `status` is `failed`."
           },
           "metrics": {
             "anyOf": [
@@ -2715,7 +2726,7 @@
         "type": "object"
       },
       "RunStatus": {
-        "description": "Lifecycle of an asynchronous job.",
+        "description": "Lifecycle of an asynchronous job.\n\n`pending -> running -> completed | failed | cancelled`, plus `pending -> cancelled`. The three terminal states are final (ADR 0017 decision 1; the transition table is `RunStatus::next`). `Cancelled` was added within `/api/v1` (ADR 0012 rule 2); exhaustive decoders must be regenerated (rule 3).",
         "oneOf": [
           {
             "description": "Accepted, not started.",
@@ -2739,9 +2750,16 @@
             "type": "string"
           },
           {
-            "description": "Finished with a failure; see the envelope error.",
+            "description": "Finished with a failure; see `error` on the response.",
             "enum": [
               "failed"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Stopped before completing (ADR 0017: reachable only through graceful shutdown in v1).",
+            "enum": [
+              "cancelled"
             ],
             "type": "string"
           }
@@ -3318,13 +3336,13 @@
       },
       "SweepRequest": {
         "additionalProperties": false,
-        "description": "Sweep request.",
+        "description": "Sweep request.\n\nEvery field is optional on the wire, but `SweepRequest::resolve` requires `seed` (non-zero), `strategy`, `params` and `trials` (ADR 0017 decision 6).",
         "properties": {
           "params": {
             "description": "Parameter ranges, as a JSON object of name to [low, high, step]."
           },
           "seed": {
-            "description": "Seed. Required for a reproducible sweep.",
+            "description": "Seed; required and non-zero on submit.",
             "format": "uint64",
             "minimum": 0.0,
             "type": [
@@ -3354,6 +3372,17 @@
       "SweepResponse": {
         "description": "Sweep response.",
         "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the job failed; present only when `status` is `failed`."
+          },
           "job_id": {
             "description": "Server-assigned job id.",
             "type": "string"

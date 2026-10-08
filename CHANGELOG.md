@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Run lifecycle types: `RunStatus::Cancelled`, `error` on run responses (E4-S3 / E11-S3, ADR 0017, q1)
+
+- `RunStatus` gains `cancelled` (`pending -> running -> completed | failed | cancelled`, plus
+  `pending -> cancelled`; terminal states are final). `BacktestResponse` and `SweepResponse` gain
+  an optional `error: ErrorDetail`, present only when `status = failed`. Both are additive within
+  `/api/v1` (ADR 0012 rule 2): no `schema_version` or `API_VERSION` change. `RunStatus::Failed` now
+  points at `error` on the response, not the envelope.
+- Migration (ADR 0012 rule 5): the new variant **breaks exhaustive decoders** (rule 3). A Python
+  `Literal["pending", "running", "completed", "failed"]` mirror, a pydantic model or a TypeScript
+  union without `cancelled` rejects it until regenerated; match on `RunStatus` with a wildcard arm
+  (the enum is `#[non_exhaustive]`). Regenerate with `make codegen`; `honba-frontend`'s
+  `src/core/types/generated/domain.ts` is stale until `make schema` runs there. Readers of the
+  run responses must tolerate the new optional `error` (records ignore unknown fields).
+- New in `honba-api` (no routes yet; `/capabilities.not_implemented` is unchanged): `RunId` and
+  `RunIdGenerator` (26-character Crockford ids, validated before any filesystem use),
+  `RunStatus::next` / `can_transition_to`, `RunManifest` (`manifest_version` 1),
+  `BacktestRequest::resolve` / `SweepRequest::resolve`. A submit will require `seed` (non-zero),
+  `strategy`, `universe`, `start`, `end` (sweeps: `seed`, `strategy`, `params`, `trials`); the wire
+  request types are unchanged and still accept `{}`.
+
 ### Breaking: one ordered execution-event drain replaces the two drains (E2-S6b, ADR 0019)
 
 - `honba_engine::ExecutionEngine::drain_events()` returns every `ExecutionEvent` in production
