@@ -12,7 +12,8 @@
     "fill": "next_open",
     "data": null,
     "warmup_bars": null,
-    "settlement_days": null
+    "settlement_days": null,
+    "impact": null
   },
   "metrics": {
     "final_equity": 1084250.5,

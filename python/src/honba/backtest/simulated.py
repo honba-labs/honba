@@ -14,6 +14,10 @@ Rules:
   If the instrument does not print, the order waits.
 * **Order within a session.** For the instruments opened together, sells fill before
   buys; each side in submission order.
+* **Impact.** With ``impact=`` a fill never happens at the printed open: the price is
+  degraded by :class:`honba.backtest.impact.MarketImpact` (square-root law, past sessions
+  only) and costs are charged on that price. Implemented on the Python backend, which is
+  what an ``impact=`` run selects.
 * **Cash.** Integer ``Money`` (ADR 0011), notional ``Money.mul_qty`` like the ledger. A
   buy debits ``notional + cost`` at once; a sell credits ``notional - cost`` at once but
   the proceeds only become *available* ``settlement_days`` sessions later.
@@ -57,6 +61,7 @@ from datetime import date, datetime, timedelta
 from typing import Any, Literal
 
 from honba import _native
+from honba.backtest.impact import MarketImpact
 from honba.domain.money import Currency, Money
 from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
@@ -76,6 +81,7 @@ __all__ = [
     "BACKEND_ENV",
     "FillCostFn",
     "FillModel",
+    "MarketImpact",
     "NextOpenExecution",
     "SessionOpen",
     "fill_costs_from_model",
@@ -150,6 +156,7 @@ class _PythonSim:
         costs: FillCostFn = zero_costs,
         long_only: bool = True,
         lot_sizes: Mapping[InstrumentId, float] | None = None,
+        impact: MarketImpact | None = None,
     ) -> None:
         if settlement_days < 0:
             raise ValueError("settlement_days must be >= 0")
@@ -162,6 +169,7 @@ class _PythonSim:
         self.positions: dict[InstrumentId, float] = {}
         self._currency = cash.currency
         self._cost_fn = costs
+        self._impact = impact
         self._lot_sizes: dict[InstrumentId, float] = {}
         for iid, lot in (lot_sizes or {}).items():
             self.set_lot_size(iid, lot)
@@ -301,6 +309,20 @@ class _PythonSim:
         for w in eligible:
             if w.intent.side is OrderSide.BUY:
                 self._fill_buy(w, opens[w.intent.instrument_id])
+        # After the fills: a session's own volume/close only ever informs *later* fills.
+        if self._impact is not None:
+            for b in bars:
+                self._impact.observe(b.instrument_id, volume=b.volume, close=b.close)
+
+    def _exec_price(self, side: OrderSide, bar: Bar, quantity: float) -> float:
+        """The fill price: the printed open degraded by square-root impact, if any."""
+        if self._impact is None:
+            return bar.open
+        fraction = self._impact.fraction(bar.instrument_id, quantity)
+        if fraction <= 0.0:
+            return bar.open
+        px = bar.open * (1.0 + fraction) if side is OrderSide.BUY else bar.open * (1.0 - fraction)
+        return px if _usable_open(px) else bar.open
 
     def _fill_sell(self, w: _Working, bar: Bar) -> None:
         want = w.intent.quantity
@@ -311,21 +333,23 @@ class _PythonSim:
             if 0 < qty < want and want - qty <= _QTY_EPS:
                 want = qty  # a hair over the position is float residue: sell it all, no reject
         if qty > 0:  # compute before dequeuing: a failure leaves the order working
-            notional = Money.mul_qty(qty, bar.open, self._currency)
-            cost = self._costs(OrderSide.SELL, qty, bar.open)
+            px = self._exec_price(OrderSide.SELL, bar, qty)
+            notional = Money.mul_qty(qty, px, self._currency)
+            cost = self._costs(OrderSide.SELL, qty, px)
         self._working.remove(w)
         if qty > 0:  # the fill, then the remainder's rejection: one queue, in that order
             proceeds = notional - cost
             self.cash = self.cash + proceeds
             self._receivables.append((self._session + self.settlement_days, proceeds))
-            self._book(w, bar, qty, notional, cost, qty >= want)
+            self._book(w, bar, qty, notional, cost, qty >= want, price=px)
         if qty < want:
             self._reject_part(w, want - qty, "no_position")
 
     def _fill_buy(self, w: _Working, bar: Bar) -> None:
         if w.first_try is None:
             w.first_try = self._session
-        px, want = bar.open, w.intent.quantity
+        want = w.intent.quantity
+        px = self._exec_price(OrderSide.BUY, bar, want)
         available = self.available_cash
         if self._buy_cost(want, px).amount <= available.amount:
             qty = want
@@ -336,12 +360,14 @@ class _PythonSim:
                 want, px, available, self._lot_sizes.get(w.intent.instrument_id, 1.0)
             )
         if qty > 0:  # compute before dequeuing: a failure leaves the order working
+            if qty != want:  # a funding cut shrinks the order, so reprice the impact
+                px = self._exec_price(OrderSide.BUY, bar, qty)
             notional = Money.mul_qty(qty, px, self._currency)
             cost = self._costs(OrderSide.BUY, qty, px)
         self._working.remove(w)
         if qty > 0:  # the fill, then the remainder's rejection: one queue, in that order
             self.cash = self.cash - (notional + cost)
-            self._book(w, bar, qty, notional, cost, qty >= want)
+            self._book(w, bar, qty, notional, cost, qty >= want, price=px)
         if qty < want:
             self._reject_part(w, want - qty, "insufficient_funds")
 
@@ -370,7 +396,15 @@ class _PythonSim:
         return lo * lot
 
     def _book(
-        self, w: _Working, bar: Bar, qty: float, notional: Money, cost: Money, complete: bool
+        self,
+        w: _Working,
+        bar: Bar,
+        qty: float,
+        notional: Money,
+        cost: Money,
+        complete: bool,
+        *,
+        price: float,
     ) -> None:
         iid = w.intent.instrument_id
         signed = qty if w.intent.side is OrderSide.BUY else -qty
@@ -381,7 +415,7 @@ class _PythonSim:
             self.positions[iid] = held
         self.fees = self.fees + cost
         self.traded_notional = self.traded_notional + notional
-        trade = Trade(iid, w.intent.side, qty, bar.open, bar.ts, w.order_id, costs=cost)
+        trade = Trade(iid, w.intent.side, qty, price, bar.ts, w.order_id, costs=cost)
         # One fill per order: its cumulative quantity is its own.
         self._events.append(Fill(trade, qty, complete))
 
@@ -679,18 +713,32 @@ class NextOpenExecution(BaseExecutionPort):
         long_only: bool = True,
         lot_sizes: Mapping[InstrumentId, float] | None = None,
         backend: BackendChoice | None = None,
+        impact: MarketImpact | None = None,
     ) -> None:
-        self._backend: Backend = resolve_backend(backend)
-        impl: type[_PythonSim | _NativeSim] = (
-            _NativeSim if self._backend == "native" else _PythonSim
-        )
-        self._impl = impl(
-            cash=cash,
-            settlement_days=settlement_days,
-            costs=costs,
-            long_only=long_only,
-            lot_sizes=lot_sizes,
-        )
+        if impact is not None and backend == "native":
+            raise ValueError(
+                "impact= needs the Python backend (the Rust simulator has no market-impact "
+                "model yet): drop backend='native'"
+            )
+        # ``auto`` with impact resolves to python: impact is only implemented there today.
+        self._backend: Backend = "python" if impact is not None else resolve_backend(backend)
+        if self._backend == "native":
+            self._impl: _PythonSim | _NativeSim = _NativeSim(
+                cash=cash,
+                settlement_days=settlement_days,
+                costs=costs,
+                long_only=long_only,
+                lot_sizes=lot_sizes,
+            )
+        else:
+            self._impl = _PythonSim(
+                cash=cash,
+                settlement_days=settlement_days,
+                costs=costs,
+                long_only=long_only,
+                lot_sizes=lot_sizes,
+                impact=impact,
+            )
 
     @property
     def backend(self) -> Backend:
@@ -869,6 +917,7 @@ def make_simulator(
     timeframe: str = "1d",
     as_of: date | None = None,
     lot_sizes: Mapping[InstrumentId, float] | None = None,
+    impact: MarketImpact | None = None,
 ) -> ExecutionPortLike:
     """Build the simulated port for ``fill``.
 
@@ -897,8 +946,14 @@ def make_simulator(
             costs=cost_fn,
             long_only=long_only,
             lot_sizes=lot_sizes,
+            impact=impact,
         )
     if fill == "bar_close":
+        if impact is not None:
+            raise ValueError(
+                "impact= requires fill='next_open': the bar-close conformance simulator has "
+                "no market-impact model"
+            )
         from honba.strategies.testing import BarCloseFills
 
         return BarCloseFills(currency=cash.currency)

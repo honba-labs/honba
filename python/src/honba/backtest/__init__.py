@@ -1,5 +1,6 @@
 """Backtest building blocks: simulated execution ports (``honba.backtest.simulated``)."""
 
+from honba.backtest.impact import MarketImpact
 from honba.backtest.simulated import (
     FillCostFn,
     FillModel,
@@ -14,6 +15,7 @@ from honba.backtest.simulated import (
 __all__ = [
     "FillCostFn",
     "FillModel",
+    "MarketImpact",
     "NextOpenExecution",
     "SessionOpen",
     "group_sessions",

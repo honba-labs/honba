@@ -53,6 +53,7 @@ from typing import Protocol, cast
 # These are the stable contracts. Session depends on them; they must not
 # depend on Session (no circular imports).
 # ---------------------------------------------------------------------------
+from honba.backtest.impact import MarketImpact
 from honba.backtest.simulated import (
     FillCostFn,
     FillModel,
@@ -163,6 +164,10 @@ class BacktestConfig:
     # run's first session date (honba.markets.india.settlement_days_for: NSE/BSE equity
     # T+2 before 2023-01-27, T+1 from then). Intraday timeframes require it explicitly.
     settlement_days: int | None = None
+    # Square-root market impact (Balch pitfall #4): None (default) fills at the printed
+    # open; a MarketImpact degrades every fill by kappa * sigma * sqrt(qty / ADV) using
+    # past sessions only, and forces the Python simulator backend.
+    impact: MarketImpact | None = None
 
     def __post_init__(self) -> None:
         if not self.symbol:
@@ -414,6 +419,7 @@ class Honba:
         on_bar: Callable[[int, Bar], None] | None = None,
         warmup_bars: int | None = None,
         settlement_days: int | None = None,
+        impact: MarketImpact | None = None,
     ) -> BacktestSession:
         """Build a BacktestSession ready for .run().
 
@@ -447,6 +453,11 @@ class Honba:
           date (NSE/BSE equity: T+2 before 2023-01-27, T+1 from then; a run that spans
           the change keeps the cycle of its first session). Required for intraday
           timeframes, where a session is a bar rather than a trading day.
+        impact:
+          Square-root market impact model (Balch pitfall #4): fills degrade by
+          ``kappa * sigma_daily * sqrt(qty / ADV)`` from past sessions only, and costs are
+          charged on the impacted price. None (default) fills at the printed open.
+          Forces the Python simulator backend.
         data / execution:
           Optional overrides for tests or custom infrastructure.
         """
@@ -464,6 +475,7 @@ class Honba:
             data=data,
             warmup_bars=warmup_bars if warmup_bars is not None else config_warmup,
             settlement_days=settlement_days,
+            impact=impact,
         )
 
         resolved_data = data if data is not None else _default_data_provider()
@@ -568,6 +580,7 @@ def _default_execution(config: BacktestConfig, cost_model: CostModel | None) -> 
         settlement_days=config.settlement_days,
         timeframe=config.timeframe,
         as_of=_parse_time(config.start).date(),
+        impact=config.impact,
     )
 
 
