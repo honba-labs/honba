@@ -142,8 +142,9 @@ async fn next_decodes_queues_and_drops_unsubscribed_ticks() {
     let Event::Trade(t) = m.event() else { panic!() };
     assert_eq!(t.instrument_id().symbol(), "TCS");
     assert_eq!(t.price(), 4100.0);
-    assert!(
-        f.next().await.unwrap().is_none(),
+    assert_eq!(
+        f.next().await.unwrap_err(),
+        PortError::Transport("ticker connection closed".into()),
         "REL dropped, then closed"
     );
 }
@@ -196,8 +197,21 @@ async fn transport_errors_map() {
 }
 
 #[tokio::test]
-async fn closed_socket_yields_none() {
+async fn closed_socket_is_transport_error() {
     let (mut f, _) = feed_with(vec![], Mode::Ltp);
-    assert!(f.next().await.unwrap().is_none());
-    assert!(f.next().await.unwrap().is_none());
+    let closed = PortError::Transport("ticker connection closed".into());
+    assert_eq!(f.next().await.unwrap_err(), closed);
+    assert_eq!(f.next().await.unwrap_err(), closed, "stays closed");
+}
+
+#[tokio::test]
+async fn queued_messages_drain_before_closed_error() {
+    let script = vec![bin(&[ltp(TCS, 100)])];
+    let (mut f, _) = feed_with(script, Mode::Ltp);
+    f.subscribe(&[inst("TCS")]).await.unwrap();
+    assert!(f.next().await.unwrap().is_some());
+    assert_eq!(
+        f.next().await.unwrap_err(),
+        PortError::Transport("ticker connection closed".into())
+    );
 }

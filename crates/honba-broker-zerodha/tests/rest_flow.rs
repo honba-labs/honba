@@ -115,10 +115,10 @@ async fn session_place_list_modify_cancel() {
         .unwrap();
     client.cancel_order("regular", &id).await.unwrap();
 
-    // Session expiry surfaces as Unavailable.
+    // Session expiry is a non-retryable rejection, not Unavailable.
     assert!(matches!(
         client.trades().await,
-        Err(PortError::Unavailable(_))
+        Err(PortError::Rejected { ref code, .. }) if code == "TokenException"
     ));
 
     let seen = client.transport().seen.lock().unwrap().clone();

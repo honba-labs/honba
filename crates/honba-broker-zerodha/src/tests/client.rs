@@ -269,10 +269,13 @@ fn err_body(kind: &str, msg: &str) -> String {
 }
 
 #[tokio::test]
-async fn token_exception_is_unavailable() {
+async fn token_exception_is_rejected_not_retryable() {
     let e = err_for(403, &err_body("TokenException", "Session expired")).await;
     match e {
-        PortError::Unavailable(m) => assert!(m.contains("Session expired"), "{m}"),
+        PortError::Rejected { code, message } => {
+            assert_eq!(code, "TokenException");
+            assert!(message.contains("Session expired"), "{message}");
+        }
         other => panic!("{other:?}"),
     }
 }

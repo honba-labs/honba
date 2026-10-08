@@ -4,9 +4,10 @@
 //! [`crate::rate_limit::RateLimiter`] at the call site.
 //!
 //! Error mapping to [`PortError`]:
-//! - `TokenException` (HTTP 403): [`PortError::Unavailable`]. The session expired; retrying
-//!   unchanged will not help until a new session is generated, despite `Unavailable` being
-//!   transient in general.
+//! - `TokenException` (HTTP 403): [`PortError::Rejected`] with `code` `"TokenException"`. The
+//!   session expired; retrying unchanged will never help until a new session is generated, so it
+//!   must not be reported as the retryable `Unavailable`. (Calling before any session exists is
+//!   `Unavailable`: nothing was sent and the caller can authenticate then retry.)
 //! - `InputException`, `OrderException`, `MarginException`, any other 4xx with a message:
 //!   [`PortError::Rejected`] (`code` is the Kite `error_type`, or `HTTP_<status>`).
 //! - HTTP 429 and 5xx (`NetworkException`, `GeneralException`): [`PortError::Transport`].
@@ -116,7 +117,10 @@ fn map_failure(resp: &HttpResponse) -> PortError {
         .clone()
         .unwrap_or_else(|| format!("HTTP {}", resp.status));
     if kind.as_deref() == Some("TokenException") {
-        return PortError::Unavailable(format!("session expired or invalid: {shown}"));
+        return PortError::Rejected {
+            code: "TokenException".to_owned(),
+            message: format!("session expired or invalid: {shown}"),
+        };
     }
     if resp.status == 429 {
         return PortError::Transport(format!("rate limited: {shown}"));

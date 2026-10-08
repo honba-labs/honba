@@ -17,7 +17,9 @@ pub const MAX_SUBSCRIPTIONS: usize = 3000;
 
 /// A [`MarketDataFeed`] backed by one KiteTicker websocket.
 ///
-/// `next()` returns `Ok(None)` when the peer has closed the socket cleanly.
+/// `next()` returns queued messages first; once the socket is closed it returns
+/// `Err(PortError::Transport("ticker connection closed"))` (the ports contract treats a closed
+/// connection as an error, never as end of stream).
 pub struct KiteFeed<S: TickerSocket> {
     socket: S,
     tokens: TokenMap,
@@ -144,7 +146,7 @@ impl<S: TickerSocket> MarketDataFeed for KiteFeed<S> {
                 return Ok(Some(m));
             }
             match self.socket.recv().await.map_err(map_transport)? {
-                None => return Ok(None),
+                None => return Err(PortError::Transport("ticker connection closed".into())),
                 Some(WsFrame::Binary(b)) => self.handle_binary(&b)?,
                 Some(WsFrame::Text(t)) => Self::handle_text(&t)?,
             }

@@ -1,10 +1,12 @@
 //! Public-API flow: instruments csv -> token map -> KiteFeed over a scripted socket.
 //!
 //! Also replicates the `MarketDataFeed` contract assertions from
-//! `honba-ports/tests/ports_contract.rs` (`feed_subscribes_then_drains_to_none`):
-//! subscribe/unsubscribe succeed, the feed drains in order to `Ok(None)`, and stays exhausted
-//! on repeated `next()`. Duplicate subscribe is not an error and does not duplicate deliveries;
-//! unsubscribing an unsubscribed symbol is not an error.
+//! `honba-ports/tests/ports_contract.rs`: subscribe/unsubscribe succeed and the feed drains
+//! queued messages in order. Unlike the in-memory contract fake, a real ticker has no
+//! "idle, nothing yet" `Ok(None)`: an exhausted `ScriptedSocket` models a closed connection, which
+//! the ports contract treats as an error, so the replica asserts drain-then-`Err(Transport)`
+//! (and that it stays closed). Duplicate subscribe is not an error and does not duplicate
+//! deliveries; unsubscribing an unsubscribed symbol is not an error.
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
@@ -16,7 +18,7 @@ use honba_broker_zerodha::transport::TransportError;
 use honba_broker_zerodha::ws::{TickerSocket, WsFrame};
 use honba_broker_zerodha::KiteFeed;
 use honba_messages::{Event, Exchange, InstrumentId, UnixNanos};
-use honba_ports::MarketDataFeed;
+use honba_ports::{MarketDataFeed, PortError};
 
 const CSV: &str = "instrument_token,exchange_token,tradingsymbol,name,last_price,expiry,strike,tick_size,lot_size,instrument_type,segment,exchange\n\
 2885633,11272,RELIANCE,RELIANCE INDUSTRIES,0,,0,0.05,1,EQ,NSE,NSE\n\
@@ -77,6 +79,13 @@ fn feed(frames: Vec<WsFrame>) -> (KiteFeed<ScriptedSocket>, Arc<Mutex<Vec<String
     (feed, sent)
 }
 
+async fn assert_closed(f: &mut KiteFeed<ScriptedSocket>) {
+    assert_eq!(
+        f.next().await.unwrap_err(),
+        PortError::Transport("ticker connection closed".into())
+    );
+}
+
 #[tokio::test]
 async fn multi_packet_frame_yields_trade_then_quote_then_next_symbol() {
     let ltp = u32s(&[2_953_217, 410_000]);
@@ -93,7 +102,7 @@ async fn multi_packet_frame_yields_trade_then_quote_then_next_symbol() {
         panic!()
     };
     assert_eq!(t.instrument_id().symbol(), "TCS");
-    assert!(f.next().await.unwrap().is_none());
+    assert_closed(&mut f).await;
 }
 
 #[tokio::test]
@@ -108,7 +117,7 @@ async fn duplicate_subscribe_does_not_duplicate_deliveries() {
         "second subscribe sends nothing"
     );
     assert!(f.next().await.unwrap().is_some());
-    assert!(f.next().await.unwrap().is_none());
+    assert_closed(&mut f).await;
 }
 
 #[tokio::test]
@@ -118,14 +127,14 @@ async fn unsubscribe_drops_later_ticks() {
     f.subscribe(&[inst("TCS")]).await.unwrap();
     f.unsubscribe(&[inst("TCS")]).await.unwrap();
     f.unsubscribe(&[inst("TCS")]).await.unwrap();
-    assert!(f.next().await.unwrap().is_none());
+    assert_closed(&mut f).await;
 }
 
 #[tokio::test]
-async fn contract_subscribe_unsubscribe_then_drain_to_none() {
+async fn contract_subscribe_unsubscribe_then_closed_error() {
     let (mut f, _) = feed(vec![]);
     f.subscribe(&[inst("RELIANCE")]).await.unwrap();
     f.unsubscribe(&[inst("RELIANCE")]).await.unwrap();
-    assert!(f.next().await.unwrap().is_none());
-    assert!(f.next().await.unwrap().is_none(), "stays exhausted");
+    assert_closed(&mut f).await;
+    assert_closed(&mut f).await;
 }
