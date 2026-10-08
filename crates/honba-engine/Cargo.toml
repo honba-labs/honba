@@ -10,7 +10,9 @@ description = "Event kernel: clock, queue, dispatch, and engine traits"
 [dependencies]
 honba-messages.workspace = true
 honba-entities.workspace = true
+honba-risk.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
 honba-sim.workspace = true
+honba-market.workspace = true

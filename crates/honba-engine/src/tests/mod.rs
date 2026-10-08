@@ -6,6 +6,7 @@ mod engine;
 mod execution;
 mod order_store;
 mod queue;
+mod risk_gate;
 
 use honba_messages::{Exchange, InstrumentId};
 

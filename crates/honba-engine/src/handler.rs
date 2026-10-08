@@ -18,6 +18,18 @@ pub trait Handler: Send {
     /// Called for every event in the queue, in time order.
     fn on_event(&mut self, event: &Event, ts_init: UnixNanos) -> Result<EngineOutput>;
 
+    /// Called by [`Engine::set_trading_state`](crate::Engine::set_trading_state) on every
+    /// handler when the state actually changes, so a handler that submits orders itself
+    /// can enforce `Halted` and reduce-only (ADR 0018 decision 7). Default: ignore.
+    fn on_trading_state(&mut self, _state: TradingState) {}
+
+    /// Whether this handler owns a risk stage. A run holds at most one stage:
+    /// [`Engine::start`](crate::Engine::start) fails with
+    /// [`AlgoError::DuplicateRiskStage`](crate::AlgoError::DuplicateRiskStage) otherwise.
+    fn holds_risk_stage(&self) -> bool {
+        false
+    }
+
     /// Called once at the end of a run.
     fn on_stop(&mut self) -> Result<()> {
         Ok(())

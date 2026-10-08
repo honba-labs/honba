@@ -1,6 +1,7 @@
 //! The engine's audit trail.
 
 use honba_messages::{IllegalTransition, OrderEventKind, VenueOrderId};
+use honba_risk::RiskRefusal;
 
 use crate::state::TradingState;
 
@@ -37,6 +38,15 @@ pub enum AuditKind {
         instrument: String,
         /// The side, rendered as `"buy"`, `"sell"` or `"no_order_side"`.
         side: String,
+    },
+    /// The risk gate refused an order (ADR 0018 decision 6). Always followed by the
+    /// [`AuditKind::OrderRejected`] for the same order, whose `reason` is
+    /// `refusal.error_code()`'s wire spelling.
+    RiskRefused {
+        /// The client order identifier.
+        order_id: String,
+        /// The typed refusal, with the numbers that caused it.
+        refusal: RiskRefusal,
     },
     /// The engine refused to submit an order (a pre-gate refusal, ADR 0019
     /// decision 5); `reason` is the `ErrorCode` wire spelling, also carried by

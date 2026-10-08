@@ -7,11 +7,12 @@ use honba_messages::{
     ErrorCode, Event, InstrumentId, Message, Order, OrderEventKind, OrderId, OrderSide, OrderState,
     OrderStatus, UnixNanos, VenueOrderId,
 };
+use honba_risk::{check_state, RiskCheck, RiskDecision, RiskLimits, RiskRequest, RiskStage};
 
 use crate::audit::{AuditKind, AuditLog, AuditRecord};
 use crate::clock::Clock;
 use crate::data::DataFeed;
-use crate::error::Result;
+use crate::error::{AlgoError, Result};
 use crate::execution::{ExecutionEngine, LegacyPortEvents};
 use crate::handler::{EngineOutput, Handler};
 use crate::queue::EventQueue;
@@ -66,6 +67,9 @@ pub struct Engine {
     observed: Vec<ExecutionEvent>,
     orders: HashMap<String, TrackedOrder>,
     positions: HashMap<InstrumentId, f64>,
+    /// Last bar close or trade price per instrument: the stage's `reference_price`.
+    last_px: HashMap<InstrumentId, f64>,
+    risk: Option<RiskStage>,
     started: bool,
     finished: bool,
 }
@@ -90,6 +94,8 @@ impl Engine {
             observed: Vec::new(),
             orders: HashMap::new(),
             positions: HashMap::new(),
+            last_px: HashMap::new(),
+            risk: None,
             started: false,
             finished: false,
         }
@@ -104,6 +110,28 @@ impl Engine {
         assert!(batch_size > 0, "batch_size must be positive");
         self.batch_size = batch_size;
         self
+    }
+
+    /// Puts `stage` in front of the execution sink: every order the engine submits passes it,
+    /// and a refusal is audited as [`AuditKind::RiskRefused`] then
+    /// [`AuditKind::OrderRejected`] and never reaches the sink (ADR 0018 decisions 6-7).
+    ///
+    /// Without a stage the engine still applies the state rules (`Halted`, reduce-only). A run
+    /// holds at most one stage: see [`Handler::holds_risk_stage`].
+    pub fn with_risk(mut self, stage: RiskStage) -> Self {
+        self.risk = Some(stage);
+        self
+    }
+
+    /// The live-run guard (ADR 0018 decision 8): `Ok` only when the engine's stage was built
+    /// with both `max_notional` and `order_rate`. An assembler building a non-simulated run
+    /// calls this before starting; an engine without a stage fails like one without limits.
+    pub fn require_live_limits(&self) -> Result<()> {
+        let limits = match &self.risk {
+            Some(stage) => stage.limits().clone(),
+            None => RiskLimits::default(),
+        };
+        limits.require_live().map_err(AlgoError::from)
     }
 
     /// Seeds the position map (net signed quantity per instrument) that fills
@@ -210,6 +238,15 @@ impl Engine {
         if self.started {
             return Ok(());
         }
+        let stages = usize::from(self.risk.is_some())
+            + self
+                .handlers
+                .iter()
+                .filter(|h| h.holds_risk_stage())
+                .count();
+        if stages > 1 {
+            return Err(AlgoError::DuplicateRiskStage);
+        }
         self.started = true;
         for h in &mut self.handlers {
             h.on_start()?;
@@ -239,12 +276,28 @@ impl Engine {
         self.audit.record(AuditKind::EventDispatched {
             ts_event: ts_event.as_u64(),
         });
+        self.observe_price(msg.event());
         for i in 0..self.handlers.len() {
             let output = self.handlers[i].on_event(msg.event(), msg.ts_init())?;
             self.apply_output(output)?;
             self.acknowledge_events()?;
         }
         Ok(true)
+    }
+
+    /// Remembers the last bar close or trade price per instrument for the risk request.
+    fn observe_price(&mut self, event: &Event) {
+        match event {
+            Event::Bar(bar) => {
+                self.last_px
+                    .insert(bar.bar_type().instrument_id().clone(), bar.close());
+            }
+            Event::Trade(tick) => {
+                self.last_px
+                    .insert(tick.instrument_id().clone(), tick.price());
+            }
+            _ => {}
+        }
     }
 
     /// Drains the queue via [`Engine::pump`], then runs `on_stop` for every handler. Idempotent.
@@ -288,6 +341,9 @@ impl Engine {
                 from: previous,
                 to: next,
             });
+            for h in &mut self.handlers {
+                h.on_trading_state(next);
+            }
         }
         previous
     }
@@ -501,6 +557,30 @@ impl Engine {
         });
     }
 
+    /// Runs the stage (or, without one, the state rules) over `order`.
+    fn risk_check(&mut self, order: &Order) -> Option<honba_risk::RiskRefusal> {
+        let instrument = order.instrument_id();
+        let request = RiskRequest {
+            order_id: order.order_id().clone(),
+            instrument_id: instrument.clone(),
+            side: order.side(),
+            quantity: order.quantity(),
+            price: order.price(),
+            trigger_price: order.trigger_price(),
+            reference_price: self.last_px.get(instrument).copied(),
+            position: self.position(instrument) + self.working_exposure(instrument, order.side()),
+            trading_state: self.trading_state,
+            ts: self.clock.now(),
+        };
+        match self.risk.as_mut() {
+            Some(stage) => match stage.check(&request) {
+                RiskDecision::Approved => None,
+                RiskDecision::Refused(refusal) => Some(refusal),
+            },
+            None => check_state(&request),
+        }
+    }
+
     fn submit(&mut self, order: Order) -> Result<()> {
         let order_id = order.order_id().as_str().to_string();
         // Whatever the sink produced earlier is ahead of this order.
@@ -520,10 +600,15 @@ impl Engine {
             self.refuse(&order, ErrorCode::OrderExecutionUnavailable);
             return Ok(());
         }
-        if !self.trading_state.accepts_orders() {
-            self.refuse(&order, ErrorCode::RiskTradingHalted);
+        if let Some(refusal) = self.risk_check(&order) {
+            self.audit.record(AuditKind::RiskRefused {
+                order_id,
+                refusal: refusal.clone(),
+            });
+            self.refuse(&order, refusal.error_code());
             return Ok(());
         }
+        let order_id = order.order_id().as_str().to_string();
         let instrument = order.instrument_id().to_string();
         let side = side_label(order.side());
         let submitted = self.submitted_message(&order);

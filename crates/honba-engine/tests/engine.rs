@@ -459,6 +459,10 @@ fn cancels_and_state_changes_are_applied_and_audited() {
                 to: TradingState::Halted,
             },
             AuditKind::EventDispatched { ts_event: 3 },
+            AuditKind::RiskRefused {
+                order_id: "O-1".to_string(),
+                refusal: honba_risk::RiskRefusal::TradingHalted,
+            },
             AuditKind::OrderRejected {
                 order_id: "O-1".to_string(),
                 reason: "risk_trading_halted".to_string(),
