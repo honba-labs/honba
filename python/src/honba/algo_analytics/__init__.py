@@ -28,6 +28,7 @@ Example::
     assert wf.passed  # CI gate: no promotion to paper trading otherwise
 """
 
+from honba.algo_analytics.deflated_sharpe import deflated_sharpe
 from honba.algo_analytics.folds import FoldWindow, Window, add_months, plan_folds
 from honba.algo_analytics.metrics import sharpe_ratio
 from honba.algo_analytics.walk_forward import (
@@ -54,6 +55,7 @@ __all__ = [
     "WalkForwardResult",
     "Window",
     "add_months",
+    "deflated_sharpe",
     "oos_is_ratio",
     "passes_oos_is_gate",
     "plan_folds",
