@@ -22,6 +22,7 @@ members = [
     "crates/honba-api",
     "crates/honba-api-rest",
     "crates/honba-api-wasm",
+    "crates/honba-broker-zerodha",
 ]
 
 [workspace.package]
@@ -49,6 +50,7 @@ honba-codegen = { path = "crates/honba-codegen" }
 honba-ports = { path = "crates/honba-ports" }
 honba-async = { path = "crates/honba-async" }
 honba-sweep = { path = "crates/honba-sweep" }
+honba-broker-zerodha = { path = "crates/honba-broker-zerodha" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 thiserror = "1"

@@ -1,0 +1,32 @@
+[package]
+name = "honba-broker-zerodha"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Zerodha Kite Connect adapter in pure Rust: REST client and KiteTicker binary decoder"
+
+[features]
+default = []
+# Real network transports (reqwest, tokio-tungstenite). Off by default so the codec, REST client
+# and gateway stay testable against in-memory transports.
+net = ["dep:reqwest", "dep:tokio-tungstenite", "dep:futures-util"]
+
+[dependencies]
+honba-messages.workspace = true
+honba-entities.workspace = true
+honba-ports.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+async-trait.workspace = true
+sha2.workspace = true
+csv.workspace = true
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"], optional = true }
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"], optional = true }
+futures-util = { version = "0.3", optional = true }
+
+[dev-dependencies]
+honba-testing.workspace = true
+tokio = { workspace = true, features = ["rt", "macros"] }
