@@ -11,7 +11,7 @@ description = "Zerodha Kite Connect adapter in pure Rust: REST client and KiteTi
 default = []
 # Real network transports (reqwest, tokio-tungstenite). Off by default so the codec, REST client
 # and gateway stay testable against in-memory transports.
-net = ["dep:reqwest", "dep:tokio-tungstenite", "dep:futures-util"]
+net = ["dep:reqwest", "dep:tokio-tungstenite", "dep:futures-util", "dep:tokio"]
 
 [dependencies]
 honba-messages.workspace = true
@@ -26,6 +26,7 @@ csv.workspace = true
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"], optional = true }
 tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"], optional = true }
 futures-util = { version = "0.3", optional = true }
+tokio = { workspace = true, optional = true }
 
 [dev-dependencies]
 honba-testing.workspace = true

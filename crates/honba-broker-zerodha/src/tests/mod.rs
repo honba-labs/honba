@@ -5,15 +5,20 @@ use honba_messages::{Exchange, InstrumentId};
 use std::collections::VecDeque;
 use std::sync::Mutex;
 
+use std::sync::Arc;
+
 use crate::transport::{HttpRequest, HttpResponse, HttpTransport, TransportError};
+use crate::ws::{TickerSocket, WsFrame};
 
 mod client;
+mod feed;
 mod gateway;
 mod mapping;
 mod rate_limit;
 mod ticker;
 mod tokens;
 mod wire;
+mod ws;
 
 /// Scripted in-memory transport that records every request.
 pub(crate) struct FakeTransport {
@@ -70,4 +75,39 @@ pub(crate) fn frame(packets: &[Vec<u8>]) -> Vec<u8> {
         f.extend_from_slice(p);
     }
     f
+}
+
+/// Scripted in-memory websocket: records sent text, replays scripted `recv` results, then
+/// reports a clean close (`Ok(None)`).
+pub(crate) struct FakeSocket {
+    frames: VecDeque<Result<Option<WsFrame>, TransportError>>,
+    sent: Arc<Mutex<Vec<String>>>,
+}
+
+impl FakeSocket {
+    /// Returns the socket and a shared handle to the text it was asked to send.
+    pub(crate) fn new(
+        frames: Vec<Result<Option<WsFrame>, TransportError>>,
+    ) -> (Self, Arc<Mutex<Vec<String>>>) {
+        let sent = Arc::new(Mutex::new(Vec::new()));
+        (
+            Self {
+                frames: frames.into(),
+                sent: Arc::clone(&sent),
+            },
+            sent,
+        )
+    }
+}
+
+#[async_trait::async_trait]
+impl TickerSocket for FakeSocket {
+    async fn send_text(&mut self, text: String) -> Result<(), TransportError> {
+        self.sent.lock().unwrap().push(text);
+        Ok(())
+    }
+
+    async fn recv(&mut self) -> Result<Option<WsFrame>, TransportError> {
+        self.frames.pop_front().unwrap_or(Ok(None))
+    }
 }
