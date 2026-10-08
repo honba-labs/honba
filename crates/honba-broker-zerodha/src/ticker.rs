@@ -241,44 +241,146 @@ pub fn decode_frame(frame: &[u8]) -> Result<Vec<DecodedTick>, TickerError> {
     Ok(out)
 }
 
-/// Converts a decoded packet into domain messages.
+fn event_ts(tick: &DecodedTick, ts_init: UnixNanos) -> UnixNanos {
+    tick.exchange_ts_secs.map_or(ts_init, |s| {
+        UnixNanos::from_u64(u64::from(s) * 1_000_000_000)
+    })
+}
+
+fn trade_message(
+    tick: &DecodedTick,
+    instrument: &InstrumentId,
+    size: f64,
+    discriminator: u64,
+    ts_init: UnixNanos,
+) -> Message {
+    let ts_event = event_ts(tick, ts_init);
+    let trade = TradeTick::new(
+        instrument.clone(),
+        tick.ltp,
+        size,
+        AggressorSide::NoAggressor,
+        TradeId::new(format!(
+            "{}-{}-{}",
+            tick.token,
+            ts_event.as_u64(),
+            discriminator
+        )),
+        ts_event,
+        ts_init,
+    );
+    Message::new(Event::Trade(trade), ts_init)
+}
+
+fn quote_message(
+    tick: &DecodedTick,
+    instrument: &InstrumentId,
+    ts_init: UnixNanos,
+) -> Option<Message> {
+    if tick.mode != Mode::Full {
+        return None;
+    }
+    let (b, a) = (tick.bids.first()?, tick.asks.first()?);
+    if !(b.price > 0.0 && a.price > 0.0 && b.price <= a.price) {
+        return None;
+    }
+    let quote = QuoteTick::new(
+        instrument.clone(),
+        b.price,
+        a.price,
+        f64::from(b.qty),
+        f64::from(a.qty),
+        event_ts(tick, ts_init),
+        ts_init,
+    );
+    Some(Message::new(Event::Quote(quote), ts_init))
+}
+
+/// Converts a decoded packet into domain messages, statelessly.
 ///
 /// Every packet yields a [`TradeTick`] at the last price (size is the last quantity when
-/// present, else zero). Full packets with a valid best bid and ask additionally yield a
-/// [`QuoteTick`]. `ts_event` is the exchange timestamp when present, else `ts_init`.
+/// present, else zero), so a repeated packet repeats the trade. Live feeds must use
+/// [`TradeFilter`] instead, which only reports trades that actually happened. Full packets
+/// with a valid best bid and ask additionally yield a [`QuoteTick`]. `ts_event` is the
+/// exchange timestamp when present, else `ts_init`. The trade id is
+/// `{token}-{ts_event}-{volume}` (volume `0` when the packet has none).
 pub fn to_messages(
     tick: &DecodedTick,
     instrument: &InstrumentId,
     ts_init: UnixNanos,
 ) -> Vec<Message> {
-    let ts_event = tick.exchange_ts_secs.map_or(ts_init, |s| {
-        UnixNanos::from_u64(u64::from(s) * 1_000_000_000)
-    });
-    let trade = TradeTick::new(
-        instrument.clone(),
-        tick.ltp,
+    let mut out = vec![trade_message(
+        tick,
+        instrument,
         f64::from(tick.last_qty.unwrap_or(0)),
-        AggressorSide::NoAggressor,
-        TradeId::new(format!("{}-{}", tick.token, ts_event.as_u64())),
-        ts_event,
+        u64::from(tick.volume.unwrap_or(0)),
         ts_init,
-    );
-    let mut out = vec![Message::new(Event::Trade(trade), ts_init)];
-    if tick.mode == Mode::Full {
-        if let (Some(b), Some(a)) = (tick.bids.first(), tick.asks.first()) {
-            if b.price > 0.0 && a.price > 0.0 && b.price <= a.price {
-                let quote = QuoteTick::new(
-                    instrument.clone(),
-                    b.price,
-                    a.price,
-                    f64::from(b.qty),
-                    f64::from(a.qty),
-                    ts_event,
+    )];
+    out.extend(quote_message(tick, instrument, ts_init));
+    out
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct TokenState {
+    volume: Option<u32>,
+    ltp: Option<f64>,
+    seq: u64,
+}
+
+/// Stateful converter that reports a trade only when one demonstrably happened.
+///
+/// Kite re-sends the same snapshot whenever anything in the packet changes (for example depth),
+/// so each packet is not a trade. Per token this tracks the last `(volume, ltp)`:
+/// - the first packet is the baseline and emits no trade;
+/// - with volume: a [`TradeTick`] only when volume strictly increased, sized by the delta (a
+///   decrease, as after a day roll, only resets the baseline);
+/// - without volume (LTP-only, indices): a [`TradeTick`] of size 0 only when the price changed.
+///
+/// Trade ids are `{token}-{ts_event}-{volume}` or, without volume, a per-token counter, so they
+/// are unique per trade. A [`QuoteTick`] is still emitted for every Full packet with a valid best
+/// bid and ask.
+#[derive(Debug, Default)]
+pub struct TradeFilter {
+    state: std::collections::HashMap<u32, TokenState>,
+}
+
+impl TradeFilter {
+    /// Creates an empty filter.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Converts `tick`, updating the per-token baseline.
+    pub fn messages(
+        &mut self,
+        tick: &DecodedTick,
+        instrument: &InstrumentId,
+        ts_init: UnixNanos,
+    ) -> Vec<Message> {
+        let st = self.state.entry(tick.token).or_default();
+        let is_baseline = st.volume.is_none() && st.ltp.is_none();
+        let mut out = Vec::new();
+        if !is_baseline {
+            match (tick.volume, st.volume) {
+                (Some(v), Some(prev)) if v > prev => out.push(trade_message(
+                    tick,
+                    instrument,
+                    f64::from(v - prev),
+                    u64::from(v),
                     ts_init,
-                );
-                out.push(Message::new(Event::Quote(quote), ts_init));
+                )),
+                (None, _) if st.ltp != Some(tick.ltp) => {
+                    st.seq += 1;
+                    out.push(trade_message(tick, instrument, 0.0, st.seq, ts_init));
+                }
+                _ => {}
             }
         }
+        if tick.volume.is_some() {
+            st.volume = tick.volume;
+        }
+        st.ltp = Some(tick.ltp);
+        out.extend(quote_message(tick, instrument, ts_init));
+        out
     }
-    out
 }

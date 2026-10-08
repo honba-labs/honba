@@ -82,9 +82,17 @@ pub(crate) fn frame(packets: &[Vec<u8>]) -> Vec<u8> {
 pub(crate) struct FakeSocket {
     frames: VecDeque<Result<Option<WsFrame>, TransportError>>,
     sent: Arc<Mutex<Vec<String>>>,
+    send_failures: VecDeque<bool>,
 }
 
 impl FakeSocket {
+    /// Scripts the next sends: `true` fails that send (and records nothing), `false` succeeds.
+    /// Sends beyond the script succeed.
+    pub(crate) fn with_send_failures(mut self, failures: Vec<bool>) -> Self {
+        self.send_failures = failures.into();
+        self
+    }
+
     /// Returns the socket and a shared handle to the text it was asked to send.
     pub(crate) fn new(
         frames: Vec<Result<Option<WsFrame>, TransportError>>,
@@ -94,6 +102,7 @@ impl FakeSocket {
             Self {
                 frames: frames.into(),
                 sent: Arc::clone(&sent),
+                send_failures: VecDeque::new(),
             },
             sent,
         )
@@ -103,6 +112,9 @@ impl FakeSocket {
 #[async_trait::async_trait]
 impl TickerSocket for FakeSocket {
     async fn send_text(&mut self, text: String) -> Result<(), TransportError> {
+        if self.send_failures.pop_front().unwrap_or(false) {
+            return Err(TransportError::Connect("send failed".into()));
+        }
         self.sent.lock().unwrap().push(text);
         Ok(())
     }

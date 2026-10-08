@@ -303,3 +303,76 @@ async fn next_fill_skips_malformed_trade_rows() {
         .unwrap();
     assert!(gw.next_fill().await.unwrap().is_none());
 }
+
+fn orders_list(rows: &[(&str, &str)]) -> Result<crate::transport::HttpResponse, TransportError> {
+    let items: Vec<String> = rows
+        .iter()
+        .map(|(oid, tag)| format!(r#"{{"order_id":"{oid}","tag":"{tag}","status":"OPEN"}}"#))
+        .collect();
+    FakeTransport::ok(
+        200,
+        &format!(r#"{{"status":"success","data":[{}]}}"#, items.join(",")),
+    )
+}
+
+#[tokio::test]
+async fn ambiguous_failure_then_resubmit_adopts_existing_order_without_placing_again() {
+    for ambiguous in [
+        Err(TransportError::Timeout),
+        Err(TransportError::Connect("reset".into())),
+    ] {
+        let mut gw = gateway(vec![
+            ambiguous,
+            orders_list(&[("9", "OTHER"), ("2201", "O1")]),
+            trades(&[("T1", "2201", 10, 1500.0)]),
+        ]);
+        let o = order("O-1", OrderType::Market, None, None);
+        assert!(gw.submit_order(o.clone()).await.is_err());
+        assert_eq!(gw.submit_order(o).await.unwrap(), OrderId::new("O-1"));
+        let reqs = gw.client().transport().requests();
+        let posts = reqs.iter().filter(|r| r.method == Method::Post).count();
+        assert_eq!(posts, 1, "no second place");
+        assert!(reqs[1].url.ends_with("/orders"));
+        // Adopted order is registered: its fill maps back to the caller id.
+        let fill = gw.next_fill().await.unwrap().unwrap();
+        assert_eq!(fill.order_id(), &OrderId::new("O-1"));
+    }
+}
+
+#[tokio::test]
+async fn ambiguous_failure_then_resubmit_places_when_no_tagged_order_exists() {
+    let mut gw = gateway(vec![
+        Err(TransportError::Timeout),
+        orders_list(&[("9", "OTHER")]),
+        placed("2202"),
+    ]);
+    let o = order("O-1", OrderType::Market, None, None);
+    assert_eq!(
+        gw.submit_order(o.clone()).await.unwrap_err(),
+        PortError::Timeout
+    );
+    assert_eq!(gw.submit_order(o).await.unwrap(), OrderId::new("O-1"));
+    let reqs = gw.client().transport().requests();
+    assert_eq!(reqs.len(), 3);
+    assert_eq!(reqs[2].method, Method::Post);
+}
+
+#[tokio::test]
+async fn rejected_failure_is_not_ambiguous() {
+    let mut gw = gateway(vec![
+        FakeTransport::ok(
+            400,
+            r#"{"status":"error","message":"no margin","error_type":"MarginException"}"#,
+        ),
+        placed("2203"),
+    ]);
+    let o = order("O-1", OrderType::Market, None, None);
+    assert!(matches!(
+        gw.submit_order(o.clone()).await.unwrap_err(),
+        PortError::Rejected { .. }
+    ));
+    gw.submit_order(o).await.unwrap();
+    let reqs = gw.client().transport().requests();
+    assert_eq!(reqs.len(), 2, "no reconciliation GET /orders");
+    assert!(reqs.iter().all(|r| r.method == Method::Post));
+}

@@ -7,7 +7,7 @@ use honba_messages::{InstrumentId, Message};
 use honba_ports::{MarketDataFeed, PortError, PortResult};
 
 use crate::gateway::NowFn;
-use crate::ticker::{decode_frame, to_messages, Mode};
+use crate::ticker::{decode_frame, Mode, TradeFilter};
 use crate::tokens::TokenMap;
 use crate::transport::TransportError;
 use crate::ws::{TickerSocket, WsFrame};
@@ -26,6 +26,8 @@ pub struct KiteFeed<S: TickerSocket> {
     mode: Mode,
     now: NowFn,
     subscribed: HashSet<u32>,
+    pending_mode: Vec<u32>,
+    filter: TradeFilter,
     queue: VecDeque<Message>,
 }
 
@@ -38,6 +40,8 @@ impl<S: TickerSocket> KiteFeed<S> {
             mode,
             now,
             subscribed: HashSet::new(),
+            pending_mode: Vec::new(),
+            filter: TradeFilter::new(),
             queue: VecDeque::new(),
         }
     }
@@ -77,7 +81,7 @@ impl<S: TickerSocket> KiteFeed<S> {
                 continue;
             }
             if let Some(inst) = self.tokens.instrument_for(tick.token) {
-                self.queue.extend(to_messages(tick, inst, ts_init));
+                self.queue.extend(self.filter.messages(tick, inst, ts_init));
             }
         }
         Ok(())
@@ -103,20 +107,36 @@ impl<S: TickerSocket> MarketDataFeed for KiteFeed<S> {
                 new.push(token);
             }
         }
-        if new.is_empty() {
-            return Ok(());
-        }
         if self.subscribed.len() + new.len() > MAX_SUBSCRIPTIONS {
             return Err(PortError::InvalidRequest(format!(
                 "subscription exceeds the {MAX_SUBSCRIPTIONS} instrument limit per connection"
             )));
         }
-        self.send(serde_json::json!({"a": "subscribe", "v": new}))
-            .await?;
+        if !new.is_empty() {
+            self.subscribed.extend(new.iter().copied());
+            self.pending_mode.extend(new.iter().copied());
+            if let Err(e) = self
+                .send(serde_json::json!({"a": "subscribe", "v": new}))
+                .await
+            {
+                // Nothing reached the server: roll back so a retry starts clean.
+                for t in &new {
+                    self.subscribed.remove(t);
+                }
+                self.pending_mode.retain(|p| !new.contains(p));
+                return Err(e);
+            }
+        }
+        if self.pending_mode.is_empty() {
+            return Ok(());
+        }
+        // The server has these tokens; if this send fails they stay subscribed and pending, so
+        // a retry re-sends only the mode.
+        let pending = self.pending_mode.clone();
         let mode = self.mode_name();
-        self.send(serde_json::json!({"a": "mode", "v": [mode, new]}))
+        self.send(serde_json::json!({"a": "mode", "v": [mode, pending]}))
             .await?;
-        self.subscribed.extend(new);
+        self.pending_mode.clear();
         Ok(())
     }
 
@@ -137,6 +157,7 @@ impl<S: TickerSocket> MarketDataFeed for KiteFeed<S> {
         for t in &gone {
             self.subscribed.remove(t);
         }
+        self.pending_mode.retain(|p| !gone.contains(p));
         Ok(())
     }
 

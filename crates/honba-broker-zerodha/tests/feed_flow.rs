@@ -89,14 +89,28 @@ async fn assert_closed(f: &mut KiteFeed<ScriptedSocket>) {
 #[tokio::test]
 async fn multi_packet_frame_yields_trade_then_quote_then_next_symbol() {
     let ltp = u32s(&[2_953_217, 410_000]);
-    let (mut f, sent) = feed(vec![WsFrame::Binary(frame(&[full_packet(), ltp]))]);
+    let ltp2 = u32s(&[2_953_217, 410_100]);
+    // The first packet per token is only a baseline; the second frame carries the changes.
+    let mut second = full_packet();
+    second[16..20].copy_from_slice(&5010u32.to_be_bytes());
+    let (mut f, sent) = feed(vec![
+        WsFrame::Binary(frame(&[full_packet(), ltp])),
+        WsFrame::Binary(frame(&[second, ltp2])),
+    ]);
     f.subscribe(&[inst("RELIANCE"), inst("TCS")]).await.unwrap();
     assert_eq!(sent.lock().unwrap().len(), 2);
 
+    // Baseline frame: only the Full packet's quote (no phantom trades).
+    let q0 = f.next().await.unwrap().unwrap();
+    assert!(matches!(q0.event(), Event::Quote(_)));
+    // Second frame: volume +10 -> trade, then its quote, then TCS price change.
     let m1 = f.next().await.unwrap().unwrap();
     let m2 = f.next().await.unwrap().unwrap();
     let m3 = f.next().await.unwrap().unwrap();
-    assert!(matches!(m1.event(), Event::Trade(_)));
+    let Event::Trade(t1) = m1.event() else {
+        panic!()
+    };
+    assert_eq!(t1.size(), 10.0);
     assert!(matches!(m2.event(), Event::Quote(_)));
     let Event::Trade(t) = m3.event() else {
         panic!()
@@ -108,7 +122,11 @@ async fn multi_packet_frame_yields_trade_then_quote_then_next_symbol() {
 #[tokio::test]
 async fn duplicate_subscribe_does_not_duplicate_deliveries() {
     let ltp = u32s(&[2_953_217, 410_000]);
-    let (mut f, sent) = feed(vec![WsFrame::Binary(frame(&[ltp]))]);
+    let ltp2 = u32s(&[2_953_217, 410_100]);
+    let (mut f, sent) = feed(vec![
+        WsFrame::Binary(frame(&[ltp])),
+        WsFrame::Binary(frame(&[ltp2])),
+    ]);
     f.subscribe(&[inst("TCS")]).await.unwrap();
     f.subscribe(&[inst("TCS")]).await.unwrap();
     assert_eq!(

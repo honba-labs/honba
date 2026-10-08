@@ -1,7 +1,7 @@
 use honba_messages::{AggressorSide, Event, UnixNanos};
 
 use super::{any_instrument, frame, u32be};
-use crate::ticker::{decode_frame, to_messages, Mode, Segment, TickerError};
+use crate::ticker::{decode_frame, to_messages, Mode, Segment, TickerError, TradeFilter};
 
 const NSE_TOKEN: u32 = 408_065 * 256 + 1;
 
@@ -160,7 +160,7 @@ fn ltp_maps_to_trade_with_ts_init() {
             assert_eq!(tr.size(), 0.0);
             assert_eq!(tr.aggressor_side(), AggressorSide::NoAggressor);
             assert_eq!(tr.ts_event(), UnixNanos::from_u64(42));
-            assert_eq!(tr.trade_id().as_str(), format!("{NSE_TOKEN}-42"));
+            assert_eq!(tr.trade_id().as_str(), format!("{NSE_TOKEN}-42-0"));
         }
         other => panic!("expected trade, got {other:?}"),
     }
@@ -216,4 +216,41 @@ fn full_skips_quote_when_crossed_or_empty() {
         to_messages(&none, &any_instrument(), UnixNanos::from_u64(1)).len(),
         1
     );
+}
+
+fn tick_of(bytes: Vec<u8>) -> crate::ticker::DecodedTick {
+    decode_frame(&frame(&[bytes])).unwrap().remove(0)
+}
+
+#[test]
+fn trade_filter_full_baseline_emits_quote_but_no_trade() {
+    let mut f = TradeFilter::new();
+    let t = tick_of(full_packet(NSE_TOKEN, 250_000, 250_100));
+    let m = f.messages(&t, &any_instrument(), UnixNanos::from_u64(1));
+    assert_eq!(m.len(), 1);
+    assert!(matches!(m[0].event(), Event::Quote(_)));
+    // Same volume again: still a quote (depth may have changed), still no trade.
+    let m = f.messages(&t, &any_instrument(), UnixNanos::from_u64(1));
+    assert_eq!(m.len(), 1);
+    assert!(matches!(m[0].event(), Event::Quote(_)));
+}
+
+#[test]
+fn trade_filter_volume_decrease_resets_baseline_without_trade() {
+    let mut f = TradeFilter::new();
+    let mut hi = tick_of(quote_packet(NSE_TOKEN));
+    hi.volume = Some(500);
+    let mut lo = hi.clone();
+    lo.volume = Some(100);
+    let mut up = hi.clone();
+    up.volume = Some(130);
+    let ts = UnixNanos::from_u64(1);
+    assert!(f.messages(&hi, &any_instrument(), ts).is_empty());
+    assert!(f.messages(&lo, &any_instrument(), ts).is_empty());
+    let m = f.messages(&up, &any_instrument(), ts);
+    let Event::Trade(tr) = m[0].event() else {
+        panic!()
+    };
+    assert_eq!(tr.size(), 30.0);
+    assert!(tr.trade_id().as_str().ends_with("-130"));
 }

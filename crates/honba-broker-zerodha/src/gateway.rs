@@ -37,6 +37,7 @@ pub struct ZerodhaGateway<T: HttpTransport> {
     orders: HashMap<OrderId, Known>,
     by_venue: HashMap<String, OrderId>,
     emitted: HashSet<String>,
+    ambiguous: HashSet<OrderId>,
     queue: VecDeque<Trade>,
 }
 
@@ -51,6 +52,7 @@ impl<T: HttpTransport> ZerodhaGateway<T> {
             orders: HashMap::new(),
             by_venue: HashMap::new(),
             emitted: HashSet::new(),
+            ambiguous: HashSet::new(),
             queue: VecDeque::new(),
         }
     }
@@ -58,6 +60,19 @@ impl<T: HttpTransport> ZerodhaGateway<T> {
     /// The underlying REST client.
     pub fn client(&self) -> &KiteClient<T> {
         &self.client
+    }
+
+    fn register(&mut self, order: &Order, venue_id: String) {
+        let id = order.order_id().clone();
+        self.by_venue.insert(venue_id.clone(), id.clone());
+        self.orders.insert(
+            id,
+            Known {
+                venue_id,
+                instrument: order.instrument_id().clone(),
+                side: order.side(),
+            },
+        );
     }
 
     fn venue_id(&self, id: &OrderId) -> PortResult<String> {
@@ -138,17 +153,31 @@ impl<T: HttpTransport> ExecutionGateway for ZerodhaGateway<T> {
             product: self.product,
             tag: kite_tag(order.order_id()),
         };
-        let venue_id = self.client.place_order(&req).await?;
         let id = order.order_id().clone();
-        self.by_venue.insert(venue_id.clone(), id.clone());
-        self.orders.insert(
-            id.clone(),
-            Known {
-                venue_id,
-                instrument: order.instrument_id().clone(),
-                side: order.side(),
-            },
-        );
+        if self.ambiguous.contains(&id) {
+            // An earlier attempt may have reached the venue. Adopt it if the tag is there.
+            let existing = self
+                .client
+                .orders()
+                .await?
+                .into_iter()
+                .find(|r| r.tag.as_deref() == Some(req.tag.as_str()));
+            if let Some(rec) = existing {
+                self.ambiguous.remove(&id);
+                self.register(&order, rec.order_id);
+                return Ok(id);
+            }
+        }
+        let venue_id = match self.client.place_order(&req).await {
+            Ok(v) => v,
+            Err(e @ (PortError::Timeout | PortError::Transport(_))) => {
+                self.ambiguous.insert(id);
+                return Err(e);
+            }
+            Err(e) => return Err(e),
+        };
+        self.ambiguous.remove(&id);
+        self.register(&order, venue_id);
         Ok(id)
     }
 
