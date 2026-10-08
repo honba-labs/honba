@@ -64,7 +64,7 @@ pub const API_TYPES: &[&str] = &[
 ];
 
 /// The run-configuration types (docs/archive/plan.md E0-S4).
-pub const CONFIG_TYPES: &[&str] = &["BacktestRunConfig"];
+pub const CONFIG_TYPES: &[&str] = &["BacktestRunConfig", "RiskLimits"];
 
 /// The strategy manifest and verified IR types (docs/archive/plan.md E0-S8).
 pub const MANIFEST_TYPES: &[&str] = &[
@@ -147,6 +147,7 @@ pub fn register_all(set: &mut SchemaSet) {
     set.add_type::<honba_strategy::IrSubscriptions>("IrSubscriptions");
 
     set.add_type::<honba_config::BacktestRunConfig>("BacktestRunConfig");
+    set.add_type::<honba_config::RiskLimits>("RiskLimits");
 }
 
 /// The schema for a request body, registered under its DTO name.

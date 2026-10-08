@@ -3,6 +3,8 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::RiskConfigError;
+
 /// Per-run risk limits. `None` means the rule is off; the default has no limits.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -24,4 +26,33 @@ pub struct OrderRateLimit {
     pub max_orders: u32,
     /// Window length in milliseconds of event time; must be `>= 1`.
     pub window_ms: u64,
+}
+
+impl RiskLimits {
+    /// Checks every set limit: `max_notional` finite and `> 0`, `max_orders` and `window_ms`
+    /// `>= 1`. The default (no limits) is valid.
+    pub fn validate(&self) -> Result<(), RiskConfigError> {
+        if let Some(v) = self.max_notional {
+            if !(v.is_finite() && v > 0.0) {
+                return Err(RiskConfigError::InvalidMaxNotional(v));
+            }
+        }
+        if let Some(rate) = self.order_rate {
+            if rate.max_orders == 0 || rate.window_ms == 0 {
+                return Err(RiskConfigError::InvalidOrderRate);
+            }
+        }
+        Ok(())
+    }
+
+    /// The guard for a non-simulated (live) run: the limits must be valid and **both**
+    /// `max_notional` and `order_rate` must be set, else
+    /// [`RiskConfigError::LiveRunWithoutLimit`].
+    pub fn require_live(&self) -> Result<(), RiskConfigError> {
+        self.validate()?;
+        if self.max_notional.is_none() || self.order_rate.is_none() {
+            return Err(RiskConfigError::LiveRunWithoutLimit);
+        }
+        Ok(())
+    }
 }

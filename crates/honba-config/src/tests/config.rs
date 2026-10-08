@@ -30,6 +30,7 @@ fn valid_config() -> BacktestRunConfig {
         execution: ExecutionConfig::default(),
         account: AccountConfig::default(),
         seed: 42,
+        risk: RiskLimits::default(),
     }
 }
 

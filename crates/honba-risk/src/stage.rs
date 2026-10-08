@@ -20,6 +20,9 @@ pub enum RiskConfigError {
     /// `order_rate` needs `max_orders >= 1` and `window_ms >= 1`.
     #[error("order_rate needs max_orders >= 1 and window_ms >= 1")]
     InvalidOrderRate,
+    /// A live run needs both `max_notional` and `order_rate` set.
+    #[error("a live run requires both max_notional and order_rate to be set")]
+    LiveRunWithoutLimit,
 }
 
 /// Tolerance for fractional positions in the reduce-only comparison.
@@ -107,6 +110,7 @@ impl RiskStage {
         currency: Currency,
         rules: Arc<dyn RulesSource>,
     ) -> Result<Self, RiskConfigError> {
+        limits.validate()?;
         let max_notional = match limits.max_notional {
             None => None,
             Some(v) if v.is_finite() && v > 0.0 => Some(
@@ -115,11 +119,6 @@ impl RiskStage {
             ),
             Some(v) => return Err(RiskConfigError::InvalidMaxNotional(v)),
         };
-        if let Some(rate) = limits.order_rate {
-            if rate.max_orders == 0 || rate.window_ms == 0 {
-                return Err(RiskConfigError::InvalidOrderRate);
-            }
-        }
         Ok(Self {
             limits,
             currency,

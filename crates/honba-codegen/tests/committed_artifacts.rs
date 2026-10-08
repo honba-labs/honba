@@ -111,3 +111,17 @@ fn generation_is_deterministic() {
         .collect();
     assert_eq!(first, second);
 }
+
+#[test]
+fn config_types_include_risk_limits() {
+    assert_eq!(
+        honba_codegen::CONFIG_TYPES,
+        ["BacktestRunConfig", "RiskLimits"]
+    );
+    assert!(honba_codegen::published_names().contains(&"RiskLimits"));
+    let schema = read(&repo().join("schema/domain/domain_schema.json"));
+    assert!(
+        schema.contains("\"RiskLimits\""),
+        "committed schema lacks RiskLimits"
+    );
+}

@@ -49,6 +49,7 @@ class BacktestRunConfig:
     account: AccountConfig | None = None
     data: DataSourceConfig | None = None
     execution: ExecutionConfig | None = None
+    risk: RiskLimits | None = None
     seed: int
     strategy: StrategyManifest
 
@@ -306,6 +307,10 @@ class OrderIntent:
     time_in_force: TimeInForce
     trigger_price: float | None = None
 
+class OrderRateLimit:
+    max_orders: int
+    window_ms: int
+
 OrderSide = Literal["buy", "sell", "no_order_side"]
 
 OrderStatus = Literal["initialized", "submitted", "accepted", "partially_filled", "filled", "cancelled", "rejected", "expired"]
@@ -362,6 +367,10 @@ class ResponseEnvelope(Generic[T]):
     data: T | None = None
     error: ErrorDetail | None = None
     schema_version: int
+
+class RiskLimits:
+    max_notional: float | None = None
+    order_rate: OrderRateLimit | None = None
 
 RunStatus = Literal["pending", "running", "completed", "failed"]
 

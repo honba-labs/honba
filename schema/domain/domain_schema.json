@@ -246,6 +246,18 @@
           },
           "description": "Simulation assumptions."
         },
+        "risk": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RiskLimits"
+            }
+          ],
+          "default": {
+            "max_notional": null,
+            "order_rate": null
+          },
+          "description": "Pre-trade risk limits (ADR 0018). Absent means no limits."
+        },
         "seed": {
           "description": "Seed for every stochastic component. Same seed and data ⇒ identical journal.",
           "format": "uint64",
@@ -2196,6 +2208,29 @@
       ],
       "type": "object"
     },
+    "OrderRateLimit": {
+      "additionalProperties": false,
+      "description": "At most `max_orders` approved orders in any `window_ms` of event time.",
+      "properties": {
+        "max_orders": {
+          "description": "Maximum approved orders per window; must be `>= 1`.",
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "window_ms": {
+          "description": "Window length in milliseconds of event time; must be `>= 1`.",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_orders",
+        "window_ms"
+      ],
+      "type": "object"
+    },
     "OrderSide": {
       "description": "Which side of the book an order sits on.",
       "oneOf": [
@@ -2632,6 +2667,34 @@
         "api_version",
         "schema_version"
       ],
+      "type": "object"
+    },
+    "RiskLimits": {
+      "additionalProperties": false,
+      "description": "Per-run risk limits. `None` means the rule is off; the default has no limits.",
+      "properties": {
+        "max_notional": {
+          "default": null,
+          "description": "Per-order notional ceiling in major units of the account currency. `None` = no notional rule; `Some` must be finite and `> 0`.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "order_rate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OrderRateLimit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Orders-per-window ceiling in event time. `None` = no rate rule."
+        }
+      },
       "type": "object"
     },
     "RunStatus": {

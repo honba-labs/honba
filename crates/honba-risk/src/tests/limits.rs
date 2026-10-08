@@ -48,3 +48,84 @@ fn round_trips() {
     let back: RiskLimits = serde_json::from_str(&serde_json::to_string(&l).unwrap()).unwrap();
     assert_eq!(back, l);
 }
+
+#[test]
+fn validate_accepts_default_and_valid_limits() {
+    assert_eq!(RiskLimits::default().validate(), Ok(()));
+    let l = RiskLimits {
+        max_notional: Some(1.0),
+        order_rate: Some(OrderRateLimit {
+            max_orders: 1,
+            window_ms: 1,
+        }),
+    };
+    assert_eq!(l.validate(), Ok(()));
+}
+
+#[test]
+fn validate_rejects_bad_notional_and_rate() {
+    use crate::RiskConfigError;
+    for v in [0.0, -1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let l = RiskLimits {
+            max_notional: Some(v),
+            order_rate: None,
+        };
+        assert!(
+            matches!(l.validate(), Err(RiskConfigError::InvalidMaxNotional(_))),
+            "{v}"
+        );
+    }
+    for (m, w) in [(0, 1), (1, 0), (0, 0)] {
+        let l = RiskLimits {
+            max_notional: None,
+            order_rate: Some(OrderRateLimit {
+                max_orders: m,
+                window_ms: w,
+            }),
+        };
+        assert_eq!(l.validate(), Err(RiskConfigError::InvalidOrderRate));
+    }
+}
+
+#[test]
+fn live_run_without_limits_refused() {
+    use crate::RiskConfigError;
+    let rate = OrderRateLimit {
+        max_orders: 30,
+        window_ms: 1000,
+    };
+    for l in [
+        RiskLimits::default(),
+        RiskLimits {
+            max_notional: Some(5.0),
+            order_rate: None,
+        },
+        RiskLimits {
+            max_notional: None,
+            order_rate: Some(rate),
+        },
+    ] {
+        assert_eq!(l.require_live(), Err(RiskConfigError::LiveRunWithoutLimit));
+    }
+    let both = RiskLimits {
+        max_notional: Some(5.0),
+        order_rate: Some(rate),
+    };
+    assert_eq!(both.require_live(), Ok(()));
+}
+
+#[test]
+fn live_run_rejects_invalid_limits_with_the_validation_error() {
+    use crate::RiskConfigError;
+    let l = RiskLimits {
+        max_notional: Some(-1.0),
+        order_rate: Some(OrderRateLimit {
+            max_orders: 1,
+            window_ms: 1,
+        }),
+    };
+    assert!(matches!(
+        l.require_live(),
+        Err(RiskConfigError::InvalidMaxNotional(_))
+    ));
+}

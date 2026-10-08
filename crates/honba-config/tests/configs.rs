@@ -46,3 +46,16 @@ fn a_typo_in_a_run_config_is_an_error_not_a_default() {
     let err = toml::from_str::<BacktestRunConfig>(&text).unwrap_err();
     assert!(err.to_string().contains("slipage_multiplier"), "{err}");
 }
+
+#[test]
+fn config_without_risk_section_parses() {
+    // ADR 0018: `[risk]` is optional; every committed config predates it.
+    for path in backtest_configs() {
+        let name = path.display();
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(!text.contains("[risk"), "{name} already has a risk section");
+        let cfg: BacktestRunConfig =
+            toml::from_str(&text).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!(cfg.risk, honba_config::RiskLimits::default(), "{name}");
+    }
+}

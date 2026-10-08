@@ -10,6 +10,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+pub use honba_risk::{OrderRateLimit, RiskLimits};
 use honba_strategy::{StrategyManifest, Universe};
 
 /// A complete, self-describing description of one backtest run.
@@ -32,6 +33,9 @@ pub struct BacktestRunConfig {
     pub account: AccountConfig,
     /// Seed for every stochastic component. Same seed and data ⇒ identical journal.
     pub seed: u64,
+    /// Pre-trade risk limits (ADR 0018). Absent means no limits.
+    #[serde(default)]
+    pub risk: RiskLimits,
 }
 
 impl Default for DataSourceConfig {
@@ -156,6 +160,7 @@ impl BacktestRunConfig {
                 return Err(RunConfigError::EmptyDataRoot);
             }
         }
+        self.risk.validate().map_err(RunConfigError::Risk)?;
         Ok(())
     }
 
@@ -166,7 +171,7 @@ impl BacktestRunConfig {
 }
 
 /// Why a run config was rejected.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum RunConfigError {
     /// The embedded strategy manifest is invalid.
@@ -179,6 +184,8 @@ pub enum RunConfigError {
     InvalidStartingCash,
     /// The local data root is blank.
     EmptyDataRoot,
+    /// The `[risk]` limits are invalid.
+    Risk(honba_risk::RiskConfigError),
 }
 
 impl std::fmt::Display for RunConfigError {
@@ -189,6 +196,7 @@ impl std::fmt::Display for RunConfigError {
             Self::NegativeSlippage => write!(f, "slippage_multiplier must be >= 0"),
             Self::InvalidStartingCash => write!(f, "starting_cash must be positive and finite"),
             Self::EmptyDataRoot => write!(f, "local data root must not be empty"),
+            Self::Risk(e) => write!(f, "invalid risk limits: {e}"),
         }
     }
 }
@@ -197,6 +205,7 @@ impl std::error::Error for RunConfigError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Strategy(e) => Some(e),
+            Self::Risk(e) => Some(e),
             _ => None,
         }
     }
