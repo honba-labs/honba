@@ -18,6 +18,11 @@ Rules:
   degraded by :class:`honba.backtest.impact.MarketImpact` (square-root law, past sessions
   only) and costs are charged on that price. Implemented on the Python backend, which is
   what an ``impact=`` run selects.
+* **Opening auction.** With ``auction=`` every fill at a printed open pays the adverse
+  spread buffer of :class:`honba.backtest.opening_auction.OpeningAuction` (``spread_bps``,
+  stacking with ``impact=``) and an order waits ``delay_bars`` extra driving bars after
+  submission before it may fill — the post-open turbulence window of Balch pitfall #8.
+  Also Python-backend only.
 * **Cash.** Integer ``Money`` (ADR 0011), notional ``Money.mul_qty`` like the ledger. A
   buy debits ``notional + cost`` at once; a sell credits ``notional - cost`` at once but
   the proceeds only become *available* ``settlement_days`` sessions later.
@@ -62,6 +67,7 @@ from typing import Any, Literal
 
 from honba import _native
 from honba.backtest.impact import MarketImpact
+from honba.backtest.opening_auction import OpeningAuction
 from honba.domain.money import Currency, Money
 from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
@@ -83,6 +89,7 @@ __all__ = [
     "FillModel",
     "MarketImpact",
     "NextOpenExecution",
+    "OpeningAuction",
     "SessionOpen",
     "fill_costs_from_model",
     "group_sessions",
@@ -157,6 +164,7 @@ class _PythonSim:
         long_only: bool = True,
         lot_sizes: Mapping[InstrumentId, float] | None = None,
         impact: MarketImpact | None = None,
+        auction: OpeningAuction | None = None,
     ) -> None:
         if settlement_days < 0:
             raise ValueError("settlement_days must be >= 0")
@@ -170,6 +178,7 @@ class _PythonSim:
         self._currency = cash.currency
         self._cost_fn = costs
         self._impact = impact
+        self._auction = auction
         self._lot_sizes: dict[InstrumentId, float] = {}
         for iid, lot in (lot_sizes or {}).items():
             self.set_lot_size(iid, lot)
@@ -298,10 +307,12 @@ class _PythonSim:
             if b.instrument_id not in self._opened and _usable_open(b.open):
                 opens.setdefault(b.instrument_id, b)
         self._opened.update(opens)
+        # The post-open delay holds every order back for ``delay_bars`` extra sessions.
+        delay = self._auction.delay_bars if self._auction is not None else 0
         eligible = [
             w
             for w in self._working
-            if w.session < self._session and w.intent.instrument_id in opens
+            if w.session + delay < self._session and w.intent.instrument_id in opens
         ]
         for w in eligible:
             if w.intent.side is OrderSide.SELL:
@@ -315,10 +326,12 @@ class _PythonSim:
                 self._impact.observe(b.instrument_id, volume=b.volume, close=b.close)
 
     def _exec_price(self, side: OrderSide, bar: Bar, quantity: float) -> float:
-        """The fill price: the printed open degraded by square-root impact, if any."""
-        if self._impact is None:
-            return bar.open
-        fraction = self._impact.fraction(bar.instrument_id, quantity)
+        """The fill price: the printed open adverse of the auction buffer and impact, if any."""
+        fraction = 0.0
+        if self._auction is not None:
+            fraction += self._auction.fraction  # the opening auction is crossed whatever the size
+        if self._impact is not None:
+            fraction += self._impact.fraction(bar.instrument_id, quantity)
         if fraction <= 0.0:
             return bar.open
         px = bar.open * (1.0 + fraction) if side is OrderSide.BUY else bar.open * (1.0 - fraction)
@@ -714,14 +727,22 @@ class NextOpenExecution(BaseExecutionPort):
         lot_sizes: Mapping[InstrumentId, float] | None = None,
         backend: BackendChoice | None = None,
         impact: MarketImpact | None = None,
+        auction: OpeningAuction | None = None,
     ) -> None:
         if impact is not None and backend == "native":
             raise ValueError(
                 "impact= needs the Python backend (the Rust simulator has no market-impact "
                 "model yet): drop backend='native'"
             )
-        # ``auto`` with impact resolves to python: impact is only implemented there today.
-        self._backend: Backend = "python" if impact is not None else resolve_backend(backend)
+        if auction is not None and backend == "native":
+            raise ValueError(
+                "auction= needs the Python backend (the Rust simulator has no opening-auction "
+                "model yet): drop backend='native'"
+            )
+        # ``auto`` with impact/auction resolves to python: both are only implemented there today.
+        self._backend: Backend = (
+            "python" if (impact is not None or auction is not None) else resolve_backend(backend)
+        )
         if self._backend == "native":
             self._impl: _PythonSim | _NativeSim = _NativeSim(
                 cash=cash,
@@ -738,6 +759,7 @@ class NextOpenExecution(BaseExecutionPort):
                 long_only=long_only,
                 lot_sizes=lot_sizes,
                 impact=impact,
+                auction=auction,
             )
 
     @property
@@ -918,6 +940,7 @@ def make_simulator(
     as_of: date | None = None,
     lot_sizes: Mapping[InstrumentId, float] | None = None,
     impact: MarketImpact | None = None,
+    auction: OpeningAuction | None = None,
 ) -> ExecutionPortLike:
     """Build the simulated port for ``fill``.
 
@@ -925,11 +948,19 @@ def make_simulator(
       market pack's cycle for ``exchange`` on ``as_of`` (today's cycle when None;
       ``honba.markets.india.settlement_days_for``). Intraday ``timeframe`` values need an
       explicit ``settlement_days`` because the port counts bars, not trading days.
+      ``auction.delay_bars`` (Balch pitfall #8) also counts driving bars, so it needs an
+      intraday ``timeframe``.
     * ``"bar_close"``: the single-price conformance simulator
       ``honba.strategies.testing.BarCloseFills`` (fills at the decision bar's close; costs
       and cash rules do not apply). Kept for the cross-language conformance suite.
     """
     if fill == "next_open":
+        if auction is not None and auction.delay_bars > 0 and not is_intraday(timeframe):
+            raise ValueError(
+                f"auction.delay_bars={auction.delay_bars} counts driving bars, and timeframe "
+                f"{timeframe!r} is not intraday: the post-open delay only means anything "
+                "sub-daily (e.g. timeframe='1m' with delay_bars=5..15)"
+            )
         if settlement_days is None:
             if is_intraday(timeframe):
                 raise ValueError(
@@ -947,12 +978,18 @@ def make_simulator(
             long_only=long_only,
             lot_sizes=lot_sizes,
             impact=impact,
+            auction=auction,
         )
     if fill == "bar_close":
         if impact is not None:
             raise ValueError(
                 "impact= requires fill='next_open': the bar-close conformance simulator has "
                 "no market-impact model"
+            )
+        if auction is not None:
+            raise ValueError(
+                "auction= requires fill='next_open': the bar-close conformance simulator has "
+                "no opening-auction model"
             )
         from honba.strategies.testing import BarCloseFills
 

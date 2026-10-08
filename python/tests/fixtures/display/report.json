@@ -13,7 +13,8 @@
     "data": null,
     "warmup_bars": null,
     "settlement_days": null,
-    "impact": null
+    "impact": null,
+    "auction": null
   },
   "metrics": {
     "final_equity": 1084250.5,

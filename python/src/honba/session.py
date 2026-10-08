@@ -54,6 +54,7 @@ from typing import Protocol, cast
 # depend on Session (no circular imports).
 # ---------------------------------------------------------------------------
 from honba.backtest.impact import MarketImpact
+from honba.backtest.opening_auction import OpeningAuction
 from honba.backtest.simulated import (
     FillCostFn,
     FillModel,
@@ -168,6 +169,11 @@ class BacktestConfig:
     # open; a MarketImpact degrades every fill by kappa * sigma * sqrt(qty / ADV) using
     # past sessions only, and forces the Python simulator backend.
     impact: MarketImpact | None = None
+    # Opening-auction realism (Balch pitfall #8): None (default) fills at the printed open;
+    # an OpeningAuction adds an adverse spread buffer (spread_bps) to every open fill and
+    # holds orders back delay_bars extra driving bars (intraday timeframes only). Also
+    # forces the Python simulator backend.
+    auction: OpeningAuction | None = None
 
     def __post_init__(self) -> None:
         if not self.symbol:
@@ -420,6 +426,7 @@ class Honba:
         warmup_bars: int | None = None,
         settlement_days: int | None = None,
         impact: MarketImpact | None = None,
+        auction: OpeningAuction | None = None,
     ) -> BacktestSession:
         """Build a BacktestSession ready for .run().
 
@@ -458,6 +465,12 @@ class Honba:
           ``kappa * sigma_daily * sqrt(qty / ADV)`` from past sessions only, and costs are
           charged on the impacted price. None (default) fills at the printed open.
           Forces the Python simulator backend.
+        auction:
+          Opening-auction realism (Balch pitfall #8): an ``OpeningAuction`` charges every
+          open fill an adverse ``spread_bps`` buffer and holds orders back ``delay_bars``
+          extra driving bars (intraday ``timeframe`` only) so entries skip the opening
+          turbulence. None (default) fills at the printed open. Forces the Python
+          simulator backend.
         data / execution:
           Optional overrides for tests or custom infrastructure.
         """
@@ -476,6 +489,7 @@ class Honba:
             warmup_bars=warmup_bars if warmup_bars is not None else config_warmup,
             settlement_days=settlement_days,
             impact=impact,
+            auction=auction,
         )
 
         resolved_data = data if data is not None else _default_data_provider()
@@ -581,6 +595,7 @@ def _default_execution(config: BacktestConfig, cost_model: CostModel | None) -> 
         timeframe=config.timeframe,
         as_of=_parse_time(config.start).date(),
         impact=config.impact,
+        auction=config.auction,
     )
 
 
