@@ -2,11 +2,19 @@
 
 use std::collections::HashMap;
 
-use honba_engine::{AlgoError, ExecutionEngine, Handler, OrderRejection, Result};
+use honba_engine::{
+    AlgoError, AuditKind, AuditLog, ExecutionEngine, Handler, OrderRejection, Result,
+};
 use honba_entities::{ExecutionEvent, Trade};
-use honba_messages::{Event, InstrumentId, OrderEvent, OrderId, OrderState, UnixNanos};
+use honba_messages::{
+    Event, InstrumentId, Order, OrderEvent, OrderId, OrderSide, OrderState, OrderStatus,
+    TradingState, UnixNanos,
+};
+use honba_risk::{
+    check_state, RiskCheck, RiskDecision, RiskLimits, RiskRefusal, RiskRequest, RiskStage,
+};
 
-use crate::context::LedgerContext;
+use crate::context::{LedgerContext, StrategyContext};
 use crate::intent::{IntentError, OrderIntent};
 use crate::strategy::{Strategy, StrategyAdapter};
 
@@ -109,6 +117,15 @@ pub struct StrategyRunner<S: Strategy, E: ExecutionEngine> {
     suppressed: Vec<SuppressedIntent>,
     states: HashMap<String, OrderState>,
     released: HashMap<InstrumentId, f64>,
+    risk: Option<RiskStage>,
+    trading_state: TradingState,
+    audit: AuditLog,
+    /// Instrument and side per order id: what working exposure needs.
+    sides: HashMap<String, (InstrumentId, OrderSide)>,
+    /// Last bar close or trade price per instrument: the stage's `reference_price`.
+    last_px: HashMap<InstrumentId, f64>,
+    /// Pre-gate `Rejected` events, booked ahead of the next drain.
+    pre_gate: Vec<ExecutionEvent>,
 }
 
 impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
@@ -136,7 +153,132 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
             suppressed: Vec::new(),
             states: HashMap::new(),
             released: HashMap::new(),
+            risk: None,
+            trading_state: TradingState::Active,
+            audit: AuditLog::new(),
+            sides: HashMap::new(),
+            last_px: HashMap::new(),
+            pre_gate: Vec::new(),
         }
+    }
+
+    /// Puts `stage` in front of the execution engine: every order the runner submits passes it,
+    /// and a refusal is audited ([`Self::audit`]) as [`AuditKind::RiskRefused`] then
+    /// [`AuditKind::OrderRejected`], never reaches the execution engine, and is booked as an
+    /// [`OrderRejection`] whose reason is the `ErrorCode` wire spelling (ADR 0018 decisions
+    /// 6-7).
+    ///
+    /// Without a stage the runner still applies the state rules (`Halted`, reduce-only). A run
+    /// holds at most one stage: the runner reports it through [`Handler::holds_risk_stage`], so
+    /// an `Engine` that already has one refuses to start.
+    #[must_use]
+    pub fn with_risk(mut self, stage: RiskStage) -> Self {
+        self.risk = Some(stage);
+        self
+    }
+
+    /// The runner's own audit trail: one [`AuditKind::RiskRefused`] and one
+    /// [`AuditKind::OrderRejected`] per order it refused before submit. The `Engine`'s log
+    /// does not include them (the runner bypasses `Engine::submit`).
+    pub fn audit(&self) -> &AuditLog {
+        &self.audit
+    }
+
+    /// The trading state the runner enforces: [`TradingState::Active`] until the hosting engine
+    /// reports a change through [`Handler::on_trading_state`].
+    pub fn trading_state(&self) -> TradingState {
+        self.trading_state
+    }
+
+    /// The live-run guard (ADR 0018 decision 8): `Ok` only when the runner's stage was built
+    /// with both `max_notional` and `order_rate`. An assembler building a non-simulated run
+    /// calls this before starting; a runner without a stage fails like one without limits.
+    pub fn require_live_limits(&self) -> Result<()> {
+        let limits = match &self.risk {
+            Some(stage) => stage.limits().clone(),
+            None => RiskLimits::default(),
+        };
+        limits.require_live().map_err(AlgoError::from)
+    }
+
+    /// The signed open quantity (`+` buy, `-` sell) of this runner's working orders on
+    /// `instrument_id` and `side` (ADR 0019 decision 5).
+    fn working_exposure(&self, instrument_id: &InstrumentId, side: OrderSide) -> f64 {
+        let sign = match side {
+            OrderSide::Buy => 1.0,
+            OrderSide::Sell => -1.0,
+            _ => return 0.0,
+        };
+        sign * self
+            .states
+            .iter()
+            .filter(|(_, st)| {
+                matches!(
+                    st.status,
+                    OrderStatus::Submitted | OrderStatus::Accepted | OrderStatus::PartiallyFilled
+                )
+            })
+            .filter(|(id, _)| {
+                self.sides
+                    .get(*id)
+                    .is_some_and(|(i, s)| i == instrument_id && *s == side)
+            })
+            .map(|(_, st)| st.quantity - st.filled_qty)
+            .sum::<f64>()
+    }
+
+    /// Runs the stage (or, without one, the state rules) over `order`, which is being submitted
+    /// during the event at `ts_init`.
+    fn risk_check(&mut self, order: &Order, ts_init: UnixNanos) -> Option<RiskRefusal> {
+        let instrument = order.instrument_id();
+        let request = RiskRequest {
+            order_id: order.order_id().clone(),
+            instrument_id: instrument.clone(),
+            side: order.side(),
+            quantity: order.quantity(),
+            price: order.price(),
+            trigger_price: order.trigger_price(),
+            reference_price: self.last_px.get(instrument).copied(),
+            position: self.adapter.context().position(instrument)
+                + self.working_exposure(instrument, order.side()),
+            trading_state: self.trading_state,
+            ts: ts_init,
+        };
+        match self.risk.as_mut() {
+            Some(stage) => match stage.check(&request) {
+                RiskDecision::Approved => None,
+                RiskDecision::Refused(refusal) => Some(refusal),
+            },
+            None => check_state(&request),
+        }
+    }
+
+    /// Refuses `order` before it reaches the execution engine (ADR 0018 decision 6):
+    /// audited, `Initialized -> Rejected`, and a `Rejected` event queued ahead of the next
+    /// drain so the refusal travels the same stream as a venue reject.
+    fn refuse(&mut self, order: &Order, refusal: RiskRefusal, ts_init: UnixNanos) {
+        let order_id = order.order_id().as_str().to_string();
+        let reason = refusal.error_code().as_str().to_string();
+        self.audit.record(AuditKind::RiskRefused {
+            order_id: order_id.clone(),
+            refusal,
+        });
+        self.audit.record(AuditKind::OrderRejected {
+            order_id: order_id.clone(),
+            reason: reason.clone(),
+        });
+        self.states.insert(order_id.clone(), OrderState::new());
+        self.sides
+            .insert(order_id, (order.instrument_id().clone(), order.side()));
+        self.pre_gate.push(ExecutionEvent::Rejected {
+            order_id: order.order_id().clone(),
+            instrument_id: order.instrument_id().clone(),
+            side: order.side(),
+            quantity: order.quantity(),
+            reason,
+            venue_order_id: None,
+            ts: ts_init,
+        });
     }
 
     /// Suppresses orders until `warmup_bars` driving bars have been seen.
@@ -226,7 +368,8 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
     /// not lose the other events: each is still booked and the first error is
     /// returned afterwards.
     fn book_events(&mut self) -> Result<()> {
-        let events = self.execution.drain_events()?;
+        let mut events = std::mem::take(&mut self.pre_gate);
+        events.extend(self.execution.drain_events()?);
         let mut first_error = None;
         for event in events {
             match event {
@@ -368,12 +511,18 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
                 continue;
             }
             let id = self.next_order_id();
-            let sent = intent
-                .clone()
-                .into_order(id.clone(), ts_init)
-                .map_err(|e| AlgoError::Component(e.to_string()))
-                .and_then(|order| self.execution.submit(order));
-            if let Err(e) = sent {
+            let order = match intent.clone().into_order(id.clone(), ts_init) {
+                Ok(order) => order,
+                Err(e) => {
+                    self.adapter.parts_mut().1.release(&intent);
+                    return Err(AlgoError::Component(e.to_string()));
+                }
+            };
+            if let Some(refusal) = self.risk_check(&order, ts_init) {
+                self.refuse(&order, refusal, ts_init);
+                continue;
+            }
+            if let Err(e) = self.execution.submit(order) {
                 self.adapter.parts_mut().1.release(&intent);
                 return Err(e);
             }
@@ -382,6 +531,10 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
                 quantity: intent.quantity,
             });
             self.states.insert(id.as_str().to_string(), state);
+            self.sides.insert(
+                id.as_str().to_string(),
+                (intent.instrument_id.clone(), intent.side),
+            );
             // Recorded only once the execution port accepted it (Python parity).
             self.submitted.push(SubmittedIntent {
                 ts_init,
@@ -390,6 +543,21 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
             });
         }
         Ok(())
+    }
+
+    /// Remembers the last bar close or trade price per instrument for the risk request.
+    fn observe_price(&mut self, event: &Event) {
+        match event {
+            Event::Bar(bar) => {
+                self.last_px
+                    .insert(bar.bar_type().instrument_id().clone(), bar.close());
+            }
+            Event::Trade(tick) => {
+                self.last_px
+                    .insert(tick.instrument_id().clone(), tick.price());
+            }
+            _ => {}
+        }
     }
 
     fn next_order_id(&mut self) -> OrderId {
@@ -417,6 +585,8 @@ impl<S: Strategy, E: ExecutionEngine> Handler for StrategyRunner<S, E> {
             self.last_bar_ts = Some(ts_init);
         }
 
+        self.observe_price(event);
+
         // 1. Set the clock and dispatch to the strategy.
         self.adapter.on_event(event, ts_init)?;
 
@@ -436,6 +606,14 @@ impl<S: Strategy, E: ExecutionEngine> Handler for StrategyRunner<S, E> {
         self.book_events()?;
 
         Ok(honba_engine::EngineOutput::None)
+    }
+
+    fn on_trading_state(&mut self, state: TradingState) {
+        self.trading_state = state;
+    }
+
+    fn holds_risk_stage(&self) -> bool {
+        self.risk.is_some()
     }
 
     fn on_stop(&mut self) -> Result<()> {

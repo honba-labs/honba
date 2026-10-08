@@ -11,6 +11,7 @@ description = "Strategy trait and reference strategies for Honba"
 honba-messages.workspace = true
 honba-entities.workspace = true
 honba-engine.workspace = true
+honba-risk.workspace = true
 honba-indicators.workspace = true
 serde.workspace = true
 schemars = { workspace = true }
@@ -21,3 +22,4 @@ honba-testing.workspace = true
 honba-sim.workspace = true
 honba-analytics.workspace = true
 honba-data.workspace = true
+honba-market.workspace = true

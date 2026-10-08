@@ -132,7 +132,13 @@ ALLOWED_DEV = {
     "honba-engine": {"honba-sim", "honba-market"},  # tests name InstrumentRules for a RulesSource
     "honba-indicators": set(),
     "honba-sim": set(),
-    "honba-strategy": {"honba-analytics", "honba-data", "honba-sim", "honba-testing"},
+    "honba-strategy": {
+        "honba-analytics",
+        "honba-data",
+        "honba-market",  # tests name InstrumentRules for a RulesSource
+        "honba-sim",
+        "honba-testing",
+    },
     "honba-testing": set(),
     "honba-analytics": set(),
     "honba-data": set(),

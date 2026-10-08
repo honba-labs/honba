@@ -9,6 +9,7 @@ mod manifest;
 mod runner_errors;
 mod runner_events;
 mod runner_rejections;
+mod runner_risk;
 mod runner_warmup;
 
 use honba_messages::{Exchange, InstrumentId};
