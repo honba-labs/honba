@@ -77,3 +77,68 @@ fn the_strategy_routes_are_built() {
         );
     }
 }
+
+#[tokio::test]
+async fn the_backtest_and_journal_routes_are_built_and_only_sweeps_and_trading_stay_flagged() {
+    // ADR 0017 decision 7 shrinks the list to the four trading rows once sweeps (E4-S5) land;
+    // until then the two sweep rows stay flagged.
+    let (_, body) = call("GET", "/capabilities").await;
+    assert_eq!(
+        strings(&body["data"]["capabilities"]["not_implemented"]),
+        [
+            "POST /sweeps",
+            "GET /sweeps/{id}",
+            "POST /orders",
+            "GET /orders",
+            "DELETE /orders/{id}",
+            "POST /positions/close",
+        ]
+    );
+    for route in [
+        ("POST", "/backtests"),
+        ("GET", "/backtests/{id}"),
+        ("GET", "/backtests/{id}/journal"),
+        ("GET", "/journals/{id}"),
+    ] {
+        assert!(
+            !NOT_IMPLEMENTED_ENDPOINTS.contains(&route),
+            "{route:?} is implemented and must not be flagged"
+        );
+    }
+}
+
+#[tokio::test]
+async fn probing_the_unflagged_routes_answers_non_501_and_writes_nothing() {
+    let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("capabilities-probe-journals");
+    let _ = std::fs::remove_dir_all(&dir);
+    let state = honba_api_rest::AppState::default()
+        .with_journals_dir(&dir, honba_api_rest::RunServiceConfig::default())
+        .unwrap();
+    let router = honba_api_rest::api_router_with(state);
+    let flagged: Vec<String> = NOT_IMPLEMENTED_ENDPOINTS
+        .iter()
+        .map(|(m, p)| format!("{m} {p}"))
+        .collect();
+    for (method, path) in ENDPOINTS {
+        if flagged.contains(&format!("{method} {path}")) {
+            continue;
+        }
+        let uri = path.replace("{id}", "X.NSE");
+        let res = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(*method)
+                    .uri(uri)
+                    .header("content-type", "application/json")
+                    .body(Body::from("{}"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_ne!(res.status(), StatusCode::NOT_IMPLEMENTED, "{method} {path}");
+    }
+    let written = std::fs::read_dir(&dir).map_or(0, Iterator::count);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(written, 0, "the probe wrote into the journals root");
+}

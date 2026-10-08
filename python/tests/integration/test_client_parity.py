@@ -335,6 +335,10 @@ def test_inproc_capabilities_are_typed_and_match_the_registry(inproc: Client) ->
     assert "GET /capabilities" in caps.endpoints and "GET /schema" in caps.endpoints
     assert set(caps.not_implemented) <= set(caps.endpoints)
     assert "GET /orders" in caps.not_implemented and "GET /health" not in caps.not_implemented
+    # Built by ADR 0017: no longer flagged. Sweeps stay flagged until E4-S5.
+    assert "POST /backtests" not in caps.not_implemented
+    assert "GET /journals/{id}" not in caps.not_implemented
+    assert "POST /sweeps" in caps.not_implemented
     assert {"india", "null"} <= set(caps.market_packs)
 
 
@@ -344,13 +348,14 @@ def test_inproc_schema_is_a_json_record_with_the_api_version(inproc: Client) -> 
 
 
 def test_inproc_501_placeholders(inproc: Client) -> None:
-    for method, path in [("GET", "/orders"), ("GET", "/journals/x"), ("GET", "/backtests/x")]:
+    # POST/GET /backtests and the journal routes are built (ADR 0017); sweeps and trading are not.
+    for method, path in [("GET", "/orders"), ("GET", "/sweeps/x"), ("DELETE", "/orders/x")]:
         resp = inproc.transport.request(method, path)
         assert resp.status == 501
         assert resp.json["error"]["code"] == "not_implemented"
     from honba.client.errors import error_from_envelope
 
-    resp = inproc.transport.request("POST", "/backtests", body={})
+    resp = inproc.transport.request("POST", "/sweeps", body={})
     err = error_from_envelope(resp.status, resp.json)
     assert isinstance(err, NotImplementedApiError) and err.category == "unsupported"
     assert err.retryable is False
@@ -412,8 +417,9 @@ RAW_REQUESTS: list[tuple[str, str, dict[str, Any] | None, Any]] = [
     ("GET", "/strategies", None, None),
     ("POST", "/strategies", None, {"code": "class S: pass"}),  # 422 source_unsupported
     ("POST", "/strategies", None, {"name": "x"}),  # 422: no manifest
-    ("POST", "/backtests", None, {}),  # 501
-    ("GET", "/backtests/abc", None, None),  # 501
+    ("POST", "/backtests", None, {}),  # 422: no seed
+    ("GET", "/backtests/abc", None, None),  # 404: ill-formed id
+    ("GET", "/backtests/abc/journal", None, None),  # 404
     ("POST", "/sweeps", None, {}),  # 501
     ("GET", "/orders", None, None),  # 501
     ("POST", "/orders", None, {}),  # 501
@@ -423,7 +429,7 @@ RAW_REQUESTS: list[tuple[str, str, dict[str, Any] | None, Any]] = [
     ("GET", "/screener/scan", {"universe": '["TCS.NSE"]', "tf": "1m"}, None),
     ("GET", "/screener/scan", {"universe": '["TCS.NSE"]', "filters": "{"}, None),  # 422
     ("GET", "/screener/scan", {"universe": '["TCS.NSE"]', "bogus": "1"}, None),  # 422
-    ("GET", "/journals/abc", None, None),  # 501
+    ("GET", "/journals/abc", None, None),  # 404
     ("GET", "/no/such/route", None, None),  # 404 not_found envelope
 ]
 

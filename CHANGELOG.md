@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+### REST: `POST/GET /backtests`, journal routes, `honba serve` run flags (E4-S3 / E11-S3, ADR 0017, q2c)
+
+- `POST /backtests` (200 `BacktestResponse` `pending`; 422 `validation_invalid_request` with
+  `context.field`; 429 `rate_limited` with `context.reason` `run_queue_full` or `shutting_down`),
+  `GET /backtests/{id}`, `GET /backtests/{id}/journal` and `GET /journals/{id}` (`TradesResponse`,
+  one `Trade` per fill record, costs zero in the account currency; partial journals return the
+  prefix of complete records) answer for real. An ill-formed, unknown or evicted id, or a sweep id
+  on `/backtests`, is 404 before any filesystem access; a sweep id on `/journals/{id}` is 422
+  `sweep_journal_per_trial`; a journal at another `schema_version` is 422 `unsupported` with
+  `found`/`expected`.
+- Migration (ADR 0012 rule 5): `/capabilities.not_implemented` drops `POST /backtests`,
+  `GET /backtests/{id}`, `GET /backtests/{id}/journal` and `GET /journals/{id}` and keeps
+  `POST /sweeps`, `GET /sweeps/{id}` (E4-S5) and the four trading rows (E11-S7). A client that
+  treated those four routes as 501 placeholders must now handle 200/404/422/429. `POST
+  /backtests` now requires `seed`, `strategy`, `universe`, `start`, `end` (it answered 501 for
+  any body before). Python's `InprocTransport` answers a valid submit with 503 `unsupported`
+  (`no_journals_dir`) until it is given a journals root (chunk q2d).
+- `honba_api_rest::AppState` gains `with_journals_dir`, `with_run_service`, `shutdown_runs`
+  and the fields `runs` and `account_currency`. `honba serve` gains `--journals-dir`
+  (default `data/journals`), `--max-concurrent-runs`, `--max-queued-runs`,
+  `--shutdown-grace-secs`, `--keep-runs`, `--keep-days`; SIGINT/SIGTERM now stops admitting,
+  cancels pending runs and waits the grace period for running ones. The generated OpenAPI,
+  `.pyi` and MCP artifacts are unchanged (route behaviour is not part of them).
+
 ### Run lifecycle types: `RunStatus::Cancelled`, `error` on run responses (E4-S3 / E11-S3, ADR 0017, q1)
 
 - `RunStatus` gains `cancelled` (`pending -> running -> completed | failed | cancelled`, plus

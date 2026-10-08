@@ -66,6 +66,8 @@ enum Commands {
         /// Allow this browser origin to read the API (CORS); repeatable. Default: none
         #[arg(long = "cors-origin")]
         cors_origin: Vec<String>,
+        #[command(flatten)]
+        runs: serve::RunsArgs,
     },
     /// Verify a strategy manifest and print its compiled IR as JSON
     Verify {
@@ -151,7 +153,8 @@ fn main() -> Result<()> {
             data_dir,
             addr,
             cors_origin,
-        } => serve::run(&data_dir, addr, &cors_origin),
+            runs,
+        } => serve::run(&data_dir, addr, &cors_origin, &runs),
         Commands::Verify { manifest } => verify::run(&manifest),
     }
 }

@@ -374,7 +374,7 @@ impl BacktestExecutor {
         })
     }
 
-    fn currency(&self) -> Result<Currency, ErrorDetail> {
+    pub(crate) fn account_currency(&self) -> Result<Currency, ErrorDetail> {
         match self.account.currency.as_str() {
             "INR" => Ok(Currency::Inr),
             other => Err(ErrorDetail::new(
@@ -429,7 +429,7 @@ impl BacktestExecutor {
                 "only the bar_fill model is available",
             ));
         }
-        let currency = self.currency()?;
+        let currency = self.account_currency()?;
         let name = self.registered_name(job)?;
         let instrument = parse_universe(&spec.universe)?;
         let bars = self.read_bars(&instrument, spec)?;

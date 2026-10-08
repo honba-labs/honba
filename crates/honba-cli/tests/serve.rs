@@ -210,3 +210,77 @@ fn a_non_loopback_address_warns_on_stderr_and_loopback_does_not() {
         .unwrap();
     assert!(!err.contains("warning"), "{err}");
 }
+
+fn post(addr: SocketAddr, path: &str, body: &str) -> (u16, Value) {
+    let mut stream = TcpStream::connect(addr).unwrap();
+    write!(
+        stream,
+        "POST {path} HTTP/1.0\r\nHost: {addr}\r\nContent-Type: application/json\r\n\
+         Content-Length: {}\r\n\r\n{body}",
+        body.len()
+    )
+    .unwrap();
+    let mut text = String::new();
+    stream.read_to_string(&mut text).unwrap();
+    let (head, body) = text.split_once("\r\n\r\n").unwrap();
+    let status = head.split_whitespace().nth(1).unwrap().parse().unwrap();
+    (status, serde_json::from_str(body).unwrap_or(Value::Null))
+}
+
+#[test]
+fn serve_runs_backtests_into_the_journals_dir_and_stops_with_no_open_run() {
+    let dir = data_dir("runs");
+    let journals = dir.join("journals");
+    let (mut child, addr) = start(&[
+        "--data-dir",
+        dir.to_str().unwrap(),
+        "--addr",
+        "127.0.0.1:0",
+        "--journals-dir",
+        journals.to_str().unwrap(),
+        "--max-concurrent-runs",
+        "1",
+        "--shutdown-grace-secs",
+        "0",
+    ]);
+
+    let (status, body) = get(addr, "/capabilities");
+    assert_eq!(status, 200);
+    let flagged = body["data"]["capabilities"]["not_implemented"].to_string();
+    assert!(!flagged.contains("/backtests"), "{flagged}");
+    assert!(!flagged.contains("/journals"), "{flagged}");
+    let (status, body) = post(addr, "/backtests", "{}");
+    assert_eq!(status, 422, "{body}");
+    let (status, body) = get(addr, "/backtests/01ARZ3NDEKTSV4RRFFQ69G5FAV");
+    assert_eq!(status, 404, "{body}");
+    assert!(!journals.exists(), "rejected requests must write nothing");
+
+    let (status, body) = post(
+        addr,
+        "/backtests",
+        r#"{"strategy":"buy_and_hold","universe":"TCS.NSE","start":"1970-01-01","end":"1970-01-02","bar_spec":"1m","seed":1}"#,
+    );
+    assert_eq!(status, 200, "{body}");
+    let id = body["data"]["run_id"].as_str().unwrap().to_owned();
+    let manifest = journals.join(&id).join("manifest.json");
+    assert!(
+        manifest.exists(),
+        "the run is journaled under --journals-dir"
+    );
+
+    Command::new("kill")
+        .args(["-INT", &child.id().to_string()])
+        .status()
+        .unwrap();
+    assert!(child.wait().unwrap().success());
+    // Graceful shutdown leaves no pending or running manifest behind (decision 5).
+    let text = std::fs::read_to_string(manifest).unwrap();
+    let status = serde_json::from_str::<Value>(&text).unwrap()["status"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(
+        ["completed", "failed", "cancelled"].contains(&status.as_str()),
+        "left {status}"
+    );
+}

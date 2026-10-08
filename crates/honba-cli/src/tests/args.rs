@@ -96,6 +96,7 @@ fn serve_defaults_to_loopback_and_needs_a_data_dir() {
             data_dir,
             addr,
             cors_origin,
+            ..
         } => {
             assert!(cors_origin.is_empty());
             assert_eq!(data_dir, PathBuf::from("bars"));
@@ -133,4 +134,59 @@ fn serve_cors_origin_is_repeatable() {
         }
         _ => panic!("expected serve"),
     }
+}
+
+#[test]
+fn serve_run_flags_default_to_the_adr_values() {
+    match parse(&["serve", "--data-dir", "d"]).unwrap().command {
+        Commands::Serve { runs, .. } => {
+            assert_eq!(runs.journals_dir, PathBuf::from("data/journals"));
+            assert_eq!(runs.max_concurrent_runs, None);
+            assert_eq!(runs.max_queued_runs, 64);
+            assert_eq!(runs.shutdown_grace_secs, 10);
+            assert_eq!(runs.keep_runs, 1_000);
+            assert_eq!(runs.keep_days, 30);
+        }
+        _ => panic!("expected serve"),
+    }
+}
+
+#[test]
+fn serve_run_flags_can_be_overridden() {
+    match parse(&[
+        "serve",
+        "--data-dir",
+        "d",
+        "--journals-dir",
+        "j",
+        "--max-concurrent-runs",
+        "3",
+        "--max-queued-runs",
+        "5",
+        "--shutdown-grace-secs",
+        "0",
+        "--keep-runs",
+        "7",
+        "--keep-days",
+        "2",
+    ])
+    .unwrap()
+    .command
+    {
+        Commands::Serve { runs, .. } => {
+            assert_eq!(runs.journals_dir, PathBuf::from("j"));
+            assert_eq!(runs.max_concurrent_runs, Some(3));
+            assert_eq!(runs.max_queued_runs, 5);
+            assert_eq!(runs.shutdown_grace_secs, 0);
+            assert_eq!(runs.keep_runs, 7);
+            assert_eq!(runs.keep_days, 2);
+        }
+        _ => panic!("expected serve"),
+    }
+}
+
+#[test]
+fn serve_rejects_a_zero_worker_pool_or_queue() {
+    assert!(parse(&["serve", "--data-dir", "d", "--max-concurrent-runs", "0"]).is_err());
+    assert!(parse(&["serve", "--data-dir", "d", "--max-queued-runs", "0"]).is_err());
 }

@@ -17,9 +17,9 @@ use axum::{
     Router,
 };
 use honba_api::{
-    ApiResponse, BacktestRequest, Capabilities, CapabilitiesResponse, CompiledStrategy, ErrorCode,
-    ErrorDetail, OrdersRequest, ResponseEnvelope, StrategiesResponse, SweepRequest,
-    VerifyStrategyRequest, VerifyStrategyResponse,
+    ApiResponse, Capabilities, CapabilitiesResponse, CompiledStrategy, ErrorCode, ErrorDetail,
+    OrdersRequest, ResponseEnvelope, StrategiesResponse, SweepRequest, VerifyStrategyRequest,
+    VerifyStrategyResponse,
 };
 use std::sync::{Arc, PoisonError};
 use tower_http::{
@@ -35,9 +35,11 @@ mod market;
 mod registry;
 mod retention;
 mod run_store;
+mod runs;
 mod screener;
 mod service;
 mod state;
+mod trades;
 
 pub use dispatch::{build_target, dispatch, DispatchError};
 pub use executor::BacktestExecutor;
@@ -148,16 +150,16 @@ pub fn api_router_with_config(state: AppState, config: &ApiConfig) -> Router {
         .route("/depth/:id", get(market::get_depth))
         .route("/strategies", post(post_strategies).get(get_strategies))
         .route("/strategies/verify", post(post_verify_strategy))
-        .route("/backtests", post(post_backtests))
-        .route("/backtests/:id", get(get_backtest_by_id))
-        .route("/backtests/:id/journal", get(get_backtest_journal))
+        .route("/backtests", post(runs::post_backtests))
+        .route("/backtests/:id", get(runs::get_backtest_by_id))
+        .route("/backtests/:id/journal", get(runs::get_backtest_journal))
         .route("/sweeps", post(post_sweeps))
         .route("/sweeps/:id", get(get_sweep_by_id))
         .route("/orders", post(post_orders).get(get_orders))
         .route("/orders/:id", delete(delete_order))
         .route("/positions/close", post(post_close_positions))
         .route("/screener/scan", get(screener::get_screener_scan))
-        .route("/journals/:id", get(get_journal_by_id))
+        .route("/journals/:id", get(runs::get_journal_by_id))
         .fallback(unknown_route)
         .method_not_allowed_fallback(unsupported_method)
         .with_state(state)
@@ -226,19 +228,18 @@ pub async fn serve_with_config(
 
 /// Registry endpoints whose handlers answer 501 `not_implemented`.
 ///
+/// The sweep rows stay until E4-S5 builds `POST /sweeps`; after that ADR 0017 decision 7
+/// leaves only the four trading rows (E11-S7).
+///
 /// Remove a row when its handler is built; `tests/capabilities.rs` probes the router and fails
 /// if this list and the real answers disagree.
 pub const NOT_IMPLEMENTED_ENDPOINTS: &[(&str, &str)] = &[
-    ("POST", "/backtests"),
-    ("GET", "/backtests/{id}"),
-    ("GET", "/backtests/{id}/journal"),
     ("POST", "/sweeps"),
     ("GET", "/sweeps/{id}"),
     ("POST", "/orders"),
     ("GET", "/orders"),
     ("DELETE", "/orders/{id}"),
     ("POST", "/positions/close"),
-    ("GET", "/journals/{id}"),
 ];
 
 fn endpoint_key((method, path): &(&str, &str)) -> String {
@@ -352,18 +353,6 @@ async fn post_verify_strategy(
     }
 }
 
-async fn post_backtests(ApiJson(_req): ApiJson<BacktestRequest>) -> NotImplemented {
-    not_implemented("running a backtest")
-}
-
-async fn get_backtest_by_id(Path(_id): Path<String>) -> NotImplemented {
-    not_implemented("reading a backtest")
-}
-
-async fn get_backtest_journal(Path(_id): Path<String>) -> NotImplemented {
-    not_implemented("streaming a backtest journal")
-}
-
 async fn post_sweeps(ApiJson(_req): ApiJson<SweepRequest>) -> NotImplemented {
     not_implemented("running a sweep")
 }
@@ -386,10 +375,6 @@ async fn delete_order(Path(_id): Path<String>) -> NotImplemented {
 
 async fn post_close_positions() -> NotImplemented {
     not_implemented("closing positions")
-}
-
-async fn get_journal_by_id(Path(_id): Path<String>) -> NotImplemented {
-    not_implemented("reading a journal")
 }
 
 #[cfg(test)]

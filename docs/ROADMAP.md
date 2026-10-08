@@ -70,7 +70,7 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | E10-S6 determinism under threads | `crates/honba-sweep/tests/sweep.rs` `determinism_under_threads_{one,four,sixteen}_worker(s)` compare journal and ranking across thread counts |
 | E11-S1 envelope and registry | `crates/honba-api`, `crates/honba-messages/src/endpoints.rs` (22 routes, `WRITE_PATHS`), `GET /capabilities` (cf1366e) |
 | E11-S2 timestamps as strings | ADR 0012 rule 4, commits 4006ff1, 9530251 |
-| E11-S3 REST read API | ADR 0013; `instruments`, `quotes` (derived from bars), `bars` (cap 100k rows), `depth` (none), `strategies`, `screener/scan`; `honba serve`; error envelope for unknown routes (e24b806) |
+| E11-S3 REST read API | ADR 0013; `instruments`, `quotes` (derived from bars), `bars` (cap 100k rows), `depth` (none), `strategies`, `screener/scan`; `honba serve`; error envelope for unknown routes (e24b806); `POST/GET /backtests`, `GET /backtests/{id}/journal`, `GET /journals/{id}` (ADR 0017, q2c; sweeps and trading routes still 501); `honba serve --journals-dir` |
 | Python SDK | `honba.client` (`HttpTransport`, `InprocTransport` via `honba._honba.api_request`), parity tests `python/tests/integration/test_client_parity.py` |
 | E11-S5 part 1 | `crates/honba-api-wasm`: `indicator_series`, `ohlc_indicator_series` (ATR), conformance vectors (d1c9db3, e9fd98e) |
 | E6 batches 1-2 | commits 6372528, 510e0d4, efca4bd, 7c9a325, 6a91432 |
@@ -319,7 +319,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 
 | ID | Scope | Size | Deps | Acceptance | Owner |
 |---|---|---|---|---|---|
-| E11-S3 rest | Backtests, sweeps, journals, orders routes (currently 501, 10 routes) built in order of R2; known limits in ADR 0013 stand (no real bid/ask, no pagination, no auth) | M each | E4-S3, E4-S5 | route unit tests / `test_client_parity` extended | honba |
+| E11-S3 rest | Backtests, sweeps, journals, orders routes (backtests and journals built by ADR 0017 q2c; 6 routes still 501: sweeps, orders, positions/close) built in order of R2; known limits in ADR 0013 stand (no real bid/ask, no pagination, no auth) | M each | E4-S3, E4-S5 | route unit tests / `test_client_parity` extended | honba |
 | E11-S4 | SSE for run progress and journals (resume-from-sequence), WS for events later; schema for streamed events | M | ADR D6, E4-S3 | `resume_from_seq`, `event_schema` / `sse_backtest_progress_inproc_and_http` | honba |
 | E11-S5 rest | WASM: screener eval export (Rust evaluator exists in `honba-indicators`, not exported), backtest replay; wasm-pack CI step never exercised | M | E4-S3 | conformance vectors `screener_scan.json` / browser-free node run | honba |
 | E11-S6 | Frontend client from OpenAPI, TS drift check in CI (currently local only) | S | none | `ts_matches_openapi` / frontend build | honba + honba-frontend |

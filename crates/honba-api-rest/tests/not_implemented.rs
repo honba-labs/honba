@@ -30,17 +30,15 @@ async fn call(method: &str, uri: &str, body: Option<&str>) -> (StatusCode, Value
 
 #[tokio::test]
 async fn unbuilt_routes_answer_501_not_implemented_envelopes() {
-    let routes: [(&str, &str, Option<&str>); 10] = [
-        ("POST", "/backtests", Some("{}")),
-        ("GET", "/backtests/r1", None),
-        ("GET", "/backtests/r1/journal", None),
+    // ADR 0017 q2c: the backtest and journal routes are built and left this list on purpose;
+    // the sweep routes follow with E4-S5, the trading routes with E11-S7.
+    let routes: [(&str, &str, Option<&str>); 6] = [
         ("POST", "/sweeps", Some("{}")),
         ("GET", "/sweeps/j1", None),
         ("POST", "/orders", Some("{}")),
         ("GET", "/orders", None),
         ("DELETE", "/orders/o1", None),
         ("POST", "/positions/close", None),
-        ("GET", "/journals/j1", None),
     ];
     for (method, uri, body) in routes {
         let (status, parsed) = call(method, uri, body).await;
