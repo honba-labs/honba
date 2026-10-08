@@ -1,7 +1,7 @@
 //! Transport abstraction for the Kite REST client.
 //!
 //! The client speaks only to [`HttpTransport`], so it stays free of I/O and is tested with
-//! in-memory fakes. [`ReqwestTransport`] (feature `net`) is the real implementation.
+//! in-memory fakes. `ReqwestTransport` (feature `net`) is the real implementation.
 
 use async_trait::async_trait;
 

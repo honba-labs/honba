@@ -204,6 +204,8 @@ ASYNC_BOUNDARY_CRATES = {
     "honba-py",
     "honba-cli",
     "honba-api-rest",
+    # Venue edge: its optional `net` feature drives sockets on tokio (never the kernel).
+    "honba-broker-zerodha",
 }
 
 # Crates that target wasm32-unknown-unknown and therefore must not pull tokio

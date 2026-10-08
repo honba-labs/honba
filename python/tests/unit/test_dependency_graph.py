@@ -48,3 +48,14 @@ def test_zerodha_may_not_depend_on_pyo3(graph, tmp_path):
 def test_no_core_crate_depends_on_a_broker_crate(graph):
     for name, allowed in graph.ALLOWED_PROD.items():
         assert "honba-broker-zerodha" not in allowed, name
+
+
+def test_zerodha_is_an_async_boundary_but_not_a_core_crate(graph):
+    assert "honba-broker-zerodha" in graph.ASYNC_BOUNDARY_CRATES
+    assert "honba-broker-zerodha" not in graph.SYNC_KERNEL_CRATES
+    assert "honba-broker-zerodha" not in graph.WASM_CRATES
+
+
+def test_unlisted_crate_may_not_use_tokio(graph, tmp_path):
+    d = _crate(tmp_path, "honba-indicators", 'tokio = "1"')
+    assert graph.check_crate(d) == 1
