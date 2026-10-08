@@ -29,12 +29,18 @@ use tower_http::{
 };
 
 mod dispatch;
+mod journal;
 mod market;
+mod retention;
+mod run_store;
 mod screener;
 mod state;
 
 pub use dispatch::{build_target, dispatch, DispatchError};
+pub use journal::{JournalWriter, NdjsonJournal};
 pub use market::{ApiQuery, ApiQueryRejection, MAX_BAR_ROWS};
+pub use retention::{evictions, RetentionPolicy};
+pub use run_store::{OsEntropy, RecoveryReport, RunClock, RunEntropy, RunStore, SystemClock};
 pub use state::AppState;
 
 /// JSON body extractor whose rejections are the standard error envelope

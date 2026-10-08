@@ -114,6 +114,13 @@ ALLOWED_PROD = {
         "honba-market",
         "honba-ports",
         "honba-risk",  # write-route gate
+        # Run executor edges (ADR 0017 decision 8). `honba-sweep` is added in the commit that
+        # wires POST /sweeps; `honba-async` is deliberately absent (workers are std threads).
+        "honba-engine",  # L3: kernel, honba_engine::Clock
+        "honba-strategy",  # L4: Strategy, StrategyIr
+        "honba-sim",  # L4: fill/execution simulation
+        "honba-analytics",  # L5: BacktestMetrics
+        "honba-config",  # L5: ExecutionConfig, AccountConfig, BacktestRunConfig validation
     },
     # Plan 4.4: pure L0-L4 only. The wasm surface computes indicators, screener
     # predicates, and replay; it has no filesystem and must stay replay-only.
