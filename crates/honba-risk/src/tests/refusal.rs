@@ -184,3 +184,29 @@ fn context_carries_the_numbers() {
         (Some(2), Some(2), Some(1000))
     );
 }
+
+#[test]
+fn context_wire_conventions_are_pinned() {
+    // Money: major-unit floats plus a sibling "currency" code, never minor-unit integers.
+    let c = RiskRefusal::MaxNotionalUnpriceable { limit: inr(5.5) }.context();
+    assert_eq!(c["limit"], 5.5);
+    assert_eq!(c["currency"], "INR");
+    // InstrumentUnknown carries the id as its display string.
+    let id = honba_messages::InstrumentId::new("X", honba_messages::Exchange::new("NSE"));
+    let c = RiskRefusal::InstrumentUnknown {
+        instrument_id: id.clone(),
+    }
+    .context();
+    assert_eq!(c["instrument_id"], id.to_string());
+    assert!(c["instrument_id"].is_string());
+    // ReduceOnly carries the side as "buy" / "sell".
+    for (side, name) in [(OrderSide::Buy, "buy"), (OrderSide::Sell, "sell")] {
+        let c = RiskRefusal::ReduceOnly {
+            position: 1.0,
+            side,
+            quantity: 1.0,
+        }
+        .context();
+        assert_eq!(c["side"], name);
+    }
+}

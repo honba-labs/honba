@@ -12,7 +12,8 @@
 //!
 //! 1. trading halted, 2. reduce-only (both in [`check_state`], which needs no rules source),
 //! 3. instrument unknown, 4-6. quantity below minimum / over freeze / not a lot multiple,
-//! 7. tick size, 8. price band, 9. maximum notional, 10. order rate (not yet enforced).
+//! 7. tick size, 8. price band, 9. maximum notional, 10. order rate (half-open event-time
+//!    window; only approved orders count, so `check` is not idempotent with a rate limit).
 
 mod limits;
 mod refusal;

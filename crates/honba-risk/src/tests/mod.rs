@@ -4,7 +4,9 @@ mod instrument;
 mod limits;
 mod notional;
 mod price;
+mod properties;
 mod quantity;
+mod rate;
 mod refusal;
 mod state;
 

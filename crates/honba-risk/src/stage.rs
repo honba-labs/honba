@@ -1,5 +1,6 @@
 //! The risk stage: fixed-order rules (ADR 0018 decision 4).
 
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 use honba_entities::{Currency, Money};
@@ -95,6 +96,8 @@ pub struct RiskStage {
     currency: Currency,
     max_notional: Option<Money>,
     rules: Arc<dyn RulesSource>,
+    /// Event times (ns) of approved orders still inside the rate window; non-decreasing.
+    approved_ts: VecDeque<u64>,
 }
 
 impl RiskStage {
@@ -122,6 +125,7 @@ impl RiskStage {
             currency,
             max_notional,
             rules,
+            approved_ts: VecDeque::new(),
         })
     }
 
@@ -146,6 +150,38 @@ impl RiskStage {
             Ok(_) => None,
             Err(_) => Some(unpriceable),
         }
+    }
+}
+
+impl RiskStage {
+    /// Rule 10: at most `max_orders` approved orders in the half-open window `(ts - W, ts]`.
+    ///
+    /// Only called once every other rule approved. Approval records the order's event time, so
+    /// `check` is deliberately not idempotent with a rate limit. A `ts` earlier than the last
+    /// recorded one is clamped to it, so the window is deterministic and never shrinks.
+    fn order_rate_rule(&mut self, req: &RiskRequest) -> Option<RiskRefusal> {
+        let rate = self.limits.order_rate?;
+        let window_ns = rate.window_ms.saturating_mul(1_000_000);
+        let last = self.approved_ts.back().copied().unwrap_or(0);
+        let now = req.ts.as_u64().max(last);
+        // Drop orders at or before `now - window_ns`: exactly one window old is out.
+        while self
+            .approved_ts
+            .front()
+            .is_some_and(|t| now.saturating_sub(*t) >= window_ns)
+        {
+            self.approved_ts.pop_front();
+        }
+        let count = u32::try_from(self.approved_ts.len()).unwrap_or(u32::MAX);
+        if count >= rate.max_orders {
+            return Some(RiskRefusal::OrderRate {
+                count,
+                max_orders: rate.max_orders,
+                window_ms: rate.window_ms,
+            });
+        }
+        self.approved_ts.push_back(now);
+        None
     }
 }
 
@@ -178,7 +214,9 @@ impl RiskCheck for RiskStage {
         if let Some(refusal) = self.max_notional_rule(req) {
             return RiskDecision::Refused(refusal);
         }
-        // Rule 10 (order rate) is enforced in the next chunk (E2-S2 r2b).
+        if let Some(refusal) = self.order_rate_rule(req) {
+            return RiskDecision::Refused(refusal);
+        }
         RiskDecision::Approved
     }
 }

@@ -6,8 +6,8 @@ use honba_entities::{Currency, Instrument, InstrumentKind, Money};
 use honba_market::IndiaMarketProfile;
 use honba_messages::{Exchange, InstrumentId, OrderId, OrderSide, TradingState, UnixNanos};
 use honba_risk::{
-    PriceField, ProfileRulesSource, RiskCheck, RiskDecision, RiskLimits, RiskRefusal, RiskRequest,
-    RiskStage, RulesSource,
+    OrderRateLimit, PriceField, ProfileRulesSource, RiskCheck, RiskDecision, RiskLimits,
+    RiskRefusal, RiskRequest, RiskStage, RulesSource,
 };
 
 fn reliance() -> InstrumentId {
@@ -160,15 +160,52 @@ fn notional_limit_with_reference_price_fallback() {
 }
 
 #[test]
-fn order_rate_field_is_accepted_but_not_yet_enforced() {
-    // r2a: the field exists and validates; enforcement arrives with the rate rule (r2b).
+fn india_order_rate_limit_enforced_in_event_time() {
+    const MS: u64 = 1_000_000;
     let mut s = stage(RiskLimits {
         max_notional: None,
-        order_rate: Some(honba_risk::OrderRateLimit {
-            max_orders: 1,
+        order_rate: Some(OrderRateLimit {
+            max_orders: 2,
             window_ms: 1000,
         }),
     });
-    assert_eq!(s.check(&req()), RiskDecision::Approved);
-    assert_eq!(s.limits().order_rate.unwrap().max_orders, 1);
+    let at = |ts: u64| RiskRequest {
+        ts: UnixNanos::new(ts),
+        ..req()
+    };
+    assert_eq!(s.check(&at(1)), RiskDecision::Approved);
+    // An off-tick order is refused by a shape rule and takes no slot.
+    let off_tick = RiskRequest {
+        price: Some(2500.03),
+        ..at(2)
+    };
+    assert!(matches!(
+        refused(s.check(&off_tick)),
+        RiskRefusal::TickSize { .. }
+    ));
+    assert_eq!(s.check(&at(3)), RiskDecision::Approved);
+
+    let got = refused(s.check(&at(4)));
+    assert_eq!(
+        got,
+        RiskRefusal::OrderRate {
+            count: 2,
+            max_orders: 2,
+            window_ms: 1000
+        }
+    );
+    assert_eq!(got.error_code().as_str(), "risk_order_rate_exceeded");
+    let c = got.context();
+    assert_eq!(
+        (
+            c["rule"].as_str(),
+            c["count"].as_u64(),
+            c["window_ms"].as_u64()
+        ),
+        (Some("order_rate"), Some(2), Some(1000))
+    );
+
+    // Half-open edge: the order at ts=1 leaves the window exactly 1000 ms later.
+    assert_eq!(s.check(&at(1 + 1000 * MS)), RiskDecision::Approved);
+    assert_eq!(s.limits().order_rate.unwrap().max_orders, 2);
 }
