@@ -37,6 +37,7 @@ def _run(prelude: str, body: str) -> subprocess.CompletedProcess[str]:
         "honba.report",
         "honba.screener",
         "honba.backtest",
+        "honba.risk",
     ],
 )
 def test_pure_python_modules_import_without_extension(module):
