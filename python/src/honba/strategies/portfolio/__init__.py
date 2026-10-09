@@ -13,7 +13,7 @@ from honba.strategies.portfolio.schedule import (
     RebalanceSchedule,
     ScheduleState,
 )
-from honba.strategies.portfolio.scoring import low_volatility, momentum
+from honba.strategies.portfolio.scoring import low_volatility, mean_reversion, momentum
 from honba.strategies.portfolio.selection import SelectAll, Selector, TopN
 from honba.strategies.portfolio.strategy import PortfolioStrategy
 from honba.strategies.portfolio.universe import NamedUniverse, StaticUniverse, Universe
@@ -41,5 +41,6 @@ __all__ = [
     "WeightingScheme",
     "build_portfolio_strategy",
     "low_volatility",
+    "mean_reversion",
     "momentum",
 ]

@@ -8,6 +8,7 @@ required) so factories can size the strategy's history buffer.
 from __future__ import annotations
 
 import math
+import statistics
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -46,6 +47,29 @@ class _LowVol:
         return None if vol is None else -vol
 
 
+@dataclass(frozen=True, slots=True)
+class _MeanReversion:
+    lookback: int
+
+    def __call__(self, instrument_id: InstrumentId, view: MarketView) -> float | None:
+        closes = view.recent_closes(instrument_id)
+        if len(closes) < self.lookback:
+            return None
+        window = closes[-self.lookback :]
+        if not all(math.isfinite(c) for c in window):
+            return None
+        try:
+            mean = statistics.mean(window)
+            stdev = statistics.stdev(window)
+        except statistics.StatisticsError:
+            return None
+        if stdev == 0.0:
+            return 0.0
+        # Lower z-score (more oversold) ranks higher
+        z = (window[-1] - mean) / stdev
+        return -z
+
+
 def momentum(lookback: int) -> Score:
     """Total return from the first to the last of the last ``lookback`` closes.
 
@@ -63,3 +87,12 @@ def low_volatility(lookback: int) -> Score:
     """
     _check(lookback)
     return _LowVol(lookback)
+
+
+def mean_reversion(lookback: int) -> Score:
+    """Negative rolling price z-score over ``lookback`` closes (most oversold ranks highest).
+
+    ``None`` with insufficient history. ``lookback >= 2``.
+    """
+    _check(lookback)
+    return _MeanReversion(lookback)

@@ -8,7 +8,7 @@ Grammar (every key optional except ``universe``; unknown keys raise ``ValueError
 * ``weighting``: ``"equal"`` (default) | ``"inverse_vol"`` | ``"inverse_vol:30"`` (lookback).
 * ``schedule``: ``"every:15d"`` (default) | ``"monthly:first_session"`` | ``"drift:0.05"``;
   join with ``+`` to rebalance when any is due, e.g. ``"monthly:first_session+drift:0.05"``.
-* ``select``: omitted keeps everything; ``"top:10:momentum:126"`` | ``"top:10:low_vol:60"``.
+* ``select``: omitted keeps everything; ``"top:10:momentum:126"`` | ``"top:10:low_vol:60"`` | ``"top:10:mean_reversion:20"``.
 * ``allocation``: fraction of portfolio value to deploy, in (0, 1] (default 0.98).
 * ``history_len``: closes kept per instrument. Omitted, it is auto-sized to
   ``max(64, longest lookback in use)``; given, it must be >= the longest lookback or a
@@ -31,7 +31,7 @@ from honba.strategies.portfolio.schedule import (
     MonthlyFirstSession,
     RebalanceSchedule,
 )
-from honba.strategies.portfolio.scoring import low_volatility, momentum
+from honba.strategies.portfolio.scoring import low_volatility, mean_reversion, momentum
 from honba.strategies.portfolio.selection import SelectAll, Selector, TopN
 from honba.strategies.portfolio.strategy import PortfolioStrategy
 from honba.strategies.portfolio.universe import NamedUniverse, StaticUniverse, Universe
@@ -50,7 +50,11 @@ KEYS = frozenset(
     }
 )
 _MIN_HISTORY = 64
-_SCORES: dict[str, Callable[[int], Callable]] = {"momentum": momentum, "low_vol": low_volatility}
+_SCORES: dict[str, Callable[[int], Callable]] = {
+    "momentum": momentum,
+    "low_vol": low_volatility,
+    "mean_reversion": mean_reversion,
+}
 
 
 def _fail(key: str, value: object, why: str) -> ValueError:
@@ -118,7 +122,11 @@ def _one_schedule(text: str, whole: object) -> RebalanceSchedule:
             if not (math.isfinite(tolerance) and tolerance > 0):
                 raise ValueError
         except ValueError:
-            raise _fail("schedule", whole, f"drift tolerance {arg!r} must be a number > 0")
+            raise _fail(
+                "schedule",
+                whole,
+                f"drift tolerance {arg!r} must be a number > 0",
+            )
         return DriftBand(tolerance)
     raise _fail(
         "schedule",
@@ -135,7 +143,11 @@ def _schedule(value: object) -> RebalanceSchedule:
 def _select(value: object) -> tuple[Selector, int]:
     parts = _text("select", value).split(":")
     if len(parts) != 4 or parts[0] != "top" or parts[2] not in _SCORES:
-        raise _fail("select", value, "expected 'top:<n>:momentum:<lookback>' or '...:low_vol:...'")
+        raise _fail(
+            "select",
+            value,
+            "expected 'top:<n>:momentum:<lookback>', 'top:<n>:low_vol:<lookback>', or 'top:<n>:mean_reversion:<lookback>'",
+        )
     n = _int("select", value, parts[1], 1)
     lookback = _int("select", value, parts[3], 2)
     return TopN(n, _SCORES[parts[2]](lookback)), lookback
