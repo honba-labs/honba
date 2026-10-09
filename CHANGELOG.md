@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Adapter event form, FakeAdapter order-state conformance (E2-S6(c))
+
+- `OrderReport` gains `venue_order_id: str | None` (ADR 0019 decision 3). This is the venue/broker
+  order id that the adapter forwards, so reconciliation can join venue reports to client orders.
+  The field is optional on the wire (`skip_serializing_if="is_none"`) and additive.
+- `FakeAdapter` accepts injected instruments so `order_state.json` bar-realisable scenarios
+  (`market_fill`, `limit_fill` under the `l1` profile) replay through it, producing the
+  normalised l1 event stream (`order`, `order_filled`). This is the first adapter to exercise
+  the event form beside the query form.
+- `honba-testing/tests/purity.rs` already closes R1; E2-S6(c) is the adapter half of the
+  kernel's one-queue contract. The query-form contract suite is unchanged; the event form
+  will be verified by `order_state.json` replay on every gateway (E2-S6(d)).
+- Migration: no breaking change to the adapter contract; `venue_order_id` is additive and
+  the existing `OrderReport` invariants are preserved.
+
 ### Kernel: wall-clock-free domain check, `UnixNanos::now` removed (E2-S3 rest)
 
 - `honba-testing/tests/purity.rs` adds `no_system_time_in_domain_crates`: an integration test

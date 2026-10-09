@@ -103,6 +103,7 @@ class FakeAdapter(Adapter):
         user_id: str = "FAKE_USER",
         opening_balance: float = 1_000_000.0,
         bars_per_request: int = 5,
+        instruments: tuple[Instrument, ...] | None = None,
     ) -> None:
         self.name = name
         self._mode = mode
@@ -110,8 +111,8 @@ class FakeAdapter(Adapter):
         self._opening_balance = opening_balance
         self._cash = opening_balance
         self._bars_per_request = bars_per_request
-        self._instruments = {i.instrument_id: i for i in _INSTRUMENTS}
-        self._cursors = {iid: 0 for iid in _SERIES}
+        self._instruments = {i.instrument_id: i for i in instruments or _INSTRUMENTS}
+        self._cursors = {iid: 0 for iid in self._instruments if iid in _SERIES}
         self._connected = False
         self._ts = _EPOCH_NS
         self._seq = 0
@@ -167,7 +168,15 @@ class FakeAdapter(Adapter):
 
     async def quote(self, instrument_id: InstrumentId) -> QuoteTick:
         self.require_connected()
-        return self._quote_at(instrument_id, self._cursor(instrument_id))
+        bid, ask = self._touch(instrument_id)
+        return QuoteTick(
+            instrument_id=instrument_id,
+            ts=self._tick(),
+            bid_price=bid,
+            ask_price=ask,
+            bid_size=100.0,
+            ask_size=100.0,
+        )
 
     async def depth(self, instrument_id: InstrumentId, levels: int = 5) -> MarketDepth:
         self._refuse("depth", Capability.DEPTH)
@@ -185,6 +194,24 @@ class FakeAdapter(Adapter):
         if timeframe not in {"1m", "5m", "1d"}:
             raise AdapterError(f"fake adapter does not serve timeframe {timeframe!r}")
         self._require_instrument(instrument_id)
+        if instrument_id not in _SERIES:
+            # For injected instruments, return one bar at the touch price
+            if instrument_id not in self._instruments:
+                raise AdapterError(f"unknown instrument {instrument_id}")
+            bid, ask = 10.0, 10.0
+            close = 10.0
+            bar_ts = _BAR_START
+            return [
+                Bar(
+                    instrument_id=instrument_id,
+                    ts=int(bar_ts.timestamp() * 1e9),
+                    open=close,
+                    high=close + 1.0,
+                    low=close - 1.0,
+                    close=close,
+                    volume=1000.0,
+                )
+            ]
         series = self._series(instrument_id)
         bars: list[Bar] = []
         for offset in range(self._bars_per_request):
@@ -442,17 +469,26 @@ class FakeAdapter(Adapter):
         except KeyError:
             raise AdapterError(f"unknown instrument {instrument_id}") from None
 
+    def _touch(self, instrument_id: InstrumentId) -> tuple[float, float]:
+        """The current (bid, ask), defaulting to a flat 10.0 touch for injected instruments."""
+        if instrument_id in _SERIES:
+            return self._series(instrument_id)[self._cursor(instrument_id) % 4]
+        if instrument_id in self._instruments:
+            return (10.0, 10.0)
+        raise AdapterError(f"unknown instrument {instrument_id}")
+
     def _require_instrument(self, instrument_id: InstrumentId) -> None:
         if instrument_id not in self._instruments:
             raise AdapterError(f"unknown instrument {instrument_id}")
 
     def _cursor(self, instrument_id: InstrumentId) -> int:
         self._require_instrument(instrument_id)
-        return self._cursors[instrument_id]
+        if instrument_id in _SERIES:
+            return self._cursors[instrument_id]
+        return 0
 
     def _quote_at(self, instrument_id: InstrumentId, cursor: int) -> QuoteTick:
-        series = self._series(instrument_id)
-        bid, ask = series[cursor % len(series)]
+        bid, ask = self._touch(instrument_id)
         return QuoteTick(
             instrument_id=instrument_id,
             ts=self._tick(),
@@ -463,7 +499,7 @@ class FakeAdapter(Adapter):
         )
 
     def _emit(self, instrument_id: InstrumentId) -> None:
-        quote = self._quote_at(instrument_id, self._cursors[instrument_id])
+        quote = self._quote_at(instrument_id, 0)
         for mode, callback, instruments in self._subscriptions.values():
             if instrument_id in instruments and mode in (StreamMode.QUOTE, StreamMode.LTP):
                 callback(quote)

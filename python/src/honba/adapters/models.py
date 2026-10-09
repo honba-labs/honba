@@ -300,6 +300,7 @@ class OrderReport:
     trigger_price: float | None = None
     reject_reason: str | None = None
     ts_event: int = 0
+    venue_order_id: str | None = None
 
     def __post_init__(self) -> None:
         _non_empty("order_id", self.order_id)
