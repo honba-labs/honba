@@ -1,7 +1,8 @@
 """Deterministic harnesses for strategy tests.
 
-``replay`` is the minimal bar replay: market intents fill at the close of the bar
-that produced them (or ``fill_delay`` bars later at the open), with no costs.
+``replay`` is the minimal bar replay: market intents fill at the close of their
+respective instrument (or ``fill_delay`` bars later at the open), with no costs.
+Sells fill before buys within each batch to prevent insufficient funds on rebalances.
 ``BarCloseFills`` is the simulated execution port of the conformance suite
 (mirrors ``honba_sim::BarFillEngine``). Use ``honba.backtest`` for realistic simulation.
 """
@@ -16,7 +17,8 @@ from typing import Any
 from honba.domain.money import Currency, Money
 from honba.entities import wire
 from honba.entities.bar import Bar
-from honba.entities.order import OrderIntent
+from honba.entities.instrument import InstrumentId
+from honba.entities.order import OrderIntent, OrderSide
 from honba.entities.tick import QuoteTick, TradeTick
 from honba.entities.trade import Trade
 from honba.strategies.base import Strategy
@@ -46,24 +48,38 @@ class ReplayResult:
 
 
 def replay(strategy: Strategy, bars: Iterable[Bar], fill_delay: int = 0) -> ReplayResult:
-    """Replays ``bars``. ``fill_delay=0`` fills at the emitting bar's close;
-    ``fill_delay=n`` fills at the open of the bar ``n`` bars later, like a live runner."""
+    """Replays ``bars``. ``fill_delay=0`` fills at the instrument's last close;
+    ``fill_delay=n`` fills at the open of the bar ``n`` bars later, like a live runner.
+    Within each fill batch, sells execute before buys so liquidation funds purchases."""
     result = ReplayResult()
     queue: list[tuple[int, OrderIntent]] = []  # (due bar index, intent)
+    last_close: dict[InstrumentId, float] = {}
+    last_open: dict[InstrumentId, float] = {}
     strategy.on_start()
     for i, bar in enumerate(bars):
+        last_close[bar.instrument_id] = bar.close
+        last_open[bar.instrument_id] = bar.open
         if isinstance(strategy.ctx, LedgerContext):
             strategy.ctx.set_now(bar.ts)
         due = [q for q in queue if q[0] <= i]
         queue = [q for q in queue if q[0] > i]
+        due.sort(key=lambda item: (0 if item[1].side is OrderSide.SELL else 1))
         for _, intent in due:
-            _fill(strategy, result, intent, bar.open, bar.ts)
+            px = last_open.get(intent.instrument_id, bar.open)
+            _fill(strategy, result, intent, px, bar.ts)
         strategy.on_bar(bar)
-        for intent in strategy.drain_intents():
+        intents = strategy.drain_intents()
+        for intent in intents:
             result.intents.append(intent)
-            if fill_delay == 0:
-                _fill(strategy, result, intent, bar.close, bar.ts)
-            else:
+        if fill_delay == 0:
+            intents_to_fill = sorted(
+                intents, key=lambda it: (0 if it.side is OrderSide.SELL else 1)
+            )
+            for intent in intents_to_fill:
+                px = last_close.get(intent.instrument_id, bar.close)
+                _fill(strategy, result, intent, px, bar.ts)
+        else:
+            for intent in intents:
                 queue.append((i + fill_delay, intent))
     strategy.on_stop()
     return result
