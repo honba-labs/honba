@@ -1,6 +1,7 @@
 //! Unit tests for this crate, one file per area.
 
 mod audit;
+mod cache;
 mod clock;
 mod engine;
 mod execution;

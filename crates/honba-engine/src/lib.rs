@@ -17,6 +17,7 @@
 //! messages, and appends what it did to an [`AuditLog`].
 
 pub mod audit;
+pub mod cache;
 pub mod clock;
 pub mod data;
 pub mod engine;
@@ -30,9 +31,10 @@ pub use audit::{
     AuditJournalReader, AuditJournalWriter, AuditKind, AuditLog, AuditRecord, ReplayOrder,
     ReplayState,
 };
+pub use cache::{CacheQuery, StateCache, TrackedOrder};
 pub use clock::Clock;
 pub use data::DataFeed;
-pub use engine::{Engine, TrackedOrder};
+pub use engine::Engine;
 pub use error::{AlgoError, Result};
 pub use execution::{ExecutionEngine, LegacyDrains, LegacyPortEvents, OrderRejection};
 pub use handler::{EngineOutput, Handler, NoopHandler};

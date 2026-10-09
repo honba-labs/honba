@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### State cache and store contract (E2-S9)
+
+- `honba-engine`: Implemented `StateCache` in `crates/honba-engine/src/cache/mod.rs` providing deterministic in-memory tracking of orders, positions, instruments, and market data (quotes, bars, last prices).
+- `CacheQuery` trait exposes query methods (`order`, `orders`, `open_orders`, `position`, `positions`, `instrument`, `instruments`, `last_quote`, `last_bar`, `last_price`, `last_ts`).
+- `Engine::cache()` provides direct access to the engine's internal `StateCache`, automatically updated during event processing.
+- `honba-strategy`: Added `CacheContext` implementing `StrategyContext` directly backed by `StateCache` (`context_reads_from_cache`).
+
 ### Audit log replay and journal writer (E2-S4 rest)
 
 - `honba-engine`: Added `ReplayState`, `ReplayOrder`, `AuditJournalWriter`, and `AuditJournalReader`.

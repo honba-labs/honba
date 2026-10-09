@@ -11,6 +11,8 @@ use std::collections::BTreeMap;
 use honba_entities::{Currency, Instrument, Money, Trade};
 use honba_messages::{InstrumentId, OrderSide, UnixNanos};
 
+use honba_engine::{CacheQuery, StateCache};
+
 use crate::intent::OrderIntent;
 
 /// What a strategy may read and do. Implementations are supplied by the
@@ -254,6 +256,89 @@ impl StrategyContext for LedgerContext {
                 p.sell += intent.quantity;
             }
         }
+        self.outbox.push(intent);
+    }
+}
+
+/// A [`StrategyContext`] implementation backed directly by a [`StateCache`].
+#[derive(Debug)]
+pub struct CacheContext<'a> {
+    cache: &'a StateCache,
+    now: UnixNanos,
+    cash: Money,
+    currency: Currency,
+    outbox: Vec<OrderIntent>,
+}
+
+impl<'a> CacheContext<'a> {
+    /// Creates a context reading from `cache` with initial `cash`.
+    pub fn new(cache: &'a StateCache, cash: Money) -> Self {
+        Self {
+            cache,
+            now: cache.last_ts(),
+            currency: cash.currency(),
+            cash,
+            outbox: Vec::new(),
+        }
+    }
+
+    /// Sets the context clock.
+    pub fn set_now(&mut self, now: UnixNanos) {
+        self.now = now;
+    }
+
+    /// The currency of this context.
+    pub fn currency(&self) -> Currency {
+        self.currency
+    }
+
+    /// Drains submitted intents.
+    pub fn drain_intents(&mut self) -> Vec<OrderIntent> {
+        std::mem::take(&mut self.outbox)
+    }
+}
+
+impl<'a> StrategyContext for CacheContext<'a> {
+    fn now(&self) -> UnixNanos {
+        self.now
+    }
+
+    fn position(&self, instrument_id: &InstrumentId) -> f64 {
+        self.cache.position(instrument_id)
+    }
+
+    fn positions(&self) -> Vec<(InstrumentId, f64)> {
+        let mut list: Vec<(InstrumentId, f64)> = self
+            .cache
+            .positions()
+            .iter()
+            .filter(|(_, &qty)| qty.abs() > EPSILON)
+            .map(|(k, &v)| (k.clone(), v))
+            .collect();
+        list.sort_by(|a, b| {
+            a.0.symbol()
+                .cmp(b.0.symbol())
+                .then_with(|| a.0.exchange().as_str().cmp(b.0.exchange().as_str()))
+        });
+        list
+    }
+
+    fn cash(&self) -> Money {
+        self.cash
+    }
+
+    fn busy(&self, instrument_id: &InstrumentId) -> bool {
+        self.cache
+            .open_orders()
+            .iter()
+            .any(|o| &o.instrument_id == instrument_id)
+    }
+
+    fn instrument(&self, instrument_id: &InstrumentId) -> Option<&Instrument> {
+        self.cache.instrument(instrument_id)
+    }
+
+    fn submit(&mut self, intent: OrderIntent) {
         self.outbox.push(intent);
     }
 }

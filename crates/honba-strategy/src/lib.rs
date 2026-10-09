@@ -26,7 +26,7 @@ pub mod sma_crossover;
 pub mod strategy;
 
 pub use buy_and_hold::BuyAndHold;
-pub use context::{LedgerContext, StrategyContext};
+pub use context::{CacheContext, LedgerContext, StrategyContext};
 pub use contract_probe::{ContractProbe, Observation};
 pub use dyn_strategy::DynStrategy;
 pub use intent::{IntentError, OrderIntent};

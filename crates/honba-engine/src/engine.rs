@@ -10,6 +10,7 @@ use honba_messages::{
 use honba_risk::{check_state, RiskCheck, RiskDecision, RiskLimits, RiskRequest, RiskStage};
 
 use crate::audit::{AuditKind, AuditLog, AuditRecord};
+use crate::cache::StateCache;
 use crate::clock::Clock;
 use crate::data::DataFeed;
 use crate::error::{AlgoError, Result};
@@ -25,29 +26,7 @@ use crate::state::TradingState;
 /// non-decreasing `ts_event` and you want immediate dispatch.
 pub const DEFAULT_BATCH_SIZE: usize = 1024;
 
-/// What the engine knows about one order it submitted or refused (ADR 0019
-/// decision 5). Entries are never removed during a run: a terminal entry
-/// answers "what happened to `O-7`".
-#[derive(Clone, Debug, PartialEq)]
-pub struct TrackedOrder {
-    /// The order's lifecycle state.
-    pub state: OrderState,
-    /// The instrument.
-    pub instrument_id: InstrumentId,
-    /// The side.
-    pub side: OrderSide,
-    /// The first venue order id any event named, if any.
-    pub venue_order_id: Option<VenueOrderId>,
-}
-
-impl TrackedOrder {
-    fn is_working(&self) -> bool {
-        matches!(
-            self.state.status,
-            OrderStatus::Submitted | OrderStatus::Accepted | OrderStatus::PartiallyFilled
-        )
-    }
-}
+pub use crate::cache::TrackedOrder;
 
 /// Drives events from a [`DataFeed`] through a set of [`Handler`]s.
 ///
@@ -65,6 +44,7 @@ pub struct Engine {
     audit: AuditLog,
     /// Every execution event acknowledged and not yet drained, in order.
     observed: Vec<ExecutionEvent>,
+    cache: StateCache,
     orders: HashMap<String, TrackedOrder>,
     positions: HashMap<InstrumentId, f64>,
     /// Last bar close or trade price per instrument: the stage's `reference_price`.
@@ -92,6 +72,7 @@ impl Engine {
             trading_state: TradingState::Active,
             audit: AuditLog::new(),
             observed: Vec::new(),
+            cache: StateCache::new(),
             orders: HashMap::new(),
             positions: HashMap::new(),
             last_px: HashMap::new(),
@@ -138,7 +119,11 @@ impl Engine {
     /// then move (ADR 0018 decision 7). A later entry for the same instrument
     /// replaces the earlier one.
     pub fn with_positions(mut self, seed: impl IntoIterator<Item = (InstrumentId, f64)>) -> Self {
-        self.positions.extend(seed);
+        let items: Vec<(InstrumentId, f64)> = seed.into_iter().collect();
+        self.positions.extend(items.iter().cloned());
+        for (inst, qty) in items {
+            self.cache.seed_position(inst, qty);
+        }
         self
     }
 
@@ -215,6 +200,11 @@ impl Engine {
     /// Returns the complete audit log.
     pub fn audit_log(&self) -> &AuditLog {
         &self.audit
+    }
+
+    /// Returns the engine's state cache (orders, positions, instruments, and market data).
+    pub fn cache(&self) -> &StateCache {
+        &self.cache
     }
 
     /// Injects a message into the queue, exactly as a feed would.
@@ -303,6 +293,7 @@ impl Engine {
 
     /// Remembers the last bar close or trade price per instrument for the risk request.
     fn observe_price(&mut self, event: &Event) {
+        self.cache.apply_event(event);
         match event {
             Event::Bar(bar) => {
                 self.last_px
@@ -427,6 +418,7 @@ impl Engine {
                 .positions
                 .entry(trade.instrument_id().clone())
                 .or_insert(0.0) += signed;
+            self.cache.seed_position(trade.instrument_id().clone(), self.positions[&trade.instrument_id()]);
         }
         let Some(tracked) = self.orders.get_mut(&order_id) else {
             // Nothing was sent under this id: every event is illegal for it.
@@ -488,6 +480,9 @@ impl Engine {
                     self.queue.push_event(message, now);
                 }
             }
+        }
+        if let Some(t) = self.orders.get(ev.order_id().as_str()) {
+            self.cache.seed_order(ev.order_id().as_str().to_string(), t.clone());
         }
         self.observed.push(ev);
     }
@@ -554,15 +549,14 @@ impl Engine {
             order_id: order_id.clone(),
             reason: reason.clone(),
         });
-        self.orders.insert(
-            order_id,
-            TrackedOrder {
-                state: OrderState::new(),
-                instrument_id: order.instrument_id().clone(),
-                side: order.side(),
-                venue_order_id: None,
-            },
-        );
+        let tracked = TrackedOrder {
+            state: OrderState::new(),
+            instrument_id: order.instrument_id().clone(),
+            side: order.side(),
+            venue_order_id: None,
+        };
+        self.cache.seed_order(order_id.clone(), tracked.clone());
+        self.orders.insert(order_id, tracked);
         self.translate(ExecutionEvent::Rejected {
             order_id: order.order_id().clone(),
             instrument_id: order.instrument_id().clone(),
@@ -640,15 +634,14 @@ impl Engine {
             instrument,
             side,
         });
-        self.orders.insert(
-            order_id,
-            TrackedOrder {
-                state: OrderState::new(),
-                instrument_id: order.instrument_id().clone(),
-                side: order.side(),
-                venue_order_id: None,
-            },
-        );
+        let tracked = TrackedOrder {
+            state: OrderState::new(),
+            instrument_id: order.instrument_id().clone(),
+            side: order.side(),
+            venue_order_id: None,
+        };
+        self.cache.seed_order(order_id.clone(), tracked.clone());
+        self.orders.insert(order_id, tracked);
         // Enqueued ahead of anything the sink can drain for this order.
         self.queue.push_event(submitted, self.clock.now());
         self.translate(ExecutionEvent::Submitted {
