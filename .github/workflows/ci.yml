@@ -82,6 +82,12 @@ jobs:
           python-version: '3.12'
           cache: pip
 
+      - name: create virtualenv (maturin develop requires one)
+        run: |
+          python -m venv "$GITHUB_WORKSPACE/.venv"
+          echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/.venv" >> "$GITHUB_ENV"
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+
       - name: install deps
         working-directory: python
         run: |
