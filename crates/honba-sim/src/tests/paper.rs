@@ -1,7 +1,7 @@
 //! Unit tests for `crate::paper`.
 
 use honba_engine::ExecutionEngine;
-use honba_entities::Trade;
+use honba_entities::{ExecutionEvent, Trade};
 use honba_messages::{OrderSide, OrderStatus, UnixNanos};
 
 use super::{any_instrument, limit, market};
@@ -118,4 +118,16 @@ fn ledger_records_and_overwrites_statuses() {
     ledger.set("O-2", OrderStatus::Rejected);
     assert_eq!(ledger.status("O-1"), Some(OrderStatus::Filled));
     assert_eq!(ledger.status("O-2"), Some(OrderStatus::Rejected));
+}
+
+#[test]
+fn with_ack_emits_accepted_before_fill_for_limit_order() {
+    let mut exec = PaperExecution::new(100.0).with_ack(true);
+    assert!(exec.ack());
+    exec.submit(limit("O-1", OrderSide::Buy, 5.0, 100.0, 1))
+        .unwrap();
+    let events = exec.drain_events().unwrap();
+    assert_eq!(events.len(), 2);
+    assert!(matches!(events[0], ExecutionEvent::Accepted { .. }));
+    assert!(matches!(events[1], ExecutionEvent::Fill { .. }));
 }

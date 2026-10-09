@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Simulators order-state conformance (E2-S6(d))
+
+- `crates/honba-sim/tests/order_state_conformance.rs` replays `schema/conformance/order_state.json`
+  conformance scenarios across gateways under their supported profiles (ADR 0019 decision 8):
+  - `BarFillEngine` replays bar-realisable scenarios (`market_fill`, `limit_fill`) under the `l1` profile.
+  - `PaperExecution` gains `with_ack(bool)` for the `ack` profile (emitting `Accepted` before filling on limit orders), replaying scenarios under the `ack` profile.
+  - `NextOpenSim` replays bar-realisable market order scenarios under the `l1` profile.
+  - `ScriptedExecution` replays scenarios under the `ack` profile.
+- Normalised event streams and terminal order states match the canonical conformance vectors across all gateways.
+
 ### Adapter event form, FakeAdapter order-state conformance (E2-S6(c))
 
 - `OrderReport` gains `venue_order_id: str | None` (ADR 0019 decision 3). This is the venue/broker
