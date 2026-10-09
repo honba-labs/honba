@@ -1,116 +1,265 @@
 name: ci
 
+# Pipeline:  changes -> [lint gates] -> [build & test] -> ci-ok (required check) -> package (main)
+#
+#   stage 0  changes        which areas the diff touches (skips whole branches of the graph)
+#   stage 1  fast gates     fmt, layering, clippy, ruff, secret scan: fail in ~1-2 min
+#   stage 2  build & test   rust tests, docs, wasm, codegen drift, python (maturin) tests
+#   stage 3  ci-ok          single aggregate job; make this the only required status check
+#   stage 4  package        wheels + honba binary as artifacts, main and tags only
+# Slow/long checks (ignored tests, slow pytest marker, cargo-deny, audit) live in nightly.yml.
+
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: 0
 
 jobs:
-  rust:
+  # ---------------------------------------------------------------- stage 0
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.f.outputs.rust }}
+      python: ${{ steps.f.outputs.python }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: f
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            rust:
+              - 'crates/**'
+              - 'Cargo.toml'
+              - 'rust-toolchain.toml'
+              - 'schema/**'
+              - 'scripts/dependency_graph.py'
+              - 'Makefile'
+              - '.github/workflows/**'
+            python:
+              - 'python/**'
+              - 'crates/**'
+              - 'schema/**'
+              - '.github/workflows/**'
+
+  # ---------------------------------------------------------------- stage 1
+  fmt:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
-          targets: wasm32-unknown-unknown
+          components: rustfmt
+      - run: cargo fmt --all -- --check
 
-      - uses: Swatinem/rust-cache@v2
-
-      - name: cargo fmt --check
-        run: cargo fmt --all -- --check
-
-      - name: cargo check
-        run: cargo check --workspace --all-targets
-
-      - name: cargo check honba-market (no default features)
-        run: cargo check -p honba-market --no-default-features
-
-      - name: cargo check honba-api-wasm (wasm32)
-        run: make check-wasm
-
-      - name: wasm conformance (node)
-        uses: taiki-e/install-action@v2
-        with:
-          tool: wasm-pack
-      - run: make test-wasm
-
-      - name: cargo clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
-
-      - name: cargo test
-        run: cargo test --workspace
-
-      - name: cargo test --doc
-        run: cargo test --workspace --doc
-
-      # Regenerates schema/domain, schema/openapi, schema/mcp and the .pyi stubs with the
-      # Rust generator and fails on any modified or untracked file. The frontend TypeScript
-      # check (make check-schema-ts) needs the sibling honba-frontend repo: local only.
-      - name: codegen drift
-        run: make check-codegen-ci
-
-      - name: cargo doc
-        run: cargo doc --workspace --no-deps
-        env:
-          RUSTDOCFLAGS: -D warnings
-
-  dependency-graph:
+  layering:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: run scripts/dependency_graph.py
+      - name: crate hierarchy, async isolation, wasm purity
         run: python3 scripts/dependency_graph.py
 
-  python:
+  secrets-scan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: no secret files tracked
+        run: |
+          bad="$(git ls-files | grep -E '(^|/)\.env(\.[^/]*)?$|\.(local|secrets)\.toml$|(^|/)secrets/' | grep -v '\.env\.example$' || true)"
+          if [ -n "$bad" ]; then echo "tracked secret files:"; echo "$bad"; exit 1; fi
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  clippy:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: lint
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: clippy with network transports (honba-broker-zerodha `net`)
+        run: cargo clippy -p honba-broker-zerodha --all-targets --features net -- -D warnings
 
+  ruff:
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: pip
+      - name: install ruff (pinned in requirements-dev.txt)
+        run: pip install "$(grep -iE '^ruff' python/requirements-dev.txt)"
+      - run: ruff check python scripts
+      - run: ruff format --check python
 
+  # ---------------------------------------------------------------- stage 2
+  rust-test:
+    needs: [fmt, layering, clippy]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: test
+      - run: cargo test --workspace
+      - run: cargo test --workspace --doc
+      - name: honba-market without default features
+        run: cargo check -p honba-market --no-default-features
+      - name: honba-broker-zerodha with network transports
+        run: cargo check -p honba-broker-zerodha --features net
+
+  docs:
+    needs: [fmt, layering]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: doc
+      - run: cargo doc --workspace --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  wasm:
+    needs: [fmt, layering, clippy]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: wasm
+      - run: make check-wasm
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+      - run: make test-wasm
+
+  # Regenerates schema/domain, schema/openapi, schema/mcp and the .pyi stubs with the Rust
+  # generator and fails on any modified or untracked file. The frontend TypeScript check
+  # (make check-schema-ts) needs the sibling honba-frontend repo: local only.
+  codegen-drift:
+    needs: [fmt, layering]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: test
+      - run: make check-codegen-ci
+
+  python:
+    needs: [changes, ruff, layering]
+    if: needs.changes.outputs.python == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: python
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
       - name: create virtualenv (maturin develop requires one)
         run: |
           python -m venv "$GITHUB_WORKSPACE/.venv"
           echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/.venv" >> "$GITHUB_ENV"
           echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
-
       - name: install deps
         working-directory: python
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
-
-      - name: build and install wheel via maturin
+      - name: build extension (maturin develop)
         working-directory: python
-        run: |
-          maturin develop
-
-      - name: verify extension type stubs
+        run: maturin develop
+      - name: extension type stubs
         working-directory: python
-        run: |
-          python -m mypy.stubtest honba._honba
-
-      - name: pytest
+        run: python -m mypy.stubtest honba._honba
+      - name: pytest (fast suite)
         working-directory: python
-        run: |
-          pytest -q tests/
+        run: pytest -q -m "not slow" tests/
 
-      - name: lint (ruff)
+  # ---------------------------------------------------------------- stage 3
+  # The only job to mark as a required status check. Skipped upstream jobs (path filter) count
+  # as success; failed or cancelled ones do not.
+  ci-ok:
+    if: always()
+    needs: [fmt, layering, secrets-scan, clippy, ruff, rust-test, docs, wasm, codegen-drift, python]
+    runs-on: ubuntu-latest
+    steps:
+      - name: all required jobs passed or were skipped
+        env:
+          NEEDS: ${{ toJSON(needs) }}
         run: |
-          # ruff is pinned in python/requirements-dev.txt (installed above)
-          ruff check python
-          ruff format --check python
+          echo "$NEEDS"
+          if echo "$NEEDS" | grep -Eq '"result": "(failure|cancelled)"'; then exit 1; fi
+
+  # ---------------------------------------------------------------- stage 4
+  package:
+    needs: ci-ok
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: PyO3/maturin-action@v1
+        with:
+          working-directory: python
+          command: build
+          args: --release --out dist
+          manylinux: auto
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: package
+      - run: cargo build --release --bin honba
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels
+          path: python/dist/*.whl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: honba-linux-x86_64
+          path: target/release/honba
