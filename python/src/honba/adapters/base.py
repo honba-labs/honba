@@ -58,6 +58,7 @@ __all__ = [
     "Adapter",
     "ExecutionAdapter",
     "ExecutionClient",
+    "FullAdapterClient",
     "MarketDataAdapter",
     "MarketDataClient",
 ]
@@ -130,8 +131,7 @@ class MarketDataAdapter(Protocol):
 
         Raises :class:`~honba.adapters.errors.AdapterError` on a transport failure. Dated
         snapshots and ``as_of`` resolution are the instrument master's job (E1-S3), built on
-        top of this fetch.
-        """
+        top of this fetch."""
         ...
 
     async def search_instruments(self, query: str) -> list[Instrument]:
@@ -160,7 +160,7 @@ class MarketDataAdapter(Protocol):
     ) -> list[Bar]:
         """Bars in ascending time order for ``[start, end)``; empty when there are none.
 
-        ``timeframe`` is the canonical aggregation name (``"1m"``, ``"1d"``), never a
+        ``timeframe`` is the canonical aggregation name (``\"1m\"``, ``\"1d\"``), never a
         broker-specific code.
         """
         ...
@@ -284,3 +284,8 @@ class MarketDataClient(_Lifecycle, MarketDataAdapter, Protocol):
 @runtime_checkable
 class ExecutionClient(_Lifecycle, ExecutionAdapter, Protocol):
     """An adapter with lifecycle *and* execution; what ``create_execution`` returns."""
+
+
+@runtime_checkable
+class FullAdapterClient(_Lifecycle, MarketDataAdapter, ExecutionAdapter, Protocol):
+    """An adapter with lifecycle, market data and execution; what ``create_full`` returns."""

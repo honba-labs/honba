@@ -21,7 +21,7 @@ from collections.abc import Callable
 from importlib.metadata import entry_points
 from typing import Any
 
-from honba.adapters.base import Adapter, ExecutionClient, MarketDataClient
+from honba.adapters.base import Adapter, ExecutionClient, FullAdapterClient, MarketDataClient
 from honba.adapters.errors import AdapterError, AdapterNotFound
 
 __all__ = [
@@ -33,6 +33,7 @@ __all__ = [
     "register_adapter",
     "resolve_adapter",
     "resolve_execution_adapter",
+    "resolve_full_adapter",
     "resolve_market_data_adapter",
 ]
 
@@ -157,6 +158,18 @@ class AdapterRegistry:
             raise AdapterError(f"adapter {name!r} does not implement execution")
         return adapter
 
+    def create_full(self, name: str, /, **config: Any) -> FullAdapterClient:
+        """Like :meth:`create`, typed as an adapter with both market data and execution.
+
+        Raises :class:`AdapterError` if the adapter does not implement both roles.
+        """
+        adapter = self.create(name, **config)
+        if not isinstance(adapter, FullAdapterClient):
+            raise AdapterError(
+                f"adapter {name!r} does not implement both market data and execution"
+            )
+        return adapter
+
     def available(self) -> list[str]:
         """Sorted names of every registered and discoverable adapter."""
         self.discover()
@@ -189,6 +202,11 @@ def resolve_market_data_adapter(name: str, /, **config: Any) -> MarketDataClient
 def resolve_execution_adapter(name: str, /, **config: Any) -> ExecutionClient:
     """:func:`resolve_adapter`, typed and checked as an execution adapter."""
     return _DEFAULT_REGISTRY.create_execution(name, **config)
+
+
+def resolve_full_adapter(name: str, /, **config: Any) -> FullAdapterClient:
+    """:func:`resolve_adapter`, typed and checked as a full adapter (market data and execution)."""
+    return _DEFAULT_REGISTRY.create_full(name, **config)
 
 
 def available_adapters() -> list[str]:

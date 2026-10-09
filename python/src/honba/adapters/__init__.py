@@ -18,6 +18,7 @@ from honba.adapters.base import (
     Adapter,
     ExecutionAdapter,
     ExecutionClient,
+    FullAdapterClient,
     MarketDataAdapter,
     MarketDataClient,
 )
@@ -63,6 +64,7 @@ from honba.adapters.registry import (
     register_adapter,
     resolve_adapter,
     resolve_execution_adapter,
+    resolve_full_adapter,
     resolve_market_data_adapter,
 )
 
@@ -81,6 +83,7 @@ __all__ = [
     "DepthLevel",
     "ExecutionAdapter",
     "ExecutionClient",
+    "FullAdapterClient",
     "Funds",
     "Holding",
     "MarginReport",
@@ -105,5 +108,6 @@ __all__ = [
     "register_adapter",
     "resolve_adapter",
     "resolve_execution_adapter",
+    "resolve_full_adapter",
     "resolve_market_data_adapter",
 ]
