@@ -26,7 +26,7 @@ import tomllib
 # L5: honba-analytics, honba-data, honba-sweep, honba-codegen, honba-config
 # L6: honba-api, honba-testing
 # L7: honba-py, honba-cli, honba-api-rest, honba-api-wasm
-# Edge: honba-broker-* (venue adapters; implement honba-ports traits, nothing above L2 reaches them)
+# Brokers are not crates: they live in the honba-adapters repo (Python).
 
 ALLOWED_PROD = {
     "honba-messages": set(),
@@ -128,10 +128,6 @@ ALLOWED_PROD = {
     "honba-api-wasm": {
         "honba-indicators",
     },
-    # Broker adapters are edge crates: they translate a venue's wire format into the domain and
-    # implement the ports. They see only the domain (messages, entities) and the port traits,
-    # never the engine, so a broker cannot leak venue rules into the kernel (R2).
-    "honba-broker-zerodha": {"honba-messages", "honba-entities", "honba-ports"},
 }
 
 # Dev-dependencies: no upward edges (a lower tier may not reach a higher one).
@@ -163,7 +159,6 @@ ALLOWED_DEV = {
     "honba-sweep": {"honba-testing"},
     "honba-api-rest": {"honba-testing"},
     "honba-api-wasm": set(),
-    "honba-broker-zerodha": {"honba-testing"},
 }
 
 # Core crates that must NEVER enable market-specific packs (like the `india` feature of honba-market)
@@ -204,8 +199,6 @@ ASYNC_BOUNDARY_CRATES = {
     "honba-py",
     "honba-cli",
     "honba-api-rest",
-    # Venue edge: its optional `net` feature drives sockets on tokio (never the kernel).
-    "honba-broker-zerodha",
 }
 
 # Crates that target wasm32-unknown-unknown and therefore must not pull tokio

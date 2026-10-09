@@ -108,8 +108,6 @@ jobs:
         with:
           shared-key: lint
       - run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: clippy with network transports (honba-broker-zerodha `net`)
-        run: cargo clippy -p honba-broker-zerodha --all-targets --features net -- -D warnings
 
   ruff:
     needs: changes
@@ -140,8 +138,6 @@ jobs:
       - run: cargo test --workspace --doc
       - name: honba-market without default features
         run: cargo check -p honba-market --no-default-features
-      - name: honba-broker-zerodha with network transports
-        run: cargo check -p honba-broker-zerodha --features net
 
   docs:
     needs: [fmt, layering]

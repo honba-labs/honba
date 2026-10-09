@@ -17,7 +17,7 @@ This document defines:
 1. **The Generic Broker API Architecture**: The polymorphic lifecycle, market data, and execution contracts shared across all broker integrations in both Python (`honba.adapters`) and Rust (`honba-ports`).
 2. **Current System Audit**: An inventory of what currently exists across `honba`, `honba-adapters`, and `honba-ports`, and what remains stubbed.
 3. **Specific Integration Plans**:
-   - **Zerodha Kite Connect**: Leveraging `kiteconnect-rs` (Rust) and implementing `honba-adapters/zerodha` (Python).
+   - **Zerodha Kite Connect**: `honba-adapters/zerodha` (Python, `honba-zerodha`); `kiteconnect-rs` is only a protocol reference.
    - **DhanHQ**: Leveraging `DhanHQ-py` (Python SDK) and implementing `honba-adapters/dhan`.
 4. **Implementation Roadmap**: Phased milestones with concrete deliverables, testing harnesses, and verification gates.
 
@@ -36,7 +36,6 @@ This document defines:
 | **Shared Adapter Support** | `honba-adapters/shared/` | **Partial**: Re-exports contract test suite and basic test fixtures. `auth.py`, `rate_limit.py`, `websocket.py`, `parsing.py` are empty (0-byte stubs). | Shared token bucket rate limiter, TOTP 2FA generator, reconnecting WebSocket base client. |
 | **Dhan Adapter Package** | `honba-adapters/dhan/` | **Stub (0-bytes)**: `honba_dhan` directory exists with 9 empty stub files (`http.py`, `execution.py`, `data.py`, `websocket.py`, etc.). | Full implementation wrapping `dhanhq` / Dhan REST & WebSocket APIs conforming to `Adapter`. |
 | **Zerodha Adapter Package** | `honba-adapters/zerodha/` | **Stub (0-bytes)**: `honba_zerodha` directory exists with 9 empty stub files. | Full implementation wrapping Kite Connect v3 REST & KiteTicker WebSocket conforming to `Adapter`. |
-| **Rust Zerodha Connector** | `honba/crates/` (target) | **Non-existent**: No Rust crate imports or bridges `kiteconnect-rs`. | Native Rust execution port wrapping `kiteconnect-rs` (or async Kite client) for zero-overhead execution. |
 
 ---
 
@@ -186,9 +185,7 @@ Every adapter translates broker responses to frozen domain models:
 
 ### 4.2 Honba Zerodha Adapter Architecture
 
-Honba will support Zerodha across two complementary tiers:
-1. **Python Adapter (`honba-adapters/zerodha`)**: Full async implementation for research, multi-asset backtests, and standard live execution.
-2. **Rust Native Port (`honba-broker-zerodha`)**: High-performance Rust crate linking `kiteconnect-rs` or an async tokio WebSocket parser directly into `honba-ports::ExecutionGateway`.
+Brokers live in the `honba-adapters` repo, not in the `honba` core framework. Zerodha is the Python package `honba-zerodha` (`honba-adapters/zerodha`), the single Zerodha implementation: async REST client, KiteTicker binary decoder, execution (ambiguous-submit reconciliation, fill de-duplication) and market data. There is no Rust Zerodha crate; an earlier `honba-broker-zerodha` crate was removed (it remains in git history).
 
 #### A. Authentication Flow
 - **Parameters**: `api_key`, `api_secret`, `user_id`, `totp_secret`, `pin`.
@@ -367,14 +364,8 @@ DHAN_STATUS_MAP = {
 5. **Certification**:
    - Run `verify_adapter_contract(ZerodhaAdapter)` against mock fixtures.
 
-### Milestone 4: Zerodha Native Rust Connector (`kiteconnect-rs` in `honba-ports`)
-1. Add `crates/honba-broker-zerodha` in `honba`:
-   - Integrate `kiteconnect-rs` dependency.
-2. Implement `honba_ports::ExecutionGateway`:
-   - Route `SubmitOrder`, `CancelOrder`, and `ModifyOrder` directly into Kite Connect REST API.
-3. Implement `honba_ports::MarketDataFeed`:
-   - Stream live KiteTicker binary ticks into `QuoteTick` channel for `honba-engine`.
-4. Run Rust unit tests in `crates/honba-broker-zerodha/tests`.
+### Milestone 4: Zerodha Native Rust Connector (dropped)
+No Rust Zerodha crate is planned: brokers belong in `honba-adapters` (Python), and the Python adapter now carries all Kite behaviour (frame decoder, trade filter, reconciliation, session checksum).
 
 ### Milestone 5: End-to-End Paper Validation & Promotion
 1. Verify with `honba-examples/basic/01_connect_dhan.py`:
