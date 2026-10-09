@@ -3,7 +3,7 @@
 from honba.strategies import indicators
 from honba.strategies.base import Strategy
 from honba.strategies.context import LedgerContext, StrategyContext
-from honba.strategies.declarative import DeclarativeStrategy, Entry
+from honba.strategies.declarative import DeclarativeStrategy, Entry, TargetWeightStrategy
 
 __all__ = [
     "DeclarativeStrategy",
@@ -11,5 +11,6 @@ __all__ = [
     "LedgerContext",
     "Strategy",
     "StrategyContext",
+    "TargetWeightStrategy",
     "indicators",
 ]

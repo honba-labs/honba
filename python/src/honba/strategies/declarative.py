@@ -1,4 +1,8 @@
-"""Jesse-style declarative rules on top of the event-driven ``Strategy``.
+"""Jesse/Backtrader-style declarative layers on top of the event-driven ``Strategy``.
+
+Two facades live here: ``DeclarativeStrategy`` (per-instrument rules) and
+``TargetWeightStrategy`` (portfolio level: declare universe + weights; framework
+rebalances, see the end of this docstring).
 
 ``DeclarativeStrategy`` lets a strategy be written as per-instrument rules instead of
 an ``on_bar`` body, so humans and LLM agents can express an idea in a few small,
@@ -48,18 +52,33 @@ Notes and caveats
 * TODO(OCO): the stop and the target are independent orders. When one fills the other
   must be cancelled by the engine / broker (OCO); this class does not cancel it.
 * Trailing stops (``OrderType.TRAILING_STOP``) are not used.
+
+TargetWeightStrategy
+--------------------
+Declare *what the portfolio should look like* (``universe()`` and optionally
+``target_weights()``); the framework does the order mechanics. On a rebalance bar it
+values the portfolio (cash + open positions at the last close), sizes each name to
+``value * allocation * weight`` in whole shares and submits market orders: first exits
+(held names with weight 0), then trims (sells), then top-ups / entries (buys), each
+group in symbol order. Busy or unpriced names are skipped and differences under one
+share are ignored. ``should_rebalance`` defaults to "first bar with prices for the
+whole universe (or the next calendar day), then every ``rebalance_days`` trading
+days"; days come from bar event time (UTC), never the wall clock. Long-only for now.
 """
 
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from typing import ClassVar
 
 from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
 from honba.entities.order import OrderIntent, OrderSide
 from honba.entities.trade import Trade
 from honba.strategies.base import Strategy
+from honba.strategies.sizing import whole_shares
 
 _EPSILON = 1e-9
 
@@ -175,3 +194,150 @@ class DeclarativeStrategy(Strategy):
             raise ValueError(
                 f"{side} take_profit {entry.take_profit} must be {where} close {close}"
             )
+
+
+_NS_PER_DAY = 86_400 * 10**9
+
+
+def _symbol_key(iid: InstrumentId) -> tuple[str, str]:
+    return (iid.symbol, iid.exchange)
+
+
+class TargetWeightStrategy(Strategy):
+    """Declare the universe and target weights; the framework rebalances (see module docs).
+
+    Override ``universe`` (required) and, to deviate from equal weight, ``target_weights``.
+    ``rebalance_days`` and ``allocation`` may be overridden as class attributes or set in
+    ``__init__``; subclasses need not call ``super().__init__()``.
+    """
+
+    rebalance_days: ClassVar[int] = 15
+    allocation: ClassVar[float] = 0.98
+
+    # -- declare (override) -----------------------------------------------------
+    def universe(self) -> Iterable[InstrumentId]:
+        """Current members; called at every rebalance so membership may change."""
+        raise NotImplementedError(f"{type(self).__name__} must override universe()")
+
+    def target_weights(self) -> Mapping[InstrumentId, float]:
+        """Target weight per instrument (long-only, sum <= 1). Default: equal weight."""
+        members = list(self.universe())
+        return {iid: 1.0 / len(members) for iid in members}
+
+    def should_rebalance(self, bar: Bar) -> bool:
+        """Default cadence: first complete-price (or next-day) bar, then every N days."""
+        if not self._tw.initial_done:
+            members = set(self.universe())
+            return members <= self._tw.prices.keys() or self._tw.day_changed
+        return self._tw.days_since >= self.rebalance_days
+
+    # -- facade -----------------------------------------------------------------
+    @property
+    def _tw(self) -> _TargetWeightState:
+        try:
+            return self.__tw
+        except AttributeError:
+            self.__tw = _TargetWeightState()
+            return self.__tw
+
+    @property
+    def _days_since_rebalance(self) -> int:
+        return self._tw.days_since
+
+    def on_bar(self, bar: Bar) -> None:
+        st = self._tw
+        st.prices[bar.instrument_id] = float(bar.close)
+        day = bar.ts // _NS_PER_DAY
+        st.day_changed = st.last_day is not None and day > st.last_day
+        if st.day_changed:
+            st.days_since += 1
+        if st.last_day is None or day > st.last_day:
+            st.last_day = day
+        if self.should_rebalance(bar):
+            self._rebalance()
+            st.initial_done = True
+            st.days_since = 0
+
+    def _rebalance(self) -> None:
+        st = self._tw
+        members = set(self.universe())
+        weights = self._checked_weights(members)
+        self._log_membership(members)
+        st.members = members
+        value = self._portfolio_value()
+        if value <= 0:
+            return
+        held = {iid: q for iid, q in self.ctx.positions().items() if q != 0}
+        exits: list[InstrumentId] = []
+        trims: list[tuple[InstrumentId, int]] = []
+        buys: list[tuple[InstrumentId, int]] = []
+        for iid in sorted(held.keys() | members, key=_symbol_key):
+            if self.busy(iid):
+                continue
+            weight = weights.get(iid, 0.0)
+            if weight == 0.0:
+                if iid in held:
+                    exits.append(iid)
+                continue
+            price = st.prices.get(iid)
+            if price is None or price <= 0:
+                continue
+            diff = whole_shares(value * self.allocation * weight, 1.0, price) - held.get(iid, 0.0)
+            if diff >= 1:
+                buys.append((iid, int(diff)))
+            elif diff <= -1:
+                trims.append((iid, int(-diff)))
+        for iid in exits:
+            qty = held[iid]
+            (self.sell if qty > 0 else self.buy)(iid, abs(qty), reason="exit")
+        for iid, qty in trims:
+            self.sell(iid, qty, reason="rebalance")
+        for iid, qty in buys:
+            self.buy(iid, qty)
+
+    def _checked_weights(self, members: set[InstrumentId]) -> dict[InstrumentId, float]:
+        weights = dict(self.target_weights())
+        for iid, w in weights.items():
+            if not math.isfinite(w):
+                raise ValueError(f"weight for {iid.symbol} must be finite, got {w}")
+            if w < 0:
+                raise ValueError(
+                    f"weight for {iid.symbol} is negative ({w}); shorts are not supported yet"
+                )
+        outside = sorted(i.symbol for i in weights.keys() - members)
+        if outside:
+            raise ValueError(f"weights given for names outside the universe: {outside}")
+        total = sum(weights.values())
+        if total > 1.0 + _EPSILON:
+            raise ValueError(f"weights sum to {total}, which exceeds 1.0")
+        return weights
+
+    def _log_membership(self, members: set[InstrumentId]) -> None:
+        previous = self._tw.members
+        for event, names in (
+            ("EVENT_MEMBERSHIP_ADD", members - previous),
+            ("EVENT_MEMBERSHIP_DEL", previous - members),
+        ):
+            if names:
+                self.log_event(event, symbols=[i.symbol for i in sorted(names, key=_symbol_key)])
+
+    def _portfolio_value(self) -> float:
+        """Cash plus open positions marked at the last close (unpriced ones are skipped)."""
+        value = self.ctx.cash().to_major()
+        for iid, qty in self.ctx.positions().items():
+            price = self._tw.prices.get(iid)
+            if price is not None and price > 0:
+                value += qty * price
+        return value
+
+
+class _TargetWeightState:
+    __slots__ = ("day_changed", "days_since", "initial_done", "last_day", "members", "prices")
+
+    def __init__(self) -> None:
+        self.prices: dict[InstrumentId, float] = {}
+        self.members: set[InstrumentId] = set()
+        self.last_day: int | None = None
+        self.days_since = 0
+        self.day_changed = False
+        self.initial_done = False
