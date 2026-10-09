@@ -196,3 +196,14 @@ class TestBoundaryHoldsForThisPackage:
         # The rule that keeps the leak from mattering: values out of an adapter are honba types.
         assert OrderReport.__module__.startswith("honba.adapters")
         assert issubclass(Capability, object)
+
+
+class TestDiscoveredEntryPoints:
+    def test_registered_entry_points_contain_installed_adapters(self) -> None:
+        adapters = available_adapters()
+        if "dhan" in adapters:
+            dhan = resolve_adapter("dhan")
+            assert dhan.capabilities().name == "dhan"
+        if "zerodha" in adapters:
+            zerodha = resolve_adapter("zerodha")
+            assert zerodha.capabilities().name == "zerodha"
