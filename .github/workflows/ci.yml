@@ -88,9 +88,12 @@ jobs:
         run: |
           bad="$(git ls-files | grep -E '(^|/)\.env(\.[^/]*)?$|\.(local|secrets)\.toml$|(^|/)secrets/' | grep -v '\.env\.example$' || true)"
           if [ -n "$bad" ]; then echo "tracked secret files:"; echo "$bad"; exit 1; fi
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # The CLI is free; gitleaks-action needs a paid license for organisation repos.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: gitleaks
+      - name: scan history for secrets
+        run: gitleaks git --redact --no-banner --verbose .
 
   clippy:
     needs: changes
