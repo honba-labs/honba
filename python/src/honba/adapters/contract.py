@@ -56,7 +56,7 @@ from honba.adapters.models import (
 )
 from honba.domain.bar import Bar
 from honba.domain.instrument import Instrument, InstrumentId, InstrumentKind
-from honba.domain.order import OrderIntent, OrderStatus
+from honba.domain.order import OrderIntent, OrderStatus, OrderType
 from honba.domain.position import Position
 from honba.domain.tick import QuoteTick, TradeTick
 from honba.domain.trade import Trade
@@ -316,6 +316,27 @@ async def _verify_capability_refusals(adapter: Adapter, probe: _Probe) -> None:
                 ),
                 CapabilityError,
             )
+
+
+async def _verify_order_type_refusals(adapter: Adapter, probe: _Probe) -> None:
+    """An undeclared opt-in order type refuses with ``CapabilityError`` before any request.
+
+    Only checked for adapters that can place orders at all and do not declare the type. An
+    adapter that declares it is not probed: the generic suite cannot know its semantics.
+    """
+    caps = adapter.capabilities()
+    if not caps.supports(Capability.PLACE_ORDER) or not callable(
+        getattr(adapter, "place_order", None)
+    ):
+        return
+    if caps.supports_order_type(OrderType.TRAILING_STOP):
+        return
+    intent = OrderIntent.trailing_stop_sell(probe.instrument_id, probe.quantity, trail_percent=1.0)
+    await _refuses(
+        f"place_order() with undeclared order type {OrderType.TRAILING_STOP.value}",
+        lambda: cast(ExecutionAdapter, adapter).place_order(intent, product=probe.product),
+        CapabilityError,
+    )
 
 
 async def _verify_market_data(adapter: Any, probe: _Probe) -> None:
@@ -593,6 +614,7 @@ async def verify_adapter_contract(
         await _verify_market_data(adapter, probe)
         await _verify_stream(adapter, probe)
         await _verify_execution(adapter, probe)
+        await _verify_order_type_refusals(adapter, probe)
     finally:
         if disconnect and adapter.is_connected():
             await adapter.disconnect()

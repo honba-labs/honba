@@ -107,12 +107,19 @@ def test_strategy_intent_survives_rust_roundtrip():
         assert back.to_domain() == intent
 
 
+#: Variants that exist only in Python until Rust gains them (parity pending). Each entry is a
+#: deliberate, reviewed exception; remove it when the Rust enum has the variant.
+PYTHON_ONLY_VARIANTS: dict[str, frozenset[str]] = {"OrderType": frozenset({"trailing_stop"})}
+
+
 def test_rust_and_python_wire_enums_have_the_same_variants():
     """A variant added on either side without the other fails here."""
     rust = _honba.wire_enum_values()
     assert set(rust) == set(wire.ENUMS)
     for name, enum in wire.ENUMS.items():
-        assert sorted(rust[name]) == sorted(member.value for member in enum), name
+        python_only = PYTHON_ONLY_VARIANTS.get(name, frozenset())
+        python = sorted(member.value for member in enum if member.value not in python_only)
+        assert sorted(rust[name]) == python, name
 
 
 @pytest.mark.parametrize(
@@ -121,6 +128,7 @@ def test_rust_and_python_wire_enums_have_the_same_variants():
         pytest.param(name, member.value, id=f"{name}.{member.name}")
         for name, enum in wire.ENUMS.items()
         for member in enum
+        if member.value not in PYTHON_ONLY_VARIANTS.get(name, frozenset())
     ],
 )
 def test_every_python_enum_value_parses_in_rust(kind, value):

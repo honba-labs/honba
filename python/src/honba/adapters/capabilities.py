@@ -97,7 +97,9 @@ def capability_for_method(method: str) -> Capability | None:
 
 
 _ALL_PRODUCTS = frozenset(Product)
-_ALL_ORDER_TYPES = frozenset(OrderType)
+#: Order types an adapter must list explicitly; default capabilities never claim them.
+_OPT_IN_ORDER_TYPES = frozenset({OrderType.TRAILING_STOP})
+_ALL_ORDER_TYPES = frozenset(OrderType) - _OPT_IN_ORDER_TYPES
 _ALL_TIME_IN_FORCE = frozenset(TimeInForce)
 _ALL_PRICE_TYPES = frozenset(PriceType)
 _ALL_STREAM_MODES = frozenset(StreamMode)
