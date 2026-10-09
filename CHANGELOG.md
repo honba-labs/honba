@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### CLI: `honba serve --trading-state` (E2-S1 rest, ADR 0018 decision 2)
+
+- `honba serve` accepts `--trading-state <active|reducing|halted>` (default `active`). It seeds
+  `AppState::with_trading_state`, so the `POST /orders` gate enforces the operator state: `halted`
+  refuses every placement with `risk_trading_halted` (422) while cancel and close still pass, and
+  `reducing` is reduce-only. The value uses the wire spellings (ADR 0012 rule 4); an unknown one is
+  a parse error. This completes E2-S1's operator exposure on the CLI (Python already exposes
+  `TradingState` and `StrategyRunner.set_trading_state`); a runtime route to change it live stays
+  501 with E11-S8.
+
 ### REST: `POST /orders` risk gate, cancel/close bypass (E2-S2 r5b / E11-S7 seam, ADR 0018 decision 7)
 
 - `POST /orders` runs approval queue (none configured) -> risk stage over the `null` profile and

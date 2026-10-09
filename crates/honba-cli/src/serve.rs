@@ -14,6 +14,19 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use honba_api_rest::{ApiConfig, AppState, RetentionPolicy, RunServiceConfig};
+use honba_messages::TradingState;
+
+/// Parses the `--trading-state` value; the spellings are the wire form (ADR 0018 decision 2).
+pub(crate) fn parse_trading_state(raw: &str) -> Result<TradingState, String> {
+    match raw {
+        "active" => Ok(TradingState::Active),
+        "reducing" => Ok(TradingState::Reducing),
+        "halted" => Ok(TradingState::Halted),
+        other => Err(format!(
+            "unknown trading state {other:?}; expected active, reducing or halted"
+        )),
+    }
+}
 
 /// The stderr warning for an `--addr` that is not loopback, or `None` when it is.
 pub(crate) fn non_loopback_warning(addr: SocketAddr) -> Option<String> {
@@ -75,6 +88,7 @@ pub fn run(
     data_dir: &Path,
     addr: SocketAddr,
     cors_origins: &[String],
+    trading_state: TradingState,
     runs: &RunsArgs,
 ) -> Result<()> {
     let config = ApiConfig::default()
@@ -83,6 +97,7 @@ pub fn run(
         .context("invalid --cors-origin (cors)")?;
     let state = AppState::from_parquet_dir(data_dir)
         .with_context(|| format!("loading data directory {}", data_dir.display()))?
+        .with_trading_state(trading_state)
         .with_journals_dir(&runs.journals_dir, runs.service_config())
         .map_err(|e| anyhow::anyhow!("{}", e.message))
         .with_context(|| format!("opening journals directory {}", runs.journals_dir.display()))?;

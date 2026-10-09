@@ -284,3 +284,35 @@ fn serve_runs_backtests_into_the_journals_dir_and_stops_with_no_open_run() {
         "left {status}"
     );
 }
+
+#[test]
+fn trading_state_gates_post_orders() {
+    let dir = data_dir("trading-state");
+    let d = dir.to_str().unwrap();
+    let order = r#"{"instrument_id":{"symbol":"TCS","exchange":"NSE"},"side":"buy","qty":1.0}"#;
+
+    // Default state is active: an order passes the risk stage and is acknowledged.
+    let (child, addr) = start(&["--data-dir", d, "--addr", "127.0.0.1:0"]);
+    let (status, body) = post(addr, "/orders", order);
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["data"]["status"], Value::from("acknowledged"));
+    stop(child);
+
+    // Halted: the same order is refused by the state rule before any shape rule.
+    let (child, addr) = start(&[
+        "--data-dir",
+        d,
+        "--addr",
+        "127.0.0.1:0",
+        "--trading-state",
+        "halted",
+    ]);
+    let (status, body) = post(addr, "/orders", order);
+    assert_eq!(status, 422, "{body}");
+    assert_eq!(body["error"]["code"], Value::from("risk_trading_halted"));
+    assert_eq!(
+        body["error"]["context"]["rule"],
+        Value::from("trading_halted")
+    );
+    stop(child);
+}

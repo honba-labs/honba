@@ -9,6 +9,7 @@ mod verify;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use honba_messages::TradingState;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
@@ -66,6 +67,9 @@ enum Commands {
         /// Allow this browser origin to read the API (CORS); repeatable. Default: none
         #[arg(long = "cors-origin")]
         cors_origin: Vec<String>,
+        /// Operator trading state the write routes enforce: active, reducing or halted
+        #[arg(long, default_value = "active", value_parser = serve::parse_trading_state)]
+        trading_state: TradingState,
         #[command(flatten)]
         runs: serve::RunsArgs,
     },
@@ -153,8 +157,9 @@ fn main() -> Result<()> {
             data_dir,
             addr,
             cors_origin,
+            trading_state,
             runs,
-        } => serve::run(&data_dir, addr, &cors_origin, &runs),
+        } => serve::run(&data_dir, addr, &cors_origin, trading_state, &runs),
         Commands::Verify { manifest } => verify::run(&manifest),
     }
 }

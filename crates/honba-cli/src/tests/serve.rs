@@ -1,4 +1,5 @@
-use crate::serve::non_loopback_warning;
+use crate::serve::{non_loopback_warning, parse_trading_state};
+use honba_messages::TradingState;
 
 #[test]
 fn loopback_addresses_do_not_warn() {
@@ -14,4 +15,16 @@ fn other_addresses_warn_about_missing_auth_and_tls() {
         assert!(warning.contains("TLS"), "{warning}");
         assert!(warning.contains(addr), "{warning}");
     }
+}
+
+#[test]
+fn trading_state_parses_the_wire_spellings_and_refuses_others() {
+    assert_eq!(parse_trading_state("active").unwrap(), TradingState::Active);
+    assert_eq!(
+        parse_trading_state("reducing").unwrap(),
+        TradingState::Reducing
+    );
+    assert_eq!(parse_trading_state("halted").unwrap(), TradingState::Halted);
+    let err = parse_trading_state("paused").unwrap_err();
+    assert!(err.contains("paused"), "{err}");
 }

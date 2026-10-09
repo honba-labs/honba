@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use clap::Parser;
+use honba_messages::TradingState;
 
 use crate::{CalendarCommands, Cli, Commands, DataCommands};
 
@@ -189,4 +190,38 @@ fn serve_run_flags_can_be_overridden() {
 fn serve_rejects_a_zero_worker_pool_or_queue() {
     assert!(parse(&["serve", "--data-dir", "d", "--max-concurrent-runs", "0"]).is_err());
     assert!(parse(&["serve", "--data-dir", "d", "--max-queued-runs", "0"]).is_err());
+}
+
+#[test]
+fn serve_trading_state_defaults_to_active() {
+    match parse(&["serve", "--data-dir", "d"]).unwrap().command {
+        Commands::Serve { trading_state, .. } => {
+            assert_eq!(trading_state, TradingState::Active)
+        }
+        _ => panic!("expected serve"),
+    }
+}
+
+#[test]
+fn serve_trading_state_accepts_the_wire_spellings() {
+    for (raw, expected) in [
+        ("active", TradingState::Active),
+        ("reducing", TradingState::Reducing),
+        ("halted", TradingState::Halted),
+    ] {
+        match parse(&["serve", "--data-dir", "d", "--trading-state", raw])
+            .unwrap()
+            .command
+        {
+            Commands::Serve { trading_state, .. } => {
+                assert_eq!(trading_state, expected, "{raw}")
+            }
+            _ => panic!("expected serve"),
+        }
+    }
+}
+
+#[test]
+fn serve_rejects_an_unknown_trading_state() {
+    assert!(parse(&["serve", "--data-dir", "d", "--trading-state", "paused"]).is_err());
 }
