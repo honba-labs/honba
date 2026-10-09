@@ -227,10 +227,12 @@ pub async fn serve_with_config(
         .await
 }
 
-/// Registry endpoints whose handlers answer 501 `not_implemented`.
+/// Routes still answering 501 `not_implemented`.
 ///
-/// The sweep rows stay until E4-S5 builds `POST /sweeps`; after that ADR 0017 decision 7
-/// leaves only the four trading rows (E11-S7).
+/// ADR 0017 decision 7 shrinks the list to the trading rows once the sweeps
+/// (E4-S5) land; ADR 0018 decision 7 (E2-S2 r5b) risk-gates `POST /orders`,
+/// `DELETE /orders/{id}` and `POST /positions/close`, so those left the list.
+/// The two sweep rows and the write ledger `GET /orders` (E11-S7) remain.
 ///
 /// Remove a row when its handler is built; `tests/capabilities.rs` probes the router and fails
 /// if this list and the real answers disagree.
