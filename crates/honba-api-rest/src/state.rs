@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use honba_api::StrategyCatalog;
 use honba_data::{DatasetReader, ReaderError};
 use honba_entities::Currency;
-use honba_messages::ErrorDetail;
+use honba_messages::{ErrorDetail, TradingState};
 use honba_ports::{BarReader, DepthReader, InstrumentMaster, QuoteReader};
 
 use crate::{BacktestExecutor, RunService, RunServiceConfig, RunStore, StrategyRegistry};
@@ -38,6 +38,11 @@ pub struct AppState {
     pub runs: Option<Arc<RunService>>,
     /// Account currency of the runs (journal fills carry no costs; they are zero in this).
     pub account_currency: Currency,
+    /// The operator trading state the write routes evaluate against (ADR 0018 decision 7).
+    ///
+    /// Set in process by the composition root; the operator route that changes it stays 501
+    /// until E11-S8. `Halted` refuses placements while cancel and close still pass.
+    pub trading_state: TradingState,
 }
 
 impl AppState {
@@ -56,7 +61,14 @@ impl AppState {
             strategies: Arc::default(),
             runs: None,
             account_currency: Currency::Inr,
+            trading_state: TradingState::Active,
         }
+    }
+
+    /// Sets the operator trading state the write routes evaluate against.
+    pub fn with_trading_state(mut self, state: TradingState) -> Self {
+        self.trading_state = state;
+        self
     }
 
     /// Serves runs from `service` (tests inject a deterministic executor this way).

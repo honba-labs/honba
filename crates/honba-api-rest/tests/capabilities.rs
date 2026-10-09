@@ -81,18 +81,13 @@ fn the_strategy_routes_are_built() {
 #[tokio::test]
 async fn the_backtest_and_journal_routes_are_built_and_only_sweeps_and_trading_stay_flagged() {
     // ADR 0017 decision 7 shrinks the list to the four trading rows once sweeps (E4-S5) land;
-    // until then the two sweep rows stay flagged.
+    // until then the two sweep rows stay flagged. ADR 0018 decision 7 (E2-S2 r5b) builds the
+    // risk gate for POST /orders, DELETE /orders/:id and POST /positions/close, so those
+    // leave the list too; the write ledger (GET /orders) stays flagged until E11-S7.
     let (_, body) = call("GET", "/capabilities").await;
     assert_eq!(
         strings(&body["data"]["capabilities"]["not_implemented"]),
-        [
-            "POST /sweeps",
-            "GET /sweeps/{id}",
-            "POST /orders",
-            "GET /orders",
-            "DELETE /orders/{id}",
-            "POST /positions/close",
-        ]
+        ["POST /sweeps", "GET /sweeps/{id}", "GET /orders"]
     );
     for route in [
         ("POST", "/backtests"),

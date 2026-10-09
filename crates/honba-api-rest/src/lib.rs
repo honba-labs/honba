@@ -32,6 +32,7 @@ mod dispatch;
 mod executor;
 mod journal;
 mod market;
+mod orders;
 mod registry;
 mod retention;
 mod run_store;
@@ -236,10 +237,7 @@ pub async fn serve_with_config(
 pub const NOT_IMPLEMENTED_ENDPOINTS: &[(&str, &str)] = &[
     ("POST", "/sweeps"),
     ("GET", "/sweeps/{id}"),
-    ("POST", "/orders"),
     ("GET", "/orders"),
-    ("DELETE", "/orders/{id}"),
-    ("POST", "/positions/close"),
 ];
 
 fn endpoint_key((method, path): &(&str, &str)) -> String {
@@ -365,16 +363,16 @@ async fn get_orders() -> NotImplemented {
     not_implemented("listing orders")
 }
 
-async fn post_orders(ApiJson(_req): ApiJson<OrdersRequest>) -> NotImplemented {
-    not_implemented("placing an order")
+async fn post_orders(State(state): State<Arc<AppState>>, req: ApiJson<OrdersRequest>) -> Response {
+    orders::post_orders(State(state), req, honba_messages::OrderId::new("rest")).await
 }
 
-async fn delete_order(Path(_id): Path<String>) -> NotImplemented {
-    not_implemented("cancelling an order")
+async fn delete_order(Path(id): Path<String>) -> Response {
+    orders::delete_order(Path(id)).await
 }
 
-async fn post_close_positions() -> NotImplemented {
-    not_implemented("closing positions")
+async fn post_close_positions() -> Response {
+    orders::post_close_positions().await
 }
 
 #[cfg(test)]

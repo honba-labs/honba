@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### REST: `POST /orders` risk gate, cancel/close bypass (E2-S2 r5b / E11-S7 seam, ADR 0018 decision 7)
+
+- `POST /orders` runs approval queue (none configured) -> risk stage over the `null` profile and
+  the `InstrumentMaster` set, then routes: a refusal is 422 with the `risk_*` code and its
+  `context`; `DELETE /orders/{id}` cancels without a gate and `POST /positions/close` closes
+  without one. Until the write ledger of E11-S7 exists, an approved order is acknowledged
+  (`{"status": "acknowledged"}`) and no gateway call is made. Known limits are documented on
+  `honba_api_rest::orders`: `trading_state` is the app's in-process state (default `Active`;
+  the route that changes it stays 501 with E11-S8), positions are zero and `ts = 0`, so the
+  rate rule cannot be exercised.
+- Migration (ADR 0012 rule 5): `/capabilities.not_implemented` drops `POST /orders`,
+  `DELETE /orders/{id}` and `POST /positions/close` and keeps `POST /sweeps`,
+  `GET /sweeps/{id}` (E4-S5) and `GET /orders` (E11-S7). A client that treated those three
+  routes as 501 placeholders must now handle 200/422.
+
 ### REST: `POST/GET /backtests`, journal routes, `honba serve` run flags (E4-S3 / E11-S3, ADR 0017, q2c)
 
 - `POST /backtests` (200 `BacktestResponse` `pending`; 422 `validation_invalid_request` with
