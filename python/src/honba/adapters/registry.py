@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from importlib.metadata import entry_points
-from typing import Any
+from typing import Any, cast
 
 from honba.adapters.base import Adapter, ExecutionClient, FullAdapterClient, MarketDataClient
 from honba.adapters.errors import AdapterError, AdapterNotFound
@@ -70,7 +70,6 @@ class AdapterRegistry:
             raise AdapterError(f"adapter {name!r} is already registered")
         self._factories[name] = factory
         self._explicit.add(name)
-        self._explicit.add(name)
 
     def unregister(self, name: str) -> None:
         """Forget ``name``. Unknown names are ignored, so teardown cannot fail."""
@@ -106,7 +105,7 @@ class AdapterRegistry:
             if not callable(loaded):
                 self._errors[entry.name] = f"{entry.value} is not callable"
                 continue
-            self._factories[entry.name] = loaded
+            self._factories[entry.name] = cast(AdapterFactory, loaded)
 
     def discovery_errors(self) -> dict[str, str]:
         """Entry points that failed to load, mapped to the reason."""

@@ -349,12 +349,13 @@ class _PythonSim:
             px = self._exec_price(OrderSide.SELL, bar, qty)
             notional = Money.mul_qty(qty, px, self._currency)
             cost = self._costs(OrderSide.SELL, qty, px)
-        self._working.remove(w)
-        if qty > 0:  # the fill, then the remainder's rejection: one queue, in that order
+            self._working.remove(w)
             proceeds = notional - cost
             self.cash = self.cash + proceeds
             self._receivables.append((self._session + self.settlement_days, proceeds))
             self._book(w, bar, qty, notional, cost, qty >= want, price=px)
+        else:
+            self._working.remove(w)
         if qty < want:
             self._reject_part(w, want - qty, "no_position")
 
@@ -377,10 +378,11 @@ class _PythonSim:
                 px = self._exec_price(OrderSide.BUY, bar, qty)
             notional = Money.mul_qty(qty, px, self._currency)
             cost = self._costs(OrderSide.BUY, qty, px)
-        self._working.remove(w)
-        if qty > 0:  # the fill, then the remainder's rejection: one queue, in that order
+            self._working.remove(w)
             self.cash = self.cash - (notional + cost)
             self._book(w, bar, qty, notional, cost, qty >= want, price=px)
+        else:
+            self._working.remove(w)
         if qty < want:
             self._reject_part(w, want - qty, "insufficient_funds")
 

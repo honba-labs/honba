@@ -140,7 +140,9 @@ def test_registering_a_second_history_for_a_name_needs_replace() -> None:
     with pytest.raises(ValueError, match="already registered"):
         register_universe_history(other)
     register_universe_history(other, replace=True)
-    assert universe_history("demo_50").symbols_on(D(2020, 6, 1)) == ("ZZZ",)
+    hist = universe_history("demo_50")
+    assert hist is not None
+    assert hist.symbols_on(D(2020, 6, 1)) == ("ZZZ",)
 
 
 # ---------------------------------------------------------------------------
