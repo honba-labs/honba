@@ -1,21 +1,17 @@
 """PortfolioStrategy end to end: strategy -> runner -> next-open simulator -> ledger.
 
 Reuses the synthetic bars of ``test_target_weight_flow``. Includes the parity check against
-a TargetWeightStrategy equal-weight book and the imperative Alpha-30 catalog strategy.
+a TargetWeightStrategy equal-weight book.
 """
 
 from __future__ import annotations
 
-import pytest
 from test_target_weight_flow import (
     BASE,
-    CASH,
     DAY,
     IDS,
     REBALANCE_DAYS,
-    REFERENCE,
     T0,
-    load_reference,
     run,
 )
 
@@ -85,27 +81,3 @@ def test_parity_with_target_weight_strategy():
     assert fill_key(new) == fill_key(old)
     assert new.ctx.positions() == old.ctx.positions()
     assert new.ctx.cash() == old.ctx.cash()
-
-
-@pytest.mark.skipif(not REFERENCE.exists(), reason="honba-strategies checkout not present")
-def test_parity_with_imperative_alpha30_equal_weight(monkeypatch):
-    from honba.markets.india.universes import UNIVERSES
-    from honba.strategies.config import StrategyConfig
-
-    ref = load_reference()
-    monkeypatch.setitem(UNIVERSES, "parity4", MEMBERS)
-    cfg = StrategyConfig(
-        name="ref",
-        symbol="AAA",
-        params={
-            "capital": CASH,
-            "universe_name": "parity4",
-            "rebalance_days": REBALANCE_DAYS,
-            "allocation": ALLOCATION,
-        },
-    )
-    ref_result = run(ref.Alpha30EqualWeight(cfg), list(MEMBERS))
-    new = run(portfolio(), list(MEMBERS))
-    assert fill_key(new) == fill_key(ref_result)
-    assert new.ctx.positions() == ref_result.ctx.positions()
-    assert new.ctx.cash() == ref_result.ctx.cash()

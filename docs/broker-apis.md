@@ -33,9 +33,9 @@ This document defines:
 | **Contract Verification Suite** | `honba/python/src/honba/adapters/contract.py` | **Complete**: `verify_adapter_contract()` tests lifecycle, capability gating, error translation, order lifecycle, idempotency. | Streaming quote/tick test harness, rate-limit recovery validation. |
 | **Test Reference Implementation** | `honba/python/src/honba/adapters/testing.py` | **Complete**: `FakeAdapter` in-memory reference implementation passing the full contract suite. | Live broker recording/playback fixtures. |
 | **Rust Port Abstractions** | `honba/crates/honba-ports/` | **Partial**: Synchronous kernel seam traits (`Clock`, `MarketDataFeed`, `ExecutionGateway`, `InstrumentMaster`, `DepthReader`, `QuoteReader`). | Async broker gateway trait implementation bindings, REST/WebSocket transport runtime. |
-| **Shared Adapter Support** | `honba-adapters/shared/` | **Partial**: Re-exports contract test suite and basic test fixtures. `auth.py`, `rate_limit.py`, `websocket.py`, `parsing.py` are empty (0-byte stubs). | Shared token bucket rate limiter, TOTP 2FA generator, reconnecting WebSocket base client. |
-| **Dhan Adapter Package** | `honba-adapters/dhan/` | **Stub (0-bytes)**: `honba_dhan` directory exists with 9 empty stub files (`http.py`, `execution.py`, `data.py`, `websocket.py`, etc.). | Full implementation wrapping `dhanhq` / Dhan REST & WebSocket APIs conforming to `Adapter`. |
-| **Zerodha Adapter Package** | `honba-adapters/zerodha/` | **Stub (0-bytes)**: `honba_zerodha` directory exists with 9 empty stub files. | Full implementation wrapping Kite Connect v3 REST & KiteTicker WebSocket conforming to `Adapter`. |
+| **Shared Adapter Support** | `honba-adapters/shared/` | **Implemented**: contract suite re-export, fixtures, `errors.py`, token-bucket `rate_limit.py`, `auth.py` (TOTP / session handling) and reconnecting `websocket.py` base client. Only `parsing.py` is still an empty placeholder (parsing lives in each adapter). | Shared parsing helpers, if a common need emerges across adapters. |
+| **Dhan Adapter Package** | `honba-adapters/dhan/` | **Implemented and tested**: `honba_dhan` has config, constants, parsing, instruments, `http.py`, execution, data, websocket and a mock transport, with contract, parsing, instrument, websocket, empty-account and read-only-guard tests. | Live-broker recording/playback fixtures. |
+| **Zerodha Adapter Package** | `honba-adapters/zerodha/` | **Implemented and tested**: `honba_zerodha` has config, constants, parsing, instruments, `http.py`, execution, data, websocket (KiteTicker decoder) and a mock transport, with contract, execution-flow, feed-flow, HTTP, mapping and ticker-decode tests. | Live-broker recording/playback fixtures. |
 
 ---
 
@@ -61,7 +61,7 @@ Honba defines broker adapters as a **facade plus two role protocols** (ADR 0010)
                  ▼                                                 ▼
    ┌───────────────────────────┐                     ┌───────────────────────────┐
    │   honba-adapters/dhan     │                     │   honba-adapters/zerodha  │
-   │    (DhanHQ-py client)     │                     │ (kiteconnect-rs / REST+WS)│
+   │    (DhanHQ-py client)     │                     │   (Kite REST + KiteTicker)│
    └───────────────────────────┘                     └───────────────────────────┘
 ```
 
@@ -317,7 +317,7 @@ DHAN_STATUS_MAP = {
 
 | Feature | Zerodha (Kite Connect) | Dhan (DhanHQ) | Honba Canonical Representation |
 |---|---|---|---|
-| **Primary Language** | Rust (`kiteconnect-rs`) & Python | Python (`dhanhq`) & REST | Async Python (`honba.adapters`) + Native Rust (`honba-ports`) |
+| **Primary Language** | Python (REST + KiteTicker; `kiteconnect-rs` is only a protocol reference) | Python (`dhanhq`) & REST | Async Python (`honba.adapters`) + Native Rust (`honba-ports`) |
 | **Auth Expiry** | 24 Hours (daily TOTP re-auth) | 30 Days (static token) or TOTP | `SessionInfo.expires_at` |
 | **Instrument Lookup** | `instrument_token` (uint32) | `security_id` (str) + `exchange_segment` | `InstrumentId(symbol, exchange)` |
 | **Market Depth** | 5 levels | **Up to 20 levels** | `MarketDepth(bids, asks)` |

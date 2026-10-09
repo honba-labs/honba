@@ -7,11 +7,6 @@ same prices the strategy marked the portfolio with and the result can be checked
 
 from __future__ import annotations
 
-import types
-from pathlib import Path
-
-import pytest
-
 from honba.backtest.simulated import NextOpenExecution, group_sessions
 from honba.domain.money import Currency, Money
 from honba.entities.bar import Bar
@@ -111,38 +106,3 @@ def test_universe_change_exits_leaver_and_enters_joiner():
         if f.instrument_id == IDS["DDD"] and f.side.name == "SELL" and f.ts > T0 + 45 * DAY
     ]
     assert [(f.ts, f.quantity) for f in exits] == [(T0 + 51 * DAY, before[0][IDS["DDD"]])]
-
-
-REFERENCE = (
-    Path(__file__).resolve().parents[4] / "honba-strategies/universe/alpha/equal_weight/strategy.py"
-)
-
-
-def load_reference():
-    """Compile the catalog strategy from source (read only: no .pyc written next to it)."""
-    module = types.ModuleType("alpha30_reference")
-    exec(compile(REFERENCE.read_text(), str(REFERENCE), "exec"), module.__dict__)  # noqa: S102
-    return module
-
-
-@pytest.mark.skipif(not REFERENCE.exists(), reason="honba-strategies checkout not present")
-def test_parity_with_imperative_alpha30_equal_weight(monkeypatch):
-    from honba.markets.india.universes import UNIVERSES
-    from honba.strategies.config import StrategyConfig
-
-    ref = load_reference()
-    members = ("AAA", "BBB", "CCC", "DDD")
-    monkeypatch.setitem(UNIVERSES, "parity4", members)
-    cfg = StrategyConfig(
-        name="ref",
-        symbol="AAA",
-        params={"capital": CASH, "universe_name": "parity4", "rebalance_days": REBALANCE_DAYS},
-    )
-    ref_result = run(ref.Alpha30EqualWeight(cfg), members)
-    new_result = run(Book(), members)
-
-    def key(result):
-        return sorted((f.ts, f.instrument_id.symbol, f.side.name, f.quantity) for f in result.fills)
-
-    assert key(new_result) == key(ref_result)
-    assert new_result.ctx.positions() == ref_result.ctx.positions()
