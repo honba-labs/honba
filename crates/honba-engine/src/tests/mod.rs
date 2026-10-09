@@ -8,6 +8,7 @@ mod execution;
 mod handler_audit;
 mod order_store;
 mod queue;
+mod reconciliation;
 mod risk_gate;
 
 use honba_messages::{Exchange, InstrumentId};

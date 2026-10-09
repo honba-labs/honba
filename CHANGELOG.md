@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Reconciliation on startup and reconnect (E2-S7)
+
+- `honba-engine`: Implemented `Reconciler` in `crates/honba-engine/src/reconciliation.rs` diffing broker snapshots (`BrokerOrderReport`, `BrokerPositionReport`, `BrokerTradeReport`) against the engine's `StateCache`.
+- Detects missed fills (`missed_fill_detected`), ghost orders (`ghost_order_detected`), position drift (`position_drift_detected`), and stale open orders (`stale_open_orders_cancelled_and_dropped`).
+- Generates synthetic events (`OrderFilled`, `OrderPartiallyFilled`, `OrderCancelled`, `OrderExpired`, `OrderRejected`) to advance the engine queue.
+- `Engine::reconcile` and `Engine::reconcile_and_inject` allow automatic catch-up on startup or reconnect, updating internal cache and dispatching caught-up events to registered handlers.
+- Verified by unit tests and recorded fixture reconciliation scenarios.
+
 ### State cache and store contract (E2-S9)
 
 - `honba-engine`: Implemented `StateCache` in `crates/honba-engine/src/cache/mod.rs` providing deterministic in-memory tracking of orders, positions, instruments, and market data (quotes, bars, last prices).

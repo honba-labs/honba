@@ -25,6 +25,7 @@ pub mod error;
 pub mod execution;
 pub mod handler;
 pub mod queue;
+pub mod reconciliation;
 pub mod state;
 
 pub use audit::{
@@ -39,6 +40,10 @@ pub use error::{AlgoError, Result};
 pub use execution::{ExecutionEngine, LegacyDrains, LegacyPortEvents, OrderRejection};
 pub use handler::{EngineOutput, Handler, NoopHandler};
 pub use queue::EventQueue;
+pub use reconciliation::{
+    BrokerOrderReport, BrokerPositionReport, BrokerSnapshot, BrokerTradeReport, GhostOrder,
+    MissedFill, PositionDrift, ReconciliationReport, Reconciler, StaleOrder,
+};
 pub use state::TradingState;
 
 #[cfg(test)]

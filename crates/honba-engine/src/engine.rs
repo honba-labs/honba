@@ -207,6 +207,51 @@ impl Engine {
         &self.cache
     }
 
+    /// Returns a mutable reference to the engine's state cache.
+    pub fn cache_mut(&mut self) -> &mut StateCache {
+        &mut self.cache
+    }
+
+    /// Reconciles broker state against the engine's cache and returns the report.
+    pub fn reconcile(
+        &self,
+        snapshot: &crate::reconciliation::BrokerSnapshot,
+    ) -> crate::reconciliation::ReconciliationReport {
+        crate::reconciliation::Reconciler::reconcile(self.cache(), snapshot, self.clock.now())
+    }
+
+    /// Reconciles broker state and injects synthetic events into the event queue.
+    pub fn reconcile_and_inject(
+        &mut self,
+        snapshot: &crate::reconciliation::BrokerSnapshot,
+    ) -> crate::reconciliation::ReconciliationReport {
+        let report = self.reconcile(snapshot);
+        let now = self.clock.now();
+        report.apply_to_cache(&mut self.cache);
+        for fill in &report.missed_fills {
+            let signed = match fill.side {
+                OrderSide::Sell => -fill.quantity,
+                _ => fill.quantity,
+            };
+            *self.positions.entry(fill.instrument_id.clone()).or_insert(0.0) += signed;
+            if let Some(tracked) = self.orders.get_mut(fill.order_id.as_str()) {
+                let _ = tracked.state.apply(&honba_messages::OrderEvent::Fill {
+                    last_qty: fill.quantity,
+                    complete: fill.completes_order,
+                });
+            }
+        }
+        for stale in &report.stale_orders {
+            if let Some(tracked) = self.orders.get_mut(stale.order_id.as_str()) {
+                let _ = tracked.state.apply(&honba_messages::OrderEvent::Cancelled);
+            }
+        }
+        for event in &report.synthetic_events {
+            self.inject(Message::new(event.clone(), now));
+        }
+        report
+    }
+
     /// Injects a message into the queue, exactly as a feed would.
     ///
     /// Used by tests and by the async shell; does not advance the clock.
@@ -293,7 +338,9 @@ impl Engine {
 
     /// Remembers the last bar close or trade price per instrument for the risk request.
     fn observe_price(&mut self, event: &Event) {
-        self.cache.apply_event(event);
+        if event.is_market_data() {
+            self.cache.apply_event(event);
+        }
         match event {
             Event::Bar(bar) => {
                 self.last_px
