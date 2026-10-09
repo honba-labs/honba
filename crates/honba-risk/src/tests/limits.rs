@@ -45,6 +45,7 @@ fn round_trips() {
             window_ms: 3,
         }),
         max_participation: None,
+        stale_after_ms: None,
     };
     let back: RiskLimits = serde_json::from_str(&serde_json::to_string(&l).unwrap()).unwrap();
     assert_eq!(back, l);
@@ -60,6 +61,7 @@ fn validate_accepts_default_and_valid_limits() {
             window_ms: 1,
         }),
         max_participation: None,
+        stale_after_ms: None,
     };
     assert_eq!(l.validate(), Ok(()));
 }
@@ -72,6 +74,7 @@ fn validate_rejects_bad_notional_and_rate() {
             max_notional: Some(v),
             order_rate: None,
             max_participation: None,
+            stale_after_ms: None,
         };
         assert!(
             matches!(l.validate(), Err(RiskConfigError::InvalidMaxNotional(_))),
@@ -86,6 +89,7 @@ fn validate_rejects_bad_notional_and_rate() {
                 window_ms: w,
             }),
             max_participation: None,
+            stale_after_ms: None,
         };
         assert_eq!(l.validate(), Err(RiskConfigError::InvalidOrderRate));
     }
@@ -104,11 +108,13 @@ fn live_run_without_limits_refused() {
             max_notional: Some(5.0),
             order_rate: None,
             max_participation: None,
+            stale_after_ms: None,
         },
         RiskLimits {
             max_notional: None,
             order_rate: Some(rate),
             max_participation: None,
+            stale_after_ms: None,
         },
     ] {
         assert_eq!(l.require_live(), Err(RiskConfigError::LiveRunWithoutLimit));
@@ -117,6 +123,7 @@ fn live_run_without_limits_refused() {
         max_notional: Some(5.0),
         order_rate: Some(rate),
         max_participation: None,
+        stale_after_ms: None,
     };
     assert_eq!(both.require_live(), Ok(()));
 }
@@ -131,6 +138,7 @@ fn live_run_rejects_invalid_limits_with_the_validation_error() {
             window_ms: 1,
         }),
         max_participation: None,
+        stale_after_ms: None,
     };
     assert!(matches!(
         l.require_live(),

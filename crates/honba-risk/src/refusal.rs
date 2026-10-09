@@ -117,6 +117,15 @@ pub enum RiskRefusal {
         /// Reason when ADV is missing or non-positive.
         reason: Option<String>,
     },
+    /// Feed quote or bar data is stale relative to event time (E2-S10).
+    FeedStale {
+        /// The instrument.
+        instrument_id: InstrumentId,
+        /// Age in nanoseconds.
+        age_ns: u64,
+        /// Staleness limit in nanoseconds.
+        stale_after_ns: u64,
+    },
 }
 
 impl RiskRefusal {
@@ -134,6 +143,7 @@ impl RiskRefusal {
             Self::MaxNotional { .. } | Self::MaxNotionalUnpriceable { .. } => "max_notional",
             Self::OrderRate { .. } => "order_rate",
             Self::MaxParticipation { .. } => "max_participation",
+            Self::FeedStale { .. } => "feed_staleness",
         }
     }
 
@@ -153,6 +163,7 @@ impl RiskRefusal {
             }
             Self::OrderRate { .. } => ErrorCode::RiskOrderRateExceeded,
             Self::MaxParticipation { .. } => ErrorCode::RiskMaxParticipationExceeded,
+            Self::FeedStale { .. } => ErrorCode::RiskFeedStale,
         }
     }
 
@@ -251,6 +262,16 @@ impl RiskRefusal {
                 }
                 obj
             }
+            Self::FeedStale {
+                instrument_id,
+                age_ns,
+                stale_after_ns,
+            } => json!({
+                "rule": rule,
+                "instrument_id": instrument_id.to_string(),
+                "age_ns": age_ns,
+                "stale_after_ns": stale_after_ns,
+            }),
         }
     }
 }

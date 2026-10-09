@@ -330,3 +330,78 @@ fn live_run_without_limits_refused() {
     let engine = Engine::new().with_risk(stage(full, true));
     assert_eq!(engine.require_live_limits(), Ok(()));
 }
+
+#[test]
+fn stale_feed_scenario() {
+    let y = InstrumentId::new("Y", Exchange::new("NSE"));
+    let limits = RiskLimits {
+        stale_after_ms: Some(1000), // 1.0s staleness threshold
+        ..RiskLimits::default()
+    };
+    let venue = ScriptedExecution::new(10.0).with("O-2", Behavior::Hold);
+
+    let mut rules_map = BTreeMap::new();
+    rules_map.insert(x(), InstrumentRules::new(1.0, 0.05));
+    rules_map.insert(y.clone(), InstrumentRules::new(1.0, 0.05));
+    let stage = RiskStage::new(limits, Currency::Inr, Arc::new(Rules(rules_map))).unwrap();
+
+    // Strategy triggers on Y quotes to buy X:
+    // At t=2500ms (Y quote): X last quote was at 1000ms -> age 1500ms > 1000ms -> refused as stale!
+    // At t=2600ms (X quote): X feed refreshed at 2600ms
+    // At t=2700ms (Y quote): X last quote was at 2600ms -> age 100ms <= 1000ms -> approved!
+    let strategy = Strategy::new(vec![
+        (2500 * MS, vec![limit("O-1", OrderSide::Buy, 1.0, 2500 * MS)]),
+        (2700 * MS, vec![limit("O-2", OrderSide::Buy, 1.0, 2700 * MS)]),
+    ]);
+
+    let mut engine = Engine::new().with_risk(stage);
+    engine.set_execution(Box::new(venue.clone()));
+    engine.add_handler(strategy.clone());
+
+    engine.start().unwrap();
+    engine.inject(Message::new(
+        Event::Quote(QuoteTick::new(x(), 1.0, 2.0, 1.0, 1.0, ts(1000 * MS), ts(1000 * MS))),
+        ts(1000 * MS),
+    ));
+    engine.inject(Message::new(
+        Event::Quote(QuoteTick::new(y.clone(), 1.0, 2.0, 1.0, 1.0, ts(2500 * MS), ts(2500 * MS))),
+        ts(2500 * MS),
+    ));
+    engine.inject(Message::new(
+        Event::Quote(QuoteTick::new(x(), 1.0, 2.0, 1.0, 1.0, ts(2600 * MS), ts(2600 * MS))),
+        ts(2600 * MS),
+    ));
+    engine.inject(Message::new(
+        Event::Quote(QuoteTick::new(y.clone(), 1.0, 2.0, 1.0, 1.0, ts(2700 * MS), ts(2700 * MS))),
+        ts(2700 * MS),
+    ));
+    engine.finish().unwrap();
+
+    // O-1 was refused for stale feed
+    let refused: Vec<_> = kinds(&engine)
+        .into_iter()
+        .filter(|k| {
+            matches!(
+                k,
+                AuditKind::RiskRefused { .. } | AuditKind::OrderRejected { .. }
+            )
+        })
+        .collect();
+    assert_eq!(
+        refused,
+        vec![
+            AuditKind::RiskRefused {
+                order_id: "O-1".to_string(),
+                refusal: RiskRefusal::FeedStale {
+                    instrument_id: x(),
+                    age_ns: 1500 * MS,
+                    stale_after_ns: 1000 * MS,
+                },
+            },
+            rejected("O-1", "risk_feed_stale"),
+        ]
+    );
+
+    // O-2 was approved and reached the venue
+    assert_eq!(venue.working_orders(), vec!["O-2".to_string()]);
+}

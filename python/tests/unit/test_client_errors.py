@@ -25,6 +25,7 @@ CODES = [
     "risk_reduce_only_violation",
     "risk_instrument_unknown",
     "risk_max_participation_exceeded",
+    "risk_feed_stale",
     "order_rejected",
     "order_execution_unavailable",
     "order_not_found",

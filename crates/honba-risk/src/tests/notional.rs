@@ -13,6 +13,7 @@ fn limit(max: f64) -> RiskLimits {
         max_notional: Some(max),
         order_rate: None,
         max_participation: None,
+        stale_after_ms: None,
     }
 }
 
@@ -135,6 +136,7 @@ fn invalid_limits_rejected_by_new() {
             window_ms,
         }),
         max_participation: None,
+        stale_after_ms: None,
     };
     assert!(matches!(
         RiskStage::new(rate(0, 1000), Currency::Inr, super::rules()).err(),

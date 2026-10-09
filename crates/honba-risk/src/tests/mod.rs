@@ -8,6 +8,7 @@ mod properties;
 mod quantity;
 mod rate;
 mod refusal;
+mod staleness;
 mod state;
 
 use std::collections::BTreeMap;
@@ -68,6 +69,7 @@ pub(crate) fn req() -> RiskRequest {
         position: 0.0,
         trading_state: TradingState::Active,
         ts: UnixNanos::new(1),
+        last_feed_ts: None,
     }
 }
 

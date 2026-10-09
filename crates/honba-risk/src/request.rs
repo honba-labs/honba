@@ -31,6 +31,8 @@ pub struct RiskRequest {
     pub trading_state: TradingState,
     /// Event time, never the wall clock.
     pub ts: UnixNanos,
+    /// Timestamp of the last market-data feed update for the instrument.
+    pub last_feed_ts: Option<UnixNanos>,
 }
 
 /// The outcome of a risk check.

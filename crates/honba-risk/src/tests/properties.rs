@@ -137,6 +137,7 @@ fn rule_order() {
             max_notional: notional.then_some(NOTIONAL_LIMIT),
             order_rate: None,
             max_participation: None,
+            stale_after_ms: None,
         });
         let expected = refusing_rules(&r, notional).into_iter().min();
         match (s.check(&r), expected) {
@@ -163,6 +164,7 @@ fn rated() -> RiskStage {
             window_ms: 1,
         }),
         max_participation: None,
+        stale_after_ms: None,
     })
 }
 

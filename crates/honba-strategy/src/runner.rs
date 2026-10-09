@@ -248,6 +248,7 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
                 + self.working_exposure(instrument, order.side()),
             trading_state: self.trading_state,
             ts: ts_init,
+            last_feed_ts: None,
         };
         match self.risk.as_mut() {
             Some(stage) => match stage.check(&request) {

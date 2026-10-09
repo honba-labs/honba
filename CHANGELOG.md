@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Feed-staleness breaker (E2-S10)
+
+- `honba-risk`: Added `stale_after_ms` limit in `RiskLimits` and `RiskRefusal::FeedStale` (`ErrorCode::RiskFeedStale`).
+- Refuses orders when the targeted instrument's market data is older than `stale_after_ms` in event time (`stale_after_blocks_orders`).
+- `Engine` tracks `last_feed_ts` per instrument from incoming market data events (`Event::Quote`, `Event::Bar`, `Event::Trade`) and evaluates feed staleness deterministically on simulated clock time (`stale_feed_scenario`).
+- Codegen schemas and Python wire error definitions updated.
+
 ### Reconciliation on startup and reconnect (E2-S7)
 
 - `honba-engine`: Implemented `Reconciler` in `crates/honba-engine/src/reconciliation.rs` diffing broker snapshots (`BrokerOrderReport`, `BrokerPositionReport`, `BrokerTradeReport`) against the engine's `StateCache`.

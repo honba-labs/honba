@@ -142,6 +142,7 @@ pub(crate) fn parse_request(v: &Value) -> Result<RiskRequest, String> {
         position: number("position")?,
         trading_state,
         ts: UnixNanos::new(ts),
+        last_feed_ts: None,
     })
 }
 
@@ -483,11 +484,12 @@ impl PyRiskLimits {
 #[pymethods]
 impl PyRiskLimits {
     #[new]
-    #[pyo3(signature = (max_notional=None, order_rate=None, max_participation=None))]
+    #[pyo3(signature = (max_notional=None, order_rate=None, max_participation=None, stale_after_ms=None))]
     fn new(
         max_notional: Option<f64>,
         order_rate: Option<(u32, u64)>,
         max_participation: Option<f64>,
+        stale_after_ms: Option<u64>,
     ) -> PyResult<Self> {
         let limits = RiskLimits {
             max_notional,
@@ -496,6 +498,7 @@ impl PyRiskLimits {
                 window_ms,
             }),
             max_participation,
+            stale_after_ms,
         };
         limits
             .validate()
@@ -520,6 +523,7 @@ impl PyRiskLimits {
                 "max_orders": r.max_orders, "window_ms": r.window_ms
             })),
             "max_participation": self.limits.max_participation,
+            "stale_after_ms": self.limits.stale_after_ms,
         });
         to_py(py, &v)
     }
@@ -540,6 +544,12 @@ impl PyRiskLimits {
     #[getter]
     fn max_participation(&self) -> Option<f64> {
         self.limits.max_participation
+    }
+
+    /// Maximum quote/feed age in milliseconds before an order is refused, or `None`.
+    #[getter]
+    fn stale_after_ms(&self) -> Option<u64> {
+        self.limits.stale_after_ms
     }
 
     /// Raises `ValueError` unless both limits are set (the guard for a live run).

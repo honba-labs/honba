@@ -26,6 +26,9 @@ pub enum RiskConfigError {
     /// A live run needs both `max_notional` and `order_rate` set.
     #[error("a live run requires both max_notional and order_rate to be set")]
     LiveRunWithoutLimit,
+    /// `stale_after_ms` must be at least 1.
+    #[error("stale_after_ms must be >= 1, got {0}")]
+    InvalidStaleAfter(u64),
 }
 
 /// Tolerance for fractional positions in the reduce-only comparison.
@@ -138,6 +141,31 @@ impl RiskStage {
 }
 
 impl RiskStage {
+    /// Feed staleness rule: quote age must not exceed `stale_after_ms`.
+    fn feed_staleness_rule(&self, req: &RiskRequest) -> Option<RiskRefusal> {
+        let stale_after_ms = self.limits.stale_after_ms?;
+        let stale_after_ns = stale_after_ms.saturating_mul(1_000_000);
+        match req.last_feed_ts {
+            None => Some(RiskRefusal::FeedStale {
+                instrument_id: req.instrument_id.clone(),
+                age_ns: u64::MAX,
+                stale_after_ns,
+            }),
+            Some(last_ts) => {
+                let age_ns = req.ts.as_u64().saturating_sub(last_ts.as_u64());
+                if age_ns > stale_after_ns {
+                    Some(RiskRefusal::FeedStale {
+                        instrument_id: req.instrument_id.clone(),
+                        age_ns,
+                        stale_after_ns,
+                    })
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
     /// Participation rule: order quantity must not exceed `max_participation * ADV`.
     /// Runs after price rules (so ADV is available in the request) and before notional,
     /// so a market-absorption refusal wins over an account-value refusal.
@@ -247,6 +275,9 @@ impl RiskCheck for RiskStage {
             });
         }
         if let Some(refusal) = price_rules(req, &rules, band) {
+            return RiskDecision::Refused(refusal);
+        }
+        if let Some(refusal) = self.feed_staleness_rule(req) {
             return RiskDecision::Refused(refusal);
         }
         if let Some(refusal) = self.max_participation_rule(req) {

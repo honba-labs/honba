@@ -29,6 +29,7 @@ fn full_risk_section_round_trips_through_toml() {
                 window_ms: 1000
             }),
             max_participation: None,
+            stale_after_ms: None,
         }
     );
     cfg.validate().unwrap();

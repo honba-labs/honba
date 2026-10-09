@@ -49,6 +49,8 @@ pub struct Engine {
     positions: HashMap<InstrumentId, f64>,
     /// Last bar close or trade price per instrument: the stage's `reference_price`.
     last_px: HashMap<InstrumentId, f64>,
+    /// Last market-data feed timestamp per instrument.
+    last_feed_ts: HashMap<InstrumentId, UnixNanos>,
     risk: Option<RiskStage>,
     started: bool,
     finished: bool,
@@ -76,6 +78,7 @@ impl Engine {
             orders: HashMap::new(),
             positions: HashMap::new(),
             last_px: HashMap::new(),
+            last_feed_ts: HashMap::new(),
             risk: None,
             started: false,
             finished: false,
@@ -342,11 +345,19 @@ impl Engine {
             self.cache.apply_event(event);
         }
         match event {
+            Event::Quote(quote) => {
+                self.last_feed_ts
+                    .insert(quote.instrument_id().clone(), quote.ts_event());
+            }
             Event::Bar(bar) => {
+                self.last_feed_ts
+                    .insert(bar.bar_type().instrument_id().clone(), bar.ts_event());
                 self.last_px
                     .insert(bar.bar_type().instrument_id().clone(), bar.close());
             }
             Event::Trade(tick) => {
+                self.last_feed_ts
+                    .insert(tick.instrument_id().clone(), tick.ts_event());
                 self.last_px
                     .insert(tick.instrument_id().clone(), tick.price());
             }
@@ -630,6 +641,7 @@ impl Engine {
             position: self.position(instrument) + self.working_exposure(instrument, order.side()),
             trading_state: self.trading_state,
             ts: self.clock.now(),
+            last_feed_ts: self.last_feed_ts.get(instrument).copied(),
         };
         match self.risk.as_mut() {
             Some(stage) => match stage.check(&request) {

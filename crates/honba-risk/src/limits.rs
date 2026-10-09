@@ -20,6 +20,10 @@ pub struct RiskLimits {
     /// `None` = no participation rule; `Some` must be in `(0, 1]`.
     #[serde(default)]
     pub max_participation: Option<f64>,
+    /// Maximum quote/feed age in milliseconds before an order is refused.
+    /// `None` = no feed staleness rule; `Some` must be `>= 1`.
+    #[serde(default)]
+    pub stale_after_ms: Option<u64>,
 }
 
 /// At most `max_orders` approved orders in any `window_ms` of event time.
@@ -49,6 +53,11 @@ impl RiskLimits {
         if let Some(p) = self.max_participation {
             if !(p.is_finite() && p > 0.0 && p <= 1.0) {
                 return Err(RiskConfigError::InvalidMaxParticipation(p));
+            }
+        }
+        if let Some(ms) = self.stale_after_ms {
+            if ms == 0 {
+                return Err(RiskConfigError::InvalidStaleAfter(ms));
             }
         }
         Ok(())

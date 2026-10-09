@@ -15,6 +15,7 @@ fn limited(max_orders: u32, window_ms: u64) -> crate::RiskStage {
             window_ms,
         }),
         max_participation: None,
+        stale_after_ms: None,
     })
 }
 

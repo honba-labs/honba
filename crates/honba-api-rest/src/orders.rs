@@ -161,6 +161,7 @@ pub(crate) async fn post_orders(
         position: 0.0,
         trading_state: state.trading_state,
         ts: UnixNanos::new(0),
+        last_feed_ts: None,
     };
     match stage.check(&request) {
         RiskDecision::Approved => success(serde_json::json!({"status": "acknowledged"})),
