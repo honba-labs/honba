@@ -266,7 +266,7 @@ impl Engine {
     /// the command/ack loop in one queue.
     ///
     /// Errors are returned verbatim: an event earlier than one already
-    /// dispatched yields [`AlgoError::ClockRegression`](crate::AlgoError::ClockRegression).
+    /// dispatched yields [`AlgoError::ClockRegression`].
     pub fn pump(&mut self) -> Result<bool> {
         let Some(msg) = self.queue.pop() else {
             return Ok(false);
@@ -748,7 +748,7 @@ impl Engine {
     /// and therefore no new messages.
     ///
     /// If the feed produces events earlier than ones already dispatched, the
-    /// clock returns [`AlgoError::ClockRegression`](crate::AlgoError::ClockRegression)
+    /// clock returns [`AlgoError::ClockRegression`]
     /// and the run aborts.
     ///
     /// This is [`Engine::start`], the pull/dispatch loop, then

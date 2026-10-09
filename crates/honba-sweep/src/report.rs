@@ -75,7 +75,7 @@ pub struct TrialMetrics {
 
 /// Every trial of a sweep, in trial order, plus the ranking.
 ///
-/// Built by [`run`](crate::run) and nothing else, which is what keeps the two
+/// Built by [`run`](crate::run()) and nothing else, which is what keeps the two
 /// invariants together: one outcome per trial in trial order, and a ranking
 /// derived only from those outcomes.
 #[derive(Clone, Debug, PartialEq)]

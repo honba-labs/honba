@@ -11,7 +11,7 @@ use crate::report::TrialReport;
 
 /// Scores a finished trial, best is highest.
 ///
-/// Implementations must be deterministic: [`run`](crate::run) sorts the scores
+/// Implementations must be deterministic: [`run`](crate::run()) sorts the scores
 /// to rank trials, so a fitness that returned a different number for the same
 /// report would make the ranking depend on when it was called.
 pub trait Fitness: Send + Sync {

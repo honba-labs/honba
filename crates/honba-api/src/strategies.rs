@@ -1,7 +1,7 @@
 //! `POST /strategies` and `GET /strategies`: compile a manifest and keep it.
 //!
 //! "Compile" is the same step as `POST /strategies/verify` ([`verify_strategy`]): a manifest in,
-//! its [`StrategyIr`] out. What this adds is a session-scoped catalog, so a later request (a
+//! its [`StrategyIr`](honba_strategy::StrategyIr) out. What this adds is a session-scoped catalog, so a later request (a
 //! backtest naming `strategy`) can refer to the result by a stable id.
 //!
 //! Everything here is pure. The catalog is a plain value; the transport decides how to share it

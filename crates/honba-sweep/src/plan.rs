@@ -281,7 +281,7 @@ impl PartialEq for StrategySpec {
 ///
 /// The seed is the trial's whole identity beyond its position in the plan: two
 /// trials with equal params must produce equal reports, which is the
-/// reproducibility contract [`run`](crate::run) is built on.
+/// reproducibility contract [`run`](crate::run()) is built on.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TrialParams {
     /// The seed handed to the strategy factory.
@@ -329,7 +329,7 @@ impl SweepPlan {
 
     /// Sets how many trials run at once.
     ///
-    /// Zero is stored as given and refused by [`run`](crate::run) with
+    /// Zero is stored as given and refused by [`run`](crate::run()) with
     /// [`SweepError::InvalidPlan`]: a limit is a plan-level decision, so it is
     /// checked where the plan is used rather than silently repaired here.
     pub fn with_max_concurrency(mut self, n: usize) -> Self {
@@ -386,7 +386,7 @@ impl SweepPlan {
 
     /// Checks that the plan can be run at all.
     ///
-    /// Every entry point calls this — [`run`](crate::run),
+    /// Every entry point calls this — [`run`](crate::run()),
     /// [`run_one`](crate::run_one) and [`run_trial`](crate::trial::run_trial) —
     /// so a plan that could not produce a report cannot produce a trial either.
     pub(crate) fn validate(&self) -> Result<()> {

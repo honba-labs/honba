@@ -10,7 +10,7 @@ pub type Result<T> = std::result::Result<T, SweepError>;
 /// A sweep has two kinds of failure and they are deliberately different types.
 /// A *plan* that cannot be run at all ([`SweepError::InvalidPlan`]) is the
 /// caller's mistake and stops the sweep. A *trial* that fails
-/// ([`SweepError::Trial`]) is a result, not a stop: [`run`](crate::run) turns it
+/// ([`SweepError::Trial`]) is a result, not a stop: [`run`](crate::run()) turns it
 /// into a [`Failed`](crate::TrialOutcome::Failed) outcome and keeps going.
 #[derive(Clone, Debug, Error, PartialEq)]
 #[non_exhaustive]
