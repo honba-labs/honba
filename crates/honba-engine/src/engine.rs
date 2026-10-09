@@ -7,7 +7,7 @@ use honba_messages::{
     ErrorCode, Event, InstrumentId, Message, Order, OrderEventKind, OrderId, OrderSide, OrderState,
     OrderStatus, UnixNanos, VenueOrderId,
 };
-use honba_risk::{check_state, RiskCheck, RiskDecision, RiskLimits, RiskRequest, RiskStage};
+use honba_risk::{check_state, DurableRiskState, FillFingerprint, FillLedger, InFlightOrder, RiskCheck, RiskDecision, RiskLimits, RiskRequest, RiskStage};
 
 use crate::audit::{AuditKind, AuditLog, AuditRecord};
 use crate::cache::StateCache;
@@ -52,6 +52,7 @@ pub struct Engine {
     /// Last market-data feed timestamp per instrument.
     last_feed_ts: HashMap<InstrumentId, UnixNanos>,
     risk: Option<RiskStage>,
+    fill_ledger: FillLedger,
     started: bool,
     finished: bool,
 }
@@ -80,6 +81,7 @@ impl Engine {
             last_px: HashMap::new(),
             last_feed_ts: HashMap::new(),
             risk: None,
+            fill_ledger: FillLedger::new(),
             started: false,
             finished: false,
         }
@@ -203,6 +205,63 @@ impl Engine {
     /// Returns the complete audit log.
     pub fn audit_log(&self) -> &AuditLog {
         &self.audit
+    }
+
+    /// Returns the engine's idempotent fill ledger.
+    pub fn fill_ledger(&self) -> &FillLedger {
+        &self.fill_ledger
+    }
+
+    /// Returns a mutable reference to the engine's idempotent fill ledger.
+    pub fn fill_ledger_mut(&mut self) -> &mut FillLedger {
+        &mut self.fill_ledger
+    }
+
+    /// Sets or replaces the engine's fill ledger (e.g. restored from durable state).
+    pub fn with_fill_ledger(mut self, ledger: FillLedger) -> Self {
+        self.fill_ledger = ledger;
+        self
+    }
+
+    /// Exports current positions, in-flight orders, and fill ledger as [`DurableRiskState`].
+    pub fn export_durable_risk(&self) -> DurableRiskState {
+        let mut state = DurableRiskState::new();
+        state.fill_ledger = self.fill_ledger.clone();
+        state.last_updated_ns = self.clock.now().as_u64();
+        for (inst, &qty) in &self.positions {
+            state.set_position(inst, qty);
+        }
+        for (id, tracked) in &self.orders {
+            if matches!(
+                tracked.state.status,
+                OrderStatus::Submitted | OrderStatus::Accepted | OrderStatus::PartiallyFilled
+            ) {
+                state.add_in_flight(InFlightOrder::new(
+                    OrderId::new(id),
+                    tracked.instrument_id.clone(),
+                    tracked.side,
+                    tracked.state.quantity,
+                    None,
+                    tracked.venue_order_id.clone(),
+                    self.clock.now(),
+                ));
+            }
+        }
+        state
+    }
+
+    /// Restores positions, in-flight orders, and fill ledger from [`DurableRiskState`].
+    pub fn with_durable_risk(mut self, state: DurableRiskState) -> Self {
+        self.fill_ledger = state.fill_ledger;
+        for (key, qty) in state.positions {
+            let parts: Vec<&str> = key.split(".").collect();
+            if parts.len() == 2 {
+                let inst = InstrumentId::new(parts[0], honba_messages::Exchange::new(parts[1]));
+                self.positions.insert(inst.clone(), qty);
+                self.cache.seed_position(inst, qty);
+            }
+        }
+        self
     }
 
     /// Returns the engine's state cache (orders, positions, instruments, and market data).
@@ -468,6 +527,15 @@ impl Engine {
         let now = self.clock.now();
         let kind = ev.order_event().kind();
         if let ExecutionEvent::Fill { trade, .. } = &ev {
+            if !self.fill_ledger.record(trade) {
+                let order_id = trade.order_id().as_str().to_string();
+                let fingerprint = FillFingerprint::from_trade(trade).as_str().to_string();
+                self.audit.record(AuditKind::DuplicateFillIgnored {
+                    order_id,
+                    fingerprint,
+                });
+                return;
+            }
             let signed = match trade.side() {
                 OrderSide::Sell => -trade.quantity(),
                 _ => trade.quantity(),

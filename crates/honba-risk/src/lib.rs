@@ -15,12 +15,16 @@
 //! 7. tick size, 8. price band, 9. maximum notional, 10. order rate (half-open event-time
 //!    window; only approved orders count, so `check` is not idempotent with a rate limit).
 
+pub mod durable;
+pub mod ledger;
 mod limits;
 mod refusal;
 mod request;
 mod rules_source;
 mod stage;
 
+pub use durable::{DurableRiskState, InFlightOrder};
+pub use ledger::{FillFingerprint, FillLedger, FillRecord};
 pub use limits::{OrderRateLimit, RiskLimits};
 pub use refusal::{PriceField, RiskRefusal};
 pub use request::{RiskCheck, RiskDecision, RiskRequest};

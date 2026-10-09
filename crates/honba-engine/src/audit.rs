@@ -121,6 +121,14 @@ pub enum AuditKind {
         /// The state the engine entered.
         to: TradingState,
     },
+    /// A duplicate fill was ignored because its content fingerprint was already recorded
+    /// in the idempotent fill ledger (E2-S11).
+    DuplicateFillIgnored {
+        /// The client order identifier.
+        order_id: String,
+        /// The content fingerprint of the fill.
+        fingerprint: String,
+    },
 }
 
 /// An in-memory, append-only audit trail.
@@ -320,7 +328,7 @@ impl ReplayState {
             AuditKind::StateChanged { to, .. } => {
                 self.trading_state = *to;
             }
-            AuditKind::IllegalTransition { .. } | AuditKind::VenueOrderIdDrift { .. } => {}
+            AuditKind::IllegalTransition { .. } | AuditKind::VenueOrderIdDrift { .. } | AuditKind::DuplicateFillIgnored { .. } => {}
         }
     }
 
@@ -570,6 +578,17 @@ impl AuditRecord {
                     "to": trading_state_to_str(to),
                 })
             }
+            AuditKind::DuplicateFillIgnored {
+                order_id,
+                fingerprint,
+            } => {
+                serde_json::json!({
+                    "seq": self.seq,
+                    "type": "duplicate_fill_ignored",
+                    "order_id": order_id,
+                    "fingerprint": fingerprint,
+                })
+            }
         }
     }
 
@@ -671,6 +690,22 @@ impl AuditRecord {
                     val.get("to").and_then(|v| v.as_str()).unwrap_or("active"),
                 );
                 AuditKind::StateChanged { from, to }
+            }
+            "duplicate_fill_ignored" => {
+                let order_id = val
+                    .get("order_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let fingerprint = val
+                    .get("fingerprint")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                AuditKind::DuplicateFillIgnored {
+                    order_id,
+                    fingerprint,
+                }
             }
             "risk_refused" => {
                 let order_id = val

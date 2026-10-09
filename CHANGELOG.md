@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Durable risk state and idempotent fill ledger (E2-S11)
+
+- `honba-risk`: Implemented `FillFingerprint`, `FillRecord`, and `FillLedger` in `crates/honba-risk/src/ledger.rs`. Incoming fills are fingerprinted deterministically via SHA-256 over order ID, trade/venue IDs, instrument, side, quantity, price, and event timestamp, deduplicating repeated fills (`fingerprint_dedup`).
+- `honba-risk`: Implemented `DurableRiskState` and `InFlightOrder` in `crates/honba-risk/src/durable.rs`, tracking in-flight orders, open positions, daily loss, and venue capital, persisted atomically with atomic tmp-file + rename writes (`atomic_snapshot`).
+- `honba-engine`: Wired `FillLedger` into `Engine`, recording fills and deduplicating replayed fills via `AuditKind::DuplicateFillIgnored`. Guarantees reconnect replays cannot double-count positions, cash, or risk counters (`reconnect_replay_no_double_count`).
+- `honba-engine`: Added `export_durable_risk` and `with_durable_risk` to serialize and restore engine execution and risk state across reconnects.
+
 ### Feed-staleness breaker (E2-S10)
 
 - `honba-risk`: Added `stale_after_ms` limit in `RiskLimits` and `RiskRefusal::FeedStale` (`ErrorCode::RiskFeedStale`).

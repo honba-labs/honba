@@ -1,5 +1,6 @@
 //! Unit tests for this crate, one file per area.
 
+mod durable_ledger;
 mod instrument;
 mod limits;
 mod notional;
