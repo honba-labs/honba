@@ -1,6 +1,10 @@
 //! The engine's audit trail.
 
-use honba_messages::{IllegalTransition, OrderEventKind, VenueOrderId};
+use std::collections::HashMap;
+
+use honba_messages::{
+    Exchange, IllegalTransition, InstrumentId, OrderEventKind, OrderSide, VenueOrderId,
+};
 use honba_risk::RiskRefusal;
 
 use crate::state::TradingState;
@@ -147,6 +151,12 @@ impl AuditLog {
         seq
     }
 
+    /// Appends a record with an explicit sequence number.
+    pub fn record_with_seq(&mut self, seq: u64, kind: AuditKind) {
+        self.next_seq = self.next_seq.max(seq.wrapping_add(1));
+        self.records.push(AuditRecord { seq, kind });
+    }
+
     /// Returns the records in the order they were recorded.
     pub fn records(&self) -> &[AuditRecord] {
         &self.records
@@ -160,5 +170,548 @@ impl AuditLog {
     /// Returns `true` if nothing has been recorded yet.
     pub fn is_empty(&self) -> bool {
         self.records.is_empty()
+    }
+
+    /// Replays this log to reconstruct the final engine state.
+    pub fn replay(&self) -> ReplayState {
+        ReplayState::from_log(self)
+    }
+
+    /// Writes all records as newline-delimited JSON to `writer`.
+    pub fn write_ndjson<W: std::io::Write>(&self, writer: W) -> std::io::Result<()> {
+        AuditJournalWriter::new(writer).write_log(self)
+    }
+
+    /// Reads an audit log from newline-delimited JSON.
+    pub fn read_ndjson<R: std::io::BufRead>(reader: R) -> std::io::Result<Self> {
+        AuditJournalReader::new(reader).read_log()
+    }
+}
+
+/// The engine state reconstructed by replaying an [`AuditLog`].
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ReplayState {
+    /// Net position per instrument.
+    positions: HashMap<InstrumentId, f64>,
+    /// Orders submitted: order_id -> ReplayOrder.
+    orders: HashMap<String, ReplayOrder>,
+    /// The final trading state.
+    trading_state: TradingState,
+    /// Number of event dispatches observed in the log.
+    dispatches: u64,
+    /// Rejections per order_id -> reason.
+    rejections: HashMap<String, String>,
+}
+
+/// The state of an order reconstructed during audit replay.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ReplayOrder {
+    /// The client order identifier.
+    pub order_id: String,
+    /// The instrument.
+    pub instrument: InstrumentId,
+    /// The order side.
+    pub side: OrderSide,
+    /// The cumulative filled quantity.
+    pub filled_qty: f64,
+    /// The latest lifecycle event kind, if any.
+    pub lifecycle: Option<OrderEventKind>,
+    /// Whether a cancel was requested.
+    pub cancel_requested: bool,
+}
+
+fn parse_instrument(s: &str) -> InstrumentId {
+    if let Some((symbol, exchange)) = s.split_once('.') {
+        InstrumentId::new(symbol, Exchange::new(exchange))
+    } else {
+        InstrumentId::new(s, Exchange::new("UNKNOWN"))
+    }
+}
+
+impl ReplayState {
+    /// Rebuilds the final state by replaying all records in `log`.
+    pub fn from_log(log: &AuditLog) -> Self {
+        Self::from_records(log.records())
+    }
+
+    /// Rebuilds the final state by replaying an iterator of audit records.
+    pub fn from_records<'a>(records: impl IntoIterator<Item = &'a AuditRecord>) -> Self {
+        let mut state = Self {
+            trading_state: TradingState::Active,
+            ..Self::default()
+        };
+        for record in records {
+            state.apply(&record.kind);
+        }
+        state
+    }
+
+    /// Applies one audit record to advance the state.
+    pub fn apply(&mut self, kind: &AuditKind) {
+        match kind {
+            AuditKind::EventDispatched { .. } => {
+                self.dispatches += 1;
+            }
+            AuditKind::OrderSubmitted {
+                order_id,
+                instrument,
+                side,
+            } => {
+                let inst = parse_instrument(instrument);
+                let s = match side.as_str() {
+                    "buy" => OrderSide::Buy,
+                    "sell" => OrderSide::Sell,
+                    _ => OrderSide::NoOrderSide,
+                };
+                self.orders.insert(
+                    order_id.clone(),
+                    ReplayOrder {
+                        order_id: order_id.clone(),
+                        instrument: inst,
+                        side: s,
+                        filled_qty: 0.0,
+                        lifecycle: None,
+                        cancel_requested: false,
+                    },
+                );
+            }
+            AuditKind::RiskRefused { order_id, refusal } => {
+                self.rejections
+                    .insert(order_id.clone(), refusal.error_code().as_str().to_string());
+            }
+            AuditKind::OrderRejected { order_id, reason } => {
+                self.rejections.insert(order_id.clone(), reason.clone());
+            }
+            AuditKind::CancelRequested { order_id } => {
+                if let Some(order) = self.orders.get_mut(order_id) {
+                    order.cancel_requested = true;
+                }
+            }
+            AuditKind::OrderLifecycle {
+                order_id, event, ..
+            } => {
+                if let Some(order) = self.orders.get_mut(order_id) {
+                    order.lifecycle = Some(*event);
+                    if matches!(
+                        *event,
+                        OrderEventKind::Cancelled
+                            | OrderEventKind::Rejected
+                            | OrderEventKind::Expired
+                    ) {
+                        order.cancel_requested = false;
+                    }
+                }
+            }
+            AuditKind::FillProduced {
+                order_id, quantity, ..
+            } => {
+                if let Some(order) = self.orders.get_mut(order_id) {
+                    order.filled_qty += quantity;
+                    let signed = match order.side {
+                        OrderSide::Sell => -quantity,
+                        _ => *quantity,
+                    };
+                    *self
+                        .positions
+                        .entry(order.instrument.clone())
+                        .or_insert(0.0) += signed;
+                }
+            }
+            AuditKind::StateChanged { to, .. } => {
+                self.trading_state = *to;
+            }
+            AuditKind::IllegalTransition { .. } | AuditKind::VenueOrderIdDrift { .. } => {}
+        }
+    }
+
+    /// Net position in `instrument` (0.0 if not held).
+    pub fn position(&self, instrument: &InstrumentId) -> f64 {
+        self.positions.get(instrument).copied().unwrap_or(0.0)
+    }
+
+    /// Net positions map.
+    pub fn positions(&self) -> &HashMap<InstrumentId, f64> {
+        &self.positions
+    }
+
+    /// Reconstructed order by client order id, if any.
+    pub fn order(&self, order_id: &str) -> Option<&ReplayOrder> {
+        self.orders.get(order_id)
+    }
+
+    /// All tracked orders.
+    pub fn orders(&self) -> &HashMap<String, ReplayOrder> {
+        &self.orders
+    }
+
+    /// The final trading state.
+    pub fn trading_state(&self) -> TradingState {
+        self.trading_state
+    }
+
+    /// Total event dispatches observed in the log.
+    pub fn dispatches(&self) -> u64 {
+        self.dispatches
+    }
+
+    /// Rejection reason for `order_id`, if rejected.
+    pub fn rejection(&self, order_id: &str) -> Option<&str> {
+        self.rejections.get(order_id).map(|s| s.as_str())
+    }
+}
+
+/// A journal writer that appends audit records to an output stream as NDJSON.
+pub struct AuditJournalWriter<W: std::io::Write> {
+    writer: std::io::BufWriter<W>,
+}
+
+impl<W: std::io::Write> AuditJournalWriter<W> {
+    /// Creates a writer wrapping `writer`.
+    pub fn new(writer: W) -> Self {
+        Self {
+            writer: std::io::BufWriter::new(writer),
+        }
+    }
+
+    /// Writes one record as a JSON line.
+    pub fn write_record(&mut self, record: &AuditRecord) -> std::io::Result<()> {
+        use std::io::Write;
+        let val = record.to_json();
+        serde_json::to_writer(&mut self.writer, &val)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        self.writer.write_all(b"\n")
+    }
+
+    /// Writes all records from `log` and flushes the writer.
+    pub fn write_log(&mut self, log: &AuditLog) -> std::io::Result<()> {
+        use std::io::Write;
+        for record in log.records() {
+            self.write_record(record)?;
+        }
+        self.writer.flush()
+    }
+}
+
+/// A journal reader that parses audit records from NDJSON.
+pub struct AuditJournalReader<R: std::io::BufRead> {
+    reader: R,
+}
+
+impl<R: std::io::BufRead> AuditJournalReader<R> {
+    /// Creates a reader wrapping `reader`.
+    pub fn new(reader: R) -> Self {
+        Self { reader }
+    }
+
+    /// Reads all records into an [`AuditLog`].
+    pub fn read_log(&mut self) -> std::io::Result<AuditLog> {
+        let mut log = AuditLog::new();
+        let mut line = String::new();
+        while self.reader.read_line(&mut line)? > 0 {
+            let trimmed = line.trim();
+            if !trimmed.is_empty() {
+                let val: serde_json::Value = serde_json::from_str(trimmed)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+                let record = AuditRecord::from_json(&val)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+                log.record_with_seq(record.seq, record.kind);
+            }
+            line.clear();
+        }
+        Ok(log)
+    }
+}
+
+fn order_event_kind_to_str(k: &OrderEventKind) -> &'static str {
+    match k {
+        OrderEventKind::Submitted => "submitted",
+        OrderEventKind::Accepted => "accepted",
+        OrderEventKind::Rejected => "rejected",
+        OrderEventKind::Fill => "fill",
+        OrderEventKind::CancelRequested => "cancel_requested",
+        OrderEventKind::Cancelled => "cancelled",
+        OrderEventKind::Expired => "expired",
+        _ => "accepted",
+    }
+}
+
+fn str_to_order_event_kind(s: &str) -> OrderEventKind {
+    match s {
+        "submitted" => OrderEventKind::Submitted,
+        "accepted" => OrderEventKind::Accepted,
+        "rejected" => OrderEventKind::Rejected,
+        "fill" | "partially_filled" | "filled" => OrderEventKind::Fill,
+        "cancel_requested" => OrderEventKind::CancelRequested,
+        "cancelled" => OrderEventKind::Cancelled,
+        "expired" => OrderEventKind::Expired,
+        _ => OrderEventKind::Accepted,
+    }
+}
+
+fn trading_state_to_str(s: &TradingState) -> &'static str {
+    match s {
+        TradingState::Active => "active",
+        TradingState::Reducing => "reducing",
+        TradingState::Halted => "halted",
+    }
+}
+
+fn str_to_trading_state(s: &str) -> TradingState {
+    match s {
+        "reducing" => TradingState::Reducing,
+        "halted" => TradingState::Halted,
+        _ => TradingState::Active,
+    }
+}
+
+impl AuditRecord {
+    /// Formats the audit record as a structured JSON value.
+    pub fn to_json(&self) -> serde_json::Value {
+        match &self.kind {
+            AuditKind::EventDispatched { ts_event } => {
+                serde_json::json!({
+                    "seq": self.seq,
+                    "type": "event_dispatched",
+                    "ts_event": ts_event,
+                })
+            }
+            AuditKind::OrderSubmitted {
+                order_id,
+                instrument,
+                side,
+            } => {
+                serde_json::json!({
+                    "seq": self.seq,
+                    "type": "order_submitted",
+                    "order_id": order_id,
+                    "instrument": instrument,
+                    "side": side,
+                })
+            }
+            AuditKind::RiskRefused { order_id, refusal } => {
+                serde_json::json!({
+                    "seq": self.seq,
+                    "type": "risk_refused",
+                    "order_id": order_id,
+                    "rule": refusal.rule(),
+                    "code": refusal.error_code().as_str(),
+                    "context": refusal.context(),
+                })
+            }
+            AuditKind::OrderRejected { order_id, reason } => {
+                serde_json::json!({
+                    "seq": self.seq,
+                    "type": "order_rejected",
+                    "order_id": order_id,
+                    "reason": reason,
+                })
+            }
+            AuditKind::CancelRequested { order_id } => {
+                serde_json::json!({
+                    "seq": self.seq,
+                    "type": "cancel_requested",
+                    "order_id": order_id,
+                })
+            }
+            AuditKind::OrderLifecycle {
+                order_id,
+                event,
+                ts_event,
+            } => {
+                serde_json::json!({
+                    "seq": self.seq,
+                    "type": "order_lifecycle",
+                    "order_id": order_id,
+                    "event": order_event_kind_to_str(event),
+                    "ts_event": ts_event,
+                })
+            }
+            AuditKind::IllegalTransition { order_id, error } => {
+                serde_json::json!({
+                    "seq": self.seq,
+                    "type": "illegal_transition",
+                    "order_id": order_id,
+                    "error": format!("{error}"),
+                })
+            }
+            AuditKind::VenueOrderIdDrift {
+                order_id,
+                recorded,
+                received,
+            } => {
+                serde_json::json!({
+                    "seq": self.seq,
+                    "type": "venue_order_id_drift",
+                    "order_id": order_id,
+                    "recorded": recorded.as_str(),
+                    "received": received.as_str(),
+                })
+            }
+            AuditKind::FillProduced {
+                order_id,
+                quantity,
+                price,
+                ts_event,
+            } => {
+                serde_json::json!({
+                    "seq": self.seq,
+                    "type": "fill_produced",
+                    "order_id": order_id,
+                    "quantity": quantity,
+                    "price": price,
+                    "ts_event": ts_event,
+                })
+            }
+            AuditKind::StateChanged { from, to } => {
+                serde_json::json!({
+                    "seq": self.seq,
+                    "type": "state_changed",
+                    "from": trading_state_to_str(from),
+                    "to": trading_state_to_str(to),
+                })
+            }
+        }
+    }
+
+    /// Parses an audit record from a JSON value.
+    pub fn from_json(val: &serde_json::Value) -> Result<Self, String> {
+        let seq = val
+            .get("seq")
+            .and_then(|v| v.as_u64())
+            .ok_or_else(|| "missing seq".to_string())?;
+        let kind_type = val
+            .get("type")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| "missing type".to_string())?;
+        let kind = match kind_type {
+            "event_dispatched" => {
+                let ts_event = val.get("ts_event").and_then(|v| v.as_u64()).unwrap_or(0);
+                AuditKind::EventDispatched { ts_event }
+            }
+            "order_submitted" => {
+                let order_id = val
+                    .get("order_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let instrument = val
+                    .get("instrument")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let side = val
+                    .get("side")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                AuditKind::OrderSubmitted {
+                    order_id,
+                    instrument,
+                    side,
+                }
+            }
+            "order_rejected" => {
+                let order_id = val
+                    .get("order_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let reason = val
+                    .get("reason")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                AuditKind::OrderRejected { order_id, reason }
+            }
+            "cancel_requested" => {
+                let order_id = val
+                    .get("order_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                AuditKind::CancelRequested { order_id }
+            }
+            "order_lifecycle" => {
+                let order_id = val
+                    .get("order_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let event = str_to_order_event_kind(
+                    val.get("event").and_then(|v| v.as_str()).unwrap_or(""),
+                );
+                let ts_event = val.get("ts_event").and_then(|v| v.as_u64()).unwrap_or(0);
+                AuditKind::OrderLifecycle {
+                    order_id,
+                    event,
+                    ts_event,
+                }
+            }
+            "fill_produced" => {
+                let order_id = val
+                    .get("order_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let quantity = val.get("quantity").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                let price = val.get("price").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                let ts_event = val.get("ts_event").and_then(|v| v.as_u64()).unwrap_or(0);
+                AuditKind::FillProduced {
+                    order_id,
+                    quantity,
+                    price,
+                    ts_event,
+                }
+            }
+            "state_changed" => {
+                let from = str_to_trading_state(
+                    val.get("from").and_then(|v| v.as_str()).unwrap_or("active"),
+                );
+                let to = str_to_trading_state(
+                    val.get("to").and_then(|v| v.as_str()).unwrap_or("active"),
+                );
+                AuditKind::StateChanged { from, to }
+            }
+            "risk_refused" => {
+                let order_id = val
+                    .get("order_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                AuditKind::RiskRefused {
+                    order_id,
+                    refusal: honba_risk::RiskRefusal::TradingHalted,
+                }
+            }
+            "venue_order_id_drift" => {
+                let order_id = val
+                    .get("order_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let recorded = val.get("recorded").and_then(|v| v.as_str()).unwrap_or("");
+                let received = val.get("received").and_then(|v| v.as_str()).unwrap_or("");
+                AuditKind::VenueOrderIdDrift {
+                    order_id,
+                    recorded: VenueOrderId::new(recorded),
+                    received: VenueOrderId::new(received),
+                }
+            }
+            "illegal_transition" => {
+                let order_id = val
+                    .get("order_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                AuditKind::IllegalTransition {
+                    order_id,
+                    error: honba_messages::IllegalTransition::InvalidQuantity {
+                        value: 0.0,
+                    },
+                }
+            }
+            other => return Err(format!("unknown record type {other}")),
+        };
+        Ok(AuditRecord { seq, kind })
     }
 }

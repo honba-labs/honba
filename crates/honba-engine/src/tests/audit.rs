@@ -119,3 +119,84 @@ fn logs_with_the_same_history_are_equal_and_debuggable() {
     assert_eq!(cloned.records().len(), 3);
     assert_eq!(format!("{cloned:?}"), rendered);
 }
+
+#[test]
+fn audit_replay_matches_state() {
+    let log = sample_log();
+    let replayed = log.replay();
+
+    let inst = honba_messages::InstrumentId::new("X", honba_messages::Exchange::new("NSE"));
+    assert_eq!(replayed.position(&inst), 5.0);
+    assert_eq!(replayed.dispatches(), 1);
+    assert_eq!(replayed.trading_state(), TradingState::Active);
+
+    let order = replayed.order("O-1").expect("order O-1 must exist");
+    assert_eq!(order.filled_qty, 5.0);
+    assert_eq!(order.side, honba_messages::OrderSide::Buy);
+    assert_eq!(order.instrument, inst);
+}
+
+#[test]
+fn audit_replay_complex_lifecycle() {
+    let mut log = AuditLog::new();
+    let inst = honba_messages::InstrumentId::new("RELIANCE", honba_messages::Exchange::new("NSE"));
+    log.record(AuditKind::OrderSubmitted {
+        order_id: "ORD-1".to_string(),
+        instrument: "RELIANCE.NSE".to_string(),
+        side: "buy".to_string(),
+    });
+    log.record(AuditKind::OrderLifecycle {
+        order_id: "ORD-1".to_string(),
+        event: honba_messages::OrderEventKind::Accepted,
+        ts_event: 10,
+    });
+    log.record(AuditKind::FillProduced {
+        order_id: "ORD-1".to_string(),
+        quantity: 10.0,
+        price: 2500.0,
+        ts_event: 15,
+    });
+    log.record(AuditKind::OrderSubmitted {
+        order_id: "ORD-2".to_string(),
+        instrument: "RELIANCE.NSE".to_string(),
+        side: "sell".to_string(),
+    });
+    log.record(AuditKind::FillProduced {
+        order_id: "ORD-2".to_string(),
+        quantity: 4.0,
+        price: 2510.0,
+        ts_event: 20,
+    });
+    log.record(AuditKind::CancelRequested {
+        order_id: "ORD-2".to_string(),
+    });
+    log.record(AuditKind::OrderLifecycle {
+        order_id: "ORD-2".to_string(),
+        event: honba_messages::OrderEventKind::Cancelled,
+        ts_event: 25,
+    });
+    log.record(AuditKind::StateChanged {
+        from: TradingState::Active,
+        to: TradingState::Reducing,
+    });
+
+    let replayed = log.replay();
+    assert_eq!(replayed.position(&inst), 6.0); // 10 buy - 4 sell
+    assert_eq!(replayed.trading_state(), TradingState::Reducing);
+
+    let ord2 = replayed.order("ORD-2").expect("ORD-2 must exist");
+    assert_eq!(ord2.filled_qty, 4.0);
+    assert_eq!(ord2.lifecycle, Some(honba_messages::OrderEventKind::Cancelled));
+    assert_eq!(ord2.cancel_requested, false);
+}
+
+#[test]
+fn journal_writer_roundtrip() {
+    let log = sample_log();
+    let mut buffer = Vec::new();
+    log.write_ndjson(&mut buffer).expect("write_ndjson must succeed");
+
+    let read_log = AuditLog::read_ndjson(&buffer[..]).expect("read_ndjson must succeed");
+    assert_eq!(log, read_log);
+    assert_eq!(log.replay(), read_log.replay());
+}

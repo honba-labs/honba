@@ -577,3 +577,58 @@ fn two_runs_with_the_same_feed_produce_identical_audit_records() {
         ]
     );
 }
+
+#[test]
+fn run_then_replay_identical_positions() {
+    let mut feed = VecFeed::new(vec![
+        bar_msg(101.0, 1),
+        bar_msg(102.0, 2),
+        bar_msg(103.0, 3),
+    ]);
+    let sink = SpySink::default();
+    let inst = InstrumentId::new("X", Exchange::new("NSE"));
+
+    let mut engine = Engine::new();
+    engine.set_execution(Box::new(sink.clone()));
+    engine.add_handler(Scripted {
+        steps: vec![
+            (
+                1,
+                EngineOutput::Orders(vec![market_order("O-1", OrderSide::Buy, 10.0, 1)]),
+            ),
+            (
+                2,
+                EngineOutput::Orders(vec![market_order("O-2", OrderSide::Sell, 4.0, 2)]),
+            ),
+            (3, EngineOutput::StateChange(TradingState::Reducing)),
+        ],
+        seen: Arc::new(Mutex::new(Vec::new())),
+    });
+    engine.run(&mut feed).unwrap();
+
+    // Verify engine state
+    assert_eq!(engine.position(&inst), 6.0);
+    assert_eq!(engine.trading_state(), TradingState::Reducing);
+
+    // Replay directly from audit log
+    let replayed = engine.audit_log().replay();
+    assert_eq!(replayed.position(&inst), engine.position(&inst));
+    assert_eq!(replayed.trading_state(), engine.trading_state());
+    assert_eq!(replayed.order("O-1").unwrap().filled_qty, 10.0);
+    assert_eq!(replayed.order("O-2").unwrap().filled_qty, 4.0);
+
+    // Write journal as NDJSON and reload
+    let mut journal_bytes = Vec::new();
+    engine
+        .audit_log()
+        .write_ndjson(&mut journal_bytes)
+        .expect("write_ndjson must succeed");
+
+    let loaded_log = honba_engine::AuditLog::read_ndjson(&journal_bytes[..])
+        .expect("read_ndjson must succeed");
+    assert_eq!(loaded_log, *engine.audit_log());
+
+    let loaded_replayed = loaded_log.replay();
+    assert_eq!(loaded_replayed.position(&inst), engine.position(&inst));
+    assert_eq!(loaded_replayed.trading_state(), engine.trading_state());
+}

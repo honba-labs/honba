@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Audit log replay and journal writer (E2-S4 rest)
+
+- `honba-engine`: Added `ReplayState`, `ReplayOrder`, `AuditJournalWriter`, and `AuditJournalReader`.
+- `AuditLog::replay()` reconstructs the final engine state (positions, orders, trading state, dispatches, rejections) strictly by applying audit records in sequential order.
+- `AuditLog::write_ndjson` and `AuditLog::read_ndjson` provide deterministic serialization and deserialization of audit logs into newline-delimited JSON.
+- `Engine::audit_log()` returns the full audit log, verified via `run_then_replay_identical_positions` integration test to reconstruct identical positions and trading state.
+
 ### Simulators order-state conformance (E2-S6(d))
 
 - `crates/honba-sim/tests/order_state_conformance.rs` replays `schema/conformance/order_state.json`

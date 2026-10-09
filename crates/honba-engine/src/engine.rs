@@ -212,6 +212,11 @@ impl Engine {
         self.audit.records()
     }
 
+    /// Returns the complete audit log.
+    pub fn audit_log(&self) -> &AuditLog {
+        &self.audit
+    }
+
     /// Injects a message into the queue, exactly as a feed would.
     ///
     /// Used by tests and by the async shell; does not advance the clock.

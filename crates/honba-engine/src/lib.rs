@@ -26,7 +26,10 @@ pub mod handler;
 pub mod queue;
 pub mod state;
 
-pub use audit::{AuditKind, AuditLog, AuditRecord};
+pub use audit::{
+    AuditJournalReader, AuditJournalWriter, AuditKind, AuditLog, AuditRecord, ReplayOrder,
+    ReplayState,
+};
 pub use clock::Clock;
 pub use data::DataFeed;
 pub use engine::{Engine, TrackedOrder};
