@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import datetime as dt
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -50,7 +51,7 @@ class TestRegistryToFill:
     ) -> None:
         # What configs/live/*.toml [adapter] name = "..." does at startup.
         config = {"name": "fake", "mode": RunMode.PAPER}
-        adapter = reg.create(config.pop("name"), **config)
+        adapter: Any = reg.create(config.pop("name"), **config)
         assert adapter.capabilities().name == "fake"
 
         await adapter.connect()
@@ -68,7 +69,7 @@ class TestRegistryToFill:
             await adapter.disconnect()
 
     async def test_the_whole_books_agree_after_a_round_trip(self, reg: AdapterRegistry) -> None:
-        adapter = reg.create("fake")
+        adapter: Any = reg.create("fake")
         await adapter.connect()
         instrument = InstrumentId("RELIANCE", "NSE")
         try:
@@ -96,7 +97,7 @@ class TestRegistryToFill:
     async def test_a_resting_order_is_cancelled_through_the_contract_api(
         self, reg: AdapterRegistry
     ) -> None:
-        adapter = reg.create("fake")
+        adapter: Any = reg.create("fake")
         await adapter.connect()
         instrument = InstrumentId("TCS", "NSE")
         try:
