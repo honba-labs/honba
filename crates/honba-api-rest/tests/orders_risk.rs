@@ -113,8 +113,9 @@ async fn order_refused_by_risk() {
 async fn post_order_flows_to_sim_only() {
     // An approved order is acknowledged; the execution gateway is not wired yet, so
     // nothing is persisted and the (unbuilt) order ledger still answers 501.
+    let app = api_router_with(state());
     let (status, body) = call(
-        api_router_with(state()),
+        app.clone(),
         Method::POST,
         "/orders",
         Some(order("X", "NSE", "buy", 25.0, Some(100.0))),
@@ -123,9 +124,25 @@ async fn post_order_flows_to_sim_only() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["data"]["status"], json!("acknowledged"));
 
-    let (status, body) = call(api_router_with(state()), Method::GET, "/orders", None).await;
+    let (status, body) = call(app, Method::GET, "/orders", None).await;
     assert_eq!(status, StatusCode::NOT_IMPLEMENTED);
     assert_eq!(body["error"]["code"], json!("not_implemented"));
+}
+
+#[tokio::test]
+async fn halted_refusal_precedes_instrument_lookup() {
+    // Regression (ADR 0018 decision 4: the state rules are 1-2, unknown instrument
+    // is 3). A halted engine reports why it is closed even for an unknown symbol.
+    let app = api_router_with(state().with_trading_state(TradingState::Halted));
+    let (status, body) = call(
+        app,
+        Method::POST,
+        "/orders",
+        Some(order("Z", "NSE", "buy", 25.0, None)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(body["error"]["code"], json!("risk_trading_halted"));
 }
 
 #[tokio::test]

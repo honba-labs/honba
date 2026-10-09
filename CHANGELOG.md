@@ -7,7 +7,8 @@
 - `POST /orders` runs approval queue (none configured) -> risk stage over the `null` profile and
   the `InstrumentMaster` set, then routes: a refusal is 422 with the `risk_*` code and its
   `context`; `DELETE /orders/{id}` cancels without a gate and `POST /positions/close` closes
-  without one. Until the write ledger of E11-S7 exists, an approved order is acknowledged
+  without one (both only acknowledge until the order store exists). Until the write ledger of
+  E11-S7 exists, an approved order is acknowledged
   (`{"status": "acknowledged"}`) and no gateway call is made. Known limits are documented on
   `honba_api_rest::orders`: `trading_state` is the app's in-process state (default `Active`;
   the route that changes it stays 501 with E11-S8), positions are zero and `ts = 0`, so the

@@ -11,10 +11,14 @@
 //! and `ts = 0`. Known limits: with no sim clock composed yet the rate rule cannot
 //! be exercised and orders carry no timestamp.
 //!
-//! A refusal is the 422 of ADR 0018 decision 5, audited as in decision 6, and
-//! never reaches the gateway. `DELETE /orders/{id}` is never risk-checked and
-//! is allowed in every state. `POST /positions/close` is allowed when halted:
-//! it is evaluated with `Reducing` substituted, so it must pass reduce-only.
+//! A refusal is the 422 of ADR 0018 decision 5 and never reaches the gateway.
+//! The decision 6 audit record and the `order_id` idempotency key of ADR 0019
+//! decision 3 both arrive with the E11-S7 write ledger; here the id is a fixed
+//! placeholder and nothing is audited. `DELETE /orders/{id}` and
+//! `POST /positions/close` cannot add exposure, so they are never risk-checked
+//! and are allowed in every state; at this seam both acknowledge without a
+//! store, and close does not yet generate the reduce-only orders the ledger
+//! will submit.
 
 use std::sync::Arc;
 
@@ -105,9 +109,8 @@ async fn last_price(state: &AppState, instrument_id: &InstrumentId) -> Option<f6
 /// stays 501 until its store exists; today an approved order is acknowledged
 /// with 200 and no state changes.
 ///
-/// `order_id` is the caller's idempotency key (ADR 0019 decision 3); only
-/// approval reaches this point with the call, so every row refused here is an
-/// `InstrumentUnknown` candidate the stage names.
+/// `order_id` is a fixed placeholder until the E11-S7 write ledger keys orders
+/// by the caller's idempotency key (ADR 0019 decision 3).
 pub(crate) async fn post_orders(
     State(state): State<Arc<AppState>>,
     crate::ApiJson(req): crate::ApiJson<OrdersRequest>,
@@ -119,26 +122,24 @@ pub(crate) async fn post_orders(
             return failure(StatusCode::UNPROCESSABLE_ENTITY, detail);
         }
     };
-    let known = match known_instrument(&state, &instrument_id).await {
-        Ok(v) => v,
+    let instrument = match known_instrument(&state, &instrument_id).await {
+        Ok(instrument) => instrument,
         Err(detail) => {
             return failure(StatusCode::INTERNAL_SERVER_ERROR, detail);
         }
-    };
-    let Some(instrument) = known else {
-        return refusal_response(&honba_risk::RiskRefusal::InstrumentUnknown {
-            instrument_id: instrument_id.clone(),
-        });
     };
     let reference_price = match last_price(&state, &instrument_id).await {
         Some(px) => Some(px),
         None => price,
     };
     let profile = Arc::new(NullMarketProfile::default());
+    // An unknown instrument contributes no rules, so the stage itself raises
+    // `InstrumentUnknown` at rule 3, after the state rules 1-2 (ADR 0018
+    // decision 4); resolving it here first would hoist rule 3 above them.
     let mut stage = match RiskStage::new(
         RiskLimits::default(),
         state.account_currency,
-        Arc::new(ProfileRulesSource::new(profile, [instrument])),
+        Arc::new(ProfileRulesSource::new(profile, instrument)),
     ) {
         Ok(stage) => stage,
         Err(e) => {
@@ -173,8 +174,9 @@ pub(crate) async fn delete_order(Path(_id): Path<String>) -> Response {
     success(serde_json::json!({"status": "cancelled"}))
 }
 
-/// `POST /positions/close` is allowed when halted: it is evaluated with
-/// `Reducing` substituted, so it must pass reduce-only.
+/// `POST /positions/close` is not risk-checked (it cannot add exposure) and is
+/// allowed in every state, including halted. The seam only acknowledges; the
+/// E11-S7 ledger will generate the reduce-only orders it evaluates.
 pub(crate) async fn post_close_positions() -> Response {
     success(serde_json::json!({"status": "closing"}))
 }
