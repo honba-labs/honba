@@ -209,7 +209,11 @@ impl Handler for BarFillEngine {
                             stop.peak
                         };
                         if b.low() <= trigger {
-                            let px = if b.open() <= trigger { b.open() } else { trigger };
+                            let px = if b.open() <= trigger {
+                                b.open()
+                            } else {
+                                trigger
+                            };
                             triggered.push((stop.order.clone(), px));
                             false
                         } else {
@@ -226,7 +230,11 @@ impl Handler for BarFillEngine {
                             stop.trough
                         };
                         if b.high() >= trigger {
-                            let px = if b.open() >= trigger { b.open() } else { trigger };
+                            let px = if b.open() >= trigger {
+                                b.open()
+                            } else {
+                                trigger
+                            };
                             triggered.push((stop.order.clone(), px));
                             false
                         } else {
@@ -303,7 +311,9 @@ impl ExecutionEngine for BarFillEngine {
 
     fn cancel(&mut self, order_id: &str, _now: UnixNanos) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
-        inner.resting_trailing.retain(|s| s.order.order_id().as_str() != order_id);
+        inner
+            .resting_trailing
+            .retain(|s| s.order.order_id().as_str() != order_id);
         Ok(())
     }
 

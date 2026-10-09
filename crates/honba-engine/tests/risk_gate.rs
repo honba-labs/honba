@@ -350,8 +350,14 @@ fn stale_feed_scenario() {
     // At t=2600ms (X quote): X feed refreshed at 2600ms
     // At t=2700ms (Y quote): X last quote was at 2600ms -> age 100ms <= 1000ms -> approved!
     let strategy = Strategy::new(vec![
-        (2500 * MS, vec![limit("O-1", OrderSide::Buy, 1.0, 2500 * MS)]),
-        (2700 * MS, vec![limit("O-2", OrderSide::Buy, 1.0, 2700 * MS)]),
+        (
+            2500 * MS,
+            vec![limit("O-1", OrderSide::Buy, 1.0, 2500 * MS)],
+        ),
+        (
+            2700 * MS,
+            vec![limit("O-2", OrderSide::Buy, 1.0, 2700 * MS)],
+        ),
     ]);
 
     let mut engine = Engine::new().with_risk(stage);
@@ -360,19 +366,51 @@ fn stale_feed_scenario() {
 
     engine.start().unwrap();
     engine.inject(Message::new(
-        Event::Quote(QuoteTick::new(x(), 1.0, 2.0, 1.0, 1.0, ts(1000 * MS), ts(1000 * MS))),
+        Event::Quote(QuoteTick::new(
+            x(),
+            1.0,
+            2.0,
+            1.0,
+            1.0,
+            ts(1000 * MS),
+            ts(1000 * MS),
+        )),
         ts(1000 * MS),
     ));
     engine.inject(Message::new(
-        Event::Quote(QuoteTick::new(y.clone(), 1.0, 2.0, 1.0, 1.0, ts(2500 * MS), ts(2500 * MS))),
+        Event::Quote(QuoteTick::new(
+            y.clone(),
+            1.0,
+            2.0,
+            1.0,
+            1.0,
+            ts(2500 * MS),
+            ts(2500 * MS),
+        )),
         ts(2500 * MS),
     ));
     engine.inject(Message::new(
-        Event::Quote(QuoteTick::new(x(), 1.0, 2.0, 1.0, 1.0, ts(2600 * MS), ts(2600 * MS))),
+        Event::Quote(QuoteTick::new(
+            x(),
+            1.0,
+            2.0,
+            1.0,
+            1.0,
+            ts(2600 * MS),
+            ts(2600 * MS),
+        )),
         ts(2600 * MS),
     ));
     engine.inject(Message::new(
-        Event::Quote(QuoteTick::new(y.clone(), 1.0, 2.0, 1.0, 1.0, ts(2700 * MS), ts(2700 * MS))),
+        Event::Quote(QuoteTick::new(
+            y.clone(),
+            1.0,
+            2.0,
+            1.0,
+            1.0,
+            ts(2700 * MS),
+            ts(2700 * MS),
+        )),
         ts(2700 * MS),
     ));
     engine.finish().unwrap();

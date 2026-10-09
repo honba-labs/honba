@@ -418,7 +418,18 @@ impl ROrderIntent {
         exchange: &str,
     ) -> PyResult<Self> {
         let (p, t) = (Some(limit_price), Some(trigger_price));
-        Self::new(symbol, "buy", quantity, "stop_limit", p, "day", exchange, t, None, None)
+        Self::new(
+            symbol,
+            "buy",
+            quantity,
+            "stop_limit",
+            p,
+            "day",
+            exchange,
+            t,
+            None,
+            None,
+        )
     }
 
     #[staticmethod]

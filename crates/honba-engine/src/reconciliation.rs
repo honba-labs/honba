@@ -224,22 +224,19 @@ impl Reconciler {
 
         // 1. Reconcile broker orders against cache
         for b_order in &snapshot.orders {
-            let matched_cache_order: Option<(&String, &TrackedOrder)> = if let Some(ref cid) =
-                b_order.order_id
-            {
-                cache
-                    .orders()
-                    .get_key_value(cid.as_str())
-                    .or_else(|| {
+            let matched_cache_order: Option<(&String, &TrackedOrder)> =
+                if let Some(ref cid) = b_order.order_id {
+                    cache.orders().get_key_value(cid.as_str()).or_else(|| {
                         cache.orders().iter().find(|(_, t)| {
                             t.venue_order_id.as_ref() == Some(&b_order.venue_order_id)
                         })
                     })
-            } else {
-                cache.orders().iter().find(|(_, t)| {
-                    t.venue_order_id.as_ref() == Some(&b_order.venue_order_id)
-                })
-            };
+                } else {
+                    cache
+                        .orders()
+                        .iter()
+                        .find(|(_, t)| t.venue_order_id.as_ref() == Some(&b_order.venue_order_id))
+                };
 
             if let Some((cid_str, tracked)) = matched_cache_order {
                 let order_id = OrderId::new(cid_str);

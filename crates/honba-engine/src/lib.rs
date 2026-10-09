@@ -42,7 +42,7 @@ pub use handler::{EngineOutput, Handler, NoopHandler};
 pub use queue::EventQueue;
 pub use reconciliation::{
     BrokerOrderReport, BrokerPositionReport, BrokerSnapshot, BrokerTradeReport, GhostOrder,
-    MissedFill, PositionDrift, ReconciliationReport, Reconciler, StaleOrder,
+    MissedFill, PositionDrift, Reconciler, ReconciliationReport, StaleOrder,
 };
 pub use state::TradingState;
 

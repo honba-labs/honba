@@ -186,15 +186,19 @@ fn audit_replay_complex_lifecycle() {
 
     let ord2 = replayed.order("ORD-2").expect("ORD-2 must exist");
     assert_eq!(ord2.filled_qty, 4.0);
-    assert_eq!(ord2.lifecycle, Some(honba_messages::OrderEventKind::Cancelled));
-    assert_eq!(ord2.cancel_requested, false);
+    assert_eq!(
+        ord2.lifecycle,
+        Some(honba_messages::OrderEventKind::Cancelled)
+    );
+    assert!(!ord2.cancel_requested);
 }
 
 #[test]
 fn journal_writer_roundtrip() {
     let log = sample_log();
     let mut buffer = Vec::new();
-    log.write_ndjson(&mut buffer).expect("write_ndjson must succeed");
+    log.write_ndjson(&mut buffer)
+        .expect("write_ndjson must succeed");
 
     let read_log = AuditLog::read_ndjson(&buffer[..]).expect("read_ndjson must succeed");
     assert_eq!(log, read_log);

@@ -71,8 +71,8 @@ fn seed_position_sets_the_position_without_touching_cash() {
 
 #[test]
 fn context_reads_from_cache() {
-    use honba_entities::{Currency, Instrument, InstrumentKind};
     use honba_engine::{StateCache, TrackedOrder};
+    use honba_entities::{Currency, Instrument, InstrumentKind};
     use honba_messages::{Exchange, InstrumentId, OrderSide, OrderState, OrderStatus, UnixNanos};
 
     let id = InstrumentId::new("INFY", Exchange::new("NSE"));

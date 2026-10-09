@@ -8,8 +8,8 @@ use std::collections::HashMap;
 
 use honba_entities::Instrument;
 use honba_messages::{
-    Bar, Event, InstrumentId, OrderEvent, OrderSide, OrderState, OrderStatus, QuoteTick,
-    UnixNanos, VenueOrderId,
+    Bar, Event, InstrumentId, OrderEvent, OrderSide, OrderState, OrderStatus, QuoteTick, UnixNanos,
+    VenueOrderId,
 };
 
 /// What the engine knows about one order it submitted or refused (ADR 0019
@@ -131,21 +131,18 @@ impl StateCache {
             }
             Event::Order(order) => {
                 let id = order.order_id().as_str().to_string();
-                if !self.orders.contains_key(&id) {
+                self.orders.entry(id).or_insert_with(|| {
                     let mut state = OrderState::new();
                     let _ = state.apply(&OrderEvent::Submitted {
                         quantity: order.quantity(),
                     });
-                    self.orders.insert(
-                        id,
-                        TrackedOrder {
-                            state,
-                            instrument_id: order.instrument_id().clone(),
-                            side: order.side(),
-                            venue_order_id: None,
-                        },
-                    );
-                }
+                    TrackedOrder {
+                        state,
+                        instrument_id: order.instrument_id().clone(),
+                        side: order.side(),
+                        venue_order_id: None,
+                    }
+                });
             }
             Event::OrderAccepted {
                 order_id,
@@ -182,7 +179,10 @@ impl StateCache {
                         OrderSide::Sell => -*last_qty,
                         _ => *last_qty,
                     };
-                    *self.positions.entry(tracked.instrument_id.clone()).or_insert(0.0) += signed;
+                    *self
+                        .positions
+                        .entry(tracked.instrument_id.clone())
+                        .or_insert(0.0) += signed;
                     self.last_px.insert(tracked.instrument_id.clone(), *last_px);
                 }
             }
@@ -202,7 +202,10 @@ impl StateCache {
                         OrderSide::Sell => -*last_qty,
                         _ => *last_qty,
                     };
-                    *self.positions.entry(tracked.instrument_id.clone()).or_insert(0.0) += signed;
+                    *self
+                        .positions
+                        .entry(tracked.instrument_id.clone())
+                        .or_insert(0.0) += signed;
                     self.last_px.insert(tracked.instrument_id.clone(), *last_px);
                 }
             }

@@ -7,7 +7,10 @@ use honba_messages::{
     ErrorCode, Event, InstrumentId, Message, Order, OrderEventKind, OrderId, OrderSide, OrderState,
     OrderStatus, UnixNanos, VenueOrderId,
 };
-use honba_risk::{check_state, DurableRiskState, FillFingerprint, FillLedger, InFlightOrder, RiskCheck, RiskDecision, RiskLimits, RiskRequest, RiskStage};
+use honba_risk::{
+    check_state, DurableRiskState, FillFingerprint, FillLedger, InFlightOrder, RiskCheck,
+    RiskDecision, RiskLimits, RiskRequest, RiskStage,
+};
 
 use crate::audit::{AuditKind, AuditLog, AuditRecord};
 use crate::cache::StateCache;
@@ -295,7 +298,10 @@ impl Engine {
                 OrderSide::Sell => -fill.quantity,
                 _ => fill.quantity,
             };
-            *self.positions.entry(fill.instrument_id.clone()).or_insert(0.0) += signed;
+            *self
+                .positions
+                .entry(fill.instrument_id.clone())
+                .or_insert(0.0) += signed;
             if let Some(tracked) = self.orders.get_mut(fill.order_id.as_str()) {
                 let _ = tracked.state.apply(&honba_messages::OrderEvent::Fill {
                     last_qty: fill.quantity,
@@ -544,7 +550,10 @@ impl Engine {
                 .positions
                 .entry(trade.instrument_id().clone())
                 .or_insert(0.0) += signed;
-            self.cache.seed_position(trade.instrument_id().clone(), self.positions[&trade.instrument_id()]);
+            self.cache.seed_position(
+                trade.instrument_id().clone(),
+                self.positions[trade.instrument_id()],
+            );
         }
         let Some(tracked) = self.orders.get_mut(&order_id) else {
             // Nothing was sent under this id: every event is illegal for it.
@@ -608,7 +617,8 @@ impl Engine {
             }
         }
         if let Some(t) = self.orders.get(ev.order_id().as_str()) {
-            self.cache.seed_order(ev.order_id().as_str().to_string(), t.clone());
+            self.cache
+                .seed_order(ev.order_id().as_str().to_string(), t.clone());
         }
         self.observed.push(ev);
     }

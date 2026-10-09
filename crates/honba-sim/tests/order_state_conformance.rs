@@ -209,13 +209,7 @@ fn matches(actual: &Value, expected: &Value) -> bool {
 fn normalise(events: &[Value], profile: &str) -> Vec<Value> {
     events
         .iter()
-        .filter(|e| {
-            if profile == "l1" && e["type"] == "order_accepted" {
-                false
-            } else {
-                true
-            }
-        })
+        .filter(|e| !(profile == "l1" && e["type"] == "order_accepted"))
         .cloned()
         .collect()
 }

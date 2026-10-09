@@ -6,8 +6,7 @@ use honba_engine::{
     BrokerOrderReport, BrokerSnapshot, CacheQuery, Engine, EngineOutput, Handler, Result,
 };
 use honba_messages::{
-    Event, Exchange, InstrumentId, OrderId, OrderSide, OrderStatus,
-    UnixNanos, VenueOrderId,
+    Event, Exchange, InstrumentId, OrderId, OrderSide, OrderStatus, UnixNanos, VenueOrderId,
 };
 
 fn ts(n: u64) -> UnixNanos {
@@ -198,7 +197,7 @@ fn recorded_fixture_reconciliation_scenarios() {
     assert_eq!(report.missed_fills.len(), 1);
     assert_eq!(report.missed_fills[0].order_id.as_str(), "ORD-MISSED");
     assert_eq!(report.missed_fills[0].quantity, 20.0);
-    assert_eq!(report.missed_fills[0].completes_order, true);
+    assert!(report.missed_fills[0].completes_order);
 
     // 2. Stale order on INFY
     assert_eq!(report.stale_orders.len(), 1);

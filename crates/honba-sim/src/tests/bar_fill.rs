@@ -278,8 +278,15 @@ fn trailing_stop_sell_rests_and_triggers_on_breach() {
     observe(&mut exec, 100.0, 1);
 
     // Trailing stop sell with trail amount 5.0
-    let ts_order = order("TS-1", OrderSide::Sell, OrderType::TrailingStop, 10.0, None, 1)
-        .with_trail_amount(5.0);
+    let ts_order = order(
+        "TS-1",
+        OrderSide::Sell,
+        OrderType::TrailingStop,
+        10.0,
+        None,
+        1,
+    )
+    .with_trail_amount(5.0);
     exec.submit(ts_order).unwrap();
     // Initially rests, no fill yet
     assert!(exec.drain_fills().unwrap().is_empty());

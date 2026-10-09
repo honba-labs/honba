@@ -328,7 +328,9 @@ impl ReplayState {
             AuditKind::StateChanged { to, .. } => {
                 self.trading_state = *to;
             }
-            AuditKind::IllegalTransition { .. } | AuditKind::VenueOrderIdDrift { .. } | AuditKind::DuplicateFillIgnored { .. } => {}
+            AuditKind::IllegalTransition { .. }
+            | AuditKind::VenueOrderIdDrift { .. }
+            | AuditKind::DuplicateFillIgnored { .. } => {}
         }
     }
 
@@ -740,9 +742,7 @@ impl AuditRecord {
                     .to_string();
                 AuditKind::IllegalTransition {
                     order_id,
-                    error: honba_messages::IllegalTransition::InvalidQuantity {
-                        value: 0.0,
-                    },
+                    error: honba_messages::IllegalTransition::InvalidQuantity { value: 0.0 },
                 }
             }
             other => return Err(format!("unknown record type {other}")),

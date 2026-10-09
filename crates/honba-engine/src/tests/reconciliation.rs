@@ -6,9 +6,7 @@ use honba_messages::{
 };
 
 use crate::cache::{CacheQuery, StateCache, TrackedOrder};
-use crate::reconciliation::{
-    BrokerOrderReport, BrokerSnapshot, Reconciler,
-};
+use crate::reconciliation::{BrokerOrderReport, BrokerSnapshot, Reconciler};
 
 fn ts(n: u64) -> UnixNanos {
     UnixNanos::from_u64(n)
@@ -54,7 +52,7 @@ fn missed_fill_detected() {
     assert_eq!(fill.quantity, 6.0);
     assert_eq!(fill.cum_qty, 6.0);
     assert_eq!(fill.price, 2500.0);
-    assert_eq!(fill.completes_order, false);
+    assert!(!fill.completes_order);
 
     assert_eq!(report.synthetic_events.len(), 1);
     assert!(matches!(
@@ -114,7 +112,7 @@ fn missed_fill_completes_order() {
     assert_eq!(report.missed_fills.len(), 1);
     let fill = &report.missed_fills[0];
     assert_eq!(fill.quantity, 6.0); // 10.0 - 4.0
-    assert_eq!(fill.completes_order, true);
+    assert!(fill.completes_order);
 
     assert_eq!(report.synthetic_events.len(), 1);
     assert!(matches!(
@@ -129,7 +127,10 @@ fn missed_fill_completes_order() {
 
     report.apply_to_cache(&mut cache);
     assert_eq!(cache.position(&instrument), 10.0);
-    assert_eq!(cache.order("O-2").unwrap().state.status, OrderStatus::Filled);
+    assert_eq!(
+        cache.order("O-2").unwrap().state.status,
+        OrderStatus::Filled
+    );
     assert_eq!(cache.open_orders().len(), 0);
 }
 
@@ -222,17 +223,21 @@ fn stale_open_orders_cancelled_and_dropped() {
 
     // Both generate synthetic cancel events
     assert_eq!(report.synthetic_events.len(), 2);
-    assert!(report
-        .synthetic_events
-        .iter()
-        .any(|e| matches!(e, Event::OrderCancelled { order_id, .. } if order_id.as_str() == "O-10")));
-    assert!(report
-        .synthetic_events
-        .iter()
-        .any(|e| matches!(e, Event::OrderCancelled { order_id, .. } if order_id.as_str() == "O-20")));
+    assert!(report.synthetic_events.iter().any(
+        |e| matches!(e, Event::OrderCancelled { order_id, .. } if order_id.as_str() == "O-10")
+    ));
+    assert!(report.synthetic_events.iter().any(
+        |e| matches!(e, Event::OrderCancelled { order_id, .. } if order_id.as_str() == "O-20")
+    ));
 
     report.apply_to_cache(&mut cache);
     assert_eq!(cache.open_orders().len(), 0);
-    assert_eq!(cache.order("O-10").unwrap().state.status, OrderStatus::Cancelled);
-    assert_eq!(cache.order("O-20").unwrap().state.status, OrderStatus::Cancelled);
+    assert_eq!(
+        cache.order("O-10").unwrap().state.status,
+        OrderStatus::Cancelled
+    );
+    assert_eq!(
+        cache.order("O-20").unwrap().state.status,
+        OrderStatus::Cancelled
+    );
 }

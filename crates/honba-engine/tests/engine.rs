@@ -624,8 +624,8 @@ fn run_then_replay_identical_positions() {
         .write_ndjson(&mut journal_bytes)
         .expect("write_ndjson must succeed");
 
-    let loaded_log = honba_engine::AuditLog::read_ndjson(&journal_bytes[..])
-        .expect("read_ndjson must succeed");
+    let loaded_log =
+        honba_engine::AuditLog::read_ndjson(&journal_bytes[..]).expect("read_ndjson must succeed");
     assert_eq!(loaded_log, *engine.audit_log());
 
     let loaded_replayed = loaded_log.replay();

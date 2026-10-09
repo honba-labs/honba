@@ -394,10 +394,15 @@ impl OrderIntent {
         if !matches!(self.side, OrderSide::Buy | OrderSide::Sell) {
             return Err(IntentError::NoSide);
         }
-        if [self.price, self.trigger_price, self.trail_amount, self.trail_percent]
-            .iter()
-            .flatten()
-            .any(|p| !p.is_finite())
+        if [
+            self.price,
+            self.trigger_price,
+            self.trail_amount,
+            self.trail_percent,
+        ]
+        .iter()
+        .flatten()
+        .any(|p| !p.is_finite())
         {
             return Err(IntentError::NonFinitePrice);
         }

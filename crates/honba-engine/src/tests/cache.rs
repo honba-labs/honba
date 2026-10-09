@@ -20,7 +20,16 @@ fn inst(symbol: &str) -> InstrumentId {
 fn bar(symbol: &str, close: f64, t: u64) -> Bar {
     let spec = BarSpecification::new(1, BarAggregation::Minute, PriceType::Last);
     let bt = BarType::new(inst(symbol), spec);
-    Bar::new(bt, close - 1.0, close + 1.0, close - 2.0, close, 100.0, ts(t), ts(t))
+    Bar::new(
+        bt,
+        close - 1.0,
+        close + 1.0,
+        close - 2.0,
+        close,
+        100.0,
+        ts(t),
+        ts(t),
+    )
 }
 
 fn quote(symbol: &str, bid: f64, ask: f64, t: u64) -> QuoteTick {
