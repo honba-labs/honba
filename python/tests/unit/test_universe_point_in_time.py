@@ -17,6 +17,7 @@ from honba.entities.instrument import InstrumentId
 from honba.markets.india.universes import (
     Constituent,
     UniverseHistory,
+    default_alpha30_history,
     load_universe_history,
     register_universe_history,
     resolve_universe,
@@ -174,6 +175,14 @@ def test_resolve_universe_without_as_of_keeps_the_static_list(tmp_path) -> None:
     assert resolve_universe("alpha30", data_dir=tmp_path) == resolve_universe(
         "nifty200_alpha_30", data_dir=tmp_path
     )
+
+
+def test_default_alpha30_history_resolves_point_in_time(tmp_path) -> None:
+    register_universe_history(default_alpha30_history())
+    resolved = resolve_universe("alpha30", as_of=D(2024, 1, 1), data_dir=tmp_path)
+    assert len(resolved) == 30
+    assert all(isinstance(i, InstrumentId) for i in resolved)
+    assert "HINDALCO" in [i.symbol for i in resolved]
 
 
 # ---------------------------------------------------------------------------

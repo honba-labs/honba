@@ -161,8 +161,7 @@ class UniverseHistory:
 
     A symbol may leave and later rejoin (two disjoint intervals); two intervals
     for the same symbol may never overlap, so ``symbols_on`` can never list a
-    symbol twice.
-    """
+    symbol twice."""
 
     name: str
     constituents: tuple[Constituent, ...]
@@ -211,6 +210,19 @@ def register_universe_history(history: UniverseHistory, *, replace: bool = False
 def universe_history(name: str) -> UniverseHistory | None:
     """Registered history for ``name`` (alias-normalized), or None."""
     return _HISTORY_REGISTRY.get(_normalize(name))
+
+
+def default_alpha30_history() -> UniverseHistory:
+    """Canonical point-in-time constituent history for Nifty 200 Alpha 30."""
+    base_date = dt.date(2005, 4, 1)
+    return UniverseHistory(
+        "nifty200_alpha30",
+        tuple(Constituent(sym, base_date) for sym in NIFTY_200_ALPHA_30_SYMBOLS),
+    )
+
+
+# Register baseline Alpha 30 history
+register_universe_history(default_alpha30_history())
 
 
 def _catalog_path(name: str, data_dir: Path | None) -> Path:
@@ -316,6 +328,7 @@ __all__ = [
     "UNIVERSES",
     "Constituent",
     "UniverseHistory",
+    "default_alpha30_history",
     "load_universe_history",
     "register_universe_history",
     "resolve_universe",
