@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Kernel: wall-clock-free domain check, `UnixNanos::now` removed (E2-S3 rest)
+
+- `honba-testing/tests/purity.rs` adds `no_system_time_in_domain_crates`: an integration test
+  that walks the production sources of every sync-kernel crate and refuses wall-clock reads
+  (`SystemTime`, `Instant::now`, chrono `::now`) outside comments, so a stray call fails the
+  suite. This completes R1's last exit criterion.
+- `honba_messages::UnixNanos::now` no longer reads the wall clock; it is the epoch (`0`),
+  a constructor kept for source compatibility whose only sane use is a zero timestamp. The
+  clocks in `honba-ports`/`honba-engine`/`honba-async` (the `Clock` trait, `LiveClock`,
+  `HistoricClock`) are the single place time enters, and none of them call `UnixNanos::now`.
+- Migration: a caller that used `UnixNanos::now()` for a live stamp must switch to an injected
+  `Clock::now` (or `LiveClock`, until callers move to the port). Documented no source
+  compatibility for the removed wall-clock read: the signature is unchanged, the value is.
+
 ### CLI: `honba serve --trading-state` (E2-S1 rest, ADR 0018 decision 2)
 
 - `honba serve` accepts `--trading-state <active|reducing|halted>` (default `active`). It seeds

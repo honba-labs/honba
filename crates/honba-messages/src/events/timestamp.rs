@@ -4,7 +4,6 @@ use chrono::{TimeZone, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// JSON representation of UnixNanos with ISO-8601 string and unix_nanos string.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -43,20 +42,11 @@ impl UnixNanos {
         Self(value)
     }
 
-    /// Returns the current wall-clock time as nanoseconds since the Unix epoch.
-    ///
-    /// ```
-    /// use honba_messages::UnixNanos;
-    ///
-    /// let ts = UnixNanos::now();
-    /// assert!(ts.as_u64() > 0);
-    /// ```
+    /// The epoch (`0`): the kernel is event-time only, so callers stamp time
+    /// from an injected clock and never ask this type for the wall clock
+    /// (E2-S3: `no_system_time_in_domain_crates` in `honba-testing`).
     pub fn now() -> Self {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_nanos() as u64)
-            .unwrap_or(0);
-        Self(nanos)
+        Self(0)
     }
 
     /// Returns the raw nanosecond value.
