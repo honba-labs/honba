@@ -10,3 +10,9 @@ node_modules/
 Cargo.lock
 *.so
 uv.lock
+.env.*
+!.env.example
+# Local credentials and per-user overrides; templates (*.example) are committed.
+secrets/
+*.local.toml
+*.secrets.toml
