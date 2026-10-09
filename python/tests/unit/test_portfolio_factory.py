@@ -96,6 +96,8 @@ def test_allocation_float_and_int():
 
 
 def test_history_len_auto_sizes_to_longest_lookback_with_floor_64():
+    assert build().history_len == 64
+    assert build(select="top:2:momentum:126").history_len == 126
     assert build()._history.maxlen == 64
     assert build(weighting="inverse_vol:20")._history.maxlen == 64
     assert build(select="top:2:momentum:126")._history.maxlen == 126

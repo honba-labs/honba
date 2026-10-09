@@ -149,3 +149,11 @@ def test_membership_change_between_rebalances():
     u.set_members([B, C])
     out = feed(s, bar(A, 2), bar(B, 2), bar(C, 2))
     assert ("A", "SELL", 500) in out
+
+
+def test_history_len_is_public_read_only_and_reflects_constructor():
+    assert PortfolioStrategy(StaticUniverse([A])).history_len == 64
+    s = PortfolioStrategy(StaticUniverse([A]), history_len=126)
+    assert s.history_len == 126
+    with pytest.raises(AttributeError):
+        s.history_len = 5  # type: ignore[misc]

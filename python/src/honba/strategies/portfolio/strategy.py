@@ -77,6 +77,11 @@ class PortfolioStrategy(TargetWeightStrategy):
 
         return build_portfolio_strategy(params, name=name)
 
+    @property
+    def history_len(self) -> int:
+        """Per-instrument close-history capacity (ring-buffer size) given at construction."""
+        return self._history.maxlen
+
     # -- TargetWeightStrategy hooks ---------------------------------------------
     def universe(self) -> Iterable[InstrumentId]:
         """Selected members for the current bar date."""
