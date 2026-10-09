@@ -18,7 +18,7 @@ from honba.domain.money import Currency, Money
 from honba.entities import wire
 from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
-from honba.entities.order import OrderIntent, OrderSide
+from honba.entities.order import OrderIntent, OrderSide, OrderType
 from honba.entities.tick import QuoteTick, TradeTick
 from honba.entities.trade import Trade
 from honba.strategies.base import Strategy
@@ -42,6 +42,13 @@ def _checked(name: str, value: float, cap: float) -> float:
 
 
 @dataclass
+class _RestingTrailingStop:
+    intent: OrderIntent
+    peak: float
+    trough: float
+
+
+@dataclass
 class ReplayResult:
     intents: list[OrderIntent] = field(default_factory=list)
     fills: list[Trade] = field(default_factory=list)
@@ -50,9 +57,11 @@ class ReplayResult:
 def replay(strategy: Strategy, bars: Iterable[Bar], fill_delay: int = 0) -> ReplayResult:
     """Replays ``bars``. ``fill_delay=0`` fills at the instrument's last close;
     ``fill_delay=n`` fills at the open of the bar ``n`` bars later, like a live runner.
-    Within each fill batch, sells execute before buys so liquidation funds purchases."""
+    Within each fill batch, sells execute before buys so liquidation funds purchases.
+    Trailing stops rest until breached, ratcheting stop price with peak/trough."""
     result = ReplayResult()
     queue: list[tuple[int, OrderIntent]] = []  # (due bar index, intent)
+    resting_stops: list[_RestingTrailingStop] = []
     last_close: dict[InstrumentId, float] = {}
     last_open: dict[InstrumentId, float] = {}
     strategy.on_start()
@@ -61,6 +70,44 @@ def replay(strategy: Strategy, bars: Iterable[Bar], fill_delay: int = 0) -> Repl
         last_open[bar.instrument_id] = bar.open
         if isinstance(strategy.ctx, LedgerContext):
             strategy.ctx.set_now(bar.ts)
+
+        # Check resting trailing stops against this bar
+        triggered: list[tuple[OrderIntent, float]] = []
+        remaining_stops: list[_RestingTrailingStop] = []
+        for stop in resting_stops:
+            if stop.intent.instrument_id != bar.instrument_id:
+                remaining_stops.append(stop)
+                continue
+            if stop.intent.side is OrderSide.SELL:
+                stop.peak = max(stop.peak, bar.high)
+                trigger_px = (
+                    stop.peak - stop.intent.trail_amount
+                    if stop.intent.trail_amount is not None
+                    else stop.peak * (1.0 - (stop.intent.trail_percent or 0.0) / 100.0)
+                )
+                if bar.low <= trigger_px:
+                    fill_px = min(bar.open, trigger_px) if bar.open <= trigger_px else trigger_px
+                    triggered.append((stop.intent, fill_px))
+                else:
+                    remaining_stops.append(stop)
+            else:  # BUY
+                stop.trough = min(stop.trough, bar.low)
+                trigger_px = (
+                    stop.trough + stop.intent.trail_amount
+                    if stop.intent.trail_amount is not None
+                    else stop.trough * (1.0 + (stop.intent.trail_percent or 0.0) / 100.0)
+                )
+                if bar.high >= trigger_px:
+                    fill_px = max(bar.open, trigger_px) if bar.open >= trigger_px else trigger_px
+                    triggered.append((stop.intent, fill_px))
+                else:
+                    remaining_stops.append(stop)
+        resting_stops = remaining_stops
+
+        triggered.sort(key=lambda item: (0 if item[0].side is OrderSide.SELL else 1))
+        for intent, px in triggered:
+            _fill(strategy, result, intent, px, bar.ts)
+
         due = [q for q in queue if q[0] <= i]
         queue = [q for q in queue if q[0] > i]
         due.sort(key=lambda item: (0 if item[1].side is OrderSide.SELL else 1))
@@ -71,16 +118,21 @@ def replay(strategy: Strategy, bars: Iterable[Bar], fill_delay: int = 0) -> Repl
         intents = strategy.drain_intents()
         for intent in intents:
             result.intents.append(intent)
+            if intent.order_type is OrderType.TRAILING_STOP:
+                ref = bar.close
+                resting_stops.append(_RestingTrailingStop(intent, peak=ref, trough=ref))
+            elif fill_delay == 0:
+                pass
+            else:
+                queue.append((i + fill_delay, intent))
         if fill_delay == 0:
+            immediate = [it for it in intents if it.order_type is not OrderType.TRAILING_STOP]
             intents_to_fill = sorted(
-                intents, key=lambda it: (0 if it.side is OrderSide.SELL else 1)
+                immediate, key=lambda it: (0 if it.side is OrderSide.SELL else 1)
             )
             for intent in intents_to_fill:
                 px = last_close.get(intent.instrument_id, bar.close)
                 _fill(strategy, result, intent, px, bar.ts)
-        else:
-            for intent in intents:
-                queue.append((i + fill_delay, intent))
     strategy.on_stop()
     return result
 
@@ -118,15 +170,52 @@ class BarCloseFills:
         self._last_price: float | None = None
         self._next_ts = 0
         self._fills: list[Trade] = []
+        self._resting_trailing: list[tuple[str, OrderIntent, float, float]] = []
 
     def on_event(self, event: Any, ts_init: int) -> None:
         if isinstance(event, Bar):
             self._last_price = event.close
+            remaining = []
+            for order_id, intent, peak, trough in self._resting_trailing:
+                if intent.instrument_id != event.instrument_id:
+                    remaining.append((order_id, intent, peak, trough))
+                    continue
+                if intent.side is OrderSide.SELL:
+                    peak = max(peak, event.high)
+                    trigger = (
+                        peak - intent.trail_amount
+                        if intent.trail_amount is not None
+                        else peak * (1.0 - (intent.trail_percent or 0.0) / 100.0)
+                    )
+                    if event.low <= trigger:
+                        px = min(event.open, trigger) if event.open <= trigger else trigger
+                        self._fill_order(order_id, intent, px, event.ts)
+                    else:
+                        remaining.append((order_id, intent, peak, trough))
+                else:
+                    trough = min(trough, event.low)
+                    trigger = (
+                        trough + intent.trail_amount
+                        if intent.trail_amount is not None
+                        else trough * (1.0 + (intent.trail_percent or 0.0) / 100.0)
+                    )
+                    if event.high >= trigger:
+                        px = max(event.open, trigger) if event.open >= trigger else trigger
+                        self._fill_order(order_id, intent, px, event.ts)
+                    else:
+                        remaining.append((order_id, intent, peak, trough))
+            self._resting_trailing = remaining
 
     def submit(self, order_id: str, intent: OrderIntent, ts: int) -> None:
         if self._last_price is None:
             raise RuntimeError(f"order {order_id} submitted before any bar: no price to fill at")
-        costs = self._costs(intent.quantity, self._last_price)
+        if intent.order_type is OrderType.TRAILING_STOP:
+            self._resting_trailing.append((order_id, intent, self._last_price, self._last_price))
+            return
+        self._fill_order(order_id, intent, self._last_price, ts)
+
+    def _fill_order(self, order_id: str, intent: OrderIntent, price: float, ts: int) -> None:
+        costs = self._costs(intent.quantity, price)
         fill_ts = max(self._next_ts, ts)
         self._next_ts = fill_ts + 1
         self._fills.append(
@@ -134,7 +223,7 @@ class BarCloseFills:
                 intent.instrument_id,
                 intent.side,
                 intent.quantity,
-                self._last_price,
+                price,
                 fill_ts,
                 order_id,
                 costs=costs,

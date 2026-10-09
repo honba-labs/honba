@@ -240,6 +240,7 @@ impl RFill {
 }
 
 /// Rust-backed OrderIntent. Mirrors `honba_strategy::OrderIntent`.
+/// Rust-backed OrderIntent. Mirrors `honba_strategy::OrderIntent`.
 ///
 /// `price` is the limit price (limit and stop-limit orders); `trigger_price`
 /// is the stop trigger (stop-market and stop-limit orders). The constructor
@@ -262,6 +263,10 @@ pub struct ROrderIntent {
     #[pyo3(get)]
     pub trigger_price: Option<f64>,
     #[pyo3(get)]
+    pub trail_amount: Option<f64>,
+    #[pyo3(get)]
+    pub trail_percent: Option<f64>,
+    #[pyo3(get)]
     pub time_in_force: String,
 }
 
@@ -269,7 +274,7 @@ pub struct ROrderIntent {
 #[allow(clippy::useless_conversion)]
 impl ROrderIntent {
     #[new]
-    #[pyo3(signature = (symbol, side, quantity, order_type="market", price=None, time_in_force="day", exchange="NSE", trigger_price=None))]
+    #[pyo3(signature = (symbol, side, quantity, order_type="market", price=None, time_in_force="day", exchange="NSE", trigger_price=None, trail_amount=None, trail_percent=None))]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         symbol: String,
@@ -280,6 +285,8 @@ impl ROrderIntent {
         time_in_force: &str,
         exchange: &str,
         trigger_price: Option<f64>,
+        trail_amount: Option<f64>,
+        trail_percent: Option<f64>,
     ) -> PyResult<Self> {
         let norm_type = match order_type.to_lowercase().as_str() {
             "stop" => "stop_market".to_string(),
@@ -293,6 +300,8 @@ impl ROrderIntent {
             order_type: norm_type,
             price,
             trigger_price,
+            trail_amount,
+            trail_percent,
             time_in_force: time_in_force.to_lowercase(),
         };
         let rust = intent
@@ -307,7 +316,7 @@ impl ROrderIntent {
     #[pyo3(signature = (symbol, quantity, exchange="NSE"))]
     pub fn market_buy(symbol: String, quantity: f64, exchange: &str) -> PyResult<Self> {
         Self::new(
-            symbol, "buy", quantity, "market", None, "day", exchange, None,
+            symbol, "buy", quantity, "market", None, "day", exchange, None, None, None,
         )
     }
 
@@ -315,7 +324,7 @@ impl ROrderIntent {
     #[pyo3(signature = (symbol, quantity, exchange="NSE"))]
     pub fn market_sell(symbol: String, quantity: f64, exchange: &str) -> PyResult<Self> {
         Self::new(
-            symbol, "sell", quantity, "market", None, "day", exchange, None,
+            symbol, "sell", quantity, "market", None, "day", exchange, None, None, None,
         )
     }
 
@@ -331,6 +340,8 @@ impl ROrderIntent {
             "day",
             exchange,
             None,
+            None,
+            None,
         )
     }
 
@@ -345,6 +356,8 @@ impl ROrderIntent {
             Some(price),
             "day",
             exchange,
+            None,
+            None,
             None,
         )
     }
@@ -367,6 +380,8 @@ impl ROrderIntent {
             "day",
             exchange,
             t,
+            None,
+            None,
         )
     }
 
@@ -388,6 +403,8 @@ impl ROrderIntent {
             "day",
             exchange,
             t,
+            None,
+            None,
         )
     }
 
@@ -401,7 +418,7 @@ impl ROrderIntent {
         exchange: &str,
     ) -> PyResult<Self> {
         let (p, t) = (Some(limit_price), Some(trigger_price));
-        Self::new(symbol, "buy", quantity, "stop_limit", p, "day", exchange, t)
+        Self::new(symbol, "buy", quantity, "stop_limit", p, "day", exchange, t, None, None)
     }
 
     #[staticmethod]
@@ -423,6 +440,54 @@ impl ROrderIntent {
             "day",
             exchange,
             t,
+            None,
+            None,
+        )
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (symbol, quantity, *, trail_amount=None, trail_percent=None, exchange="NSE"))]
+    pub fn trailing_stop_buy(
+        symbol: String,
+        quantity: f64,
+        trail_amount: Option<f64>,
+        trail_percent: Option<f64>,
+        exchange: &str,
+    ) -> PyResult<Self> {
+        Self::new(
+            symbol,
+            "buy",
+            quantity,
+            "trailing_stop",
+            None,
+            "day",
+            exchange,
+            None,
+            trail_amount,
+            trail_percent,
+        )
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (symbol, quantity, *, trail_amount=None, trail_percent=None, exchange="NSE"))]
+    pub fn trailing_stop_sell(
+        symbol: String,
+        quantity: f64,
+        trail_amount: Option<f64>,
+        trail_percent: Option<f64>,
+        exchange: &str,
+    ) -> PyResult<Self> {
+        Self::new(
+            symbol,
+            "sell",
+            quantity,
+            "trailing_stop",
+            None,
+            "day",
+            exchange,
+            None,
+            trail_amount,
+            trail_percent,
         )
     }
 
@@ -447,6 +512,7 @@ impl ROrderIntent {
             "limit" => RustOrderType::Limit,
             "stop" | "stop_market" => RustOrderType::StopMarket,
             "stop_limit" => RustOrderType::StopLimit,
+            "trailing_stop" => RustOrderType::TrailingStop,
             other => return Err(format!("unknown order type: {other}")),
         };
         let tif = match self.time_in_force.as_str() {
@@ -464,6 +530,8 @@ impl ROrderIntent {
             order_type,
             price: self.price,
             trigger_price: self.trigger_price,
+            trail_amount: self.trail_amount,
+            trail_percent: self.trail_percent,
             time_in_force: tif,
         })
     }

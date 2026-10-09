@@ -504,6 +504,7 @@ impl NativeSim {
             "limit" => OrderType::Limit,
             "stop_market" => OrderType::StopMarket,
             "stop_limit" => OrderType::StopLimit,
+            "trailing_stop" => OrderType::TrailingStop,
             other => return Err(SimError::value(format!("unknown order type {other:?}"))),
         };
         let ts = UnixNanos::from_u64(o.ts);

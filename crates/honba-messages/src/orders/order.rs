@@ -38,6 +38,8 @@ crate::enum_with_all! {
         StopMarket,
         /// Become a limit order when a stop price is touched.
         StopLimit,
+        /// Trailing stop: market order once triggered.
+        TrailingStop,
     }
 }
 
@@ -127,6 +129,20 @@ pub struct Order {
     /// Stop trigger price; `None` unless the order is a stop order.
     #[serde(serialize_with = "serialize_finite_opt")]
     pub(crate) trigger_price: Option<f64>,
+    /// Absolute trailing stop distance (price units).
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_finite_opt"
+    )]
+    pub(crate) trail_amount: Option<f64>,
+    /// Percentage trailing stop distance (0 < p < 100).
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_finite_opt"
+    )]
+    pub(crate) trail_percent: Option<f64>,
     pub(crate) status: OrderStatus,
     pub(crate) time_in_force: TimeInForce,
     pub(crate) ts_event: UnixNanos,
@@ -151,6 +167,10 @@ struct OrderRepr {
     quantity: f64,
     price: Option<f64>,
     trigger_price: Option<f64>,
+    #[serde(default)]
+    trail_amount: Option<f64>,
+    #[serde(default)]
+    trail_percent: Option<f64>,
     status: OrderStatus,
     time_in_force: TimeInForce,
     ts_event: UnixNanos,
@@ -171,6 +191,8 @@ impl TryFrom<OrderRepr> for Order {
             quantity: r.quantity,
             price: r.price,
             trigger_price: r.trigger_price,
+            trail_amount: r.trail_amount,
+            trail_percent: r.trail_percent,
             status: r.status,
             time_in_force: r.time_in_force,
             ts_event: r.ts_event,
@@ -204,6 +226,8 @@ impl Order {
             quantity,
             price,
             trigger_price: None,
+            trail_amount: None,
+            trail_percent: None,
             status: OrderStatus::Initialized,
             time_in_force,
             ts_event,
@@ -223,6 +247,23 @@ impl Order {
         positive("quantity", self.quantity)?;
         finite_opt("price", self.price)?;
         finite_opt("trigger_price", self.trigger_price)?;
+        finite_opt("trail_amount", self.trail_amount)?;
+        finite_opt("trail_percent", self.trail_percent)?;
+        if let Some(amt) = self.trail_amount {
+            if amt <= 0.0 {
+                return Err(InvariantError::NotPositive {
+                    field: "trail_amount",
+                    value: amt,
+                });
+            }
+        }
+        if let Some(pct) = self.trail_percent {
+            if !(0.0 < pct && pct < 100.0) {
+                return Err(InvariantError::OutsideRange {
+                    field: "trail_percent",
+                });
+            }
+        }
         if self.cancel_requested
             && !matches!(
                 self.status,
@@ -271,6 +312,16 @@ impl Order {
         self.trigger_price
     }
 
+    /// Returns the trail amount, if any.
+    pub fn trail_amount(&self) -> Option<f64> {
+        self.trail_amount
+    }
+
+    /// Returns the trail percent, if any.
+    pub fn trail_percent(&self) -> Option<f64> {
+        self.trail_percent
+    }
+
     /// Returns the current status.
     pub fn status(&self) -> OrderStatus {
         self.status
@@ -314,6 +365,18 @@ impl Order {
     /// ```
     pub fn with_trigger_price(mut self, trigger_price: f64) -> Self {
         self.trigger_price = Some(trigger_price);
+        self
+    }
+
+    /// Sets the trail amount, returning `self` for chaining.
+    pub fn with_trail_amount(mut self, trail_amount: f64) -> Self {
+        self.trail_amount = Some(trail_amount);
+        self
+    }
+
+    /// Sets the trail percent, returning `self` for chaining.
+    pub fn with_trail_percent(mut self, trail_percent: f64) -> Self {
+        self.trail_percent = Some(trail_percent);
         self
     }
 

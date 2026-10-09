@@ -17,6 +17,10 @@ fn constructors_are_valid() {
         OrderIntent::stop_sell(any_instrument(), 1.0, 10.0),
         OrderIntent::stop_limit_buy(any_instrument(), 1.0, 10.0, 10.5),
         OrderIntent::stop_limit_sell(any_instrument(), 1.0, 10.0, 9.5),
+        OrderIntent::trailing_stop_amount_buy(any_instrument(), 1.0, 15.0),
+        OrderIntent::trailing_stop_percent_buy(any_instrument(), 1.0, 2.5),
+        OrderIntent::trailing_stop_amount_sell(any_instrument(), 1.0, 15.0),
+        OrderIntent::trailing_stop_percent_sell(any_instrument(), 1.0, 2.5),
     ] {
         assert_eq!(i.validate(), Ok(()), "{i:?}");
     }
@@ -28,6 +32,21 @@ fn stop_constructors_set_trigger_not_limit() {
     assert_eq!(i.order_type, OrderType::StopMarket);
     assert_eq!((i.price, i.trigger_price), (None, Some(99.0)));
     assert_eq!(i.side, OrderSide::Sell);
+}
+
+#[test]
+fn trailing_stop_constructors_set_trail_values() {
+    let amt_sell = OrderIntent::trailing_stop_amount_sell(any_instrument(), 2.0, 12.0);
+    assert_eq!(amt_sell.order_type, OrderType::TrailingStop);
+    assert_eq!(amt_sell.trail_amount, Some(12.0));
+    assert_eq!(amt_sell.trail_percent, None);
+    assert_eq!(amt_sell.side, OrderSide::Sell);
+
+    let pct_buy = OrderIntent::trailing_stop_percent_buy(any_instrument(), 5.0, 3.5);
+    assert_eq!(pct_buy.order_type, OrderType::TrailingStop);
+    assert_eq!(pct_buy.trail_amount, None);
+    assert_eq!(pct_buy.trail_percent, Some(3.5));
+    assert_eq!(pct_buy.side, OrderSide::Buy);
 }
 
 #[test]
@@ -84,6 +103,75 @@ fn validate_rejects_each_broken_rule() {
             },
             UnexpectedTriggerPrice(OrderType::Limit),
         ),
+        (
+            OrderIntent {
+                trail_amount: Some(5.0),
+                ..base.clone()
+            },
+            UnexpectedTrailAmount(OrderType::StopLimit),
+        ),
+        (
+            OrderIntent {
+                trail_percent: Some(2.0),
+                ..base.clone()
+            },
+            UnexpectedTrailPercent(OrderType::StopLimit),
+        ),
+        (
+            OrderIntent {
+                order_type: OrderType::TrailingStop,
+                price: None,
+                trigger_price: None,
+                trail_amount: None,
+                trail_percent: None,
+                ..base.clone()
+            },
+            MissingTrail(OrderType::TrailingStop),
+        ),
+        (
+            OrderIntent {
+                order_type: OrderType::TrailingStop,
+                price: None,
+                trigger_price: None,
+                trail_amount: Some(5.0),
+                trail_percent: Some(2.0),
+                ..base.clone()
+            },
+            ConflictingTrail(OrderType::TrailingStop),
+        ),
+        (
+            OrderIntent {
+                order_type: OrderType::TrailingStop,
+                price: None,
+                trigger_price: None,
+                trail_amount: Some(-1.0),
+                trail_percent: None,
+                ..base.clone()
+            },
+            InvalidTrailAmount(-1.0),
+        ),
+        (
+            OrderIntent {
+                order_type: OrderType::TrailingStop,
+                price: None,
+                trigger_price: None,
+                trail_amount: None,
+                trail_percent: Some(150.0),
+                ..base.clone()
+            },
+            InvalidTrailPercent(150.0),
+        ),
+        (
+            OrderIntent {
+                order_type: OrderType::TrailingStop,
+                price: Some(100.0),
+                trigger_price: None,
+                trail_amount: Some(5.0),
+                trail_percent: None,
+                ..base.clone()
+            },
+            UnexpectedPrice(OrderType::TrailingStop),
+        ),
     ];
     for (intent, err) in cases {
         assert_eq!(intent.validate(), Err(err), "{intent:?}");
@@ -97,16 +185,32 @@ fn validate_rejects_each_broken_rule() {
 }
 
 #[test]
-fn into_order_keeps_trigger_price() {
+fn into_order_keeps_trigger_price_and_trail() {
     let order = OrderIntent::stop_buy(any_instrument(), 1.0, 10.0)
         .into_order(OrderId::new("O"), 1.into())
         .unwrap();
     assert_eq!(order.trigger_price(), Some(10.0));
     assert_eq!(order.price(), None);
+    assert_eq!(order.trail_amount(), None);
+
     let order = OrderIntent::market_buy(any_instrument(), 1.0)
         .into_order(OrderId::new("O"), 1.into())
         .unwrap();
     assert_eq!(order.trigger_price(), None);
+
+    let ts_amt = OrderIntent::trailing_stop_amount_sell(any_instrument(), 1.0, 12.5)
+        .into_order(OrderId::new("O"), 1.into())
+        .unwrap();
+    assert_eq!(ts_amt.order_type(), OrderType::TrailingStop);
+    assert_eq!(ts_amt.trail_amount(), Some(12.5));
+    assert_eq!(ts_amt.trail_percent(), None);
+
+    let ts_pct = OrderIntent::trailing_stop_percent_buy(any_instrument(), 1.0, 3.0)
+        .into_order(OrderId::new("O"), 1.into())
+        .unwrap();
+    assert_eq!(ts_pct.order_type(), OrderType::TrailingStop);
+    assert_eq!(ts_pct.trail_amount(), None);
+    assert_eq!(ts_pct.trail_percent(), Some(3.0));
 }
 
 #[test]

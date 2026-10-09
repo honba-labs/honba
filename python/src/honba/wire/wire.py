@@ -262,6 +262,8 @@ class Order(_Wire):
     ts_event: UnixNanos
     ts_init: UnixNanos
     cancel_requested: bool = False
+    trail_amount: Float | None = None
+    trail_percent: Float | None = None
 
     @model_validator(mode="after")
     def _check_cancel_requested(self) -> Order:
@@ -271,10 +273,15 @@ class Order(_Wire):
         return self
 
     @model_serializer(mode="wrap")
-    def _omit_false_cancel_requested(self, handler: Any) -> Any:
+    def _omit_optional(self, handler: Any) -> Any:
         data = handler(self)
-        if isinstance(data, dict) and not data.get("cancel_requested", False):
-            data.pop("cancel_requested", None)
+        if isinstance(data, dict):
+            if not data.get("cancel_requested", False):
+                data.pop("cancel_requested", None)
+            if data.get("trail_amount") is None:
+                data.pop("trail_amount", None)
+            if data.get("trail_percent") is None:
+                data.pop("trail_percent", None)
         return data
 
 
@@ -285,12 +292,30 @@ class OrderIntent(_Command):
     order_type: WireOrderType
     price: Float | None = None
     trigger_price: Float | None = None
+    trail_amount: Float | None = None
+    trail_percent: Float | None = None
     time_in_force: WireTimeInForce
+
+    @model_serializer(mode="wrap")
+    def _omit_none_trail(self, handler: Any) -> Any:
+        data = handler(self)
+        if isinstance(data, dict):
+            if data.get("trail_amount") is None:
+                data.pop("trail_amount", None)
+            if data.get("trail_percent") is None:
+                data.pop("trail_percent", None)
+        return data
 
     @model_validator(mode="after")
     def _check_invariants(self) -> OrderIntent:
         _order.validate_intent(
-            self.side, self.quantity, self.order_type, self.price, self.trigger_price
+            self.side,
+            self.quantity,
+            self.order_type,
+            self.price,
+            self.trigger_price,
+            self.trail_amount,
+            self.trail_percent,
         )
         return self
 
@@ -303,6 +328,8 @@ class OrderIntent(_Command):
             order_type=value.order_type,
             price=value.price,
             trigger_price=value.trigger_price,
+            trail_amount=value.trail_amount,
+            trail_percent=value.trail_percent,
             time_in_force=value.time_in_force,
         )
 
@@ -315,6 +342,8 @@ class OrderIntent(_Command):
             self.price,
             self.time_in_force,
             self.trigger_price,
+            trail_amount=self.trail_amount,
+            trail_percent=self.trail_percent,
         )
 
 

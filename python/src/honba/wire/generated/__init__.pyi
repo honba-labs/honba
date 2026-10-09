@@ -162,6 +162,8 @@ class EventOrder(TypedDict):
     side: OrderSide
     status: OrderStatus
     time_in_force: TimeInForce
+    trail_amount: NotRequired[float | None]
+    trail_percent: NotRequired[float | None]
     trigger_price: NotRequired[float | None]
     ts_event: UnixNanos
     ts_init: UnixNanos
@@ -293,6 +295,8 @@ class Order:
     side: OrderSide
     status: OrderStatus
     time_in_force: TimeInForce
+    trail_amount: float | None = None
+    trail_percent: float | None = None
     trigger_price: float | None = None
     ts_event: UnixNanos
     ts_init: UnixNanos
@@ -306,6 +310,8 @@ class OrderIntent:
     quantity: float
     side: OrderSide
     time_in_force: TimeInForce
+    trail_amount: float | None = None
+    trail_percent: float | None = None
     trigger_price: float | None = None
 
 class OrderRateLimit:
@@ -316,7 +322,7 @@ OrderSide = Literal["buy", "sell", "no_order_side"]
 
 OrderStatus = Literal["initialized", "submitted", "accepted", "partially_filled", "filled", "cancelled", "rejected", "expired"]
 
-OrderType = Literal["market", "limit", "stop_market", "stop_limit"]
+OrderType = Literal["market", "limit", "stop_market", "stop_limit", "trailing_stop"]
 
 class OrdersRequest:
     instrument_id: InstrumentId | None = None

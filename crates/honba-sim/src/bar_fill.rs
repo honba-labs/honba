@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use honba_engine::{AlgoError, ExecutionEngine, Handler, LegacyDrains, OrderRejection, Result};
 use honba_entities::{Currency, ExecutionEvent, Money, Trade};
-use honba_messages::{Event, Order, OrderId, UnixNanos};
+use honba_messages::{Event, Order, OrderId, OrderSide, OrderType, UnixNanos};
 
 /// Largest accepted flat cost per fill.
 pub const MAX_FLAT_COST: f64 = 1e9;
@@ -77,9 +77,17 @@ impl FillCosts {
     }
 }
 
+#[derive(Clone)]
+struct RestingTrailingStop {
+    order: Order,
+    peak: f64,
+    trough: f64,
+}
+
 #[derive(Default)]
 struct Inner {
     last_price: Option<f64>,
+    resting_trailing: Vec<RestingTrailingStop>,
     events: Vec<ExecutionEvent>,
     legacy: LegacyDrains,
     next_ts: u64,
@@ -182,7 +190,74 @@ impl Handler for BarFillEngine {
         _ts_init: UnixNanos,
     ) -> Result<honba_engine::EngineOutput> {
         if let Event::Bar(b) = event {
-            self.inner.lock().unwrap().last_price = Some(b.close());
+            let mut inner = self.inner.lock().unwrap();
+            inner.last_price = Some(b.close());
+            let iid = b.bar_type().instrument_id();
+            let mut triggered = Vec::new();
+            inner.resting_trailing.retain_mut(|stop| {
+                if stop.order.instrument_id() != iid {
+                    return true;
+                }
+                match stop.order.side() {
+                    OrderSide::Sell => {
+                        stop.peak = stop.peak.max(b.high());
+                        let trigger = if let Some(amt) = stop.order.trail_amount() {
+                            stop.peak - amt
+                        } else if let Some(pct) = stop.order.trail_percent() {
+                            stop.peak * (1.0 - pct / 100.0)
+                        } else {
+                            stop.peak
+                        };
+                        if b.low() <= trigger {
+                            let px = if b.open() <= trigger { b.open() } else { trigger };
+                            triggered.push((stop.order.clone(), px));
+                            false
+                        } else {
+                            true
+                        }
+                    }
+                    OrderSide::Buy => {
+                        stop.trough = stop.trough.min(b.low());
+                        let trigger = if let Some(amt) = stop.order.trail_amount() {
+                            stop.trough + amt
+                        } else if let Some(pct) = stop.order.trail_percent() {
+                            stop.trough * (1.0 + pct / 100.0)
+                        } else {
+                            stop.trough
+                        };
+                        if b.high() >= trigger {
+                            let px = if b.open() >= trigger { b.open() } else { trigger };
+                            triggered.push((stop.order.clone(), px));
+                            false
+                        } else {
+                            true
+                        }
+                    }
+                    OrderSide::NoOrderSide | _ => false,
+                }
+            });
+            for (order, price) in triggered {
+                let costs = self.costs.of(order.quantity(), price, self.currency)?;
+                let ts = UnixNanos::from_u64(inner.next_ts.max(b.ts_event().as_u64()));
+                inner.next_ts = ts.as_u64() + 1;
+                let trade = Trade::new(
+                    OrderId::new(order.order_id().as_str()),
+                    order.instrument_id().clone(),
+                    order.side(),
+                    order.quantity(),
+                    price,
+                    self.currency,
+                    ts,
+                    ts,
+                )
+                .with_costs(costs);
+                inner.events.push(ExecutionEvent::Fill {
+                    trade,
+                    cum_qty: order.quantity(),
+                    complete: true,
+                    venue_order_id: None,
+                });
+            }
         }
         Ok(honba_engine::EngineOutput::None)
     }
@@ -191,6 +266,15 @@ impl Handler for BarFillEngine {
 impl ExecutionEngine for BarFillEngine {
     fn submit(&mut self, order: Order) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
+        if order.order_type() == OrderType::TrailingStop {
+            let ref_px = inner.last_price.unwrap_or(0.0);
+            inner.resting_trailing.push(RestingTrailingStop {
+                order,
+                peak: ref_px,
+                trough: ref_px,
+            });
+            return Ok(());
+        }
         let price = inner.last_price.unwrap_or(0.0);
         // Costs first: a fill whose cost cannot be represented is refused
         // before it consumes a timestamp or reaches the fill buffer.
@@ -217,7 +301,9 @@ impl ExecutionEngine for BarFillEngine {
         Ok(())
     }
 
-    fn cancel(&mut self, _order_id: &str, _now: UnixNanos) -> Result<()> {
+    fn cancel(&mut self, order_id: &str, _now: UnixNanos) -> Result<()> {
+        let mut inner = self.inner.lock().unwrap();
+        inner.resting_trailing.retain(|s| s.order.order_id().as_str() != order_id);
         Ok(())
     }
 

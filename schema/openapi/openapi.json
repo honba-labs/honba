@@ -1208,6 +1208,22 @@
               "time_in_force": {
                 "$ref": "#/components/schemas/TimeInForce"
               },
+              "trail_amount": {
+                "description": "Absolute trailing stop distance (price units).",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "trail_percent": {
+                "description": "Percentage trailing stop distance (0 < p < 100).",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
               "trigger_price": {
                 "description": "Stop trigger price; `None` unless the order is a stop order.",
                 "format": "double",
@@ -2129,6 +2145,22 @@
           "time_in_force": {
             "$ref": "#/components/schemas/TimeInForce"
           },
+          "trail_amount": {
+            "description": "Absolute trailing stop distance (price units).",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "trail_percent": {
+            "description": "Percentage trailing stop distance (0 < p < 100).",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
           "trigger_price": {
             "description": "Stop trigger price; `None` unless the order is a stop order.",
             "format": "double",
@@ -2162,7 +2194,7 @@
         "type": "string"
       },
       "OrderIntent": {
-        "description": "A strategy's desire to trade, before it becomes a concrete [`Order`].\n\nStrategies emit intents; the runner converts them into orders with unique ids and timestamps. This indirection keeps strategies free of bookkeeping they shouldn't care about.\n\nPrice fields by order type (checked by [`OrderIntent::validate`], on deserialization, and by [`OrderIntent::into_order`], so an invalid intent built with a constructor or struct literal never becomes an [`Order`]):\n\n| `order_type`  | `price` (limit) | `trigger_price` (stop) | |---------------|-----------------|------------------------| | `Market`      | none            | none                   | | `Limit`       | required        | none                   | | `StopMarket`  | none            | required               | | `StopLimit`   | required        | required               |\n\n``` use honba_strategy::OrderIntent; use honba_messages::{InstrumentId, OrderSide, OrderType, Exchange};\n\nlet intent = OrderIntent::market_buy( InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), 75.0, ); assert_eq!(intent.side, OrderSide::Buy); assert_eq!(intent.order_type, OrderType::Market); ```",
+        "description": "A strategy's desire to trade, before it becomes a concrete [`Order`].\n\nStrategies emit intents; the runner converts them into orders with unique ids and timestamps. This indirection keeps strategies free of bookkeeping they shouldn't care about.\n\nPrice fields by order type (checked by [`OrderIntent::validate`], on deserialization, and by [`OrderIntent::into_order`], so an invalid intent built with a constructor or struct literal never becomes an [`Order`]):\n\n| `order_type`    | `price` (limit) | `trigger_price` (stop) | `trail_*` (trailing stop) | |-----------------|-----------------|------------------------|---------------------------| | `Market`        | none            | none                   | none                      | | `Limit`         | required        | none                   | none                      | | `StopMarket`    | none            | required               | none                      | | `StopLimit`     | required        | required               | none                      | | `TrailingStop`  | none            | none                   | exactly one required      |\n\n``` use honba_strategy::OrderIntent; use honba_messages::{InstrumentId, OrderSide, OrderType, Exchange};\n\nlet intent = OrderIntent::market_buy( InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), 75.0, ); assert_eq!(intent.side, OrderSide::Buy); assert_eq!(intent.order_type, OrderType::Market); ```",
         "properties": {
           "instrument_id": {
             "allOf": [
@@ -2208,6 +2240,22 @@
               }
             ],
             "description": "How long the order remains active."
+          },
+          "trail_amount": {
+            "description": "Absolute trailing stop distance (price units).",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "trail_percent": {
+            "description": "Percentage trailing stop distance (0 < p < 100).",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "trigger_price": {
             "description": "Stop trigger price, for `StopMarket` and `StopLimit` orders.",
@@ -2365,6 +2413,13 @@
             "description": "Become a limit order when a stop price is touched.",
             "enum": [
               "stop_limit"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Trailing stop: market order once triggered.",
+            "enum": [
+              "trailing_stop"
             ],
             "type": "string"
           }

@@ -269,3 +269,40 @@ fn a_cost_that_cannot_be_represented_fails_the_fill_instead_of_charging_zero() {
     assert!(err.to_string().contains("cost"), "{err}");
     assert!(exec.drain_fills().unwrap().is_empty());
 }
+
+#[test]
+fn trailing_stop_sell_rests_and_triggers_on_breach() {
+    use honba_messages::{Bar, BarAggregation, BarSpecification, BarType, Event, PriceType};
+
+    let mut exec = BarFillEngine::new();
+    observe(&mut exec, 100.0, 1);
+
+    // Trailing stop sell with trail amount 5.0
+    let ts_order = order("TS-1", OrderSide::Sell, OrderType::TrailingStop, 10.0, None, 1)
+        .with_trail_amount(5.0);
+    exec.submit(ts_order).unwrap();
+    // Initially rests, no fill yet
+    assert!(exec.drain_fills().unwrap().is_empty());
+
+    let bt = BarType::new(
+        any_instrument(),
+        BarSpecification::new(1, BarAggregation::Minute, PriceType::Last),
+    );
+
+    // Bar 2: high moves up to 110.0, low is 106.0. Peak becomes 110.0, trigger is 105.0.
+    // Low 106.0 does not breach 105.0.
+    let t2 = UnixNanos::from_u64(2);
+    let bar2 = Bar::new(bt.clone(), 107.0, 110.0, 106.0, 108.0, 1.0, t2, t2);
+    exec.on_event(&Event::Bar(bar2), t2).unwrap();
+    assert!(exec.drain_fills().unwrap().is_empty());
+
+    // Bar 3: drops to 104.0, breaching 105.0!
+    let t3 = UnixNanos::from_u64(3);
+    let bar3 = Bar::new(bt, 107.0, 107.0, 104.0, 105.0, 1.0, t3, t3);
+    exec.on_event(&Event::Bar(bar3), t3).unwrap();
+    let fills = exec.drain_fills().unwrap();
+    assert_eq!(fills.len(), 1);
+    assert_eq!(fills[0].price(), 105.0);
+    assert_eq!(fills[0].quantity(), 10.0);
+    assert_eq!(fills[0].side(), OrderSide::Sell);
+}

@@ -16,12 +16,13 @@ use serde::{Deserialize, Serialize};
 /// deserialization, and by [`OrderIntent::into_order`], so an invalid intent
 /// built with a constructor or struct literal never becomes an [`Order`]):
 ///
-/// | `order_type`  | `price` (limit) | `trigger_price` (stop) |
-/// |---------------|-----------------|------------------------|
-/// | `Market`      | none            | none                   |
-/// | `Limit`       | required        | none                   |
-/// | `StopMarket`  | none            | required               |
-/// | `StopLimit`   | required        | required               |
+/// | `order_type`    | `price` (limit) | `trigger_price` (stop) | `trail_*` (trailing stop) |
+/// |-----------------|-----------------|------------------------|---------------------------|
+/// | `Market`        | none            | none                   | none                      |
+/// | `Limit`         | required        | none                   | none                      |
+/// | `StopMarket`    | none            | required               | none                      |
+/// | `StopLimit`     | required        | required               | none                      |
+/// | `TrailingStop`  | none            | none                   | exactly one required      |
 ///
 /// ```
 /// use honba_strategy::OrderIntent;
@@ -49,6 +50,12 @@ pub struct OrderIntent {
     pub price: Option<f64>,
     /// Stop trigger price, for `StopMarket` and `StopLimit` orders.
     pub trigger_price: Option<f64>,
+    /// Absolute trailing stop distance (price units).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trail_amount: Option<f64>,
+    /// Percentage trailing stop distance (0 < p < 100).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trail_percent: Option<f64>,
     /// How long the order remains active.
     pub time_in_force: TimeInForce,
 }
@@ -71,6 +78,18 @@ pub enum IntentError {
     MissingTriggerPrice(OrderType),
     /// The order type takes no trigger price but one was given.
     UnexpectedTriggerPrice(OrderType),
+    /// The order type takes no trail_amount but one was given.
+    UnexpectedTrailAmount(OrderType),
+    /// The order type takes no trail_percent but one was given.
+    UnexpectedTrailPercent(OrderType),
+    /// Trailing stop order requires exactly one of trail_amount or trail_percent.
+    MissingTrail(OrderType),
+    /// Trailing stop order cannot have both trail_amount and trail_percent.
+    ConflictingTrail(OrderType),
+    /// Trail amount is non-positive or not finite.
+    InvalidTrailAmount(f64),
+    /// Trail percent is outside (0, 100) or not finite.
+    InvalidTrailPercent(f64),
 }
 
 impl fmt::Display for IntentError {
@@ -86,6 +105,24 @@ impl fmt::Display for IntentError {
             }
             IntentError::UnexpectedTriggerPrice(t) => {
                 write!(f, "{t:?} order takes no trigger_price")
+            }
+            IntentError::UnexpectedTrailAmount(t) => {
+                write!(f, "{t:?} order takes no trail_amount")
+            }
+            IntentError::UnexpectedTrailPercent(t) => {
+                write!(f, "{t:?} order takes no trail_percent")
+            }
+            IntentError::MissingTrail(t) | IntentError::ConflictingTrail(t) => {
+                write!(
+                    f,
+                    "{t:?} order requires exactly one of trail_amount or trail_percent"
+                )
+            }
+            IntentError::InvalidTrailAmount(amt) => {
+                write!(f, "trail_amount must be finite and positive, got {amt}")
+            }
+            IntentError::InvalidTrailPercent(pct) => {
+                write!(f, "trail_percent must be in (0, 100), got {pct}")
             }
         }
     }
@@ -103,6 +140,10 @@ struct OrderIntentRepr {
     order_type: OrderType,
     price: Option<f64>,
     trigger_price: Option<f64>,
+    #[serde(default)]
+    trail_amount: Option<f64>,
+    #[serde(default)]
+    trail_percent: Option<f64>,
     time_in_force: TimeInForce,
 }
 
@@ -117,6 +158,8 @@ impl TryFrom<OrderIntentRepr> for OrderIntent {
             order_type: r.order_type,
             price: r.price,
             trigger_price: r.trigger_price,
+            trail_amount: r.trail_amount,
+            trail_percent: r.trail_percent,
             time_in_force: r.time_in_force,
         };
         intent.validate()?;
@@ -140,6 +183,8 @@ impl OrderIntent {
             order_type,
             price,
             trigger_price,
+            trail_amount: None,
+            trail_percent: None,
             time_in_force: TimeInForce::Day,
         }
     }
@@ -265,6 +310,82 @@ impl OrderIntent {
         )
     }
 
+    /// A trailing stop buy with optional trail amount or trail percent.
+    pub fn trailing_stop_buy(
+        instrument_id: InstrumentId,
+        quantity: f64,
+        trail_amount: Option<f64>,
+        trail_percent: Option<f64>,
+    ) -> Self {
+        Self {
+            instrument_id,
+            side: OrderSide::Buy,
+            quantity,
+            order_type: OrderType::TrailingStop,
+            price: None,
+            trigger_price: None,
+            trail_amount,
+            trail_percent,
+            time_in_force: TimeInForce::Day,
+        }
+    }
+
+    /// A trailing stop sell with optional trail amount or trail percent.
+    pub fn trailing_stop_sell(
+        instrument_id: InstrumentId,
+        quantity: f64,
+        trail_amount: Option<f64>,
+        trail_percent: Option<f64>,
+    ) -> Self {
+        Self {
+            instrument_id,
+            side: OrderSide::Sell,
+            quantity,
+            order_type: OrderType::TrailingStop,
+            price: None,
+            trigger_price: None,
+            trail_amount,
+            trail_percent,
+            time_in_force: TimeInForce::Day,
+        }
+    }
+
+    /// A trailing stop buy trailing by a fixed amount.
+    pub fn trailing_stop_amount_buy(
+        instrument_id: InstrumentId,
+        quantity: f64,
+        trail_amount: f64,
+    ) -> Self {
+        Self::trailing_stop_buy(instrument_id, quantity, Some(trail_amount), None)
+    }
+
+    /// A trailing stop buy trailing by a percentage.
+    pub fn trailing_stop_percent_buy(
+        instrument_id: InstrumentId,
+        quantity: f64,
+        trail_percent: f64,
+    ) -> Self {
+        Self::trailing_stop_buy(instrument_id, quantity, None, Some(trail_percent))
+    }
+
+    /// A trailing stop sell trailing by a fixed amount.
+    pub fn trailing_stop_amount_sell(
+        instrument_id: InstrumentId,
+        quantity: f64,
+        trail_amount: f64,
+    ) -> Self {
+        Self::trailing_stop_sell(instrument_id, quantity, Some(trail_amount), None)
+    }
+
+    /// A trailing stop sell trailing by a percentage.
+    pub fn trailing_stop_percent_sell(
+        instrument_id: InstrumentId,
+        quantity: f64,
+        trail_percent: f64,
+    ) -> Self {
+        Self::trailing_stop_sell(instrument_id, quantity, None, Some(trail_percent))
+    }
+
     /// Checks the intent's invariants (see the table on [`OrderIntent`]).
     pub fn validate(&self) -> Result<(), IntentError> {
         if !(self.quantity.is_finite() && self.quantity > 0.0) {
@@ -273,7 +394,7 @@ impl OrderIntent {
         if !matches!(self.side, OrderSide::Buy | OrderSide::Sell) {
             return Err(IntentError::NoSide);
         }
-        if [self.price, self.trigger_price]
+        if [self.price, self.trigger_price, self.trail_amount, self.trail_percent]
             .iter()
             .flatten()
             .any(|p| !p.is_finite())
@@ -285,6 +406,7 @@ impl OrderIntent {
             OrderType::Limit => (true, false),
             OrderType::StopMarket => (false, true),
             OrderType::StopLimit => (true, true),
+            OrderType::TrailingStop => (false, false),
             // `OrderType` is non-exhaustive; unknown kinds carry no price rules.
             _ => return Ok(()),
         };
@@ -295,10 +417,35 @@ impl OrderIntent {
             _ => {}
         }
         match (needs_trigger, self.trigger_price.is_some()) {
-            (true, false) => Err(IntentError::MissingTriggerPrice(t)),
-            (false, true) => Err(IntentError::UnexpectedTriggerPrice(t)),
-            _ => Ok(()),
+            (true, false) => return Err(IntentError::MissingTriggerPrice(t)),
+            (false, true) => return Err(IntentError::UnexpectedTriggerPrice(t)),
+            _ => {}
         }
+        if self.order_type == OrderType::TrailingStop {
+            match (self.trail_amount.is_some(), self.trail_percent.is_some()) {
+                (false, false) => return Err(IntentError::MissingTrail(t)),
+                (true, true) => return Err(IntentError::ConflictingTrail(t)),
+                _ => {}
+            }
+            if let Some(amt) = self.trail_amount {
+                if !amt.is_finite() || amt <= 0.0 {
+                    return Err(IntentError::InvalidTrailAmount(amt));
+                }
+            }
+            if let Some(pct) = self.trail_percent {
+                if !pct.is_finite() || !(0.0 < pct && pct < 100.0) {
+                    return Err(IntentError::InvalidTrailPercent(pct));
+                }
+            }
+        } else {
+            if self.trail_amount.is_some() {
+                return Err(IntentError::UnexpectedTrailAmount(t));
+            }
+            if self.trail_percent.is_some() {
+                return Err(IntentError::UnexpectedTrailPercent(t));
+            }
+        }
+        Ok(())
     }
 
     /// Validates the intent and converts it into a concrete order.
@@ -320,7 +467,7 @@ impl OrderIntent {
     /// ```
     pub fn into_order(self, order_id: OrderId, ts: UnixNanos) -> Result<Order, IntentError> {
         self.validate()?;
-        let order = Order::new(
+        let mut order = Order::new(
             order_id,
             self.instrument_id,
             self.side,
@@ -331,9 +478,15 @@ impl OrderIntent {
             ts,
             ts,
         );
-        Ok(match self.trigger_price {
-            Some(trigger) => order.with_trigger_price(trigger),
-            None => order,
-        })
+        if let Some(trigger) = self.trigger_price {
+            order = order.with_trigger_price(trigger);
+        }
+        if let Some(amt) = self.trail_amount {
+            order = order.with_trail_amount(amt);
+        }
+        if let Some(pct) = self.trail_percent {
+            order = order.with_trail_percent(pct);
+        }
+        Ok(order)
     }
 }

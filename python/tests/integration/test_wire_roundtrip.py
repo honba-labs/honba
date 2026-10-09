@@ -100,6 +100,8 @@ def test_strategy_intent_survives_rust_roundtrip():
         OrderIntent.limit_sell(nifty, 25, 22100.5),
         OrderIntent.stop_buy(nifty, 75, 22050.0),
         OrderIntent.stop_limit_sell(nifty, 75, 21950.0, 21940.0),
+        OrderIntent.trailing_stop_sell(nifty, 75, trail_amount=50.0),
+        OrderIntent.trailing_stop_buy(nifty, 75, trail_percent=1.5),
     ]
     for intent in intents:
         payload = wire.OrderIntent.from_domain(intent).model_dump_json()
@@ -109,7 +111,7 @@ def test_strategy_intent_survives_rust_roundtrip():
 
 #: Variants that exist only in Python until Rust gains them (parity pending). Each entry is a
 #: deliberate, reviewed exception; remove it when the Rust enum has the variant.
-PYTHON_ONLY_VARIANTS: dict[str, frozenset[str]] = {"OrderType": frozenset({"trailing_stop"})}
+PYTHON_ONLY_VARIANTS: dict[str, frozenset[str]] = {}
 
 
 def test_rust_and_python_wire_enums_have_the_same_variants():
