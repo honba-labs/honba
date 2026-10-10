@@ -1,5 +1,6 @@
 //! Unit tests for `honba-api` (ADR 007: one file per area).
 
+mod cache;
 mod endpoints;
 mod market;
 mod run_id;

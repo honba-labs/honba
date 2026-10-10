@@ -13,6 +13,7 @@
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(unsafe_code)]
 
+pub mod cache;
 pub mod capabilities;
 pub mod market;
 pub mod requests;
@@ -25,6 +26,7 @@ pub mod screener;
 pub mod strategies;
 pub mod verify;
 
+pub use cache::{canonical_json_bytes, CacheKey, CachedResult, ResultCache};
 pub use capabilities::{Capabilities, CapabilityManifest};
 pub use honba_messages::{
     write_endpoints, Access, ApiResponse, ApiVersion, Endpoint, ErrorCategory, ErrorCode,
