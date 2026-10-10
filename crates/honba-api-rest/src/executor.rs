@@ -10,8 +10,8 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use honba_analytics::{EquityStats, RoundTrip, TradeStats};
 use honba_api::{
-    parse_instrument_id, parse_timeframe, BacktestMetrics, JournalWriter, ResolvedBacktest,
-    ResolvedRequest, RunExecutor, RunJob, RunOutcome,
+    parse_instrument_id, parse_timeframe, BacktestMetrics, CacheKey, CachedResult, JournalWriter,
+    ResolvedBacktest, ResolvedRequest, ResultCache, RunExecutor, RunJob, RunOutcome,
 };
 use honba_config::{AccountConfig, ExecutionConfig, FillModel};
 use honba_engine::{
@@ -44,6 +44,7 @@ pub struct BacktestExecutor {
     registry: StrategyRegistry,
     account: AccountConfig,
     execution: ExecutionConfig,
+    cache: Option<ResultCache>,
 }
 
 impl BacktestExecutor {
@@ -55,6 +56,7 @@ impl BacktestExecutor {
             registry,
             account: AccountConfig::default(),
             execution: ExecutionConfig::default(),
+            cache: None,
         }
     }
 
@@ -62,6 +64,13 @@ impl BacktestExecutor {
     #[must_use]
     pub fn with_account(mut self, account: AccountConfig) -> Self {
         self.account = account;
+        self
+    }
+
+    /// Attaches a result cache to this executor (ADR 0020, E4-S1).
+    #[must_use]
+    pub fn with_cache(mut self, cache: ResultCache) -> Self {
+        self.cache = Some(cache);
         self
     }
 }
@@ -423,6 +432,29 @@ impl BacktestExecutor {
         if job.seed == 0 {
             return Err(invalid("seed", "zero_seed", "seed must be non-zero"));
         }
+        let dataset_id = format!(
+            "{}:{}:{}:{}",
+            spec.universe,
+            spec.bar_spec,
+            spec.start.as_u64(),
+            spec.end.as_u64()
+        );
+        let params = json!({"seed": job.seed, "initial_capital": spec.initial_capital});
+        let cost_model_version = match self.execution.fill_model {
+            FillModel::BarFill => "bar_fill:v1",
+            _ => "custom:v1",
+        };
+        let cache_key =
+            CacheKey::compute(&job.strategy_id, &params, &dataset_id, cost_model_version);
+
+        if let Some(ref cache) = self.cache {
+            if let Some(cached) = cache.get(&cache_key) {
+                return Ok(RunOutcome::Backtest {
+                    metrics: cached.metrics,
+                    assumptions: cached.assumptions,
+                });
+            }
+        }
         if !matches!(self.execution.fill_model, FillModel::BarFill) {
             return Err(ErrorDetail::new(
                 ErrorCode::Unsupported,
@@ -472,10 +504,27 @@ impl BacktestExecutor {
         journal.flush()?;
 
         let fills = std::mem::take(&mut *lock(&sink.fills));
-        Ok(RunOutcome::Backtest {
+        let outcome = RunOutcome::Backtest {
             metrics: metrics(&fills, spec.initial_capital)?,
             assumptions: assumptions(),
-        })
+        };
+        if let Some(ref cache) = self.cache {
+            if let RunOutcome::Backtest {
+                ref metrics,
+                ref assumptions,
+            } = outcome
+            {
+                cache.insert(
+                    cache_key,
+                    CachedResult {
+                        metrics: metrics.clone(),
+                        assumptions: assumptions.clone(),
+                        journal_path: None,
+                    },
+                );
+            }
+        }
+        Ok(outcome)
     }
 }
 
