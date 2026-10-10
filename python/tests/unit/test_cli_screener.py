@@ -116,3 +116,27 @@ def test_screener_scan_table_and_json():
     doc = json.loads(res_json.output)
     assert "total" in doc
     assert "rows" in doc
+
+
+def test_screener_scan_metric_comparison_operand():
+    result = runner.invoke(
+        app,
+        [
+            "screener",
+            "scan",
+            "--market",
+            "india",
+            "--print-request",
+            "volume > 500000 AND close > sma50",
+        ],
+    )
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    items = data["filters"]["items"]
+    assert len(items) == 2
+    assert items[0]["key"] == "volume"
+    assert items[0]["op"] == "gt"
+    assert items[0]["value"] == 500000.0
+    assert items[1]["key"] == "close"
+    assert items[1]["op"] == "gt"
+    assert items[1]["value"]["key"] == "SMA50"

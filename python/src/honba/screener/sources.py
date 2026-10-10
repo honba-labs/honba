@@ -8,6 +8,7 @@ from typing import Any
 
 from honba.entities.instrument import InstrumentId
 from honba.entities.screener import (
+    MetricRef,
     ScreenerFilterGroup,
     ScreenerFilterPredicate,
     ScreenerRow,
@@ -38,6 +39,10 @@ def _gather_metric_keys(req: ScreenerScanRequest) -> set[str]:
                 walk_group(item)
             elif isinstance(item, ScreenerFilterPredicate):
                 keys.add(item.key)
+                if isinstance(item.value, MetricRef):
+                    keys.add(item.value.key)
+                elif isinstance(item.value, dict) and "key" in item.value:
+                    keys.add(item.value["key"])
             elif isinstance(item, dict):
                 if "operator" in item:
                     walk_group(ScreenerFilterGroup.model_validate(item))

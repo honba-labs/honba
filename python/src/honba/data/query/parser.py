@@ -431,7 +431,7 @@ class Parser:
         op = self._match_comparison_op()
         if op is not None:
             # Check if right operand is metric or quantity
-            val = self._parse_quantity_token(metric)
+            val = self.parse_operand(metric)
             return op, val
 
         raise self.error(f"unexpected predicate token {self.current.value!r}")
