@@ -29,7 +29,7 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | E1 Instruments and adapters | 1 | 2 | 3 | Adapter Protocol and contract suite exist; no option metadata, instrument master impl, session or feed |
 | E2 Safe engine | 1 | 4 | 6 | Kill switch, audit log and fill feedback loop work; no risk stage, no order FSM, no reconciliation |
 | E3 Execution realism | 0 | 2 | 5 | Bar-fill (L1) simulator and Python next-open simulator only |
-| E4 Research pipeline | 0 | 3 | 5 | Python `BacktestSession` and Rust `honba-sweep` exist; no journal, gates, look-ahead test, CLI or REST runner |
+| E4 Research pipeline | 1 | 3 | 4 | Journal v1 and result cache (E4-S1) shipped; Python `BacktestSession` and Rust `honba-sweep` exist; gates, look-ahead test, CLI or REST runner open |
 | E5 Agent and API | 0 | 2 | 7 | 20 MCP tool schemas and OpenAPI are generated; no MCP server, scopes, sandbox, approval queue |
 | E6 Indicators | n/a | 0 | 1 | Batches 1-2 (O(1) rolling) done; batches 3-4 and render contract (S5) not started |
 | E7 Scale and ops | 0 | 0 | 5 | Pull-based; E7-S4 is superseded by `honba-sweep` (E10-S5) |
@@ -37,7 +37,7 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | E9 Frontend and AlgoDesigner | 0 | 1 | 7 | Greenfield; generated TS types only |
 | E10 Async core | 6 | 1 | 1 | Ports, shell, engine output, Arc dataset, sweep, determinism test and Python runtime bridge (ADR 0015) shipped; connectors open |
 | E11 Versioned API | 3 | 2 | 3 | Read API, SDK and WASM indicators shipped; streaming, writes, auth open |
-| **Total (74)** | **19** | **17** | **38** | |
+| **Total (74)** | **20** | **17** | **37** | |
 
 ### 1.1 What is shipped (evidence)
 
@@ -72,6 +72,7 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | E11-S2 timestamps as strings | ADR 0012 rule 4, commits 4006ff1, 9530251 |
 | E11-S3 REST read API | ADR 0013; `instruments`, `quotes` (derived from bars), `bars` (cap 100k rows), `depth` (none), `strategies`, `screener/scan`; `honba serve`; error envelope for unknown routes (e24b806); `POST/GET /backtests`, `GET /backtests/{id}/journal`, `GET /journals/{id}` (ADR 0017, q2c; sweeps and trading routes still 501); `honba serve --journals-dir` |
 | Python SDK | `honba.client` (`HttpTransport`, `InprocTransport` via `honba._honba.api_request`), parity tests `python/tests/integration/test_client_parity.py` |
+| E4-S1 journal schema v1 and result cache | ADR 0020, `JournalHeader`/`JournalV1` NDJSON roundtrip (`honba-engine`), `CacheKey`/`ResultCache` (`honba-api`), `BacktestExecutor` caching with unit tests `journal_schema_roundtrip`, `cache_key_changes_with_costs` and integration test `rerun_hits_cache` |
 | E11-S5 part 1 | `crates/honba-api-wasm`: `indicator_series`, `ohlc_indicator_series` (ATR), conformance vectors (d1c9db3, e9fd98e) |
 | E6 batches 1-2 | commits 6372528, 510e0d4, efca4bd, 7c9a325, 6a91432 |
 | Backtest foundation (Python) | `python/src/honba/session.py` `BacktestSession`/`BacktestResult`, `backtest/simulated.py` `NextOpenExecution`, date-aware India settlement (9cc171e), single-round costs (d38fe82) |
@@ -274,7 +275,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 
 | ID | Scope | Size | Deps | Acceptance | Owner |
 |---|---|---|---|---|---|
-| E4-S1 | Journal schema v1 (seed, config hash, dataset id, git rev, trial count, schema_version) from `AuditLog`; result cache keyed by hash(manifest, params, dataset id, cost-model version) | M | E2-S4, ADR D3 | `journal_schema_roundtrip`, `cache_key_changes_with_costs` / `rerun_hits_cache` | honba |
+| E4-S1 (DONE) | Journal schema v1 (seed, config hash, dataset id, git rev, trial count, schema_version) from `AuditLog`; result cache keyed by hash(manifest, params, dataset id, cost-model version) | M | E2-S4, ADR D3 | `journal_schema_roundtrip`, `cache_key_changes_with_costs` / `rerun_hits_cache` | honba |
 | E4-S2 | `hyperparameters()` and one-line param declarations drive sweep space; defaults checked by `verify` | S | E0-S8 | `param_range_to_schema` / `sweep_space_from_manifest` | honba (+strategies) |
 | E4-S3 | Finish runner: `honba backtest` CLI, `POST/GET /backtests` with `run_id`, typed `assumptions.not_modelled` and timing rule, manifest-driven | M | ADR 0017 (accepted), E3-S1a | `result_has_not_modelled`, `cli_exit_codes` / `rest_backtest_roundtrip_matches_session` (parity defined on the Rust-registered strategy subset; other strategies are 422) | honba |
 | E4-S4 | Look-ahead guarantee: truncating future data never changes earlier decisions; vectorized vs event-driven parity | M | E4-S3 | `truncation_property` / `prefilter_vs_event_driven_fixture` | honba |
@@ -435,7 +436,7 @@ Checked about 25 verdicts against code, git log and ls/grep (read-only). Counts:
 | E2-S9 | PARTIAL, "StateCache stub in execution.rs" | `engine/src/cache/mod.rs` is a 10-byte stub; `execution.rs` has no cache | NOT STARTED |
 | E4-S2 | PARTIAL, "manifest params with `range=a:b:step`" | No range or hyperparameter code in `strategies/manifest.py` or `base.py` | NOT STARTED |
 | E4-S6 | PARTIAL, "DSR/PBO/MC in CHANGELOG" | `monte_carlo.rs` and `walk_forward.rs` are 1-line uncompiled files; no DSR/PBO anywhere | NOT STARTED |
-| E4-S1 | PARTIAL, "BacktestResult wire model (commit 166c0bd)" | No journal schema or cache; `AuditLog` is in-memory | NOT STARTED |
+| E4-S1 | PARTIAL, "BacktestResult wire model (commit 166c0bd)" | Journal v1 schema + NDJSON (`honba-engine`), ResultCache + CacheKey (`honba-api`), integration in `BacktestExecutor` | DONE |
 | E4-S5 | PARTIAL, "fitness enum Sharpe, Calmar, Sortino, Omega" | Only `SharpeFitness` implements the `Fitness` trait | PARTIAL (corrected) |
 | E2-S1 | PARTIAL, "enforcement unknown" | Halted refuses and audits (`engine.rs:261`); Reducing accepted without restriction; no Python or CLI exposure found | PARTIAL (clarified) |
 | E0-S4/S5/S6/S8 | PARTIAL | Handoff and commits: schema export, versioning, money, manifest+IR+`verify` all shipped with tests | DONE |
