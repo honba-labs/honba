@@ -337,6 +337,14 @@ class OrdersResponse:
 
 ParamLocation = Literal["path", "query", "body"]
 
+class ParameterSpec:
+    default: Any
+    description: str | None = None
+    max: float | None = None
+    min: float | None = None
+    range: str | None = None
+    step: float | None = None
+
 class Position:
     avg_price: float
     currency: Currency
@@ -455,6 +463,7 @@ class StrategyManifest:
     api_version: str
     driving_timeframe: TimeframeSpec
     name: str
+    parameters: dict[str, ParameterSpec] | None = None
     schedules: dict[str, str] | None = None
     source_hash: str
     subscriptions: Subscriptions

@@ -236,6 +236,57 @@
             ],
             "type": "object"
           },
+          "ParameterSpec": {
+            "additionalProperties": false,
+            "description": "A parameter declaration with a default value and optional sweep range (E4-S2).",
+            "properties": {
+              "default": {
+                "description": "Default value for the parameter."
+              },
+              "description": {
+                "description": "Optional documentation description.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "max": {
+                "description": "Maximum value (inclusive).",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "min": {
+                "description": "Minimum value (inclusive).",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "range": {
+                "description": "Search range expression: \"min:max:step\" (e.g. \"10:50:5\").",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "step": {
+                "description": "Step size between trials.",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "default"
+            ],
+            "type": "object"
+          },
           "RiskLimits": {
             "additionalProperties": false,
             "description": "Per-run risk limits. `None` means the rule is off; the default has no limits.",
@@ -302,6 +353,13 @@
               "name": {
                 "description": "Strategy's declared name, used in journals and reports.",
                 "type": "string"
+              },
+              "parameters": {
+                "additionalProperties": {
+                  "$ref": "#/$defs/ParameterSpec"
+                },
+                "description": "Optional parameter declarations defining defaults and search spaces (E4-S2).",
+                "type": "object"
               },
               "schedules": {
                 "additionalProperties": {
@@ -563,6 +621,13 @@
                 "description": "Strategy's declared name, used in journals and reports.",
                 "type": "string"
               },
+              "parameters": {
+                "additionalProperties": {
+                  "$ref": "#/$defs/ParameterSpec"
+                },
+                "description": "Optional parameter declarations defining defaults and search spaces (E4-S2).",
+                "type": "object"
+              },
               "schedules": {
                 "additionalProperties": {
                   "type": "string"
@@ -695,6 +760,57 @@
             "required": [
               "exchange",
               "symbol"
+            ],
+            "type": "object"
+          },
+          "ParameterSpec": {
+            "additionalProperties": false,
+            "description": "A parameter declaration with a default value and optional sweep range (E4-S2).",
+            "properties": {
+              "default": {
+                "description": "Default value for the parameter."
+              },
+              "description": {
+                "description": "Optional documentation description.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "max": {
+                "description": "Maximum value (inclusive).",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "min": {
+                "description": "Minimum value (inclusive).",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "range": {
+                "description": "Search range expression: \"min:max:step\" (e.g. \"10:50:5\").",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "step": {
+                "description": "Step size between trials.",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "default"
             ],
             "type": "object"
           },
@@ -842,6 +958,13 @@
                 "description": "Strategy's declared name, used in journals and reports.",
                 "type": "string"
               },
+              "parameters": {
+                "additionalProperties": {
+                  "$ref": "#/$defs/ParameterSpec"
+                },
+                "description": "Optional parameter declarations defining defaults and search spaces (E4-S2).",
+                "type": "object"
+              },
               "schedules": {
                 "additionalProperties": {
                   "type": "string"
@@ -977,6 +1100,57 @@
             ],
             "type": "object"
           },
+          "ParameterSpec": {
+            "additionalProperties": false,
+            "description": "A parameter declaration with a default value and optional sweep range (E4-S2).",
+            "properties": {
+              "default": {
+                "description": "Default value for the parameter."
+              },
+              "description": {
+                "description": "Optional documentation description.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "max": {
+                "description": "Maximum value (inclusive).",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "min": {
+                "description": "Minimum value (inclusive).",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "range": {
+                "description": "Search range expression: \"min:max:step\" (e.g. \"10:50:5\").",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "step": {
+                "description": "Step size between trials.",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "default"
+            ],
+            "type": "object"
+          },
           "Subscriptions": {
             "additionalProperties": false,
             "description": "The market data a strategy subscribes to.\n\nA strategy that forgets a subscription gets no events for it, which in a backtest looks like a strategy that never trades. Recording the set explicitly is what lets the loader fail loudly instead.",
@@ -1085,6 +1259,13 @@
               "name": {
                 "description": "Strategy's declared name, used in journals and reports.",
                 "type": "string"
+              },
+              "parameters": {
+                "additionalProperties": {
+                  "$ref": "#/$defs/ParameterSpec"
+                },
+                "description": "Optional parameter declarations defining defaults and search spaces (E4-S2).",
+                "type": "object"
               },
               "schedules": {
                 "additionalProperties": {
@@ -1220,6 +1401,57 @@
             ],
             "type": "object"
           },
+          "ParameterSpec": {
+            "additionalProperties": false,
+            "description": "A parameter declaration with a default value and optional sweep range (E4-S2).",
+            "properties": {
+              "default": {
+                "description": "Default value for the parameter."
+              },
+              "description": {
+                "description": "Optional documentation description.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "max": {
+                "description": "Maximum value (inclusive).",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "min": {
+                "description": "Minimum value (inclusive).",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "range": {
+                "description": "Search range expression: \"min:max:step\" (e.g. \"10:50:5\").",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "step": {
+                "description": "Step size between trials.",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "default"
+            ],
+            "type": "object"
+          },
           "StrategyManifest": {
             "additionalProperties": false,
             "description": "A verified, hashable description of a strategy, ready to be run.",
@@ -1239,6 +1471,13 @@
               "name": {
                 "description": "Strategy's declared name, used in journals and reports.",
                 "type": "string"
+              },
+              "parameters": {
+                "additionalProperties": {
+                  "$ref": "#/$defs/ParameterSpec"
+                },
+                "description": "Optional parameter declarations defining defaults and search spaces (E4-S2).",
+                "type": "object"
               },
               "schedules": {
                 "additionalProperties": {

@@ -2530,6 +2530,57 @@
           }
         ]
       },
+      "ParameterSpec": {
+        "additionalProperties": false,
+        "description": "A parameter declaration with a default value and optional sweep range (E4-S2).",
+        "properties": {
+          "default": {
+            "description": "Default value for the parameter."
+          },
+          "description": {
+            "description": "Optional documentation description.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "max": {
+            "description": "Maximum value (inclusive).",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "min": {
+            "description": "Minimum value (inclusive).",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "range": {
+            "description": "Search range expression: \"min:max:step\" (e.g. \"10:50:5\").",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "step": {
+            "description": "Step size between trials.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "default"
+        ],
+        "type": "object"
+      },
       "Position": {
         "description": "A position in a single instrument.\n\nA position is *flat* when `quantity == 0`. Fills update the position via [`Position::apply_fill`]. Realized PnL accrues when a fill reduces or reverses the existing position; unrealized PnL is computed on demand against a mark price.\n\n``` use honba_entities::{Currency, Position, PositionSide}; use honba_messages::{InstrumentId, Exchange};\n\nlet id = InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")); let mut pos = Position::flat(id, Currency::Inr);\n\npos.apply_fill(PositionSide::Long, 75.0, 22_000.0); pos.apply_fill(PositionSide::Long, 25.0, 22_100.0);\n\nassert_eq!(pos.quantity(), 100.0); assert_eq!(pos.avg_price(), 22_025.0);   // (75*22000 + 25*22100) / 100, exact, exact ```\n\nInvariants (checked by [`Position::validate`] and on deserialization): `quantity` and `avg_price` are finite and `>= 0` (the side carries the direction). `realized_pnl` is an integer `Money` and so cannot be non-finite; the wire form reads it the same way `Trade` reads costs.",
         "properties": {
@@ -3317,6 +3368,13 @@
           "name": {
             "description": "Strategy's declared name, used in journals and reports.",
             "type": "string"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ParameterSpec"
+            },
+            "description": "Optional parameter declarations defining defaults and search spaces (E4-S2).",
+            "type": "object"
           },
           "schedules": {
             "additionalProperties": {
