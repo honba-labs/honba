@@ -51,6 +51,11 @@ def test_load_tools_reads_the_generated_schemas():
     assert by_name["get_backtest"].read_only is True
     assert by_name["get_bars"].input_schema["type"] == "object"
     assert by_name["backtest"].read_only is True  # from readOnlyHint in the artifact
+    # E5-S3: scope annotations are present
+    assert by_name["backtest"].scope == "research"
+    assert by_name["screen"].scope == "read:market"
+    assert by_name["get_instruments"].scope == "read:market"
+    assert by_name["get_bars"].scope == "read:market"
 
 
 RUN_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
@@ -79,6 +84,21 @@ def test_toolset_filter():
     assert {t.name for t in gateway.list_tools()} == selected
 
 
+def test_scope_filter():
+    """E5-S3: scope filter restricts exposed tools by OAuth2 scope."""
+    all_tools = load_tools()
+    market_tools = {t.name for t in all_tools if t.scope == "read:market"}
+    research_tools = {t.name for t in all_tools if t.scope == "research"}
+
+    # read:market scope exposes only market data tools
+    gateway = McpGateway(StubClient({}), scope="read:market")
+    assert {t.name for t in gateway.list_tools()} == market_tools
+
+    # research scope exposes backtest/sweep tools
+    gateway = McpGateway(StubClient({}), scope="research")
+    assert {t.name for t in gateway.list_tools()} == research_tools
+
+
 def test_toolset_filter_rejects_unknown_name():
     with pytest.raises(McpError) as err:
         McpGateway(StubClient({}), toolset={"no_such_tool"})
@@ -97,6 +117,7 @@ def test_read_only_switch_blocks_writes():
         },
         read_only=False,
         endpoint=("POST", "/orders"),
+        scope="write:orders",
     )
     gateway = McpGateway(StubClient({}), tools=[write_tool], read_only=True)
 

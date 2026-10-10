@@ -32,7 +32,7 @@ def tool_descriptors(gateway: McpGateway) -> list[dict[str, Any]]:
             "name": spec.name,
             "description": spec.description,
             "inputSchema": dict(spec.input_schema),
-            "annotations": {"readOnlyHint": spec.read_only},
+            "annotations": {"readOnlyHint": spec.read_only, "scope": spec.scope},
         }
         for spec in gateway.list_tools()
     ]
@@ -135,6 +135,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="turn the read-only kill switch off (writes then flow through the REST API)",
     )
+    parser.add_argument(
+        "--scope",
+        choices=["read:market", "read:account", "write:orders", "research"],
+        default=None,
+        help="OAuth2 scope to filter exposed tools",
+    )
     options = parser.parse_args(argv)
 
     import asyncio
@@ -142,7 +148,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     from honba.client import Client
 
     client = Client.http(options.base_url) if options.base_url else Client.inproc(options.data_dir)
-    gateway = McpGateway(client, read_only=not options.allow_writes)
+    gateway = McpGateway(client, read_only=not options.allow_writes, scope=options.scope)
     try:
         asyncio.run(run_stdio(gateway))
     finally:

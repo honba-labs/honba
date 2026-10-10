@@ -26,6 +26,13 @@ def serve(
         bool,
         typer.Option("--allow-writes", help="Turn the read-only kill switch off"),
     ] = False,
+    scope: Annotated[
+        str | None,
+        typer.Option(
+            "--scope",
+            help="OAuth2 scope to filter exposed tools (read:market, read:account, write:orders, research)",
+        ),
+    ] = None,
 ) -> None:
     """Serve the Honba MCP server over stdio."""
     argv = ["--data-dir", str(data_dir)]
@@ -33,4 +40,6 @@ def serve(
         argv += ["--base-url", base_url]
     if allow_writes:
         argv += ["--allow-writes"]
+    if scope is not None:
+        argv += ["--scope", scope]
     raise SystemExit(mcp_main(argv))

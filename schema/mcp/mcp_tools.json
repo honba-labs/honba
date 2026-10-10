@@ -3,7 +3,8 @@
   "tools": [
     {
       "annotations": {
-        "readOnlyHint": true
+        "readOnlyHint": true,
+        "scope": "research"
       },
       "description": "Run a backtest over historical data with a verified strategy manifest.",
       "inputSchema": {
@@ -684,7 +685,8 @@
     },
     {
       "annotations": {
-        "readOnlyHint": true
+        "readOnlyHint": true,
+        "scope": "research"
       },
       "description": "Run a seeded parameter sweep over a strategy manifest.",
       "inputSchema": {
@@ -1057,7 +1059,8 @@
     },
     {
       "annotations": {
-        "readOnlyHint": true
+        "readOnlyHint": true,
+        "scope": "research"
       },
       "description": "Verify a strategy manifest and compile it to the runnable StrategyIr.",
       "inputSchema": {
@@ -1358,7 +1361,8 @@
     },
     {
       "annotations": {
-        "readOnlyHint": true
+        "readOnlyHint": true,
+        "scope": "research"
       },
       "description": "Compile a strategy manifest and keep it in this session's catalog; returns its content id and StrategyIr.",
       "inputSchema": {
@@ -1677,7 +1681,8 @@
     },
     {
       "annotations": {
-        "readOnlyHint": true
+        "readOnlyHint": true,
+        "scope": "research"
       },
       "description": "List the strategies compiled in this session, ordered by id.",
       "inputSchema": {
@@ -1690,7 +1695,8 @@
     },
     {
       "annotations": {
-        "readOnlyHint": true
+        "readOnlyHint": true,
+        "scope": "read:market"
       },
       "description": "Screen a universe of instruments with a filter evaluated over their bars (OHLCV, SMA<N>, RSI, 52-week high/low); fundamentals are rejected as unsupported.",
       "inputSchema": {
@@ -1741,7 +1747,8 @@
     },
     {
       "annotations": {
-        "readOnlyHint": true
+        "readOnlyHint": true,
+        "scope": "read:market"
       },
       "description": "List instruments, optionally filtered by exchange or symbol.",
       "inputSchema": {
@@ -1776,7 +1783,8 @@
     },
     {
       "annotations": {
-        "readOnlyHint": true
+        "readOnlyHint": true,
+        "scope": "read:market"
       },
       "description": "Fetch historical bars for an instrument.",
       "inputSchema": {
@@ -1825,7 +1833,8 @@
     },
     {
       "annotations": {
-        "readOnlyHint": true
+        "readOnlyHint": true,
+        "scope": "research"
       },
       "description": "Get the current state of a backtest run by its run_id (poll to completion).",
       "inputSchema": {
@@ -1845,7 +1854,8 @@
     },
     {
       "annotations": {
-        "readOnlyHint": true
+        "readOnlyHint": true,
+        "scope": "research"
       },
       "description": "Read the fills of a backtest run by its run_id, in journal order.",
       "inputSchema": {
@@ -1865,7 +1875,8 @@
     },
     {
       "annotations": {
-        "readOnlyHint": true
+        "readOnlyHint": true,
+        "scope": "research"
       },
       "description": "Get the current state of a parameter sweep job by its job_id.",
       "inputSchema": {

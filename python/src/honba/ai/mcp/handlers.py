@@ -67,13 +67,15 @@ class ToolResult:
 
 
 class McpGateway:
-    """A toolset bound to a client, with an optional read-only kill switch.
+    """A toolset bound to a client, with an optional read-only kill switch and scope filter.
 
     Args:
         client: an object with ``request_data(method, path, query=..., body=...)``
             (normally :class:`honba.client.Client`).
         tools: the tools to expose; defaults to the generated ones.
         toolset: an explicit allowlist of tool names (the "selected toolset"); defaults to all.
+        scope: OAuth2 scope to filter tools (``read:market``, ``read:account``, ``write:orders``,
+            ``research``); if given, only tools with matching ``scope`` are exposed.
         read_only: when true (the default), a tool whose ``readOnlyHint`` is false is refused.
         free_text_keys: result keys treated as untrusted free text.
     """
@@ -84,6 +86,7 @@ class McpGateway:
         *,
         tools: Iterable[ToolSpec] | None = None,
         toolset: Iterable[str] | None = None,
+        scope: str | None = None,
         read_only: bool = True,
         free_text_keys: Iterable[str] = FREE_TEXT_KEYS,
     ) -> None:
@@ -91,6 +94,10 @@ class McpGateway:
         self._read_only = read_only
         self._free_text_keys = frozenset(free_text_keys)
         available = {spec.name: spec for spec in (tools if tools is not None else load_tools())}
+
+        # Filter by scope if provided
+        if scope is not None:
+            available = {name: spec for name, spec in available.items() if spec.scope == scope}
 
         if toolset is None:
             selected = available

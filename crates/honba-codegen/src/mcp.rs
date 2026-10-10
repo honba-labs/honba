@@ -28,6 +28,8 @@ pub(crate) struct Tool {
     pub(crate) endpoint: (&'static str, &'static str),
     /// Arguments, as `(name, registered type, required, description)`.
     pub(crate) args: &'static [(&'static str, &'static str, bool, &'static str)],
+    /// OAuth2 scope required for this tool (E5-S3).
+    pub(crate) scope: &'static str,
 }
 
 pub(crate) const TOOLS: &[Tool] = &[
@@ -55,6 +57,7 @@ pub(crate) const TOOLS: &[Tool] = &[
                 "Run configuration, including the seed that makes the run reproducible.",
             ),
         ],
+        scope: "research",
     },
     Tool {
         name: "sweep",
@@ -74,6 +77,7 @@ pub(crate) const TOOLS: &[Tool] = &[
                 "Parameter ranges, trial count, and seed.",
             ),
         ],
+        scope: "research",
     },
     Tool {
         name: "verify_strategy",
@@ -85,6 +89,7 @@ pub(crate) const TOOLS: &[Tool] = &[
             true,
             "The strategy manifest to verify; the response is its compiled StrategyIr.",
         )],
+        scope: "research",
     },
     Tool {
         name: "compile_strategy",
@@ -96,12 +101,14 @@ pub(crate) const TOOLS: &[Tool] = &[
             true,
             "The strategy manifest to compile. Source code is not accepted.",
         )],
+        scope: "research",
     },
     Tool {
         name: "list_strategies",
         description: "List the strategies compiled in this session, ordered by id.",
         endpoint: ("GET", "/strategies"),
         args: &[],
+        scope: "research",
     },
     Tool {
         name: "screen",
@@ -113,6 +120,7 @@ pub(crate) const TOOLS: &[Tool] = &[
             true,
             "JSON-encoded filters and universe (instrument ids), plus optional tf and as_of.",
         )],
+        scope: "read:market",
     },
     Tool {
         name: "get_instruments",
@@ -124,6 +132,7 @@ pub(crate) const TOOLS: &[Tool] = &[
             false,
             "Optional exchange and symbol filters.",
         )],
+        scope: "read:market",
     },
     Tool {
         name: "get_bars",
@@ -135,24 +144,28 @@ pub(crate) const TOOLS: &[Tool] = &[
             true,
             "Timeframe and inclusive date range.",
         )],
+        scope: "read:market",
     },
     Tool {
         name: "get_backtest",
         description: "Get the current state of a backtest run by its run_id (poll to completion).",
         endpoint: ("GET", "/backtests/{id}"),
         args: &[],
+        scope: "research",
     },
     Tool {
         name: "get_backtest_journal",
         description: "Read the fills of a backtest run by its run_id, in journal order.",
         endpoint: ("GET", "/backtests/{id}/journal"),
         args: &[],
+        scope: "research",
     },
     Tool {
         name: "get_sweep",
         description: "Get the current state of a parameter sweep job by its job_id.",
         endpoint: ("GET", "/sweeps/{id}"),
         args: &[],
+        scope: "research",
     },
 ];
 
@@ -214,7 +227,7 @@ fn render_tool(set: &SchemaSet, tool: &Tool) -> Value {
         "name": tool.name,
         "description": tool.description,
         "inputSchema": input,
-        "annotations": {"readOnlyHint": !is_write},
+        "annotations": {"readOnlyHint": !is_write, "scope": tool.scope},
     })
 }
 

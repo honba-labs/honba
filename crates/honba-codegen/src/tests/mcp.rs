@@ -166,6 +166,21 @@ fn every_tool_maps_to_a_registered_endpoint() {
 }
 
 #[test]
+fn every_tool_has_a_valid_scope() {
+    let valid_scopes = ["read:market", "read:account", "write:orders", "research"];
+    let rendered = render(&full());
+    for out in rendered["tools"].as_array().unwrap() {
+        let scope = out["annotations"]["scope"].as_str().expect("scope missing");
+        assert!(
+            valid_scopes.contains(&scope),
+            "tool {} has invalid scope: {}",
+            out["name"],
+            scope
+        );
+    }
+}
+
+#[test]
 fn the_read_only_hint_comes_from_the_write_registry() {
     let rendered = render(&full());
     for (tool, out) in TOOLS.iter().zip(rendered["tools"].as_array().unwrap()) {

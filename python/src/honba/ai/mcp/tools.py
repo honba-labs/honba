@@ -31,6 +31,7 @@ class ToolSpec:
     input_schema: Mapping[str, Any]
     read_only: bool
     endpoint: tuple[str, str]
+    scope: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,6 +95,7 @@ def load_tools(path: str | Path | None = None) -> list[ToolSpec]:
                 description=raw.get("description", ""),
                 input_schema=raw["inputSchema"],
                 read_only=bool(raw.get("annotations", {}).get("readOnlyHint", False)),
+                scope=raw.get("annotations", {}).get("scope", ""),
                 endpoint=(binding.method, binding.path),
             )
         )
