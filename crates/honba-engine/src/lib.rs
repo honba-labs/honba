@@ -29,8 +29,8 @@ pub mod reconciliation;
 pub mod state;
 
 pub use audit::{
-    AuditJournalReader, AuditJournalWriter, AuditKind, AuditLog, AuditRecord, ReplayOrder,
-    ReplayState,
+    AuditJournalReader, AuditJournalWriter, AuditKind, AuditLog, AuditRecord, JournalHeader,
+    JournalV1, ReplayOrder, ReplayState,
 };
 pub use cache::{CacheQuery, StateCache, TrackedOrder};
 pub use clock::Clock;

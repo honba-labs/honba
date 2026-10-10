@@ -1,7 +1,7 @@
 //! Reconciliation on startup and reconnect (E2-S7).
 //!
 //! Diffs broker-reported orders, positions, and trades against the engine's
-//! [`StateCache`](crate::cache::StateCache), identifying:
+//! [`StateCache`], identifying:
 //! - Missed fills (broker reported fills that the engine did not see);
 //! - Stale open orders (orders open in cache but closed or unknown at broker);
 //! - Ghost orders (orders reported by broker that the engine has no record of);

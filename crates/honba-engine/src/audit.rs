@@ -432,6 +432,126 @@ impl<R: std::io::BufRead> AuditJournalReader<R> {
     }
 }
 
+/// Header metadata for a Journal v1 stream (ADR 0020, E4-S1).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct JournalHeader {
+    /// Wire schema version (e.g. ).
+    pub schema_version: u32,
+    /// Format version of the journal layout (always 1 for v1).
+    pub journal_version: u32,
+    /// PRNG seed used for the run.
+    pub seed: u64,
+    /// Hash of the run configuration.
+    pub config_hash: String,
+    /// Dataset identifier or fingerprint.
+    pub dataset_id: String,
+    /// Git revision, if known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub git_rev: Option<String>,
+    /// Trial count / index, if applicable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trial_count: Option<u32>,
+}
+
+/// A version 1 journal containing a provenance metadata header followed by audit records.
+#[derive(Debug, Clone, PartialEq)]
+pub struct JournalV1 {
+    /// Header metadata.
+    pub header: JournalHeader,
+    /// The audit log records.
+    pub log: AuditLog,
+}
+
+impl JournalV1 {
+    /// Creates a new journal from header and log.
+    pub fn new(header: JournalHeader, log: AuditLog) -> Self {
+        Self { header, log }
+    }
+
+    /// Creates a new journal from header and a reference to an audit log.
+    pub fn from_audit_log(header: JournalHeader, log: &AuditLog) -> Self {
+        Self {
+            header,
+            log: log.clone(),
+        }
+    }
+
+    /// Writes the journal (header followed by audit records) as NDJSON to writer.
+    pub fn write_ndjson<W: std::io::Write>(&self, writer: W) -> std::io::Result<()> {
+        use std::io::Write;
+        let mut buf_writer = std::io::BufWriter::new(writer);
+
+        let mut header_val = serde_json::to_value(&self.header)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        if let Some(obj) = header_val.as_object_mut() {
+            obj.insert("type".to_string(), serde_json::json!("header"));
+        }
+        serde_json::to_writer(&mut buf_writer, &header_val)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        buf_writer.write_all(b"\n")?;
+
+        for record in self.log.records() {
+            let val = record.to_json();
+            serde_json::to_writer(&mut buf_writer, &val)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            buf_writer.write_all(b"\n")?;
+        }
+        buf_writer.flush()
+    }
+
+    /// Reads a version 1 journal from newline-delimited JSON.
+    pub fn read_ndjson<R: std::io::BufRead>(mut reader: R) -> std::io::Result<Self> {
+        let mut line = String::new();
+        // First non-empty line must be the header
+        while reader.read_line(&mut line)? > 0 {
+            let trimmed = line.trim();
+            if !trimmed.is_empty() {
+                break;
+            }
+            line.clear();
+        }
+        if line.trim().is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "empty journal stream",
+            ));
+        }
+
+        let header_val: serde_json::Value = serde_json::from_str(line.trim())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        if header_val.get("type").and_then(|v| v.as_str()) != Some("header") {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "missing journal v1 header",
+            ));
+        }
+
+        let header: JournalHeader = serde_json::from_value(header_val)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        if header.journal_version != 1 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("unsupported journal version: {}", header.journal_version),
+            ));
+        }
+
+        let mut log = AuditLog::new();
+        line.clear();
+        while reader.read_line(&mut line)? > 0 {
+            let trimmed = line.trim();
+            if !trimmed.is_empty() {
+                let val: serde_json::Value = serde_json::from_str(trimmed)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+                let record = AuditRecord::from_json(&val)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+                log.record_with_seq(record.seq, record.kind);
+            }
+            line.clear();
+        }
+        Ok(Self { header, log })
+    }
+}
+
 fn order_event_kind_to_str(k: &OrderEventKind) -> &'static str {
     match k {
         OrderEventKind::Submitted => "submitted",

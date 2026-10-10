@@ -204,3 +204,29 @@ fn journal_writer_roundtrip() {
     assert_eq!(log, read_log);
     assert_eq!(log.replay(), read_log.replay());
 }
+
+#[test]
+fn journal_schema_roundtrip() {
+    let header = crate::JournalHeader {
+        schema_version: 4,
+        journal_version: 1,
+        seed: 42,
+        config_hash: "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+            .to_string(),
+        dataset_id: "NSE:TCS:1d:2024-01-01:2024-12-31".to_string(),
+        git_rev: Some("a06d5d9".to_string()),
+        trial_count: Some(1),
+    };
+    let log = sample_log();
+    let journal = crate::JournalV1::from_audit_log(header.clone(), &log);
+
+    let mut buffer = Vec::new();
+    journal
+        .write_ndjson(&mut buffer)
+        .expect("write_ndjson must succeed");
+
+    let read = crate::JournalV1::read_ndjson(&buffer[..]).expect("read_ndjson must succeed");
+    assert_eq!(read.header, header);
+    assert_eq!(read.log, log);
+    assert_eq!(read.log.replay(), log.replay());
+}
