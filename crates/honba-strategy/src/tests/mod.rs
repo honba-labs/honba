@@ -5,6 +5,7 @@ mod dyn_strategy;
 mod intent;
 mod ir;
 mod ledger;
+mod look_ahead;
 mod manifest;
 mod runner_errors;
 mod runner_events;

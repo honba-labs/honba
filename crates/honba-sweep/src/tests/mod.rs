@@ -95,3 +95,35 @@ fn no_equity_report(trial_id: usize) -> TrialReport {
         audit: Vec::new(),
     }
 }
+
+/// Metrics for a trial with the given `sortino`, `calmar` and `profit_factor`; the other
+/// stats are irrelevant to the fitnesses that read these three.
+fn metrics_with(
+    sortino: Option<f64>,
+    calmar: Option<f64>,
+    profit_factor: Option<f64>,
+) -> TrialMetrics {
+    let mut metrics = sharpe_metrics(sortino);
+    if let Some(equity) = metrics.equity.as_mut() {
+        equity.calmar = calmar;
+    }
+    if let Some(trades) = metrics.trades.as_mut() {
+        trades.profit_factor = profit_factor;
+    }
+    metrics
+}
+
+/// A report for `trial_id` with the given `sortino`, `calmar` and `profit_factor`.
+fn report_with(
+    trial_id: usize,
+    sortino: Option<f64>,
+    calmar: Option<f64>,
+    profit_factor: Option<f64>,
+) -> TrialReport {
+    TrialReport {
+        trial_id,
+        params: buy_and_hold_params(trial_id as u64),
+        metrics: metrics_with(sortino, calmar, profit_factor),
+        audit: Vec::new(),
+    }
+}

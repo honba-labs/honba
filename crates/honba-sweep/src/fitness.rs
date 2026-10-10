@@ -59,3 +59,55 @@ impl Fitness for SharpeFitness {
             .unwrap_or(0.0)
     }
 }
+
+/// Ranks by the Calmar ratio, `annualized_return / max_drawdown`, zero when it is undefined.
+///
+/// Like [`SharpeFitness`], zero is the "no information" score: a trial with no return series,
+/// or one whose maximum drawdown was zero (the ratio is undefined), is ranked with the trials
+/// that traded and lost nothing rather than as though it had an infinite ratio.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct CalmarFitness;
+
+impl Fitness for CalmarFitness {
+    fn score(&self, report: &TrialReport) -> f64 {
+        report
+            .metrics
+            .equity
+            .and_then(|equity| equity.calmar)
+            .unwrap_or(0.0)
+    }
+}
+
+/// Ranks by the Sortino ratio, the mean excess return over downside deviation, zero when it is
+/// undefined (no return series, or no downside).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SortinoFitness;
+
+impl Fitness for SortinoFitness {
+    fn score(&self, report: &TrialReport) -> f64 {
+        report
+            .metrics
+            .equity
+            .and_then(|equity| equity.sortino)
+            .unwrap_or(0.0)
+    }
+}
+
+/// Ranks by the Omega ratio at the zero threshold, which reduces to the profit factor
+/// (`gross_profit / gross_loss`) of the trial's round trips.
+///
+/// Zero is the "no information" score: a trial with no round trips, or one with no losing
+/// trips (the ratio is undefined), is ranked with the trials that broke even rather than as
+/// though it had an infinite ratio.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct OmegaFitness;
+
+impl Fitness for OmegaFitness {
+    fn score(&self, report: &TrialReport) -> f64 {
+        report
+            .metrics
+            .trades
+            .and_then(|trades| trades.profit_factor)
+            .unwrap_or(0.0)
+    }
+}

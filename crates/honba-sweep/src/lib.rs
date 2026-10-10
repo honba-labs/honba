@@ -17,7 +17,7 @@ pub mod run;
 pub mod trial;
 
 pub use error::{Result, SweepError};
-pub use fitness::{Fitness, SharpeFitness};
+pub use fitness::{CalmarFitness, Fitness, OmegaFitness, SharpeFitness, SortinoFitness};
 pub use honba_data::Dataset;
 pub use plan::{
     default_initial_cash, StrategyFactory, StrategySpec, SweepPlan, TrialParams,
