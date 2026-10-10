@@ -250,8 +250,11 @@ pub fn api_request_stream(
             Ok(f) => f,
             Err(e) => return Err(PyValueError::new_err(e)),
         };
-        pyo3::Python::with_gil(|py| callback.call1(py, (frame,)).map(|_| ()))
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        pyo3::Python::with_gil(|py| {
+            let payload = pyo3::types::PyBytes::new_bound(py, &frame);
+            callback.call1(py, (payload,)).map(|_| ())
+        })
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
         frame_count += 1;
     }
 

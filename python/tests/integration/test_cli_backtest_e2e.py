@@ -54,6 +54,16 @@ def test_a_completed_run_exits_0_with_json_on_stdout(dirs: tuple[Path, Path]) ->
     assert "slippage" in out["assumptions"]["not_modelled"]
 
 
+def test_stream_mode_follows_a_real_run(dirs: tuple[Path, Path]) -> None:
+    res = runner.invoke(app, args(dirs, "--stream"))
+    assert res.exit_code == 0, res.output
+    out = json.loads(res.stdout)
+    assert out["status"] == "completed" and out["metrics"]["trades"] >= 1
+    # The run id is printed at once, and at least one StreamFrame reaches stderr.
+    assert "run_id:" in res.stderr
+    assert '"kind"' in res.stderr
+
+
 def test_a_run_without_bars_exits_1_and_reports_the_error(dirs: tuple[Path, Path]) -> None:
     res = runner.invoke(app, args(dirs, start="2030-01-01", end="2030-02-01"))
     assert res.exit_code == 1, res.output

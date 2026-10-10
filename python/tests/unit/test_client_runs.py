@@ -279,3 +279,65 @@ def test_run_backtest_submits_then_waits() -> None:
     )
     assert result.status == "completed"
     assert [s[0] for s in transport.sent] == ["POST", "GET", "GET"]
+
+
+class StreamingScripted(Scripted):
+    """A transport that also records ``stream`` calls and replays canned SSE frames."""
+
+    def __init__(self, *answers: Response, frames: tuple[bytes, ...] = ()) -> None:
+        super().__init__(*answers)
+        self.frames = list(frames)
+        self.streamed: list[tuple[str, str, Mapping[str, Any] | None, Any]] = []
+
+    def stream(
+        self,
+        method: str,
+        path: str,
+        *,
+        query: Mapping[str, Any] | None = None,
+        body: Any = None,
+        on_frame: Any = None,
+    ) -> int:
+        self.streamed.append((method, path, query, body))
+        for frame in self.frames:
+            if on_frame is not None:
+                on_frame(frame)
+        return len(self.frames)
+
+
+def test_stream_backtest_follows_events_and_returns_the_terminal_result() -> None:
+    frames = (
+        b'{"kind": "status", "status": "running", "seq": 0}',
+        b'{"kind": "record", "seq": 0, "message": {}}',
+        b'{"kind": "status", "status": "completed", "seq": 1}',
+    )
+    transport = StreamingScripted(
+        ok(run("completed", metrics=METRICS, assumptions=ASSUMPTIONS)), frames=frames
+    )
+    seen: list[dict[str, Any]] = []
+    result = Client(transport).stream_backtest(RUN_ID, on_frame=seen.append)
+    assert transport.streamed[0][:2] == ("GET", f"/backtests/{RUN_ID}/events")
+    assert [f["status"] for f in seen if f["kind"] == "status"] == ["running", "completed"]
+    assert result.status == "completed" and result.metrics is not None
+    assert result.metrics.trades == 2
+
+
+def test_stream_backtest_passes_the_resume_token() -> None:
+    transport = StreamingScripted(ok(run("completed")))
+    Client(transport).stream_backtest(RUN_ID, resume_from_seq=3)
+    assert transport.streamed[0][2] == {"resume_from_seq": 3}
+
+
+def test_stream_backtest_without_a_streaming_transport_is_unsupported() -> None:
+    from honba.client import UnsupportedApiError
+
+    with pytest.raises(UnsupportedApiError):
+        Client(Scripted(ok(run("completed")))).stream_backtest(RUN_ID)
+
+
+def test_stream_backtest_rejects_a_malformed_frame() -> None:
+    from honba.client import InvalidResponseError
+
+    transport = StreamingScripted(ok(run("completed")), frames=(b"not json",))
+    with pytest.raises(InvalidResponseError):
+        Client(transport).stream_backtest(RUN_ID)

@@ -97,6 +97,11 @@ def _describe(error: ApiError) -> str:
     return f"{error.code}: {error.message}" + (f" ({detail})" if detail else "")
 
 
+def _emit_frame(frame: dict[str, Any]) -> None:
+    """Print one streamed ``StreamFrame`` as a JSON line on stderr."""
+    typer.echo(json.dumps(frame), err=True)
+
+
 def _plain(result: BacktestResult) -> str:
     lines = [f"run_id: {result.run_id}", f"status: {result.status}"]
     if result.metrics is not None:
@@ -141,20 +146,37 @@ def backtest(
     ] = None,
     timeout: Annotated[float, typer.Option(help="Seconds to wait for the run to finish.")] = 300.0,
     poll_interval: Annotated[float, typer.Option(help="Seconds between status polls.")] = 0.1,
+    wait: Annotated[
+        bool,
+        typer.Option(
+            "--wait",
+            help="Poll to a terminal status (the default; mutually exclusive with --stream).",
+        ),
+    ] = False,
+    stream: Annotated[
+        bool,
+        typer.Option("--stream", help="Follow the run's SSE event stream to completion."),
+    ] = False,
     format: Annotated[
         str, typer.Option("--format", "-f", help="json (default) or plain.")
     ] = "json",
 ) -> None:
     """Run one backtest through the Honba run service and print the result.
 
+    By default the run is submitted and polled to a terminal status (``--wait`` is an explicit
+    spelling of that). With ``--stream`` the run id is printed at once and the run's events are
+    followed over ``GET /backtests/{id}/events`` (ADR 0021) until it finishes.
+
     Prints the terminal run (status, metrics, assumptions including `not_modelled`, and the
-    error of a failed run) as JSON on stdout; diagnostics go to stderr.
+    error of a failed run) as JSON on stdout; diagnostics and streamed events go to stderr.
 
     Exit codes: 0 completed; 1 failed run; 2 usage or validation (422); 3 transport or queue
     (429 queue full, 503, connection failure, poll timeout).
     """
     if format not in _FORMATS:
         raise _usage(f"--format must be one of {', '.join(_FORMATS)}")
+    if wait and stream:
+        raise _usage("give at most one of --wait or --stream")
     if (data_dir is None) == (url is None):
         raise _usage("give exactly one of --data-dir (in process) or --url (running server)")
     for name, value in (("--timeout", timeout), ("--poll-interval", poll_interval)):
@@ -187,7 +209,12 @@ def backtest(
             max_queued_runs=max_queued_runs,
             http_timeout=max(10.0, poll_interval * 10),
         )
-        result = client.run_backtest(**fields, timeout=timeout, poll_interval=poll_interval)
+        if stream:
+            submitted = client.submit_backtest(**fields)
+            typer.echo(f"run_id: {submitted.run_id}", err=True)
+            result = client.stream_backtest(submitted.run_id, on_frame=_emit_frame)
+        else:
+            result = client.run_backtest(**fields, timeout=timeout, poll_interval=poll_interval)
     except (RequestValidationError, NotADirectoryError, ValueError) as exc:
         raise _usage(str(exc)) from None
     except ValidationApiError as exc:

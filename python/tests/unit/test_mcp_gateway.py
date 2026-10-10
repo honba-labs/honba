@@ -38,12 +38,35 @@ def test_load_tools_reads_the_generated_schemas():
         "screen",
         "get_instruments",
         "get_bars",
+        "get_backtest",
+        "get_backtest_journal",
+        "get_sweep",
     }
     by_name = {t.name: t for t in tools}
     assert by_name["get_bars"].endpoint == ("GET", "/bars/{id}")
     assert by_name["backtest"].endpoint == ("POST", "/backtests")
+    assert by_name["get_backtest"].endpoint == ("GET", "/backtests/{id}")
+    assert by_name["get_backtest_journal"].endpoint == ("GET", "/backtests/{id}/journal")
+    assert by_name["get_sweep"].endpoint == ("GET", "/sweeps/{id}")
+    assert by_name["get_backtest"].read_only is True
     assert by_name["get_bars"].input_schema["type"] == "object"
     assert by_name["backtest"].read_only is True  # from readOnlyHint in the artifact
+
+
+RUN_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+
+
+def test_run_read_tools_build_the_run_paths():
+    from honba.ai.mcp.tools import build_request
+
+    by_name = {t.name: t for t in load_tools()}
+    for name, path in [
+        ("get_backtest", f"/backtests/{RUN_ID}"),
+        ("get_backtest_journal", f"/backtests/{RUN_ID}/journal"),
+        ("get_sweep", f"/sweeps/{RUN_ID}"),
+    ]:
+        method, built, query, body = build_request(by_name[name], {"id": RUN_ID})
+        assert (method, built, query, body) == ("GET", path, None, None), name
 
 
 def test_toolset_filter():

@@ -240,3 +240,73 @@ def test_inproc_native_failures_become_non_retryable_transport_errors(
     assert err.value.code == "transport_error"
     assert err.value.retryable is False
     assert err.value.__cause__ is exc
+
+
+def test_http_stream_delivers_sse_data_frames() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        body = 'event: status\nid: 0\ndata: {"kind":"status"}\n\ndata: {"kind":"record"}\n\n'
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, text=body)
+
+    frames: list[bytes] = []
+    count = make(handler).stream("GET", "/backtests/X/events", on_frame=frames.append)
+    assert count == 2
+    assert frames == [b'{"kind":"status"}', b'{"kind":"record"}']
+    assert seen[0].method == "GET"
+    assert seen[0].url.path == "/backtests/X/events"
+    assert seen[0].headers["accept"] == "text/event-stream"
+
+
+def test_http_stream_non_2xx_is_a_transport_error() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"error": {"code": "not_found", "message": "m"}})
+
+    with pytest.raises(TransportApiError) as err:
+        make(handler).stream("GET", "/backtests/X/events")
+    assert err.value.status == 404
+
+
+class FakeStreamNative:
+    """A stand-in for ``honba._honba.api_request_stream``: replays the frames it is given."""
+
+    def __init__(self, frames: list[bytes]) -> None:
+        self.frames = frames
+        self.calls: list[tuple[Any, ...]] = []
+
+    def __call__(self, *args: Any) -> int:
+        self.calls.append(args)
+        callback = args[3]
+        for frame in self.frames:
+            callback(frame)
+        return len(self.frames)
+
+
+def test_inproc_stream_calls_the_native_callback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = FakeStreamNative([b'{"kind":"status"}', b'{"kind":"record"}'])
+    monkeypatch.setattr("honba.client.transport.native_attr", lambda name: fake)
+    frames: list[bytes] = []
+    count = InprocTransport(tmp_path).stream(
+        "GET", "/backtests/X/events", query={"resume_from_seq": 2}, on_frame=frames.append
+    )
+    assert count == 2
+    assert frames == [b'{"kind":"status"}', b'{"kind":"record"}']
+    call = fake.calls[0]
+    assert call[:3] == (str(tmp_path), "GET", "/backtests/X/events")
+    assert callable(call[3])
+    assert call[4:] == ('{"resume_from_seq":2}', None)
+
+
+def test_inproc_stream_native_failures_are_non_retryable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def boom(*args: Any) -> int:
+        raise ValueError("bad call")
+
+    monkeypatch.setattr("honba.client.transport.native_attr", lambda name: boom)
+    with pytest.raises(TransportApiError) as err:
+        InprocTransport(tmp_path).stream("GET", "/backtests/X/events")
+    assert err.value.code == "transport_error" and err.value.retryable is False

@@ -136,6 +136,24 @@ pub(crate) const TOOLS: &[Tool] = &[
             "Timeframe and inclusive date range.",
         )],
     },
+    Tool {
+        name: "get_backtest",
+        description: "Get the current state of a backtest run by its run_id (poll to completion).",
+        endpoint: ("GET", "/backtests/{id}"),
+        args: &[],
+    },
+    Tool {
+        name: "get_backtest_journal",
+        description: "Read the fills of a backtest run by its run_id, in journal order.",
+        endpoint: ("GET", "/backtests/{id}/journal"),
+        args: &[],
+    },
+    Tool {
+        name: "get_sweep",
+        description: "Get the current state of a parameter sweep job by its job_id.",
+        endpoint: ("GET", "/sweeps/{id}"),
+        args: &[],
+    },
 ];
 
 /// Renders the MCP tool schemas.

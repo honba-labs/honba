@@ -1822,6 +1822,66 @@
         "type": "object"
       },
       "name": "get_bars"
+    },
+    {
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "description": "Get the current state of a backtest run by its run_id (poll to completion).",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "The `{id}` segment of GET /backtests/{id}.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "get_backtest"
+    },
+    {
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "description": "Read the fills of a backtest run by its run_id, in journal order.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "The `{id}` segment of GET /backtests/{id}/journal.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "get_backtest_journal"
+    },
+    {
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "description": "Get the current state of a parameter sweep job by its job_id.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "The `{id}` segment of GET /sweeps/{id}.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "get_sweep"
     }
   ]
 }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 import time
 from collections.abc import Callable, Mapping, Sequence
@@ -18,6 +19,7 @@ from honba.client.errors import (
     InvalidResponseError,
     RequestValidationError,
     RunTimeoutError,
+    UnsupportedApiError,
     error_from_envelope,
 )
 from honba.client.models import (
@@ -302,6 +304,44 @@ class Client:
             sleep=sleep,
             clock=clock,
         )
+
+    def stream_backtest(
+        self,
+        run_id: str,
+        *,
+        on_frame: Callable[[dict[str, Any]], None] | None = None,
+        resume_from_seq: int | None = None,
+    ) -> BacktestResult:
+        """Follow ``GET /backtests/{id}/events`` (ADR 0021) to a terminal status, then return
+        the terminal :class:`BacktestResult`.
+
+        ``on_frame`` receives each decoded ``StreamFrame`` dict as it arrives. ``resume_from_seq``
+        replays journal records with line index ``>=`` it. Needs a transport with event
+        streaming; one without it raises :class:`~honba.client.UnsupportedApiError`.
+        """
+        stream = getattr(self._transport, "stream", None)
+        if stream is None:
+            raise UnsupportedApiError(
+                "unsupported", "this transport does not support event streaming", status=501
+            )
+        request = rq.backtest_events(run_id, resume_from_seq=resume_from_seq)
+        bad_frames: list[str] = []
+
+        def handle(raw: bytes) -> None:
+            try:
+                frame = json.loads(raw)
+            except ValueError as exc:
+                bad_frames.append(str(exc))
+                return
+            if on_frame is not None:
+                on_frame(frame)
+
+        stream(request.method, request.path, query=request.query, body=None, on_frame=handle)
+        if bad_frames:
+            raise InvalidResponseError(
+                f"run event stream carried a non-JSON frame: {bad_frames[0]}", status=200
+            )
+        return self.backtest(run_id)
 
     # -- plumbing ----------------------------------------------------------------------------
 

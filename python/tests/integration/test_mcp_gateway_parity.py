@@ -51,6 +51,15 @@ def client(data_dir: Path) -> Iterator[Client]:
         yield inproc
 
 
+@pytest.fixture(scope="module")
+def run_client(data_dir: Path) -> Iterator[Client]:
+    """A client with a journals root, so the run read tools (ADR 0017 decision 9) answer."""
+    pytest.importorskip("honba._honba")
+    journals = data_dir.parent / "mcp-parity-journals"
+    with Client.inproc(data_dir, journals_dir=journals) as inproc:
+        yield inproc
+
+
 def test_mcp_call_matches_rest_response(client: Client) -> None:
     gateway = McpGateway(client)
 
@@ -69,6 +78,24 @@ def test_mcp_call_matches_rest_response(client: Client) -> None:
 
     strategies = gateway.call_tool("list_strategies", {})
     assert strategies.data == client.request_data("GET", "/strategies")
+
+
+def test_mcp_run_reads_match_rest(run_client: Client) -> None:
+    """ADR 0017 decision 9: an agent polls and reads a run through the gateway."""
+    gateway = McpGateway(run_client)
+    submitted = run_client.submit_backtest(
+        strategy="sma_crossover", universe="TCS.NSE", start="2024-01-01", end="2024-01-02",
+        seed=1, bar_spec="1m", initial_capital=1_000_000.0,
+    )  # fmt: skip
+    run_id = submitted.run_id
+    run_client.wait(run_id, timeout=60)
+
+    status = gateway.call_tool("get_backtest", {"id": run_id})
+    assert status.data == run_client.request_data("GET", f"/backtests/{run_id}")
+    assert status.data["status"] == "completed"
+
+    journal = gateway.call_tool("get_backtest_journal", {"id": run_id})
+    assert journal.data == run_client.request_data("GET", f"/backtests/{run_id}/journal")
 
 
 def test_mcp_error_carries_the_rest_code(client: Client) -> None:

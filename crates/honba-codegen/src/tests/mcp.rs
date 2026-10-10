@@ -236,6 +236,30 @@ fn compile_and_list_strategies_are_read_only_tools_on_their_routes() {
 }
 
 #[test]
+fn run_read_tools_drive_the_run_routes_read_only() {
+    // ADR 0017 decision 9: an agent can submit, poll and read a run without the CLI.
+    let rendered = render(&full());
+    let tools = rendered["tools"].as_array().unwrap();
+    for (name, endpoint) in [
+        ("get_backtest", ("GET", "/backtests/{id}")),
+        ("get_backtest_journal", ("GET", "/backtests/{id}/journal")),
+        ("get_sweep", ("GET", "/sweeps/{id}")),
+    ] {
+        let tool = TOOLS.iter().find(|t| t.name == name).unwrap();
+        assert_eq!(tool.endpoint, endpoint);
+        let out = tools.iter().find(|t| t["name"] == name).unwrap();
+        assert_eq!(out["annotations"]["readOnlyHint"], json!(true), "{name}");
+        // The endpoint's `{id}` placeholder is a required string argument.
+        assert_eq!(out["inputSchema"]["required"], json!(["id"]), "{name}");
+        assert_eq!(
+            out["inputSchema"]["properties"]["id"]["type"],
+            json!("string"),
+            "{name}"
+        );
+    }
+}
+
+#[test]
 fn screen_takes_the_scan_query_and_is_read_only() {
     let rendered = render(&full());
     let screen = rendered["tools"]

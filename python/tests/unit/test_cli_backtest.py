@@ -239,3 +239,60 @@ def test_plain_format_prints_a_summary(fake: list[Any]) -> None:
     res = invoke([*ARGS, "--format", "plain"])
     assert res.exit_code == 0
     assert RUN_ID in res.stdout and "slippage" in res.stdout
+
+
+class StreamingFakeClient(FakeClient):
+    """A client that submits, then follows the event stream (E4-S3 ``--stream``)."""
+
+    def __init__(
+        self, outcome: BacktestResult | Exception, submitted: BacktestResult, frames: list[Any]
+    ) -> None:
+        super().__init__(outcome)
+        self._submitted = submitted
+        self.frames = frames
+        self.submit_calls: list[dict[str, Any]] = []
+        self.stream_calls: list[str] = []
+
+    def submit_backtest(self, **kwargs: Any) -> BacktestResult:
+        self.submit_calls.append(kwargs)
+        return self._submitted
+
+    def stream_backtest(self, run_id: str, *, on_frame: Any = None) -> BacktestResult:
+        self.stream_calls.append(run_id)
+        for frame in self.frames:
+            if on_frame is not None:
+                on_frame(frame)
+        if isinstance(self.outcome, Exception):
+            raise self.outcome
+        return self.outcome
+
+
+def test_stream_submits_prints_the_run_id_and_follows_events(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = StreamingFakeClient(
+        result("completed", metrics=METRICS, assumptions=ASSUMPTIONS),
+        submitted=result("pending"),
+        frames=[{"kind": "status", "status": "running", "seq": 0}],
+    )
+    monkeypatch.setattr(cli, "_open_client", lambda **kw: client)
+    res = invoke([*ARGS, "--stream"])
+    assert res.exit_code == 0, res.output
+    assert client.submit_calls and client.stream_calls == [RUN_ID]
+    out = json.loads(res.stdout)
+    assert out["run_id"] == RUN_ID and out["status"] == "completed"
+    assert f"run_id: {RUN_ID}" in res.stderr
+    assert '"running"' in res.stderr  # the streamed frame
+
+
+def test_wait_is_the_default_and_is_accepted_alone(fake: list[Any]) -> None:
+    use(fake, result("completed", metrics=METRICS, assumptions=ASSUMPTIONS))
+    res = invoke([*ARGS, "--wait"])
+    assert res.exit_code == 0, res.output
+    assert fake[1].calls  # run_backtest, i.e. poll to completion
+
+
+def test_wait_and_stream_together_are_a_usage_error(fake: list[Any]) -> None:
+    res = invoke([*ARGS, "--wait", "--stream"])
+    assert res.exit_code == 2, res.output
+    assert len(fake) == 1  # no client was opened

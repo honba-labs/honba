@@ -178,6 +178,57 @@ class HttpTransport:
             ) from exc
         return Response(http.status_code, _parse_json(http.text))
 
+    def stream(
+        self,
+        method: str,
+        path: str,
+        *,
+        query: Mapping[str, Any] | None = None,
+        body: Any = None,
+        on_frame: Callable[[bytes], None] | None = None,
+    ) -> int:
+        """Follow a server-sent-events response, calling ``on_frame`` with each ``data:``
+        payload (``bytes``); returns the number of frames.
+
+        Raises :class:`TransportApiError` on a connection failure, a timeout, or a non-2xx
+        status.
+        """
+        headers = {"accept": "text/event-stream"}
+        if body is not None:
+            headers["content-type"] = "application/json"
+        try:
+            with self._http.stream(
+                method,
+                path,
+                params=dict(query) if query else None,
+                content=_dumps(body).encode() if body is not None else None,
+                headers=headers,
+            ) as response:
+                if not 200 <= response.status_code < 300:
+                    response.read()
+                    raise TransportApiError(
+                        "transport_error",
+                        f"HTTP {response.status_code} on the event stream",
+                        status=response.status_code,
+                        retryable=False,
+                    )
+                count = 0
+                for line in response.iter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    if on_frame is not None:
+                        on_frame(line[len("data:") :].lstrip().encode())
+                    count += 1
+                return count
+        except httpx.TimeoutException as exc:
+            raise TransportApiError(
+                "timeout", str(exc) or "event stream timed out", retryable=True
+            ) from exc
+        except httpx.TransportError as exc:
+            raise TransportApiError(
+                "transport_error", str(exc) or type(exc).__name__, retryable=True
+            ) from exc
+
     def close(self) -> None:
         self._http.close()
 
@@ -256,6 +307,40 @@ class InprocTransport:
                 "transport_error", str(exc) or type(exc).__name__, retryable=False
             ) from exc
         return Response(status, _parse_json(text))
+
+    def stream(
+        self,
+        method: str,
+        path: str,
+        *,
+        query: Mapping[str, Any] | None = None,
+        body: Any = None,
+        on_frame: Callable[[bytes], None] | None = None,
+    ) -> int:
+        """Follow a server-sent-events response through the native router, calling ``on_frame``
+        with each ``data:`` payload (``bytes``); returns the number of frames."""
+        extra: dict[str, Any] = {}
+        if self._journals_dir is not None:
+            extra["journals_dir"] = self._journals_dir
+            if self._max_concurrent_runs is not None:
+                extra["max_concurrent_runs"] = self._max_concurrent_runs
+            if self._max_queued_runs is not None:
+                extra["max_queued_runs"] = self._max_queued_runs
+        callback = on_frame if on_frame is not None else (lambda _payload: None)
+        try:
+            return native_attr("api_request_stream")(
+                self._data_dir,
+                method,
+                path,
+                callback,
+                _dumps(dict(query)) if query else None,
+                _dumps(body) if body is not None else None,
+                **extra,
+            )
+        except (OSError, ValueError) as exc:
+            raise TransportApiError(
+                "transport_error", str(exc) or type(exc).__name__, retryable=False
+            ) from exc
 
     def close(self) -> None:
         """Nothing to release: the native state is process-wide."""

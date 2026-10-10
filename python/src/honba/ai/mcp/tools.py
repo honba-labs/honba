@@ -56,6 +56,9 @@ TOOL_BINDINGS: dict[str, _Binding] = {
     "screen": _Binding("GET", "/screener/scan"),
     "get_instruments": _Binding("GET", "/instruments"),
     "get_bars": _Binding("GET", "/bars/{id}"),
+    "get_backtest": _Binding("GET", "/backtests/{id}"),
+    "get_backtest_journal": _Binding("GET", "/backtests/{id}/journal"),
+    "get_sweep": _Binding("GET", "/sweeps/{id}"),
 }
 
 

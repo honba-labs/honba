@@ -21,6 +21,7 @@ __all__ = [
     "RustSmaCrossover",
     "TradingState",
     "api_request",
+    "api_request_stream",
     "canonical_json",
     "codegen_artifacts",
     "codegen_render",
@@ -65,6 +66,25 @@ def api_request(
     and pending queue (``None``: server defaults). Raises ``OSError`` when ``data_dir`` or
     ``journals_dir`` cannot be loaded and ``ValueError`` for a malformed request (bad method,
     relative path, non-flat query). Wrapped by ``honba.client.InprocTransport``.
+    """
+
+def api_request_stream(
+    data_dir: str,
+    method: str,
+    path: str,
+    callback: Callable[[bytes], None],
+    query_json: str | None = None,
+    body_json: str | None = None,
+    journals_dir: str | None = None,
+    max_concurrent_runs: int | None = None,
+    max_queued_runs: int | None = None,
+) -> int:
+    """Follow a server-sent-events response through the REST router, in process.
+
+    Sends one request (same arguments as :func:`api_request`) and calls ``callback`` with each
+    SSE ``data:`` payload (``bytes``); returns the number of frames delivered. ``ValueError``
+    for a malformed request and ``OSError`` when ``data_dir`` or ``journals_dir`` cannot be
+    loaded. Wrapped by ``honba.client.InprocTransport.stream``.
     """
 
 def canonical_json(kind: str, payload: str) -> str: ...

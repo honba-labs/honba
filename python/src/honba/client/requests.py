@@ -451,3 +451,22 @@ def get_backtest(run_id: str) -> ApiRequest:
 def backtest_journal(run_id: str) -> ApiRequest:
     """``GET /backtests/{id}/journal``."""
     return ApiRequest("GET", f"/backtests/{_run_id_segment(run_id)}/journal")
+
+
+def backtest_events(run_id: str, *, resume_from_seq: int | None = None) -> ApiRequest:
+    """``GET /backtests/{id}/events`` (ADR 0021): the run's SSE event stream.
+
+    ``resume_from_seq`` replays journal records with line index ``>=`` it; ``None`` starts at 0.
+    """
+    query: dict[str, Any] = {}
+    if resume_from_seq is not None:
+        if isinstance(resume_from_seq, bool) or not isinstance(resume_from_seq, int):
+            raise RequestValidationError(
+                "resume_from_seq", "invalid_value", "resume_from_seq must be a non-negative integer"
+            )
+        if resume_from_seq < 0:
+            raise RequestValidationError(
+                "resume_from_seq", "invalid_value", "resume_from_seq must be >= 0"
+            )
+        query["resume_from_seq"] = resume_from_seq
+    return ApiRequest("GET", f"/backtests/{_run_id_segment(run_id)}/events", query or None)

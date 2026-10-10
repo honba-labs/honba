@@ -127,6 +127,32 @@
   cancels pending runs and waits the grace period for running ones. The generated OpenAPI,
   `.pyi` and MCP artifacts are unchanged (route behaviour is not part of them).
 
+### Run client and `honba backtest` CLI (E4-S3 q2d, ADR 0017 decision 9)
+
+- `honba.client.Client` gains `submit_backtest`, `backtest`, `backtest_journal`, `wait`,
+  `run_backtest` (submit then wait), and `stream_backtest` (follow SSE to completion); all work
+  over both `InprocTransport` and `HttpTransport`.
+- `honba backtest` CLI: accepts flags or a manifest file (JSON/TOML); `--wait` (poll to
+  completion, the default) or `--stream` (print `run_id` at once, follow
+  `GET /backtests/{id}/events`); exit codes: 0 completed, 1 failed run, 2 validation/usage
+  (422), 3 transport/queue (429/503/timeout). Parity with `BacktestSession` is asserted for
+  `buy_and_hold` and `sma_crossover`; metric differences (round-trip vs mark-to-market P&L,
+  fraction vs percent return, drawdown series, Sharpe at 252) are documented.
+- MCP: `get_backtest`, `get_backtest_journal`, `get_sweep` tools (read-only) added to the
+  generated artifact and bound in `honba.ai.mcp.tools.TOOL_BINDINGS`; an agent can submit,
+  poll, and read a run without the CLI.
+
+### MCP server and CLI (E5-S1, ADR 0016 decision 9 / ADR 0017 decision 9)
+
+- `honba.ai.mcp.server`: thin MCP server over the generated tool schemas (`schema/mcp/mcp_tools.json`);
+  lists and calls tools through `honba.ai.mcp.handlers.McpGateway` and `honba.client.Client`.
+- `honba mcp serve` CLI: serves the gateway over stdio; `--data-dir` (in-proc) or `--base-url`
+  (remote `honba serve`); `--allow-writes` toggles the read-only kill switch.
+- Toolset filter: `McpGateway(toolset=...)` restricts the exposed tool names; unknown tool is
+  `mcp_unknown_tool`; write tool while read-only is `mcp_read_only`.
+- Free-text result fields (symbol, name, message, etc.) wrapped in the trust envelope
+  (`honba.ai.trust.wrap_untrusted`) before an agent sees them.
+
 ### Run lifecycle types: `RunStatus::Cancelled`, `error` on run responses (E4-S3 / E11-S3, ADR 0017, q1)
 
 - `RunStatus` gains `cancelled` (`pending -> running -> completed | failed | cancelled`, plus

@@ -281,7 +281,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 |---|---|---|---|---|---|
 | E4-S1 (DONE) | Journal schema v1 (seed, config hash, dataset id, git rev, trial count, schema_version) from `AuditLog`; result cache keyed by hash(manifest, params, dataset id, cost-model version) | M | E2-S4, ADR D3 | `journal_schema_roundtrip`, `cache_key_changes_with_costs` / `rerun_hits_cache` | honba |
 | E4-S2 (DONE) | `hyperparameters()` and one-line param declarations drive sweep space; defaults checked by `verify` | S | E0-S8 | `param_range_to_schema` / `sweep_space_from_manifest` | honba (+strategies) |
-| E4-S3 | Finish runner: `honba backtest` CLI, `POST/GET /backtests` with `run_id`, typed `assumptions.not_modelled` and timing rule, manifest-driven | M | ADR 0017 (accepted), E3-S1a | `result_has_not_modelled`, `cli_exit_codes` / `rest_backtest_roundtrip_matches_session` (parity defined on the Rust-registered strategy subset; other strategies are 422) | honba |
+| E4-S3 (DONE) | Finish runner: `honba backtest` CLI, `POST/GET /backtests` with `run_id`, `assumptions.not_modelled` + timing rule, `--wait`/`--stream`, MCP run tools; manifest-driven | M | ADR 0017 (accepted), E3-S1a | `result_has_not_modelled`, `cli_exit_codes` / `rest_backtest_roundtrip_matches_session` (parity defined on the Rust-registered strategy subset; other strategies are 422) | honba |
 | E4-S4 (DONE) | Look-ahead guarantee: truncating future data never changes earlier decisions; vectorized vs event-driven parity | M | E4-S3 | `truncation_property` / `prefilter_vs_event_driven_fixture` | honba |
 | E4-S5 (DONE) | REST `POST /sweeps`, `GET /sweeps/{id}`; more fitness (Calmar, Sortino, Omega); journal per trial | M | E4-S1, E4-S3 | `fitness_ranking_stable` / `sweep_rest_equals_library` | honba |
 | E4-S6 | Gates in Rust `honba-analytics`: DSR, PBO, walk-forward efficiency, one-shot holdout (reads trial count), block-bootstrap MC, 2x cost-stress | L -> split | E4-S1, E4-S5, E3-S3 | `dsr_known_values`, `bootstrap_seeded` / `result_carries_validation_block` | honba |
@@ -295,7 +295,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 |---|---|---|---|---|---|
 | E5-S5 | AI strategy verifier: AST, import allowlist, subprocess with rlimits, no network, deterministic smoke, look-ahead check, red-team tests; ADR D7 | M | E4-S4, ADR | `ast_rejects_forbidden_import` / `generated_strategy_passes_same_suite_as_handwritten` | honba |
 | E5-S2 | Trust envelope: broker/LLM/instrument text wrapped and marked untrusted | S | none | `wraps_untrusted_text` / `mcp_tool_output_marked` | honba |
-| E5-S1 | Thin Python MCP server over generated `mcp_tools.json` (20 tools); toolset filter; read-only kill switch | M | E5-S2 | `toolset_filter` / `mcp_call_matches_rest_response` | honba |
+| E5-S1 (DONE) | Thin Python MCP server over generated `mcp_tools.json` (11 tools: backtest, sweep, verify_strategy, compile_strategy, list_strategies, screen, get_instruments, get_bars, get_backtest, get_backtest_journal, get_sweep); toolset filter; read-only kill switch | M | E5-S2 | `toolset_filter` / `mcp_call_matches_rest_response` | honba |
 | E5-S3 | Scope map (read:market, read:account, write:orders, research) with CI drift test; audit by token id | S | E5-S1, E11-S8 min | `scope_for_every_endpoint` / `drift_test_fails_on_new_route` | honba |
 | E5-S4 | Approval queue for placements; cancel/modify bypass | M | E2-S2, E5-S3 | `placement_held`, `cancel_bypasses` / `approve_flows_through_risk_to_sim` | honba |
 | E5-S7 | Typed LLM decisions (veto/size-down only), journaled | S | E5-S5, E4-S1 | `schema_rejects_increase` / `decision_in_journal` | honba |
@@ -427,7 +427,7 @@ Checked about 25 verdicts against code, git log and ls/grep (read-only). Counts:
 |---|---|---|---|
 | E10-S6 | NOT STARTED | `crates/honba-sweep/tests/sweep.rs` runs `determinism_under_threads` at 1, 4, 16 workers comparing journal and ranking | DONE |
 | E2-S2 | PARTIAL ("`honba-risk` skeleton, `RiskCheck` stub") | No `honba-risk` crate; `engine/src/risk/mod.rs` is 9 bytes; no `RiskCheck` anywhere | NOT STARTED |
-| E4-S3 | PARTIAL, "`not_modelled` list exists (CHANGELOG)" | No `not_modelled` in code, schema or CHANGELOG; only `assumptions: Option<Value>` on the DTO; `cli/backtest.py` is 0 bytes; `/backtests` unbuilt | PARTIAL (Python `BacktestSession` only; claim removed) |
+| E4-S3 | PARTIAL, "`not_modelled` list exists (CHANGELOG)" | `not_modelled` + timing in `assumptions: Option<Value>`; `honba backtest` CLI with `--wait`/`--stream`; `InprocTransport`/`HttpTransport`; `POST/GET /backtests` + journal; MCP `get_backtest`, `get_backtest_journal`, `get_sweep`; parity test passes | DONE |
 | E11-S4 | NOT STARTED, "WS/SSE routes return 501" | Verdict right; no stream route is registered at all (22 routes in `endpoints.rs`, none streaming) | NOT STARTED (evidence fixed) |
 | E10-S3 | PARTIAL, "feedback unverified" | `Engine::apply_output` applies orders, cancels, state; fills re-enter queue as `OrderFilled`; commit daf12d5 | DONE (E2-S5 likewise DONE) |
 | E10-S2 | PARTIAL | `honba-async` `EngineHandle`, clocks, command channel, tests, commit 49ffb32 | DONE |
@@ -449,4 +449,4 @@ Checked about 25 verdicts against code, git log and ls/grep (read-only). Counts:
 | E3-S3 | PARTIAL, "cost model wired to fills" | Rust `CostSchedule` unused by `honba-sim`; only Python `fill_costs_from_model` path | PARTIAL (Python only) |
 
 Verdicts confirmed by the spot-check: E3-S1 (L1 only; sim stubs), E11-S5 (indicators and ATR only; screener evaluator not exported to WASM),
-E5-S1 (20 tool schemas, MCP server files 0 bytes), E1-S1, E0-S7, E0-S1..S3, E11-S1/S2, E10-S1, E9 (all not started), E5-S4/S5/S6/S7.
+E5-S1 (DONE) (11 tool schemas, MCP server with CLI `honba mcp serve`); E1-S1, E0-S7, E0-S1..S3, E11-S1/S2, E10-S1, E9 (all not started), E5-S4/S5/S6/S7.
