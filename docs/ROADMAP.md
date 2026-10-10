@@ -276,7 +276,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 | ID | Scope | Size | Deps | Acceptance | Owner |
 |---|---|---|---|---|---|
 | E4-S1 (DONE) | Journal schema v1 (seed, config hash, dataset id, git rev, trial count, schema_version) from `AuditLog`; result cache keyed by hash(manifest, params, dataset id, cost-model version) | M | E2-S4, ADR D3 | `journal_schema_roundtrip`, `cache_key_changes_with_costs` / `rerun_hits_cache` | honba |
-| E4-S2 | `hyperparameters()` and one-line param declarations drive sweep space; defaults checked by `verify` | S | E0-S8 | `param_range_to_schema` / `sweep_space_from_manifest` | honba (+strategies) |
+| E4-S2 (DONE) | `hyperparameters()` and one-line param declarations drive sweep space; defaults checked by `verify` | S | E0-S8 | `param_range_to_schema` / `sweep_space_from_manifest` | honba (+strategies) |
 | E4-S3 | Finish runner: `honba backtest` CLI, `POST/GET /backtests` with `run_id`, typed `assumptions.not_modelled` and timing rule, manifest-driven | M | ADR 0017 (accepted), E3-S1a | `result_has_not_modelled`, `cli_exit_codes` / `rest_backtest_roundtrip_matches_session` (parity defined on the Rust-registered strategy subset; other strategies are 422) | honba |
 | E4-S4 | Look-ahead guarantee: truncating future data never changes earlier decisions; vectorized vs event-driven parity | M | E4-S3 | `truncation_property` / `prefilter_vs_event_driven_fixture` | honba |
 | E4-S5 rest | REST `POST /sweeps`, `GET /sweeps/{id}`; more fitness (Calmar, Sortino, Omega); journal per trial | M | E4-S1, E4-S3 | `fitness_ranking_stable` / `sweep_rest_equals_library` | honba |
@@ -434,7 +434,7 @@ Checked about 25 verdicts against code, git log and ls/grep (read-only). Counts:
 | E1-S2 | PARTIAL, "Instrument has option fields; round-trip tests" | `Instrument` has no expiry/strike; `india/fno/mod.rs` is 8 bytes | PARTIAL (trait only) |
 | E3-S2 | PARTIAL, "FillModel/LatencyModel traits" | Only a config enum in `honba-config`; `sim/{latency,cost,simulator}` are stubs | NOT STARTED |
 | E2-S9 | PARTIAL, "StateCache stub in execution.rs" | `engine/src/cache/mod.rs` is a 10-byte stub; `execution.rs` has no cache | NOT STARTED |
-| E4-S2 | PARTIAL, "manifest params with `range=a:b:step`" | No range or hyperparameter code in `strategies/manifest.py` or `base.py` | NOT STARTED |
+| E4-S2 | PARTIAL, "manifest params with `range=a:b:step`" | One-line Parameter declarations, `hyperparameters()`, manifest validation and grid generation | DONE |
 | E4-S6 | PARTIAL, "DSR/PBO/MC in CHANGELOG" | `monte_carlo.rs` and `walk_forward.rs` are 1-line uncompiled files; no DSR/PBO anywhere | NOT STARTED |
 | E4-S1 | PARTIAL, "BacktestResult wire model (commit 166c0bd)" | Journal v1 schema + NDJSON (`honba-engine`), ResultCache + CacheKey (`honba-api`), integration in `BacktestExecutor` | DONE |
 | E4-S5 | PARTIAL, "fitness enum Sharpe, Calmar, Sortino, Omega" | Only `SharpeFitness` implements the `Fitness` trait | PARTIAL (corrected) |
