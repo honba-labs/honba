@@ -480,10 +480,15 @@ class SweepReportResponse:
     ranked: list[Any]
 
 class SweepRequest:
+    bar_spec: str | None = None
+    end: str | None = None
+    initial_capital: float | None = None
     params: Any = None
     seed: int | None = None
+    start: str | None = None
     strategy: str | None = None
     trials: int | None = None
+    universe: str | None = None
 
 class SweepResponse:
     error: ErrorDetail | None = None

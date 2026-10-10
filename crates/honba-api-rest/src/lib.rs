@@ -156,6 +156,7 @@ pub fn api_router_with_config(state: AppState, config: &ApiConfig) -> Router {
         .route("/backtests/:id/journal", get(runs::get_backtest_journal))
         .route("/sweeps", post(post_sweeps))
         .route("/sweeps/:id", get(get_sweep_by_id))
+        .route("/sweeps/:id/journal", get(runs::get_sweep_journal))
         .route("/orders", post(post_orders).get(get_orders))
         .route("/orders/:id", delete(delete_order))
         .route("/positions/close", post(post_close_positions))
@@ -232,15 +233,11 @@ pub async fn serve_with_config(
 /// ADR 0017 decision 7 shrinks the list to the trading rows once the sweeps
 /// (E4-S5) land; ADR 0018 decision 7 (E2-S2 r5b) risk-gates `POST /orders`,
 /// `DELETE /orders/{id}` and `POST /positions/close`, so those left the list.
-/// The two sweep rows and the write ledger `GET /orders` (E11-S7) remain.
+/// The write ledger `GET /orders` (E11-S7) remains.
 ///
 /// Remove a row when its handler is built; `tests/capabilities.rs` probes the router and fails
 /// if this list and the real answers disagree.
-pub const NOT_IMPLEMENTED_ENDPOINTS: &[(&str, &str)] = &[
-    ("POST", "/sweeps"),
-    ("GET", "/sweeps/{id}"),
-    ("GET", "/orders"),
-];
+pub const NOT_IMPLEMENTED_ENDPOINTS: &[(&str, &str)] = &[("GET", "/orders")];
 
 fn endpoint_key((method, path): &(&str, &str)) -> String {
     format!("{method} {path}")
@@ -353,12 +350,15 @@ async fn post_verify_strategy(
     }
 }
 
-async fn post_sweeps(ApiJson(_req): ApiJson<SweepRequest>) -> NotImplemented {
-    not_implemented("running a sweep")
+async fn post_sweeps(
+    State(state): State<Arc<AppState>>,
+    ApiJson(request): ApiJson<SweepRequest>,
+) -> Response {
+    runs::post_sweeps(State(state), ApiJson(request)).await
 }
 
-async fn get_sweep_by_id(Path(_id): Path<String>) -> NotImplemented {
-    not_implemented("reading a sweep")
+async fn get_sweep_by_id(State(state): State<Arc<AppState>>, Path(id): Path<String>) -> Response {
+    runs::get_sweep_by_id(State(state), Path(id)).await
 }
 
 async fn get_orders() -> NotImplemented {

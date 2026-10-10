@@ -7,6 +7,7 @@ use crate::{
     ResolvedSweep, RunEvent, RunId, RunIdGenerator, RunKind, RunManifest, RunStatus,
     StrategyCatalog, MANIFEST_VERSION,
 };
+use honba_messages::UnixNanos;
 
 use super::tests_manifest;
 
@@ -223,9 +224,14 @@ fn a_sweep_manifest_projects_a_sweep_response() {
         compiled.ir,
         ResolvedRequest::Sweep(ResolvedSweep {
             strategy: "sma".into(),
-            params: json!({"fast": [5, 20, 5]}),
+            params: json!({"params": {"fast": [5, 20, 5]}, "fitness": "sharpe"}),
             trials: 10,
             seed: 7,
+            universe: "TCS.NSE".into(),
+            start: UnixNanos::from_u64(1),
+            end: UnixNanos::from_u64(2),
+            bar_spec: "1d".into(),
+            initial_capital: 1_000_000.0,
         }),
         "t0",
     );

@@ -246,17 +246,25 @@ fn a_catalog_ir_runs_through_its_registered_name() {
 }
 
 #[test]
-fn a_sweep_job_is_not_implemented_by_this_executor() {
+fn a_sweep_job_is_implemented_by_this_executor() {
     let mut job = job(42);
     job.kind = RunKind::Sweep;
     job.request = ResolvedRequest::Sweep(ResolvedSweep {
         strategy: "sma_crossover".into(),
-        params: json!({"fast": [1, 2, 1]}),
+        params: json!({"params": {"fast": [1, 2, 1]}, "fitness": "sharpe"}),
         trials: 2,
         seed: 42,
+        universe: "TCS.NSE".into(),
+        start: UnixNanos::from_u64(1),
+        end: UnixNanos::from_u64(2),
+        bar_spec: "1d".into(),
+        initial_capital: 1_000_000.0,
     });
+    // The executor now implements sweeps; it should return a proper error (not NotImplemented)
+    // because the Memory journal writer doesn't have real data
     let err = executor().execute(job, &mut Memory::default()).unwrap_err();
-    assert_eq!(err.code, ErrorCode::NotImplemented);
+    // Should be market_data_unavailable or some other error, not NotImplemented
+    assert_ne!(err.code, ErrorCode::NotImplemented);
 }
 
 #[test]

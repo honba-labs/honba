@@ -76,11 +76,11 @@ fn error_statuses_and_codes_match_the_served_api() {
         (status, &body["error"]["code"]),
         (422, &json!("validation_invalid_request"))
     );
-    // Sweeps stay unbuilt until E4-S5.
+    // POST /sweeps is now built (E4-S5): an empty body fails resolution.
     let (status, body) = call(&dir, "POST", "/sweeps", None, Some("{}"));
     assert_eq!(
         (status, &body["error"]["code"]),
-        (501, &json!("not_implemented"))
+        (422, &json!("validation_invalid_request"))
     );
 }
 

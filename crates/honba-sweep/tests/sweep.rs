@@ -90,7 +90,7 @@ fn sma(seed: u64, symbol: &str, fast: usize, slow: usize) -> TrialParams {
 fn custom(seed: u64, factory: Arc<dyn StrategyFactory>) -> TrialParams {
     TrialParams {
         seed,
-        spec: StrategySpec::Custom(factory),
+        spec: StrategySpec::Custom { inner: factory },
     }
 }
 

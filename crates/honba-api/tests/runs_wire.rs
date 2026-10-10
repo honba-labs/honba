@@ -106,14 +106,34 @@ fn a_submit_body_resolves_through_serde() {
 
 #[test]
 fn a_sweep_body_resolves_through_serde() {
-    let body = json!({"strategy": "sma", "params": {"fast": [5, 20, 5]}, "trials": 3, "seed": 9});
+    let body = json!({
+        "strategy": "sma",
+        "universe": "TCS.NSE",
+        "start": "2024-01-01",
+        "end": "2024-06-01",
+        "bar_spec": "1d",
+        "initial_capital": 1_000_000.0,
+        "params": {"fast": [5, 20, 5]},
+        "trials": 3,
+        "seed": 9
+    });
     let resolved = serde_json::from_value::<SweepRequest>(body)
         .unwrap()
         .resolve()
         .unwrap();
     assert_eq!((resolved.trials, resolved.seed), (3, 9));
 
-    let zero = json!({"strategy": "sma", "params": {"a": [1, 2, 1]}, "trials": 3, "seed": 0});
+    let zero = json!({
+        "strategy": "sma",
+        "universe": "TCS.NSE",
+        "start": "2024-01-01",
+        "end": "2024-06-01",
+        "bar_spec": "1d",
+        "initial_capital": 1_000_000.0,
+        "params": {"a": [1, 2, 1]},
+        "trials": 3,
+        "seed": 0
+    });
     let err = serde_json::from_value::<SweepRequest>(zero)
         .unwrap()
         .resolve()

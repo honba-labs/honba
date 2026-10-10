@@ -907,6 +907,28 @@
             "additionalProperties": false,
             "description": "Parameter ranges, trial count, and seed.",
             "properties": {
+              "bar_spec": {
+                "description": "Bar specification as a string (e.g. \"1d\").",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "end": {
+                "description": "Exclusive end date/time.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "initial_capital": {
+                "description": "Initial capital.",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
               "params": {
                 "description": "Parameter ranges, as a JSON object of name to [low, high, step]."
               },
@@ -916,6 +938,13 @@
                 "minimum": 0.0,
                 "type": [
                   "integer",
+                  "null"
+                ]
+              },
+              "start": {
+                "description": "Inclusive start date/time.",
+                "type": [
+                  "string",
                   "null"
                 ]
               },
@@ -932,6 +961,13 @@
                 "minimum": 0.0,
                 "type": [
                   "integer",
+                  "null"
+                ]
+              },
+              "universe": {
+                "description": "Universe of instruments.",
+                "type": [
+                  "string",
                   "null"
                 ]
               }

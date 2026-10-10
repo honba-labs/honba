@@ -51,6 +51,16 @@ pub struct ResolvedSweep {
     pub trials: u64,
     /// Seed, non-zero.
     pub seed: u64,
+    /// Universe of instruments.
+    pub universe: String,
+    /// Inclusive start.
+    pub start: UnixNanos,
+    /// Exclusive end, strictly after `start`.
+    pub end: UnixNanos,
+    /// Bar specification text, e.g. `1d`.
+    pub bar_spec: String,
+    /// Initial capital, finite and positive.
+    pub initial_capital: f64,
 }
 
 /// A resolved run request of either kind (what a manifest pins).
@@ -139,6 +149,12 @@ impl SweepRequest {
     pub fn resolve(&self) -> Result<ResolvedSweep, ErrorDetail> {
         let seed = seed(self.seed)?;
         let strategy = required("strategy", &self.strategy)?.to_owned();
+        let universe = required("universe", &self.universe)?.to_owned();
+        let start = required("start", &self.start)?.to_owned();
+        let end = required("end", &self.end)?.to_owned();
+        let bar_spec = self.bar_spec.as_deref().map_or("1d", str::trim).to_owned();
+        let initial_capital = self.initial_capital.unwrap_or(1_000_000.0);
+
         let params = match &self.params {
             None => return Err(invalid("params", "missing", "params is required")),
             Some(Value::Object(map)) if !map.is_empty() => Value::Object(map.clone()),
@@ -155,11 +171,27 @@ impl SweepRequest {
             Some(0) => return Err(invalid("trials", "zero", "trials must be at least 1")),
             Some(n) => n,
         };
+
+        let start_ns = crate::market::parse_bound("start", &start)?;
+        let end_ns = crate::market::parse_bound("end", &end)?;
+        if start_ns >= end_ns {
+            return Err(crate::market::invalid(
+                "end",
+                "empty_range",
+                "`start` must be strictly before `end`",
+            ));
+        }
+
         Ok(ResolvedSweep {
             strategy,
             params,
             trials,
             seed,
+            universe,
+            start: start_ns,
+            end: end_ns,
+            bar_spec,
+            initial_capital,
         })
     }
 }

@@ -135,6 +135,21 @@ pub struct SweepRequest {
     /// Strategy name or manifest id.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub strategy: Option<String>,
+    /// Universe of instruments.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub universe: Option<String>,
+    /// Inclusive start date/time.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start: Option<String>,
+    /// Exclusive end date/time.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end: Option<String>,
+    /// Bar specification as a string (e.g. "1d").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bar_spec: Option<String>,
+    /// Initial capital.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub initial_capital: Option<f64>,
     /// Parameter ranges, as a JSON object of name to [low, high, step].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub params: Option<serde_json::Value>,

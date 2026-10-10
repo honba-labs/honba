@@ -60,9 +60,14 @@ fn a_job_carries_what_the_manifest_pins() {
 fn a_sweep_job_carries_the_sweep_kind_and_seed() {
     let m = manifest(ResolvedRequest::Sweep(ResolvedSweep {
         strategy: "sma".into(),
-        params: json!({"fast": [1, 2, 1]}),
+        params: json!({"params": {"fast": [1, 2, 1]}, "fitness": "sharpe"}),
         trials: 2,
         seed: 7,
+        universe: "TCS.NSE".into(),
+        start: UnixNanos::from_u64(1),
+        end: UnixNanos::from_u64(2),
+        bar_spec: "1d".into(),
+        initial_capital: 1_000_000.0,
     }));
     let job = RunJob::from_manifest(&m);
     assert_eq!(job.kind, RunKind::Sweep);
@@ -91,9 +96,14 @@ fn a_backtest_outcome_completes_a_running_manifest() {
 fn a_sweep_outcome_completes_a_running_sweep_manifest() {
     let mut m = manifest(ResolvedRequest::Sweep(ResolvedSweep {
         strategy: "sma".into(),
-        params: json!({"fast": [1, 2, 1]}),
+        params: json!({"params": {"fast": [1, 2, 1]}, "fitness": "sharpe"}),
         trials: 2,
         seed: 7,
+        universe: "TCS.NSE".into(),
+        start: UnixNanos::from_u64(1),
+        end: UnixNanos::from_u64(2),
+        bar_spec: "1d".into(),
+        initial_capital: 1_000_000.0,
     }));
     m.start("a").unwrap();
     let report = SweepReportResponse {

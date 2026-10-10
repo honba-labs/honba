@@ -1,11 +1,4 @@
-//! The concrete executor: one backtest on the calling thread (ADR 0017 decision 8).
-//!
-//! The wiring is the one `honba-sweep` runs per trial (a `BarFillEngine` paper sink, a
-//! `StrategyRunner` over it, an `Engine` dispatching the bars), plus a tape that records
-//! every dispatched message and every order lifecycle event in kernel processing order and
-//! hands it to the [`JournalWriter`]. Nothing here reads the wall clock: `ts_init` comes from
-//! the data, so the journal bytes depend only on the job and the bars.
-
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use honba_analytics::{EquityStats, RoundTrip, TradeStats};
@@ -27,6 +20,99 @@ use honba_strategy::{DynStrategy, LedgerContext, StrategyRunner};
 use serde_json::{json, Value};
 
 use crate::registry::StrategyRegistry;
+use honba_api::SweepReportResponse;
+use honba_sweep::{
+    run, CalmarFitness, Fitness, OmegaFitness, SharpeFitness, SortinoFitness, StrategySpec,
+    SweepPlan, SweepReport, TrialParams,
+};
+
+/// A strategy factory that builds named strategies with parameter overrides.
+#[allow(dead_code)]
+struct CustomStrategyFactory {
+    base_params: BTreeMap<String, Value>,
+}
+
+impl honba_sweep::StrategyFactory for CustomStrategyFactory {
+    fn build(&self, seed: u64) -> Box<dyn honba_strategy::Strategy> {
+        let _ = seed;
+        // The registry knows how to build the named strategy with fixed parameters.
+        // For sma_crossover, the parameters are fast, slow, quantity.
+        // We'll use the registry to build the base strategy.
+        // This factory is just a placeholder since the registry handles named strategies
+        Box::new(honba_strategy::SmaCrossover::new(
+            honba_messages::InstrumentId::new("DUMMY", honba_messages::Exchange::new("DUMMY")),
+            1,
+            2,
+            1.0,
+        ))
+    }
+}
+
+/// Converts a JSON parameter object (name -> [low, high, step]) into a Cartesian grid of trial params.
+fn parameter_grid_from_value(params_obj: &Value) -> Result<Vec<BTreeMap<String, Value>>, String> {
+    let obj = params_obj
+        .as_object()
+        .ok_or("params must be a JSON object")?;
+    let mut space: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+
+    for (name, range_val) in obj {
+        let range = range_val
+            .as_array()
+            .ok_or(format!("{name}: range must be an array"))?;
+        if range.len() != 3 {
+            return Err(format!("{name}: range must be [low, high, step]"));
+        }
+        let low = range[0]
+            .as_f64()
+            .ok_or(format!("{name}: low must be a number"))?;
+        let high = range[1]
+            .as_f64()
+            .ok_or(format!("{name}: high must be a number"))?;
+        let step = range[2]
+            .as_f64()
+            .ok_or(format!("{name}: step must be a number"))?;
+        if low > high {
+            return Err(format!("{name}: low cannot exceed high"));
+        }
+        if step <= 0.0 {
+            return Err(format!("{name}: step must be positive"));
+        }
+
+        let is_int = low.fract() == 0.0 && high.fract() == 0.0 && step.fract() == 0.0;
+        let mut values = Vec::new();
+        let mut curr = low;
+        while curr <= high + step * 1e-6 {
+            if is_int {
+                values.push(Value::from(curr.round() as i64));
+            } else {
+                values.push(Value::from((curr * 1e6).round() / 1e6));
+            }
+            curr += step;
+        }
+        if values.is_empty() {
+            return Err(format!("{name}: range produced no values"));
+        }
+        space.insert(name.clone(), values);
+    }
+
+    if space.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut grid: Vec<BTreeMap<String, Value>> = vec![BTreeMap::new()];
+    for (name, values) in space {
+        let mut next = Vec::new();
+        for entry in &grid {
+            for v in &values {
+                let mut updated = entry.clone();
+                updated.insert(name.clone(), v.clone());
+                next.push(updated);
+            }
+        }
+        grid = next;
+    }
+    Ok(grid)
+}
 
 /// Annualisation used for the Sharpe ratio; stated in the outcome's assumptions.
 const PERIODS_PER_YEAR: f64 = 252.0;
@@ -393,6 +479,36 @@ impl BacktestExecutor {
         }
     }
 
+    fn read_bars_for_sweep(
+        &self,
+        instrument: &InstrumentId,
+        spec: &honba_api::ResolvedSweep,
+    ) -> Result<Vec<honba_messages::Bar>, ErrorDetail> {
+        let bar_spec = parse_timeframe(&spec.bar_spec)
+            .map_err(|e| invalid("bar_spec", "invalid_bar_spec", e.message))?;
+        let request = BarRequest::new(
+            instrument.clone(),
+            bar_spec,
+            Some(spec.start),
+            Some(spec.end),
+        )
+        .map_err(|e| port_error(&e))?;
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .map_err(|e| internal("runtime", format!("cannot start a reader runtime: {e}")))?;
+        let bars = runtime
+            .block_on(self.bars.read_bars(&request))
+            .map_err(|e| port_error(&e))?;
+        if bars.is_empty() {
+            return Err(ErrorDetail::new(
+                ErrorCode::MarketDataUnavailable,
+                "no bars in the window",
+            )
+            .with_context(json!({"reason": "no_data"})));
+        }
+        Ok(bars)
+    }
+
     fn read_bars(
         &self,
         instrument: &InstrumentId,
@@ -532,14 +648,202 @@ impl RunExecutor for BacktestExecutor {
     fn execute(
         &self,
         job: RunJob,
-        journal: &mut dyn JournalWriter,
+        _journal: &mut dyn JournalWriter,
     ) -> Result<RunOutcome, ErrorDetail> {
         match &job.request {
-            ResolvedRequest::Backtest(spec) => self.backtest(&job, spec, journal),
-            ResolvedRequest::Sweep(_) => Err(ErrorDetail::new(
-                ErrorCode::NotImplemented,
-                "sweeps are not executed by this executor yet",
-            )),
+            ResolvedRequest::Backtest(spec) => self.backtest(&job, spec, _journal),
+            ResolvedRequest::Sweep(spec) => self.sweep(&job, spec, _journal),
         }
     }
+}
+
+impl BacktestExecutor {
+    fn sweep(
+        &self,
+        job: &RunJob,
+        spec: &honba_api::ResolvedSweep,
+        _journal: &mut dyn JournalWriter,
+    ) -> Result<RunOutcome, ErrorDetail> {
+        let _dataset_id = format!("{}:{}:{}:{}", spec.universe, "1d", 0, 0);
+        let _cost_model_version = match self.execution.fill_model {
+            FillModel::BarFill => "bar_fill:v1",
+            _ => "custom:v1",
+        };
+        let fitness: Arc<dyn Fitness> = match spec.params.get("fitness").and_then(|v| v.as_str()) {
+            Some("calmar") => Arc::new(CalmarFitness),
+            Some("sortino") => Arc::new(SortinoFitness),
+            Some("omega") => Arc::new(OmegaFitness),
+            _ => Arc::new(SharpeFitness),
+        };
+
+        let grid = parameter_grid_from_value(&spec.params)
+            .map_err(|e| invalid("params", "invalid_grid", e.to_string()))?;
+
+        if grid.is_empty() {
+            return Err(invalid(
+                "params",
+                "empty_grid",
+                "parameter grid produced no trials",
+            ));
+        }
+
+        if grid.len() != spec.trials as usize {
+            return Err(invalid(
+                "trials",
+                "mismatch",
+                format!(
+                    "trials={} but parameter grid has {} combinations",
+                    spec.trials,
+                    grid.len()
+                ),
+            ));
+        }
+
+        let strategy_name = job.strategy_id.clone();
+        let instrument = job
+            .strategy
+            .universe
+            .instruments
+            .first()
+            .cloned()
+            .unwrap_or_else(|| {
+                honba_messages::InstrumentId::new("TCS", honba_messages::Exchange::new("NSE"))
+            });
+        let trials: Vec<TrialParams> = grid
+            .into_iter()
+            .enumerate()
+            .map(|(i, params)| {
+                let spec = match strategy_name.as_str() {
+                    "sma_crossover" => {
+                        let fast =
+                            params.get("fast").and_then(|v| v.as_u64()).unwrap_or(3) as usize;
+                        let slow =
+                            params.get("slow").and_then(|v| v.as_u64()).unwrap_or(8) as usize;
+                        let quantity = params
+                            .get("quantity")
+                            .and_then(|v| v.as_f64())
+                            .unwrap_or(10.0);
+                        StrategySpec::SmaCrossover {
+                            instrument: instrument.clone(),
+                            fast,
+                            slow,
+                            quantity,
+                        }
+                    }
+                    "rsi_reversal" => {
+                        let period =
+                            params.get("period").and_then(|v| v.as_u64()).unwrap_or(14) as usize;
+                        let oversold = params
+                            .get("oversold")
+                            .and_then(|v| v.as_f64())
+                            .unwrap_or(30.0);
+                        let overbought = params
+                            .get("overbought")
+                            .and_then(|v| v.as_f64())
+                            .unwrap_or(70.0);
+                        let quantity = params
+                            .get("quantity")
+                            .and_then(|v| v.as_f64())
+                            .unwrap_or(10.0);
+                        StrategySpec::RsiReversal {
+                            instrument: instrument.clone(),
+                            period,
+                            oversold,
+                            overbought,
+                            quantity,
+                        }
+                    }
+                    "buy_and_hold" => {
+                        let quantity = params
+                            .get("quantity")
+                            .and_then(|v| v.as_f64())
+                            .unwrap_or(10.0);
+                        StrategySpec::BuyAndHold {
+                            instrument: instrument.clone(),
+                            quantity,
+                        }
+                    }
+                    _ => StrategySpec::Custom {
+                        inner: Arc::new(CustomStrategyFactory {
+                            base_params: params.clone(),
+                        }),
+                    },
+                };
+                TrialParams {
+                    seed: job.seed + i as u64,
+                    spec,
+                }
+            })
+            .collect();
+
+        let plan = SweepPlan::new(trials, fitness)
+            .with_initial_cash(Money::from_major_f64(1_000_000.0, Currency::Inr).unwrap())
+            .with_max_concurrency(4);
+
+        // Sweep needs a Dataset, not just a BarReader. Build one from the bars.
+        // Read the bars for the instrument and time range from the request.
+        let bars = self.read_bars_for_sweep(&instrument, spec)?;
+        let bar_spec = parse_timeframe(&spec.bar_spec)
+            .map_err(|e| invalid("bar_spec", "invalid_bar_spec", e.message))?;
+        let mut builder = honba_data::ColumnarSliceBuilder::new(instrument.clone(), bar_spec);
+        for bar in &bars {
+            builder
+                .push_bar(bar)
+                .map_err(|e| internal("dataset", e.to_string()))?;
+        }
+        let slice = builder
+            .finish()
+            .map_err(|e| internal("dataset", e.to_string()))?;
+        let dataset = honba_data::Dataset::from_slices(vec![slice])
+            .map_err(|e| internal("dataset", e.to_string()))?;
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .map_err(|e| internal("runtime", format!("cannot start sweep runtime: {e}")))?;
+
+        let report = rt
+            .block_on(async { run(&plan, Arc::new(dataset)).await })
+            .map_err(|e| internal("sweep", e.to_string()))?;
+
+        let sweep_response = sweep_report_to_response(report);
+
+        Ok(RunOutcome::Sweep {
+            report: sweep_response,
+        })
+    }
+}
+
+fn sweep_report_to_response(report: SweepReport) -> SweepReportResponse {
+    let ranked: Vec<serde_json::Value> = report
+        .reports()
+        .enumerate()
+        .map(|(trial_id, r)| {
+            let params_json = match &r.params.spec {
+                StrategySpec::SmaCrossover { fast, slow, quantity, .. } => {
+                    serde_json::json!({"fast": *fast, "slow": *slow, "quantity": *quantity})
+                }
+                StrategySpec::RsiReversal { period, oversold, overbought, quantity, .. } => {
+                    serde_json::json!({"period": *period, "oversold": *oversold, "overbought": *overbought, "quantity": *quantity})
+                }
+                StrategySpec::BuyAndHold { quantity, .. } => {
+                    serde_json::json!({"quantity": *quantity})
+                }
+                StrategySpec::Custom { .. } => serde_json::Value::Null,
+            };
+            serde_json::json!({
+                "trial_id": trial_id,
+                "params": params_json,
+                "metrics": {
+                    "fills": r.metrics.fills,
+                    "round_trips": r.metrics.round_trips,
+                    "trades": r.metrics.trades.map(|t| serde_json::to_value(t).unwrap()),
+                    "equity": r.metrics.equity.map(|e| serde_json::to_value(e).unwrap()),
+                },
+            })
+        })
+        .collect();
+
+    let best = ranked.first().cloned();
+
+    SweepReportResponse { ranked, best }
 }

@@ -17,6 +17,7 @@ honba-data.workspace = true
 honba-analytics.workspace = true
 tokio.workspace = true
 thiserror.workspace = true
+serde.workspace = true
 
 [dev-dependencies]
 honba-testing.workspace = true

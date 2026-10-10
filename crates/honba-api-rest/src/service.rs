@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 
 use honba_api::{
     unknown_strategy, BacktestRequest, BacktestResponse, JournalWriter, ResolvedRequest,
-    RunExecutor, RunId, RunJob, StrategyCatalog,
+    RunExecutor, RunId, RunJob, StrategyCatalog, SweepRequest,
 };
 use honba_messages::{ErrorCode, ErrorDetail};
 use honba_strategy::StrategyIr;
@@ -240,6 +240,52 @@ impl RunService {
         self.shared.work.notify_one();
         manifest.to_backtest_response().ok_or_else(|| {
             ErrorDetail::new(ErrorCode::InternalError, "admitted run is not a backtest")
+                .with_context(json!({"reason": "run_kind"}))
+        })
+    }
+
+    /// `POST /sweeps`: resolve and validate, check the queue, write the pending manifest
+    /// and enqueue. A refusal at any step leaves nothing on disk and consumes no id.
+    ///
+    /// Errors: 422 `validation_invalid_request` from the resolver or the strategy lookup;
+    /// 429 `rate_limited` with `reason` `run_queue_full` (and `max_queued`) or
+    /// `shutting_down`.
+    pub fn submit_sweep(
+        &self,
+        request: &SweepRequest,
+    ) -> Result<honba_api::SweepResponse, ErrorDetail> {
+        let resolved = request.resolve()?;
+        let (strategy_id, ir) = resolve_strategy(
+            &self.strategies,
+            &self.registry,
+            &resolved.strategy,
+            &resolved.universe,
+            &resolved.bar_spec,
+        )?;
+        // The check and the push share one lock, so the bound cannot be overshot.
+        let mut queue = lock(&self.shared.queue);
+        if queue.closed {
+            return Err(shutting_down());
+        }
+        if queue.items.len() >= self.max_queued {
+            return Err(
+                ErrorDetail::new(ErrorCode::RateLimited, "the run queue is full").with_context(
+                    json!({
+                        "reason": "run_queue_full",
+                        "max_queued": self.max_queued
+                    }),
+                ),
+            );
+        }
+        let manifest =
+            self.shared
+                .store
+                .submit(strategy_id, ir, ResolvedRequest::Sweep(resolved))?;
+        queue.items.push_back(manifest.run_id.clone());
+        drop(queue);
+        self.shared.work.notify_one();
+        manifest.to_sweep_response().ok_or_else(|| {
+            ErrorDetail::new(ErrorCode::InternalError, "admitted run is not a sweep")
                 .with_context(json!({"reason": "run_kind"}))
         })
     }

@@ -126,6 +126,11 @@ fn unknown_strategy_is_a_strategy_field_error() {
 fn full_sweep() -> SweepRequest {
     SweepRequest {
         strategy: Some("sma".into()),
+        universe: Some("TCS.NSE".into()),
+        start: Some("2024-01-01".into()),
+        end: Some("2024-06-01".into()),
+        bar_spec: Some("1d".into()),
+        initial_capital: Some(1_000_000.0),
         params: Some(json!({"fast": [5, 20, 5]})),
         trials: Some(10),
         seed: Some(7),

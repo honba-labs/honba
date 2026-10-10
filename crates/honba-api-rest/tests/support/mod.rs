@@ -128,9 +128,14 @@ pub fn backtest_request(seed: u64) -> ResolvedRequest {
 pub fn sweep_request(seed: u64) -> ResolvedRequest {
     ResolvedRequest::Sweep(ResolvedSweep {
         strategy: "sma".into(),
-        params: json!({"fast": [5, 10]}),
+        params: json!({"params": {"fast": [5, 10]}, "fitness": "sharpe"}),
         trials: 2,
         seed,
+        universe: "TCS.NSE".into(),
+        start: UnixNanos::from_u64(1),
+        end: UnixNanos::from_u64(2),
+        bar_spec: "1d".into(),
+        initial_capital: 1_000_000.0,
     })
 }
 

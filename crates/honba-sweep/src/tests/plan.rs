@@ -208,7 +208,9 @@ fn build_erases_every_spec_into_the_same_strategy_type() {
             instrument: any_instrument(),
             quantity: 1.0,
         },
-        StrategySpec::Custom(Arc::new(Fixed)),
+        StrategySpec::Custom {
+            inner: Arc::new(Fixed),
+        },
     ];
     let names: Vec<String> = specs
         .iter()
@@ -222,7 +224,9 @@ fn build_erases_every_spec_into_the_same_strategy_type() {
 
 #[test]
 fn a_custom_factory_is_given_the_trial_seed() {
-    let spec = StrategySpec::Custom(Arc::new(Seeded));
+    let spec = StrategySpec::Custom {
+        inner: Arc::new(Seeded),
+    };
     assert_eq!(spec.build(7).name(), "seed-7");
     assert_eq!(spec.build(11).name(), "seed-11");
 }
@@ -243,12 +247,20 @@ fn built_in_specs_compare_by_value_and_custom_specs_by_factory_identity() {
         }
     );
     assert_eq!(
-        StrategySpec::Custom(Arc::clone(&shared)),
-        StrategySpec::Custom(Arc::clone(&shared))
+        StrategySpec::Custom {
+            inner: Arc::clone(&shared)
+        },
+        StrategySpec::Custom {
+            inner: Arc::clone(&shared)
+        }
     );
     assert_ne!(
-        StrategySpec::Custom(Arc::clone(&shared)),
-        StrategySpec::Custom(Arc::new(Fixed))
+        StrategySpec::Custom {
+            inner: Arc::clone(&shared)
+        },
+        StrategySpec::Custom {
+            inner: Arc::new(Fixed)
+        }
     );
 }
 
@@ -263,7 +275,12 @@ fn a_spec_renders_readably_including_the_erased_case() {
         "BuyAndHold { instrument: \"X.NSE\", quantity: 1.0 }"
     );
     assert_eq!(
-        format!("{:?}", StrategySpec::Custom(Arc::new(Fixed))),
+        format!(
+            "{:?}",
+            StrategySpec::Custom {
+                inner: Arc::new(Fixed)
+            }
+        ),
         "Custom(<factory>)"
     );
 }

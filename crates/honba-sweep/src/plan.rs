@@ -124,55 +124,10 @@ pub enum StrategySpec {
         quantity: f64,
     },
     /// Anything else, for strategies that do not exist yet.
-    Custom(Arc<dyn StrategyFactory>),
-}
-
-impl StrategySpec {
-    /// Builds the strategy for a trial with the given seed.
-    ///
-    /// The named variants ignore the seed: they have nothing random to seed.
-    /// [`StrategySpec::Custom`] passes it to the factory, which is where a
-    /// stochastic strategy gets its determinism from.
-    ///
-    /// # Panics
-    ///
-    /// Panics if a named variant is given parameters its own strategy refuses
-    /// ([`SmaCrossover`] with `fast >= slow` or a zero period,
-    /// [`RsiReversal`] with a zero period or inverted thresholds). A sweep
-    /// turns that panic into a failed trial rather than losing the run.
-    pub fn build(&self, seed: u64) -> Box<dyn Strategy> {
-        match self {
-            Self::SmaCrossover {
-                instrument,
-                fast,
-                slow,
-                quantity,
-            } => Box::new(SmaCrossover::new(
-                instrument.clone(),
-                *fast,
-                *slow,
-                *quantity,
-            )),
-            Self::RsiReversal {
-                instrument,
-                period,
-                oversold,
-                overbought,
-                quantity,
-            } => Box::new(RsiReversal::new(
-                instrument.clone(),
-                *period,
-                *oversold,
-                *overbought,
-                *quantity,
-            )),
-            Self::BuyAndHold {
-                instrument,
-                quantity,
-            } => Box::new(BuyAndHold::new(instrument.clone(), *quantity)),
-            Self::Custom(factory) => factory.build(seed),
-        }
-    }
+    Custom {
+        /// The strategy factory.
+        inner: Arc<dyn StrategyFactory>,
+    },
 }
 
 impl fmt::Debug for StrategySpec {
@@ -212,7 +167,7 @@ impl fmt::Debug for StrategySpec {
                 .field("instrument", &instrument.to_string())
                 .field("quantity", quantity)
                 .finish(),
-            Self::Custom(_) => f.write_str("Custom(<factory>)"),
+            Self::Custom { inner: _ } => f.write_str("Custom(<factory>)"),
         }
     }
 }
@@ -271,8 +226,58 @@ impl PartialEq for StrategySpec {
                     quantity: right_quantity,
                 },
             ) => left_instrument == right_instrument && left_quantity == right_quantity,
-            (Self::Custom(left), Self::Custom(right)) => Arc::ptr_eq(left, right),
+            (Self::Custom { inner: left }, Self::Custom { inner: right }) => {
+                Arc::ptr_eq(left, right)
+            }
             _ => false,
+        }
+    }
+}
+
+impl StrategySpec {
+    /// Builds the strategy for a trial with the given seed.
+    ///
+    /// The named variants ignore the seed: they have nothing random to seed.
+    /// [`StrategySpec::Custom`] passes it to the factory, which is where a
+    /// stochastic strategy gets its determinism from.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a named variant is given parameters its own strategy refuses
+    /// ([`SmaCrossover`] with `fast >= slow` or a zero period,
+    /// [`RsiReversal`] with a zero period or inverted thresholds). A sweep
+    /// turns that panic into a failed trial rather than losing the run.
+    pub fn build(&self, seed: u64) -> Box<dyn Strategy> {
+        match self {
+            Self::SmaCrossover {
+                instrument,
+                fast,
+                slow,
+                quantity,
+            } => Box::new(SmaCrossover::new(
+                instrument.clone(),
+                *fast,
+                *slow,
+                *quantity,
+            )),
+            Self::RsiReversal {
+                instrument,
+                period,
+                oversold,
+                overbought,
+                quantity,
+            } => Box::new(RsiReversal::new(
+                instrument.clone(),
+                *period,
+                *oversold,
+                *overbought,
+                *quantity,
+            )),
+            Self::BuyAndHold {
+                instrument,
+                quantity,
+            } => Box::new(BuyAndHold::new(instrument.clone(), *quantity)),
+            Self::Custom { inner: factory } => factory.build(seed),
         }
     }
 }

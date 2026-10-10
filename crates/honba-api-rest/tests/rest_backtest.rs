@@ -186,17 +186,41 @@ async fn a_sweep_id_is_404_on_backtest_routes_and_422_on_the_journal_route() {
 }
 
 #[tokio::test]
-async fn sweeps_stay_501_until_e4_s5() {
-    let scratch = Scratch::new("rest-sweeps-501");
+async fn sweeps_are_implemented_e4_s5() {
+    // This test documents that sweeps are now implemented (E4-S5)
+    let scratch = Scratch::new("rest-sweeps-e4s5");
     let (router, _) = router_with(&scratch, real_executor(), config(1, 4, 100));
-    for (method, uri, body) in [
-        ("POST", "/sweeps", Some(json!({}))),
-        ("GET", "/sweeps/01ARZ3NDEKTSV4RRFFQ69G5FAV", None),
-    ] {
-        let (status, body) = call(&router, method, uri, body).await;
-        assert_eq!(status, StatusCode::NOT_IMPLEMENTED, "{uri}");
-        assert_eq!(body["error"]["code"], "not_implemented");
-    }
+    // POST /sweeps should now be implemented (not 501)
+    let (_status, _body) = call(
+        &router,
+        "POST",
+        "/sweeps",
+        Some(json!({
+            "strategy": "sma_crossover",
+            "seed": 42,
+            "universe": "TCS.NSE",
+            "start": "2024-01-01",
+            "end": "2024-06-01",
+            "bar_spec": "1d",
+            "initial_capital": 1_000_000.0,
+            "params": {"fast": [10, 30, 10], "slow": [50, 100, 25]},
+            "trials": 9
+        })),
+    )
+    .await;
+    // Should be 200 (pending) or 422 (validation), not 501
+    assert_ne!(
+        _status,
+        StatusCode::NOT_IMPLEMENTED,
+        "POST /sweeps should be implemented"
+    );
+    // GET /sweeps/{id} should also be implemented
+    let (status, _body) = call(&router, "GET", "/sweeps/01ARZ3NDEKTSV4RRFFQ69G5FAV", None).await;
+    assert_ne!(
+        status,
+        StatusCode::NOT_IMPLEMENTED,
+        "GET /sweeps/{{id}} should be implemented"
+    );
 }
 
 #[tokio::test]
