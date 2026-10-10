@@ -426,7 +426,7 @@ Checked about 25 verdicts against code, git log and ls/grep (read-only). Counts:
 | Story | Audit said | Code shows | Corrected |
 |---|---|---|---|
 | E10-S6 | NOT STARTED | `crates/honba-sweep/tests/sweep.rs` runs `determinism_under_threads` at 1, 4, 16 workers comparing journal and ranking | DONE |
-| E2-S2 | PARTIAL ("`honba-risk` skeleton, `RiskCheck` stub") | No `honba-risk` crate; `engine/src/risk/mod.rs` is 9 bytes; no `RiskCheck` anywhere | NOT STARTED |
+| E2-S2 | PARTIAL ("`honba-risk` skeleton, `RiskCheck` stub") | `honba-risk` crate with `RiskCheck`, `RiskStage`, typed refusals (`TradingHalted`, `ReduceOnly`, `InstrumentUnknown`, `QuantityBelowMin`, `QuantityOverFreeze`, `LotMultiple`, `TickSize`, `PriceBand`, `MaxParticipation`, `MaxNotional`, `OrderRate`, `FeedStale`), rules source port, India profile; unit + property + conformance tests | DONE |
 | E4-S3 | PARTIAL, "`not_modelled` list exists (CHANGELOG)" | `not_modelled` + timing in `assumptions: Option<Value>`; `honba backtest` CLI with `--wait`/`--stream`; `InprocTransport`/`HttpTransport`; `POST/GET /backtests` + journal; MCP `get_backtest`, `get_backtest_journal`, `get_sweep`; parity test passes | DONE |
 | E11-S4 | NOT STARTED, "WS/SSE routes return 501" | Verdict right; no stream route is registered at all (22 routes in `endpoints.rs`, none streaming) | NOT STARTED (evidence fixed) |
 | E10-S3 | PARTIAL, "feedback unverified" | `Engine::apply_output` applies orders, cancels, state; fills re-enter queue as `OrderFilled`; commit daf12d5 | DONE (E2-S5 likewise DONE) |

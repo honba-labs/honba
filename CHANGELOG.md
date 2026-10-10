@@ -87,6 +87,24 @@
   `TradingState` and `StrategyRunner.set_trading_state`); a runtime route to change it live stays
   501 with E11-S8.
 
+### Risk stage crate: `honba-risk` (E2-S2, ADR 0018)
+
+- New crate at L2 (`crates/honba-risk`): pure, no I/O, no clock, no broker vocabulary. Implements
+  the pre-trade risk stage as a fixed-order rule evaluator behind the `RiskCheck` trait.
+- `RiskStage` rules in order: 1. trading halted, 2. reduce-only (state rules, no rules source),
+  3. instrument unknown, 4-6. quantity below min / over freeze / not lot multiple, 7. tick size,
+  8. price band, 9. max notional (with reference price fallback), 10. order rate (half-open event-time
+  window; only approved orders count), 11. feed staleness (quote age > `stale_after_ms`),
+  12. max participation (ADV-based). Each refusal carries a stable `ErrorCode` and structured context.
+- `RulesSource` port decouples the stage from the India pack; `ProfileRulesSource` adapts
+  `honba_market::InstrumentRules` + `PriceBand` (lives in `honba-market` so `honba-risk` has no
+  `honba-market` dependency; the adapter is an L4 edge).
+- `RiskLimits` config with validation: `max_notional` (Money), `order_rate` (max_orders, window_ms),
+  `max_participation`, `stale_after_ms`, lot/tick/freeze from the rules source.
+- Unit tests: property tests (deterministic, rule order, idempotent without rate), profile tests
+  (India cash equity flows through all rules, order rate limit in event time, notional with
+  reference price fallback, unknown instrument/state rules), conformance test (`risk_conformance`).
+
 ### REST: `POST /orders` risk gate, cancel/close bypass (E2-S2 r5b / E11-S7 seam, ADR 0018 decision 7)
 
 - `POST /orders` runs approval queue (none configured) -> risk stage over the `null` profile and
