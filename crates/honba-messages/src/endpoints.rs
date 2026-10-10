@@ -165,6 +165,7 @@ pub const ENDPOINTS: &[(&str, &str)] = &[
     ("POST", "/backtests"),
     ("GET", "/backtests/{id}"),
     ("GET", "/backtests/{id}/journal"),
+    ("GET", "/backtests/{id}/events"),
     ("POST", "/sweeps"),
     ("GET", "/sweeps/{id}"),
     ("POST", "/orders"),

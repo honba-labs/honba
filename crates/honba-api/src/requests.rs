@@ -161,6 +161,15 @@ pub struct SweepRequest {
     pub seed: Option<u64>,
 }
 
+/// `GET /backtests/{id}/events` query parameters (ADR 0021).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct BacktestEventsQuery {
+    /// Replay the journal records with line index `>=` this value (0-based; default 0).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resume_from_seq: Option<u64>,
+}
+
 /// Orders request.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

@@ -37,14 +37,15 @@ pub use market::{
     DEFAULT_DEPTH_LEVELS, DEFAULT_TIMEFRAME, MAX_DEPTH_LEVELS,
 };
 pub use requests::{
-    BacktestRequest, BarsQuery, DepthQuery, InstrumentsQuery, OrdersRequest, QuotesQuery,
-    ScreenerQuery, StrategiesRequest, SweepRequest,
+    BacktestEventsQuery, BacktestRequest, BarsQuery, DepthQuery, InstrumentsQuery, OrdersRequest,
+    QuotesQuery, ScreenerQuery, StrategiesRequest, SweepRequest,
 };
 pub use responses::{
     BacktestMetrics, BacktestResponse, BacktestStatus, BarsResponse, CapabilitiesResponse,
     CompiledStrategy, DepthLevel, DepthResponse, InstrumentsResponse, OrdersResponse,
     PositionsResponse, QuotesResponse, RunStatus, ScreenerResponse, ScreenerResultRow,
-    StrategiesResponse, SweepReportResponse, SweepResponse, SweepStatus, TradesResponse,
+    StrategiesResponse, StreamFrame, SweepReportResponse, SweepResponse, SweepStatus,
+    TradesResponse,
 };
 pub use run_id::{RunId, RunIdError, RunIdGenerator};
 pub use run_ports::{JournalWriter, RunExecutor, RunJob, RunOutcome};

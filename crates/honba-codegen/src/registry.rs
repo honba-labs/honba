@@ -164,6 +164,7 @@ pub fn request_type_names() -> &'static [&'static str] {
         "StrategiesRequest",
         "BacktestRequest",
         "SweepRequest",
+        "BacktestEventsQuery",
         "OrdersRequest",
     ]
 }
@@ -179,6 +180,7 @@ pub fn register_requests(set: &mut SchemaSet) {
     set.add_type::<honba_api::BacktestRequest>("BacktestRequest");
     set.add_type::<honba_api::SweepRequest>("SweepRequest");
     set.add_type::<honba_api::OrdersRequest>("OrdersRequest");
+    set.add_type::<honba_api::BacktestEventsQuery>("BacktestEventsQuery");
 }
 
 /// Adds the response DTOs to `set`.
@@ -195,6 +197,7 @@ pub fn register_responses(set: &mut SchemaSet) {
     set.add_type::<honba_api::BacktestMetrics>("BacktestMetrics");
     set.add_type::<honba_api::SweepResponse>("SweepResponse");
     set.add_type::<honba_api::SweepReportResponse>("SweepReportResponse");
+    set.add_type::<honba_api::StreamFrame>("StreamFrame");
     set.add_type::<honba_api::OrdersResponse>("OrdersResponse");
     set.add_type::<honba_api::PositionsResponse>("PositionsResponse");
     set.add_type::<honba_api::TradesResponse>("TradesResponse");

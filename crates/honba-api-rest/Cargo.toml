@@ -31,6 +31,10 @@ tracing.workspace = true
 anyhow.workspace = true
 schemars.workspace = true
 async-trait.workspace = true
+async-stream.workspace = true
+futures.workspace = true
+tokio-stream.workspace = true
+http-body-util.workspace = true
 serde_urlencoded = "0.7"
 # Run ids: OS entropy at the edge (ADR 0017 decision 2); chrono formats manifest timestamps.
 getrandom = "0.3"
@@ -39,3 +43,4 @@ chrono.workspace = true
 [dev-dependencies]
 arrow.workspace = true
 parquet.workspace = true
+tempfile = "3"

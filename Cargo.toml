@@ -66,6 +66,10 @@ anyhow = "1"
 schemars = { version = "0.8", features = ["derive"] }
 itertools = "0.13"
 indexmap = "2"
+async-stream = "0.3"
+futures = "0.3"
+tokio-stream = "0.1"
+http-body-util = "0.1"
 
 
 honba-api = { path = "crates/honba-api" }

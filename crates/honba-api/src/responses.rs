@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use honba_entities::{Position, Trade};
 use std::collections::BTreeMap;
 
-use honba_messages::{Bar, ErrorDetail, InstrumentId, Order, QuoteTick};
+use honba_messages::{Bar, ErrorDetail, InstrumentId, Message, Order, QuoteTick};
 use honba_strategy::StrategyIr;
 
 use crate::capabilities::Capabilities;
@@ -199,4 +199,33 @@ pub struct PositionsResponse {
 pub struct TradesResponse {
     /// Realized trades.
     pub trades: Vec<Trade>,
+}
+
+/// One frame of the run event stream (ADR 0021, `GET /backtests/{id}/events`).
+///
+/// A `Record` frame carries one journal `Message` with its 0-based line index; a `Status` frame
+/// carries the manifest status with `seq` = the number of journal records delivered so far.
+/// Every frame's `seq` is a valid resume token: resuming at `N` replays records with line
+/// index `>= N`, so the stream neither skips nor repeats a record across a reconnect.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum StreamFrame {
+    /// The run's lifecycle state; emitted on connect, on every status change, and once more
+    /// (terminal) when the stream ends. `error` is present only for a failed run.
+    Status {
+        /// The manifest status.
+        status: RunStatus,
+        /// Next journal line index to read (records delivered so far).
+        seq: u64,
+        /// Why the run failed; present only when `status` is `failed`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error: Option<ErrorDetail>,
+    },
+    /// One journal record.
+    Record {
+        /// The record's 0-based line index in `events.ndjson`.
+        seq: u64,
+        /// The journal message.
+        message: Message,
+    },
 }

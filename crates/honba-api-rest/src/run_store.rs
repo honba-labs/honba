@@ -176,7 +176,8 @@ impl RunStore {
         (ms, rfc3339(ms))
     }
 
-    fn dir(&self, id: &RunId) -> PathBuf {
+    /// Returns the run directory path for `id`.
+    pub fn dir(&self, id: &RunId) -> PathBuf {
         self.root.join(id.as_str())
     }
 

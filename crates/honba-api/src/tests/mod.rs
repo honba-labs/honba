@@ -9,6 +9,7 @@ mod run_requests;
 mod runs;
 mod screener;
 mod strategies;
+mod stream_frame;
 
 use serde_json::json;
 

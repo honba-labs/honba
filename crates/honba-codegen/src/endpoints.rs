@@ -10,6 +10,11 @@ use serde_json::{json, Map, Value};
 
 use crate::schemas::{SchemaSet, COMPONENTS_PREFIX};
 
+/// Endpoints that stream (`text/event-stream`) rather than answer one JSON body.
+///
+/// The 200 response for these carries a `StreamFrame` per line, not an envelope.
+const STREAM_PATHS: &[(&str, &str)] = &[("GET", "/backtests/{id}/events")];
+
 /// The response payload type for each endpoint, so a path can name it.
 fn response_type_for(method: &str, path: &str) -> Option<&'static str> {
     Some(match (method, path) {
@@ -27,6 +32,7 @@ fn response_type_for(method: &str, path: &str) -> Option<&'static str> {
         ("POST", "/backtests") => "BacktestResponse",
         ("GET", "/backtests/{id}") => "BacktestResponse",
         ("GET", "/backtests/{id}/journal") => "TradesResponse",
+        ("GET", "/backtests/{id}/events") => "StreamFrame",
         ("POST", "/sweeps") => "SweepResponse",
         ("GET", "/sweeps/{id}") => "SweepResponse",
         ("POST", "/orders") => "OrdersResponse",
@@ -52,6 +58,7 @@ fn request_type_for(method: &str, path: &str) -> Option<&'static str> {
         ("GET", "/bars/{id}") => "BarsQuery",
         ("GET", "/depth/{id}") => "DepthQuery",
         ("GET", "/screener/scan") => "ScreenerQuery",
+        ("GET", "/backtests/{id}/events") => "BacktestEventsQuery",
         _ => return None,
     })
 }
@@ -110,14 +117,26 @@ fn operation(set: &SchemaSet, method: &str, path: &'static str) -> Value {
         .map(|name| format!("{COMPONENTS_PREFIX}{name}"))
         .unwrap_or_else(|| format!("{COMPONENTS_PREFIX}Capabilities"));
 
+    let is_stream = STREAM_PATHS.iter().any(|(m, p)| *m == method && *p == path);
+
     let mut responses = Map::new();
-    responses.insert(
-        "200".into(),
-        json!({
-            "description": "Success. Always enveloped; see ResponseEnvelope.",
-            "content": {"application/json": {"schema": {"$ref": response}}},
-        }),
-    );
+    if is_stream {
+        responses.insert(
+            "200".into(),
+            json!({
+                "description": "Success. One text/event-stream connection; every `data:` line is a StreamFrame JSON payload whose SSE `id` equals its `seq`.",
+                "content": {"text/event-stream": {"schema": {"$ref": response}}},
+            }),
+        );
+    } else {
+        responses.insert(
+            "200".into(),
+            json!({
+                "description": "Success. Always enveloped; see ResponseEnvelope.",
+                "content": {"application/json": {"schema": {"$ref": response}}},
+            }),
+        );
+    }
     responses.insert(
         "default".into(),
         json!({
@@ -126,6 +145,10 @@ fn operation(set: &SchemaSet, method: &str, path: &'static str) -> Value {
         }),
     );
     op.insert("responses".into(), Value::Object(responses));
+
+    if is_stream {
+        op.insert("x-honba-stream".into(), json!(true));
+    }
 
     let is_write = WRITE_PATHS.iter().any(|(m, p)| *m == method && *p == path);
     let access = if is_write {

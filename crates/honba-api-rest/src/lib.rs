@@ -40,9 +40,10 @@ mod runs;
 mod screener;
 mod service;
 mod state;
+mod streams;
 mod trades;
 
-pub use dispatch::{build_target, dispatch, DispatchError};
+pub use dispatch::{build_target, dispatch, dispatch_stream, DispatchError};
 pub use executor::BacktestExecutor;
 pub use honba_api::JournalWriter;
 pub use journal::NdjsonJournal;
@@ -54,6 +55,7 @@ pub use service::{
     RunService, RunServiceConfig, ShutdownReport, DEFAULT_MAX_QUEUED, DEFAULT_SHUTDOWN_GRACE,
 };
 pub use state::AppState;
+pub use streams::get_backtest_events;
 
 /// JSON body extractor whose rejections are the standard error envelope
 /// (`validation_invalid_request`) rather than axum's plain-text message.
@@ -154,6 +156,7 @@ pub fn api_router_with_config(state: AppState, config: &ApiConfig) -> Router {
         .route("/backtests", post(runs::post_backtests))
         .route("/backtests/:id", get(runs::get_backtest_by_id))
         .route("/backtests/:id/journal", get(runs::get_backtest_journal))
+        .route("/backtests/:id/events", get(get_backtest_events))
         .route("/sweeps", post(post_sweeps))
         .route("/sweeps/:id", get(get_sweep_by_id))
         .route("/sweeps/:id/journal", get(runs::get_sweep_journal))

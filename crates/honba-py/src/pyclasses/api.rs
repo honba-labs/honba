@@ -15,7 +15,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
 use honba_api_rest::{
-    api_router_with, build_target, dispatch, AppState, DispatchError, RunServiceConfig,
+    api_router_with, build_target, dispatch, dispatch_stream, AppState, DispatchError,
+    RunServiceConfig,
 };
 use pyo3::exceptions::{PyOSError, PyValueError};
 use pyo3::prelude::*;
@@ -174,7 +175,91 @@ pub fn api_request(
         })
 }
 
+/// Sends one SSE streaming request through the REST router and calls `callback` for each frame.
+///
+/// The callback receives the raw `data:` line bytes. Returns the number of frames delivered.
+///
+/// `journals_dir` starts the run service over that directory (created if missing), enabling
+/// `/backtests` and `/journals`; `max_concurrent_runs` and `max_queued_runs` tune it.
+///
+/// Raises `OSError` when `data_dir` or `journals_dir` cannot be loaded and `ValueError` for a
+/// request that is not well formed (bad method, relative path, non-flat query). A request the
+/// API rejects (404, 422, 429, 501, 503) is a normal return carrying the error envelope.
+#[pyfunction]
+#[pyo3(signature = (data_dir, method, path, callback, query_json=None, body_json=None, journals_dir=None, max_concurrent_runs=None, max_queued_runs=None))]
+#[allow(clippy::too_many_arguments)]
+pub fn api_request_stream(
+    _py: Python<'_>,
+    data_dir: &str,
+    method: &str,
+    path: &str,
+    callback: PyObject,
+    query_json: Option<&str>,
+    body_json: Option<&str>,
+    journals_dir: Option<&str>,
+    max_concurrent_runs: Option<usize>,
+    max_queued_runs: Option<usize>,
+) -> PyResult<usize> {
+    let runs = RunsOptions {
+        journals_dir: journals_dir.map(str::to_owned),
+        max_concurrent: max_concurrent_runs,
+        max_queued: max_queued_runs,
+    };
+    let state = state_for(data_dir, &runs).map_err(|e| match e {
+        ApiRequestError::DataDir(m) | ApiRequestError::Runs(m) => PyOSError::new_err(m),
+        ApiRequestError::Dispatch(e) => PyValueError::new_err(e.to_string()),
+    })?;
+    let target =
+        build_target(path, query_json).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    let router = api_router_with(state);
+
+    // Run on a private runtime to not wedge the shared one.
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| PyOSError::new_err(e.to_string()))?;
+
+    // Use a channel to collect frames from the async callback
+    let (tx, rx) = std::sync::mpsc::channel::<Result<Vec<u8>, String>>();
+
+    let tx_for_callback = tx.clone();
+    let result = rt.block_on(async move {
+        let result = dispatch_stream(router, method, &target, body_json, move |frame_bytes| {
+            let _ = tx_for_callback.send(Ok(frame_bytes.to_vec()));
+            Ok(())
+        })
+        .await;
+
+        match result {
+            Ok(()) => Ok(()),
+            Err(e) => Err(e.to_string()),
+        }
+    });
+
+    // Signal end of stream by dropping the sender
+    drop(tx);
+
+    if let Err(e) = result {
+        return Err(PyValueError::new_err(e));
+    }
+
+    // Now collect frames from the channel and call back with GIL
+    let mut frame_count = 0usize;
+    for frame_result in rx {
+        let frame = match frame_result {
+            Ok(f) => f,
+            Err(e) => return Err(PyValueError::new_err(e)),
+        };
+        pyo3::Python::with_gil(|py| callback.call1(py, (frame,)).map(|_| ()))
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        frame_count += 1;
+    }
+
+    Ok(frame_count)
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(api_request, m)?)?;
+    m.add_function(wrap_pyfunction!(api_request_stream, m)?)?;
     Ok(())
 }

@@ -23,6 +23,9 @@ AggressorSide = Literal["buyer", "seller", "no_aggressor"]
 
 ApiVersion = str
 
+class BacktestEventsQuery:
+    resume_from_seq: int | None = None
+
 class BacktestMetrics:
     max_drawdown: float
     net_pnl: float
@@ -469,6 +472,19 @@ class StrategyManifest:
     subscriptions: Subscriptions
     universe: Universe
     warmup_bars: int
+
+class StreamFrameStatus(TypedDict):
+    error: NotRequired[ErrorDetail | None]
+    kind: Literal["status"]
+    seq: int
+    status: RunStatus
+
+class StreamFrameRecord(TypedDict):
+    kind: Literal["record"]
+    message: Message
+    seq: int
+
+StreamFrame = StreamFrameStatus | StreamFrameRecord
 
 class Subscriptions:
     instruments: list[InstrumentId]

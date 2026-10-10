@@ -69,6 +69,22 @@
       "ApiVersion": {
         "type": "string"
       },
+      "BacktestEventsQuery": {
+        "additionalProperties": false,
+        "description": "`GET /backtests/{id}/events` query parameters (ADR 0021).",
+        "properties": {
+          "resume_from_seq": {
+            "description": "Replay the journal records with line index `>=` this value (0-based; default 0).",
+            "format": "uint64",
+            "minimum": 0.0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "BacktestMetrics": {
         "description": "Headline performance numbers for a completed backtest.\n\nA fixed, documented set rather than a free-form object, so a dashboard can bind to fields that are guaranteed present.",
         "properties": {
@@ -3421,6 +3437,84 @@
         ],
         "type": "object"
       },
+      "StreamFrame": {
+        "description": "One frame of the run event stream (ADR 0021, `GET /backtests/{id}/events`).\n\nA `Record` frame carries one journal `Message` with its 0-based line index; a `Status` frame carries the manifest status with `seq` = the number of journal records delivered so far. Every frame's `seq` is a valid resume token: resuming at `N` replays records with line index `>= N`, so the stream neither skips nor repeats a record across a reconnect.",
+        "oneOf": [
+          {
+            "description": "The run's lifecycle state; emitted on connect, on every status change, and once more (terminal) when the stream ends. `error` is present only for a failed run.",
+            "properties": {
+              "error": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ErrorDetail"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Why the run failed; present only when `status` is `failed`."
+              },
+              "kind": {
+                "enum": [
+                  "status"
+                ],
+                "type": "string"
+              },
+              "seq": {
+                "description": "Next journal line index to read (records delivered so far).",
+                "format": "uint64",
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              "status": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RunStatus"
+                  }
+                ],
+                "description": "The manifest status."
+              }
+            },
+            "required": [
+              "kind",
+              "seq",
+              "status"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "One journal record.",
+            "properties": {
+              "kind": {
+                "enum": [
+                  "record"
+                ],
+                "type": "string"
+              },
+              "message": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Message"
+                  }
+                ],
+                "description": "The journal message."
+              },
+              "seq": {
+                "description": "The record's 0-based line index in `events.ndjson`.",
+                "format": "uint64",
+                "minimum": 0.0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "kind",
+              "message",
+              "seq"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "Subscriptions": {
         "additionalProperties": false,
         "description": "The market data a strategy subscribes to.\n\nA strategy that forgets a subscription gets no events for it, which in a backtest looks like a strategy that never trades. Recording the set explicitly is what lets the loader fail loudly instead.",
@@ -4014,6 +4108,63 @@
           "runs"
         ],
         "x-honba-access": "read_only"
+      }
+    },
+    "/backtests/{id}/events": {
+      "get": {
+        "operationId": "get_backtests_by_id_events",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "resume_from_seq",
+            "required": false,
+            "schema": {
+              "description": "Replay the journal records with line index `>=` this value (0-based; default 0).",
+              "format": "uint64",
+              "minimum": 0.0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreamFrame"
+                }
+              }
+            },
+            "description": "Success. One text/event-stream connection; every `data:` line is a StreamFrame JSON payload whose SSE `id` equals its `seq`."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseEnvelope"
+                }
+              }
+            },
+            "description": "Failure. Carries the envelope's `error` with a stable ErrorCode."
+          }
+        },
+        "summary": "GET backtests  id  events",
+        "tags": [
+          "runs"
+        ],
+        "x-honba-access": "read_only",
+        "x-honba-stream": true
       }
     },
     "/backtests/{id}/journal": {
