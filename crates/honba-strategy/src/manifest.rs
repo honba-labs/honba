@@ -50,6 +50,259 @@ pub struct StrategyManifest {
     /// Optional wall-clock schedules (session open/close, rebalance times).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub schedules: BTreeMap<String, String>,
+    /// Optional parameter declarations defining defaults and search spaces (E4-S2).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub parameters: BTreeMap<String, ParameterSpec>,
+}
+
+/// A parameter declaration with a default value and optional sweep range (E4-S2).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ParameterSpec {
+    /// Default value for the parameter.
+    pub default: serde_json::Value,
+    /// Search range expression: "min:max:step" (e.g. "10:50:5").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub range: Option<String>,
+    /// Minimum value (inclusive).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    /// Maximum value (inclusive).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+    /// Step size between trials.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub step: Option<f64>,
+    /// Optional documentation description.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+impl ParameterSpec {
+    /// Builds a parameter specification with a default value.
+    pub fn new(default: impl Into<serde_json::Value>) -> Self {
+        Self {
+            default: default.into(),
+            range: None,
+            min: None,
+            max: None,
+            step: None,
+            description: None,
+        }
+    }
+
+    /// Sets the range expression string ("min:max:step").
+    #[must_use]
+    pub fn with_range(mut self, range: impl Into<String>) -> Self {
+        self.range = Some(range.into());
+        self
+    }
+
+    /// Sets explicit numerical bounds and step size.
+    #[must_use]
+    pub fn with_bounds(mut self, min: f64, max: f64, step: f64) -> Self {
+        self.min = Some(min);
+        self.max = Some(max);
+        self.step = Some(step);
+        self.range = Some(format!("{min}:{max}:{step}"));
+        self
+    }
+
+    /// Sets a documentation description.
+    #[must_use]
+    pub fn with_description(mut self, desc: impl Into<String>) -> Self {
+        self.description = Some(desc.into());
+        self
+    }
+
+    /// Parses a "min:max:step" string expression.
+    pub fn parse_range_str(range_str: &str) -> Result<(f64, f64, f64), ManifestError> {
+        let parts: Vec<&str> = range_str.split(':').map(str::trim).collect();
+        if parts.len() != 3 {
+            return Err(ManifestError::InvalidParameterRange {
+                name: String::new(),
+                reason: format!("expected min:max:step format, got {range_str:?}"),
+            });
+        }
+        let min: f64 = parts[0]
+            .parse()
+            .map_err(|e| ManifestError::InvalidParameterRange {
+                name: String::new(),
+                reason: format!("invalid min in {range_str:?}: {e}"),
+            })?;
+        let max: f64 = parts[1]
+            .parse()
+            .map_err(|e| ManifestError::InvalidParameterRange {
+                name: String::new(),
+                reason: format!("invalid max in {range_str:?}: {e}"),
+            })?;
+        let step: f64 = parts[2]
+            .parse()
+            .map_err(|e| ManifestError::InvalidParameterRange {
+                name: String::new(),
+                reason: format!("invalid step in {range_str:?}: {e}"),
+            })?;
+        if min > max {
+            return Err(ManifestError::InvalidParameterRange {
+                name: String::new(),
+                reason: format!("min ({min}) cannot be greater than max ({max})"),
+            });
+        }
+        if step <= 0.0 {
+            return Err(ManifestError::InvalidParameterRange {
+                name: String::new(),
+                reason: format!("step ({step}) must be greater than 0"),
+            });
+        }
+        Ok((min, max, step))
+    }
+
+    /// Validates internal consistency and ensures default is within [min, max].
+    pub fn validate(&self, name: &str) -> Result<(), ManifestError> {
+        let (min, max, step) = if let Some(ref r) = self.range {
+            let (min, max, step) = Self::parse_range_str(r).map_err(|e| match e {
+                ManifestError::InvalidParameterRange { reason, .. } => {
+                    ManifestError::InvalidParameterRange {
+                        name: name.to_string(),
+                        reason,
+                    }
+                }
+                other => other,
+            })?;
+            (Some(min), Some(max), Some(step))
+        } else {
+            (self.min, self.max, self.step)
+        };
+
+        if let (Some(min), Some(max)) = (min, max) {
+            if min > max {
+                return Err(ManifestError::InvalidParameterRange {
+                    name: name.to_string(),
+                    reason: format!("min ({min}) cannot be greater than max ({max})"),
+                });
+            }
+        }
+        if let Some(step) = step {
+            if step <= 0.0 {
+                return Err(ManifestError::InvalidParameterRange {
+                    name: name.to_string(),
+                    reason: format!("step ({step}) must be positive"),
+                });
+            }
+        }
+
+        // Validate default value against bounds
+        if let Some(def_num) = self.default.as_f64() {
+            if let Some(min) = min {
+                if def_num < min {
+                    return Err(ManifestError::ParameterDefaultOutOfRange {
+                        name: name.to_string(),
+                        default: self.default.to_string(),
+                        min: min.to_string(),
+                        max: max.map_or_else(|| "inf".to_string(), |m| m.to_string()),
+                    });
+                }
+            }
+            if let Some(max) = max {
+                if def_num > max {
+                    return Err(ManifestError::ParameterDefaultOutOfRange {
+                        name: name.to_string(),
+                        default: self.default.to_string(),
+                        min: min.map_or_else(|| "-inf".to_string(), |m| m.to_string()),
+                        max: max.to_string(),
+                    });
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Computes the discrete parameter values across the declared range.
+    pub fn discrete_values(&self) -> Vec<serde_json::Value> {
+        let (min, max, step) = if let Some(ref r) = self.range {
+            if let Ok(triple) = Self::parse_range_str(r) {
+                (Some(triple.0), Some(triple.1), Some(triple.2))
+            } else {
+                (self.min, self.max, self.step)
+            }
+        } else {
+            (self.min, self.max, self.step)
+        };
+
+        if let (Some(min), Some(max), Some(step)) = (min, max, step) {
+            let is_integer = self.default.is_i64()
+                || self.default.is_u64()
+                || (min.fract() == 0.0 && max.fract() == 0.0 && step.fract() == 0.0);
+            let mut values = Vec::new();
+            let mut curr = min;
+            while curr <= max + step * 1e-6 {
+                if is_integer {
+                    values.push(serde_json::json!(curr.round() as i64));
+                } else {
+                    values.push(serde_json::json!((curr * 1e6).round() / 1e6));
+                }
+                curr += step;
+            }
+            if !values.is_empty() {
+                return values;
+            }
+        }
+        vec![self.default.clone()]
+    }
+}
+
+/// Constructs a [`ParameterSpec`] from a range expression like `"10:50:5"` and a default value.
+pub fn param_range_to_schema(
+    range: &str,
+    default: serde_json::Value,
+) -> Result<ParameterSpec, ManifestError> {
+    let (min, max, step) = ParameterSpec::parse_range_str(range)?;
+    let spec = ParameterSpec {
+        default,
+        range: Some(range.to_string()),
+        min: Some(min),
+        max: Some(max),
+        step: Some(step),
+        description: None,
+    };
+    spec.validate("param")?;
+    Ok(spec)
+}
+
+/// Extracts discrete parameter combinations / search space from a strategy manifest.
+pub fn sweep_space_from_manifest(
+    manifest: &StrategyManifest,
+) -> Result<BTreeMap<String, Vec<serde_json::Value>>, ManifestError> {
+    manifest.validate()?;
+    let mut space = BTreeMap::new();
+    for (name, spec) in &manifest.parameters {
+        space.insert(name.clone(), spec.discrete_values());
+    }
+    Ok(space)
+}
+
+/// Generates the Cartesian product grid of parameter assignments from a strategy manifest.
+pub fn parameter_grid_from_manifest(
+    manifest: &StrategyManifest,
+) -> Result<Vec<BTreeMap<String, serde_json::Value>>, ManifestError> {
+    let space = sweep_space_from_manifest(manifest)?;
+    if space.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut grid: Vec<BTreeMap<String, serde_json::Value>> = vec![BTreeMap::new()];
+    for (name, values) in space {
+        let mut next = Vec::new();
+        for entry in &grid {
+            for v in &values {
+                let mut updated = entry.clone();
+                updated.insert(name.clone(), v.clone());
+                next.push(updated);
+            }
+        }
+        grid = next;
+    }
+    Ok(grid)
 }
 
 /// The set of instruments a strategy may trade.
@@ -124,6 +377,7 @@ impl StrategyManifest {
             driving_timeframe,
             warmup_bars: 0,
             schedules: BTreeMap::new(),
+            parameters: BTreeMap::new(),
         }
     }
 
@@ -145,6 +399,13 @@ impl StrategyManifest {
     #[must_use]
     pub fn with_schedule(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.schedules.insert(key.into(), value.into());
+        self
+    }
+
+    /// Adds a parameter declaration.
+    #[must_use]
+    pub fn with_parameter(mut self, name: impl Into<String>, spec: ParameterSpec) -> Self {
+        self.parameters.insert(name.into(), spec);
         self
     }
 
@@ -193,6 +454,10 @@ impl StrategyManifest {
         {
             return Err(ManifestError::NamedUniverseUnresolved);
         }
+        // Validate each declared parameter and check default is within bounds
+        for (name, spec) in &self.parameters {
+            spec.validate(name)?;
+        }
         Ok(())
     }
 }
@@ -214,6 +479,24 @@ pub enum ManifestError {
     ZeroInterval,
     /// A named universe was not resolved to concrete instruments.
     NamedUniverseUnresolved,
+    /// Parameter range expression was malformed or inconsistent.
+    InvalidParameterRange {
+        /// Name of the offending parameter.
+        name: String,
+        /// Description of the issue.
+        reason: String,
+    },
+    /// A parameter's default value fell outside its declared sweep range.
+    ParameterDefaultOutOfRange {
+        /// Name of the offending parameter.
+        name: String,
+        /// Default value string representation.
+        default: String,
+        /// Minimum allowed string representation.
+        min: String,
+        /// Maximum allowed string representation.
+        max: String,
+    },
 }
 
 impl std::fmt::Display for ManifestError {
@@ -229,6 +512,20 @@ impl std::fmt::Display for ManifestError {
                 write!(
                     f,
                     "named universe must be resolved to instruments before running"
+                )
+            }
+            Self::InvalidParameterRange { name, reason } => {
+                write!(f, "parameter {name:?} has invalid range: {reason}")
+            }
+            Self::ParameterDefaultOutOfRange {
+                name,
+                default,
+                min,
+                max,
+            } => {
+                write!(
+                    f,
+                    "parameter {name:?} default {default} is outside range [{min}, {max}]"
                 )
             }
         }

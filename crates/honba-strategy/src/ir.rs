@@ -85,6 +85,10 @@ impl IrError {
                 ManifestError::UnsupportedApiVersion { .. } => "unsupported_api_version",
                 ManifestError::ZeroInterval => "zero_interval",
                 ManifestError::NamedUniverseUnresolved => "named_universe_unresolved",
+                ManifestError::InvalidParameterRange { .. } => "invalid_parameter_range",
+                ManifestError::ParameterDefaultOutOfRange { .. } => {
+                    "parameter_default_out_of_range"
+                }
             },
             Self::NoSubscriptions => "no_subscriptions",
             Self::SubscriptionOutsideUniverse(_) => "subscription_outside_universe",

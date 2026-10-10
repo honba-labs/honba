@@ -1,9 +1,11 @@
-//! Tests for the strategy manifest (docs/archive/plan.md E0-S8).
+//! Tests for the strategy manifest (docs/archive/plan.md E0-S8, E4-S2).
 
 use honba_messages::{BarAggregation, Exchange, InstrumentId};
+use serde_json::json;
 
 use crate::manifest::{
-    ManifestError, StrategyManifest, Subscriptions, TimeframeSpec, Universe, STRATEGY_API_VERSION,
+    param_range_to_schema, ManifestError, ParameterSpec, StrategyManifest, Subscriptions,
+    TimeframeSpec, Universe, STRATEGY_API_VERSION,
 };
 
 fn any_id(symbol: &str) -> InstrumentId {
@@ -173,4 +175,81 @@ fn a_manifest_error_message_names_the_problem() {
         "timeframe interval must be > 0"
     );
     assert!(ManifestError::EmptyName.to_string().contains("name"));
+}
+
+#[test]
+fn param_range_to_schema_parses_valid_range() {
+    let spec = param_range_to_schema("10:50:5", json!(20)).expect("valid range should succeed");
+    assert_eq!(spec.range.as_deref(), Some("10:50:5"));
+    assert_eq!(spec.min, Some(10.0));
+    assert_eq!(spec.max, Some(50.0));
+    assert_eq!(spec.step, Some(5.0));
+    assert_eq!(spec.default, json!(20));
+    assert_eq!(
+        spec.discrete_values(),
+        vec![
+            json!(10),
+            json!(15),
+            json!(20),
+            json!(25),
+            json!(30),
+            json!(35),
+            json!(40),
+            json!(45),
+            json!(50)
+        ]
+    );
+}
+
+#[test]
+fn param_range_to_schema_rejects_default_outside_range() {
+    // default below min
+    let err = param_range_to_schema("10:50:5", json!(5)).unwrap_err();
+    assert!(matches!(
+        err,
+        ManifestError::ParameterDefaultOutOfRange { .. }
+    ));
+
+    // default above max
+    let err = param_range_to_schema("10:50:5", json!(60)).unwrap_err();
+    assert!(matches!(
+        err,
+        ManifestError::ParameterDefaultOutOfRange { .. }
+    ));
+}
+
+#[test]
+fn param_range_to_schema_rejects_invalid_syntax_and_bounds() {
+    // not 3 parts
+    assert!(matches!(
+        param_range_to_schema("10:50", json!(20)),
+        Err(ManifestError::InvalidParameterRange { .. })
+    ));
+
+    // min > max
+    assert!(matches!(
+        param_range_to_schema("50:10:5", json!(20)),
+        Err(ManifestError::InvalidParameterRange { .. })
+    ));
+
+    // negative step
+    assert!(matches!(
+        param_range_to_schema("10:50:-5", json!(20)),
+        Err(ManifestError::InvalidParameterRange { .. })
+    ));
+}
+
+#[test]
+fn manifest_with_parameters_validates_and_rejects_out_of_range_default() {
+    let valid_spec = ParameterSpec::new(json!(20)).with_range("10:50:5");
+    let valid_manifest = sample().with_parameter("fast", valid_spec);
+    assert_eq!(valid_manifest.validate(), Ok(()));
+
+    let invalid_spec = ParameterSpec::new(json!(100)).with_range("10:50:5");
+    let invalid_manifest = sample().with_parameter("fast", invalid_spec);
+    let err = invalid_manifest.validate().unwrap_err();
+    assert!(matches!(
+        err,
+        ManifestError::ParameterDefaultOutOfRange { ref name, .. } if name == "fast"
+    ));
 }

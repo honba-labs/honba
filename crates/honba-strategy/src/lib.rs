@@ -32,7 +32,8 @@ pub use dyn_strategy::DynStrategy;
 pub use intent::{IntentError, OrderIntent};
 pub use ir::{IrError, IrSubscriptions, IrUniverse, StrategyIr};
 pub use manifest::{
-    ManifestError, StrategyManifest, Subscriptions, TimeframeSpec, Universe, STRATEGY_API_VERSION,
+    param_range_to_schema, parameter_grid_from_manifest, sweep_space_from_manifest, ManifestError,
+    ParameterSpec, StrategyManifest, Subscriptions, TimeframeSpec, Universe, STRATEGY_API_VERSION,
 };
 pub use rsi_reversal::RsiReversal;
 pub use runner::{IntentRejection, StrategyRunner, SubmittedIntent, SuppressedIntent};
