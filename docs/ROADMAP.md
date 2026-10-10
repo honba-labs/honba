@@ -36,8 +36,8 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | E8 Multi-leg | 0 | 0 | 4 | Optional; not scheduled (open decision D13) |
 | E9 Frontend and AlgoDesigner | 0 | 1 | 7 | Greenfield; generated TS types only |
 | E10 Async core | 6 | 1 | 1 | Ports, shell, engine output, Arc dataset, sweep, determinism test and Python runtime bridge (ADR 0015) shipped; connectors open |
-| E11 Versioned API | 3 | 2 | 3 | Read API, SDK and WASM indicators shipped; streaming, writes, auth open |
-| **Total (74)** | **22** | **15** | **37** | |
+| E11 Versioned API | 3 | 2 | 2 | Read API, SDK and WASM indicators shipped; SSE streaming shipped; writes, auth open |
+| **Total (74)** | **23** | **14** | **37** | |
 
 ### 1.1 What is shipped (evidence)
 
@@ -66,6 +66,8 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | SDK capabilities and schema | commit f19a301 |
 | WASM hardening | commit 101f81f |
 | ADR 0014 (schema/codegen from Rust), ADR 0015 (explicit runtime) | `docs/adr/` |
+|---|---|
+| E11-S4 SSE streaming | ADR 0021, `crates/honba-api-rest/src/streams.rs`, `crates/honba-api/src/responses.rs::StreamFrame`, `crates/honba-messages/src/endpoints.rs` `GET /backtests/{id}/events`, `honba._honba.api_request_stream`, `python/honba/client/transport.py` `stream()`, `honba.client.Client.stream_backtest()`, `schema/conformance/stream_frames.json`, commits 523bca5..eac57f6 |
 | honba-docs chunks | documentation chunks in the `honba-docs` repo (not itemised here) |
 | E10-S6 determinism under threads | `crates/honba-sweep/tests/sweep.rs` `determinism_under_threads_{one,four,sixteen}_worker(s)` compare journal and ranking across thread counts |
 | E11-S1 envelope and registry | `crates/honba-api`, `crates/honba-messages/src/endpoints.rs` (22 routes, `WRITE_PATHS`), `GET /capabilities` (cf1366e) |
@@ -323,7 +325,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 | ID | Scope | Size | Deps | Acceptance | Owner |
 |---|---|---|---|---|---|
 | E11-S3 rest | Backtests, sweeps, journals, orders routes (backtests and journals built by ADR 0017 q2c; 6 routes still 501: sweeps, orders, positions/close) built in order of R2; known limits in ADR 0013 stand (no real bid/ask, no pagination, no auth) | M each | E4-S3, E4-S5 | route unit tests / `test_client_parity` extended | honba |
-| E11-S4 | SSE for run progress and journals (resume-from-sequence), WS for events later; schema for streamed events | M | ADR D6, E4-S3 | `resume_from_seq`, `event_schema` / `sse_backtest_progress_inproc_and_http` | honba |
+| E11-S4 | SSE for run progress and journals (resume-from-sequence), WS for events later; schema for streamed events | M | ADR D6, E4-S3 | `resume_from_seq`, `event_schema` / `sse_backtest_progress_inproc_and_http` | honba | **DONE** (ADR 0021, commits 523bca5) |
 | E11-S5 rest | WASM: screener eval export (Rust evaluator exists in `honba-indicators`, not exported), backtest replay; wasm-pack CI step never exercised | M | E4-S3 | conformance vectors `screener_scan.json` / browser-free node run | honba |
 | E11-S6 | Frontend client from OpenAPI, TS drift check in CI (currently local only) | S | none | `ts_matches_openapi` / frontend build | honba + honba-frontend |
 | E11-S7 | Write endpoints behind risk and approval queue | M | E2-S2, E5-S4 | `order_refused_by_risk` / `post_order_flows_to_sim_only` | honba |
@@ -355,7 +357,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 
 Already decided: pyo3 single cdylib (ADR 0014 decision, `honba-py`), Strategy ABC with shim (ADR 0008), schema from Rust (ADR 0014),
 integer money (0011), versioning and nanosecond strings (0012), REST read ports (0013), explicit runtime (0015, implemented in E10-S7), next-open Rust port split into three chunks (0016, chunk 1 done),
-run lifecycle and `run_id` (0017, D1), risk stage (0018, D4), `OrderState` FSM and client order ids (0019, D5/D2).
+run lifecycle and `run_id` (0017, D1), risk stage (0018, D4), `OrderState` FSM and client order ids (0019, D5/D2), SSE streaming (0021, D6).
 
 ---
 

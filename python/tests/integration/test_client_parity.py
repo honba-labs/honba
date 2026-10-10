@@ -26,7 +26,6 @@ from honba.client import (
     Client,
     MarketDataUnavailableApiError,
     NotFoundApiError,
-    NotImplementedApiError,
     RequestValidationError,
     TransportApiError,
     ValidationApiError,
@@ -335,10 +334,10 @@ def test_inproc_capabilities_are_typed_and_match_the_registry(inproc: Client) ->
     assert "GET /capabilities" in caps.endpoints and "GET /schema" in caps.endpoints
     assert set(caps.not_implemented) <= set(caps.endpoints)
     assert "GET /orders" in caps.not_implemented and "GET /health" not in caps.not_implemented
-    # Built by ADR 0017: no longer flagged. Sweeps stay flagged until E4-S5.
+    # Built by ADR 0017: no longer flagged. Sweeps built by E4-S5.
     assert "POST /backtests" not in caps.not_implemented
+    assert "POST /sweeps" not in caps.not_implemented
     assert "GET /journals/{id}" not in caps.not_implemented
-    assert "POST /sweeps" in caps.not_implemented
     assert {"india", "null"} <= set(caps.market_packs)
 
 
@@ -348,17 +347,18 @@ def test_inproc_schema_is_a_json_record_with_the_api_version(inproc: Client) -> 
 
 
 def test_inproc_501_placeholders(inproc: Client) -> None:
-    # POST/GET /backtests and the journal routes are built (ADR 0017); sweeps and trading are not.
-    for method, path in [("GET", "/orders"), ("GET", "/sweeps/x"), ("DELETE", "/orders/x")]:
+    # GET /orders is the only built route still returning 501 (ADR 0017).
+    # POST /orders and DELETE /orders/{id} are risk-gated (E2-S2), not 501.
+    for method, path in [("GET", "/orders")]:
         resp = inproc.transport.request(method, path)
         assert resp.status == 501
         assert resp.json["error"]["code"] == "not_implemented"
     from honba.client.errors import error_from_envelope
 
+    # POST /sweeps is now implemented (E4-S5); expect 422 for empty body, not 501.
     resp = inproc.transport.request("POST", "/sweeps", body={})
     err = error_from_envelope(resp.status, resp.json)
-    assert isinstance(err, NotImplementedApiError) and err.category == "unsupported"
-    assert err.retryable is False
+    assert isinstance(err, ValidationApiError)
 
 
 def test_inproc_unknown_route_is_a_not_found_envelope(inproc: Client) -> None:
