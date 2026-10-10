@@ -34,7 +34,7 @@ class Ichimoku(Indicator):
     def update(self, high: float, low: float) -> tuple[float, float] | None:
         self._h.append(high)
         self._l.append(low)
-        if len(self._h) < self._h.maxlen:
+        if self._h.maxlen is None or len(self._h) < self._h.maxlen:
             return None
         tenkan, kijun, senkou_b = (self._mid(n) for n in self._n)
         self._spans.append(((tenkan + kijun) / 2, senkou_b))

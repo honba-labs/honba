@@ -37,7 +37,7 @@ class UltimateOscillator(Indicator):
         lo, hi = min(low, prev), max(high, prev)
         self._bp.append(close - lo)
         self._tr.append(hi - lo)
-        if len(self._tr) < self._tr.maxlen:
+        if self._tr.maxlen is None or len(self._tr) < self._tr.maxlen:
             return None
         return (
             100.0

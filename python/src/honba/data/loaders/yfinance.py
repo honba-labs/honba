@@ -226,11 +226,12 @@ def dataframe_to_bars(
 
     for idx, row in df.iterrows():
         try:
-            op = float(row["Open"])
-            hi = float(row["High"])
-            lo = float(row["Low"])
-            cl = float(row["Close"])
-            vo = float(row["Volume"])
+            r: Any = row
+            op = float(r["Open"])
+            hi = float(r["High"])
+            lo = float(r["Low"])
+            cl = float(r["Close"])
+            vo = float(r["Volume"])
         except (ValueError, TypeError):
             continue
 

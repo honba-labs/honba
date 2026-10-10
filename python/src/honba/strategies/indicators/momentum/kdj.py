@@ -40,7 +40,7 @@ class Kdj(Indicator):
     def update(self, high: float, low: float, close: float) -> tuple[float, float, float] | None:
         self._h.append(high)
         self._l.append(low)
-        if len(self._h) < self._h.maxlen:
+        if self._h.maxlen is None or len(self._h) < self._h.maxlen:
             return None
         hh, ll = max(self._h), min(self._l)
         k = self._k.update((close - ll) / (hh - ll) * 100 if hh != ll else 0.0)

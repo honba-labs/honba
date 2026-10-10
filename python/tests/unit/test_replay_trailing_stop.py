@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-import pytest
-
 from typing import ClassVar
 
-from honba.domain.money import Currency, Money
+import pytest
+
 from honba.entities.bar import Bar
 from honba.entities.instrument import InstrumentId
 from honba.entities.order import OrderIntent, OrderSide, OrderType
 from honba.entities.trade import Trade
 from honba.strategies.base import Strategy
-from honba.strategies.context import LedgerContext
 from honba.strategies.testing import BarCloseFills, replay
 
 NSE = "NSE"
@@ -22,7 +20,9 @@ INFY = InstrumentId("INFY", NSE)
 class TrailingSellStrategy(Strategy):
     name: ClassVar[str] = "trailing_sell_test"
 
-    def __init__(self, trail_amount: float | None = None, trail_percent: float | None = None) -> None:
+    def __init__(
+        self, trail_amount: float | None = None, trail_percent: float | None = None
+    ) -> None:
         self.trail_amount = trail_amount
         self.trail_percent = trail_percent
         self.placed = False
@@ -46,7 +46,9 @@ class TrailingSellStrategy(Strategy):
 class TrailingBuyStrategy(Strategy):
     name: ClassVar[str] = "trailing_buy_test"
 
-    def __init__(self, trail_amount: float | None = None, trail_percent: float | None = None) -> None:
+    def __init__(
+        self, trail_amount: float | None = None, trail_percent: float | None = None
+    ) -> None:
         self.trail_amount = trail_amount
         self.trail_percent = trail_percent
         self.placed = False

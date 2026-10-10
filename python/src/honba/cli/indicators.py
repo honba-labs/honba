@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import NoReturn
 
 import typer
 
@@ -11,7 +12,7 @@ from honba.strategies.indicators import FAMILIES, indicator_spec, list_indicator
 app = typer.Typer(help="Discover the built-in technical indicators.", no_args_is_help=True)
 
 
-def _fail(msg: str) -> None:
+def _fail(msg: str) -> NoReturn:
     typer.echo(f"error: {msg}", err=True)
     raise typer.Exit(1)
 

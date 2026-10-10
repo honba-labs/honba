@@ -45,7 +45,7 @@ class RelativeVigorIndex(Indicator):
             return None
         n = self._num.update(_swma(*self._co))
         d = self._den.update(_swma(*self._hl))
-        if n is None:
+        if n is None or d is None:
             return None
         self._r.append(n / d if d != 0 else 0.0)
         if len(self._r) < 4:

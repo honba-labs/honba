@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any
 
 from honba.domain.option import OptionKind
 
@@ -92,11 +91,15 @@ def bs_greeks(
 
     if kind == OptionKind.CALL:
         delta = _norm_cdf(d1)
-        theta = -(spot * pdf_d1 * iv) / (2.0 * math.sqrt(tau)) - r * strike * discount * _norm_cdf(d2)
+        theta = -(spot * pdf_d1 * iv) / (2.0 * math.sqrt(tau)) - r * strike * discount * _norm_cdf(
+            d2
+        )
         rho = strike * tau * discount * _norm_cdf(d2)
     else:
         delta = _norm_cdf(d1) - 1.0
-        theta = -(spot * pdf_d1 * iv) / (2.0 * math.sqrt(tau)) + r * strike * discount * _norm_cdf(-d2)
+        theta = -(spot * pdf_d1 * iv) / (2.0 * math.sqrt(tau)) + r * strike * discount * _norm_cdf(
+            -d2
+        )
         rho = -strike * tau * discount * _norm_cdf(-d2)
 
     gamma = pdf_d1 / (spot * sigma_sqrt_tau)
@@ -107,7 +110,7 @@ def bs_greeks(
         delta=delta,
         gamma=gamma,
         theta=theta / 365.0,  # daily theta convention
-        vega=vega / 100.0,    # per 1% vol convention
+        vega=vega / 100.0,  # per 1% vol convention
         rho=rho / 100.0,
     )
 

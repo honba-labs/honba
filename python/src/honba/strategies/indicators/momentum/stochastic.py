@@ -43,4 +43,6 @@ class Stochastic(Indicator):
         hh, ll = max(self._h), min(self._l)
         k = self._k.update(100.0 * (close - ll) / (hh - ll) if hh != ll else 0.0)
         d = self._d.update(k) if k is not None else None
-        return StochasticValue(k, d) if d is not None else None
+        if k is None or d is None:
+            return None
+        return StochasticValue(k, d)

@@ -46,7 +46,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Protocol, TypeGuard, cast
 
 # ---------------------------------------------------------------------------
 # Domain / strategy imports
@@ -559,7 +559,7 @@ def _default_data_provider() -> DataProvider:
     to pass data= explicitly in early development.
     """
     try:
-        from honba.data import get_default_provider
+        from honba.data import get_default_provider  # pyright: ignore[reportAttributeAccessIssue]
 
         return get_default_provider()
     except ImportError as e:
@@ -569,7 +569,7 @@ def _default_data_provider() -> DataProvider:
         ) from e
 
 
-def _is_cost_model(costs: object) -> bool:
+def _is_cost_model(costs: object) -> TypeGuard[CostModel]:
     """A post-hoc CostModel (``apply(trade) -> Trade``), as opposed to a pack name or fill fn."""
     return not isinstance(costs, str) and hasattr(costs, "apply")
 

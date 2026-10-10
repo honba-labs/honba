@@ -269,6 +269,8 @@ class OrderIntent:
     order_type: str
     price: float | None
     trigger_price: float | None
+    trail_amount: float | None
+    trail_percent: float | None
     time_in_force: str
     def __new__(
         cls,
@@ -280,6 +282,8 @@ class OrderIntent:
         time_in_force: str = "day",
         exchange: str = "NSE",
         trigger_price: float | None = None,
+        trail_amount: float | None = None,
+        trail_percent: float | None = None,
     ) -> Self: ...
     @staticmethod
     def market_buy(symbol: str, quantity: float, exchange: str = "NSE") -> OrderIntent: ...
@@ -317,6 +321,24 @@ class OrderIntent:
         limit_price: float,
         exchange: str = "NSE",
     ) -> OrderIntent: ...
+    @staticmethod
+    def trailing_stop_buy(
+        symbol: str,
+        quantity: float,
+        *,
+        trail_amount: float | None = None,
+        trail_percent: float | None = None,
+        exchange: str = "NSE",
+    ) -> OrderIntent: ...
+    @staticmethod
+    def trailing_stop_sell(
+        symbol: str,
+        quantity: float,
+        *,
+        trail_amount: float | None = None,
+        trail_percent: float | None = None,
+        exchange: str = "NSE",
+    ) -> OrderIntent: ...
 
 @final
 class TradingState:
@@ -338,6 +360,7 @@ class RiskLimits:
         max_notional: float | None = None,
         order_rate: tuple[int, int] | None = None,
         max_participation: float | None = None,
+        stale_after_ms: int | None = None,
     ) -> Self: ...
     @staticmethod
     def from_dict(d: dict[str, Any] | str) -> RiskLimits:
@@ -349,6 +372,8 @@ class RiskLimits:
     def order_rate(self) -> tuple[int, int] | None: ...
     @property
     def max_participation(self) -> float | None: ...
+    @property
+    def stale_after_ms(self) -> int | None: ...
     def require_live(self) -> None:
         """Raise ``ValueError`` unless both limits are set (the live-run guard)."""
     def __eq__(self, other: object, /) -> bool: ...

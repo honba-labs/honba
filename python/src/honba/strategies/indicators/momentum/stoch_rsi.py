@@ -48,4 +48,6 @@ class StochRsi(Indicator):
         hi, lo = max(self._w), min(self._w)
         k = self._k.update(100.0 * (r - lo) / (hi - lo) if hi != lo else 0.0)
         d = self._d.update(k) if k is not None else None
-        return StochRsiValue(k, d) if d is not None else None
+        if k is None or d is None:
+            return None
+        return StochRsiValue(k, d)

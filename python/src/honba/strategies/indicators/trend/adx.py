@@ -48,7 +48,7 @@ class Adx(Indicator):
         mdm = down if down > up and down > 0 else 0.0
         tr = max(high - low, abs(high - pc), abs(low - pc))
         t, p, m = self._tr.update(tr), self._pdm.update(pdm), self._mdm.update(mdm)
-        if t is None:
+        if t is None or p is None or m is None:
             return None
         pdi = 100.0 * p / t if t > 0 else 0.0
         mdi = 100.0 * m / t if t > 0 else 0.0

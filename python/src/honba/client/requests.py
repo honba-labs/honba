@@ -109,7 +109,8 @@ def _id_text(value: object, field: str = "id") -> str:
     if isinstance(value, str):
         text = value
     elif hasattr(value, "symbol") and hasattr(value, "exchange"):
-        text = f"{value.symbol}.{value.exchange}"
+        v: Any = value
+        text = f"{v.symbol}.{v.exchange}"
     else:
         text = ""
     symbol, dot, exchange = text.rpartition(".")

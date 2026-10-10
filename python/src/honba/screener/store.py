@@ -114,7 +114,7 @@ class ParquetBarStore:
             records.append(
                 CoverageRecord(
                     # Legacy ledgers wrote "venue"; it wins when both keys exist.
-                    exchange=r["venue"] if "venue" in r else r.get("exchange"),
+                    exchange=str(r.get("venue") or r.get("exchange") or "NSE"),
                     symbol=r["symbol"],
                     timeframe=r["timeframe"],
                     interval=DateInterval(

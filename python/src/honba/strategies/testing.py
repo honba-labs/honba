@@ -104,13 +104,13 @@ def replay(strategy: Strategy, bars: Iterable[Bar], fill_delay: int = 0) -> Repl
                     remaining_stops.append(stop)
         resting_stops = remaining_stops
 
-        triggered.sort(key=lambda item: (0 if item[0].side is OrderSide.SELL else 1))
+        triggered.sort(key=lambda item: 0 if item[0].side is OrderSide.SELL else 1)
         for intent, px in triggered:
             _fill(strategy, result, intent, px, bar.ts)
 
         due = [q for q in queue if q[0] <= i]
         queue = [q for q in queue if q[0] > i]
-        due.sort(key=lambda item: (0 if item[1].side is OrderSide.SELL else 1))
+        due.sort(key=lambda item: 0 if item[1].side is OrderSide.SELL else 1)
         for _, intent in due:
             px = last_open.get(intent.instrument_id, bar.open)
             _fill(strategy, result, intent, px, bar.ts)
@@ -128,7 +128,7 @@ def replay(strategy: Strategy, bars: Iterable[Bar], fill_delay: int = 0) -> Repl
         if fill_delay == 0:
             immediate = [it for it in intents if it.order_type is not OrderType.TRAILING_STOP]
             intents_to_fill = sorted(
-                immediate, key=lambda it: (0 if it.side is OrderSide.SELL else 1)
+                immediate, key=lambda it: 0 if it.side is OrderSide.SELL else 1
             )
             for intent in intents_to_fill:
                 px = last_close.get(intent.instrument_id, bar.close)

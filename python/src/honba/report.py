@@ -37,7 +37,7 @@ import json
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, is_dataclass
-from typing import Any, TextIO
+from typing import TYPE_CHECKING, Any, TextIO
 
 from honba.display import (
     Column,
@@ -55,10 +55,13 @@ _format_timestamp_ns = format_timestamp_ns
 # BacktestResult is defined in session; import for type checkers only at
 # runtime we accept any object with the expected attributes (duck typing)
 # so report can be used in tests without importing the full session graph.
-try:
+if TYPE_CHECKING:
     from honba.session import BacktestResult
-except ImportError:  # pragma: no cover — bootstrap / circular-import guard
-    BacktestResult = Any  # type: ignore[misc, assignment]
+else:
+    try:
+        from honba.session import BacktestResult
+    except ImportError:  # pragma: no cover — bootstrap / circular-import guard
+        BacktestResult = Any  # type: ignore[misc, assignment]
 
 
 # =============================================================================
@@ -171,14 +174,17 @@ def _fill_rows(fills: Sequence[Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for t in fills:
         side = getattr(t, "side", None)
-        costs = getattr(t, "costs", 0)
-        if hasattr(costs, "to_major"):  # integer Money (ADR 0011): display in major units
-            costs = costs.to_major()
+        costs: Any = getattr(t, "costs", 0)
+        to_major = getattr(costs, "to_major", None)
+        if callable(to_major):  # integer Money (ADR 0011): display in major units
+            costs = to_major()
         inst = getattr(t, "instrument_id", None)
+        side_val = getattr(side, "value", None) if side is not None else None
+        side_str = side_val.upper() if side_val is not None else str(side)
         rows.append(
             {
                 "ts": getattr(t, "ts", 0),
-                "side": side.value.upper() if hasattr(side, "value") else str(side),
+                "side": side_str,
                 "symbol": f"{inst.symbol}.{inst.exchange}" if inst else "?",
                 "quantity": getattr(t, "quantity", 0),
                 "price": getattr(t, "price", 0),
@@ -355,13 +361,15 @@ def _print_tui(
             except (ValueError, OSError):
                 time_str = "?"
             side = getattr(t, "side", None)
-            side_str = side.value.upper() if hasattr(side, "value") else str(side)
+            side_val = getattr(side, "value", None) if side is not None else None
+            side_str = side_val.upper() if side_val is not None else str(side)
             side_style = "green" if side_str == "BUY" else "red"
             qty = getattr(t, "quantity", 0)
             price = getattr(t, "price", 0)
             costs = getattr(t, "costs", 0)
-            if hasattr(costs, "to_major"):  # integer Money (ADR 0011): display in major units
-                costs = costs.to_major()
+            to_major = getattr(costs, "to_major", None)
+            if callable(to_major):  # integer Money (ADR 0011): display in major units
+                costs = to_major()
             inst = getattr(t, "instrument_id", None)
             sym = f"{inst.symbol}.{inst.exchange}" if inst else "?"
 
@@ -455,7 +463,7 @@ def _trade_to_dict(t: Any) -> dict[str, Any]:
     return d
 
 
-def _rejection_to_dict(r: Any) -> dict[str, Any]:
+def _rejection_to_dict(r: Any) -> Any:
     if hasattr(r, "to_dict"):
         try:
             return r.to_dict()

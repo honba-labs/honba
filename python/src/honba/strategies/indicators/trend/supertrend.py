@@ -47,9 +47,17 @@ class Supertrend(Indicator):
         if self._dir == 0:
             self._dir = -1
         else:
-            if not (lower > self._lower or pc < self._lower):
+            if (
+                self._lower is not None
+                and pc is not None
+                and not (lower > self._lower or pc < self._lower)
+            ):
                 lower = self._lower
-            if not (upper < self._upper or pc > self._upper):
+            if (
+                self._upper is not None
+                and pc is not None
+                and not (upper < self._upper or pc > self._upper)
+            ):
                 upper = self._upper
             if self._dir == -1:
                 self._dir = 1 if close > upper else -1

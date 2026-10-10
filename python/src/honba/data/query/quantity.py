@@ -9,9 +9,8 @@ from __future__ import annotations
 import decimal
 import re
 from dataclasses import dataclass
-from typing import NamedTuple
 
-from honba.markets.india.units import INDIA_CURRENCY_SYMBOLS, INDIA_MULTIPLIERS
+from honba.markets.india.units import INDIA_CURRENCY_SYMBOLS, INDIA_MULTIPLIERS, MultiplierSpec
 from honba.wire.screener import MetricDefinition, UnitType, ValueType
 
 
@@ -21,12 +20,6 @@ class QuantityError(ValueError):
 
 class UnitMismatchError(QuantityError):
     """Raised when a quantity unit/suffix does not match the metric's expected unit."""
-
-
-class MultiplierSpec(NamedTuple):
-    canonical: str
-    multiplier: float
-    aliases: tuple[str, ...]
 
 
 SHARED_MULTIPLIERS: dict[str, MultiplierSpec] = {

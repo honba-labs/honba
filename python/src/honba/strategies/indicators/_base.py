@@ -33,6 +33,7 @@ class Indicator:
     family: ClassVar[str]
     inputs: ClassVar[tuple[str, ...]] = ("close",)
     outputs: ClassVar[tuple[str, ...]] = ("value",)
+    _init_args: dict[str, Any]
 
     def __new__(cls, *args, **kwargs):
         self = super().__new__(cls)

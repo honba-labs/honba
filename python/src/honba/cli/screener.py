@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 from rich.console import Console
@@ -182,18 +182,20 @@ def _build_scan_request(
     if sort:
         parts = sort.split(":")
         k_tf = parts[0]
-        direction = parts[1] if len(parts) > 1 else "desc"
+        dir_val: Literal["asc", "desc"] = (
+            "asc" if len(parts) > 1 and parts[1].lower() == "asc" else "desc"
+        )
         if "@" in k_tf:
             k, tf = k_tf.split("@", 1)
-            sort_spec = ScreenerSortSpec(key=k, dir=direction, timeframe=Timeframe(tf))
+            sort_spec = ScreenerSortSpec(key=k, dir=dir_val, timeframe=Timeframe(tf))
         else:
-            sort_spec = ScreenerSortSpec(key=k_tf, dir=direction)
+            sort_spec = ScreenerSortSpec(key=k_tf, dir=dir_val)
 
     return ScreenerScanRequest(
         market=market,
         types=types,
-        primary_only=primary_only,
-        column_set=column_set,
+        primaryOnly=primary_only,
+        columnSet=column_set,
         columns=col_specs,
         filters=filter_group,
         sort=sort_spec,

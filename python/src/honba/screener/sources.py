@@ -115,8 +115,8 @@ class LocalScreenerSource:
 
             matching_rows.append(
                 ScreenerRow(
-                    full_symbol=f"{inst.symbol}.{inst.exchange}",
-                    instrument_id=str(inst),
+                    fullSymbol=f"{inst.symbol}.{inst.exchange}",
+                    instrumentId=str(inst),
                     name=inst.symbol,
                     values=values,
                 )

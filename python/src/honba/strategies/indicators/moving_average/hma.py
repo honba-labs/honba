@@ -22,6 +22,6 @@ class Hma(Indicator):
 
     def update(self, x: float) -> float | None:
         h, f = self._half.update(x), self._full.update(x)
-        if f is None:
+        if h is None or f is None:
             return None
         return self._out.update(2.0 * h - f)

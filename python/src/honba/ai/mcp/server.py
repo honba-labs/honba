@@ -54,7 +54,7 @@ def _error_content(err: McpError) -> str:
 
 def _import_types() -> Any:
     try:
-        from mcp import types
+        from mcp import types  # pyright: ignore[reportMissingImports]
     except ImportError as exc:  # pragma: no cover - depends on the optional extra
         raise RuntimeError(
             "the MCP server needs the optional 'mcp' package; install honba[ai]"
@@ -103,7 +103,7 @@ def build_server(gateway: McpGateway) -> Any:
         RuntimeError: the ``mcp`` package is not installed.
     """
     try:
-        from mcp.server import Server
+        from mcp.server import Server  # pyright: ignore[reportMissingImports]
     except ImportError as exc:  # pragma: no cover - depends on the optional extra
         raise RuntimeError(
             "the MCP server needs the optional 'mcp' package; install honba[ai]"
@@ -118,7 +118,7 @@ def build_server(gateway: McpGateway) -> Any:
 
 async def run_stdio(gateway: McpGateway) -> None:
     """Serve the gateway over stdio (the local default transport)."""
-    from mcp.server.stdio import stdio_server
+    from mcp.server.stdio import stdio_server  # pyright: ignore[reportMissingImports]
 
     server = build_server(gateway)
     async with stdio_server() as (read, write):

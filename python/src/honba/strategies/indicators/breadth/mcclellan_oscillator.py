@@ -25,4 +25,6 @@ class McClellanOscillator(Indicator):
 
     def update(self, advances: float, declines: float) -> float:
         net = advances - declines
-        return self._f.update(net) - self._s.update(net)
+        f = self._f.update(net)
+        s = self._s.update(net)
+        return (f - s) if f is not None and s is not None else 0.0

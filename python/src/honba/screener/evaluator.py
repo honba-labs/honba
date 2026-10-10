@@ -144,12 +144,22 @@ def evaluate_predicate_on_bars(
     lhs_prev = lhs_series[-2] if len(lhs_series) >= 2 else None
 
     if pred.op == FilterOp.CROSSES_ABOVE:
-        if lhs_prev is None or rhs_prev is None:
+        if not (
+            isinstance(lhs_curr, (int, float))
+            and isinstance(rhs_curr, (int, float))
+            and isinstance(lhs_prev, (int, float))
+            and isinstance(rhs_prev, (int, float))
+        ):
             return False
         return bool(lhs_prev <= rhs_prev and lhs_curr > rhs_curr)
 
     if pred.op == FilterOp.CROSSES_BELOW:
-        if lhs_prev is None or rhs_prev is None:
+        if not (
+            isinstance(lhs_curr, (int, float))
+            and isinstance(rhs_curr, (int, float))
+            and isinstance(lhs_prev, (int, float))
+            and isinstance(rhs_prev, (int, float))
+        ):
             return False
         return bool(lhs_prev >= rhs_prev and lhs_curr < rhs_curr)
 

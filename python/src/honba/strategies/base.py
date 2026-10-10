@@ -39,6 +39,8 @@ class Strategy(ABC):
     # Driving bars consumed before the first order (``StrategyManifest.warmup_bars``); the
     # runner suppresses orders until then. A runner or config value overrides it.
     warmup_bars: ClassVar[int] = 0
+    _ctx: StrategyContext
+    logger: logging.Logger
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)

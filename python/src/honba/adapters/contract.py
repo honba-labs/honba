@@ -37,7 +37,7 @@ from __future__ import annotations
 import datetime as dt
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, NoReturn, cast
 
 from honba.adapters.base import Adapter, ExecutionAdapter, MarketDataAdapter, MarketDataClient
 from honba.adapters.capabilities import AdapterCapabilities, Capability, capability_for_method
@@ -96,7 +96,7 @@ class ContractViolation(AssertionError):
     """
 
 
-def _fail(message: str) -> None:
+def _fail(message: str) -> NoReturn:
     raise ContractViolation(message)
 
 

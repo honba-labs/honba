@@ -43,11 +43,11 @@ class Tsi(Indicator):
         dx = close - prev
         n = self._n1.update(dx)
         d = self._d1.update(abs(dx))
-        if n is None:
+        if n is None or d is None:
             return None
-        n, d = self._n2.update(n), self._d2.update(d)
-        if n is None:
+        n2, d2 = self._n2.update(n), self._d2.update(d)
+        if n2 is None or d2 is None:
             return None
-        t = 100.0 * n / d if d != 0 else 0.0
+        t = 100.0 * n2 / d2 if d2 != 0 else 0.0
         s = self._sig.update(t)
         return TsiValue(t, s) if s is not None else None
