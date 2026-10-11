@@ -465,6 +465,14 @@ impl PyTradingState {
     fn __repr__(&self) -> String {
         format!("TradingState.{}", self.__str__().to_uppercase())
     }
+
+    /// Whether a transition from this state to `next` is permitted.
+    fn can_transition_to(&self, next: PyTradingState) -> bool {
+        use honba_messages::TradingState;
+        let current: TradingState = (*self).into();
+        let next_rust: TradingState = next.into();
+        current.can_transition_to(next_rust)
+    }
 }
 
 /// Per-run risk limits (`max_notional` in major units, `order_rate` as `(max_orders,
