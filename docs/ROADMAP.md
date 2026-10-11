@@ -11,6 +11,7 @@ b12e5ba..1b2f6ce). Also done since v5 (see 1.1): cancel-time rule, rejection-que
 capabilities/schema, WASM hardening, ADR 0014/0015, golden vectors validated against the schema, honba-docs chunks.
 E5-S5 done (2026-10-11): AI strategy verifier (ADR 0022).
 E11-S8 done (2026-10-11): Minimal auth (Bearer token, scope map, file token store, audit log) (ADR 0023).
+E5-S10, E5-S11 added (2026-10-11): In-process Llama runtime (GBNF constraints) and financial domain alignment (SFT + RLVR compiler rewards).
 The two superseded documents are kept in `docs/archive/` for history and are not updated.
 
 Story verdicts come from the 2026-10-06 audit (a scratch file, `ROADMAP_AUDIT.md`, model output, not kept in the repo) after a spot-check
@@ -229,7 +230,7 @@ Done work is removed. Sizes: S (<=1 day), M (2-4 days), L (split before start). 
 | R2 Runs | A backtest is a first-class server object | ADR-Run, E3-S1a (next-open Rust port), E4-S3, E4-S1, E11-S3 rest (backtests, sweeps, journals), E4-S5 | `POST /backtests` returns `run_id`; result carries `assumptions.not_modelled`; sweep over REST; journal v1 |
 | R3 Live-shaped runtime | Python and Rust share one runtime; push updates | E11-S4 (E10-S7 done) | `honba.event_loop` owns one runtime (done); SSE streams run progress with resume |
 | R4 Trustworthy research | Results that resist self-deception | E4-S2, E4-S4, E4-S6, E4-S7, E6 batches 3-4 | Look-ahead property test; DSR/PBO/holdout/MC/cost-stress gates in result |
-| R5 Agent surfaces | Safe LLM and automation access | E5-S5, E5-S2, E5-S1 server, E5-S3, E5-S4, E5-S7, E11-S7 | MCP server from generated schemas; scope drift test; verifier; write routes gated |
+| R5 Agent surfaces | Safe LLM and automation access | E5-S5, E5-S2, E5-S1 server, E5-S3, E5-S4, E5-S7, E5-S10, E5-S11, E11-S7 | MCP server from generated schemas; scope drift test; verifier; in-process tiny LLM with GBNF & financial alignment; write routes gated |
 | R6 Live-ready | Broker, paper on live data | E1-S2..S6, E10-S8, E2-S7, E2-S9..S11, E3-S2..S7 | Instrument master, feed connector, reconciliation, L2 simulator, sandbox adapter |
 | R7 Frontend | Capability-driven apps | E11-S5/S6 rest, E9 | WASM replay, generated client, AlgoDesigner |
 | R8 Optional | Scale and arbitrage | E7, E8 | Only if profiling or product decision demands |
@@ -304,6 +305,8 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 | E5-S4 (DONE) | Approval queue for placements; cancel/modify bypass | M | E2-S2, E5-S3 | `placement_held`, `cancel_bypasses` / `approve_flows_through_risk_to_sim` | honba |
 | E5-S7 | Typed LLM decisions (veto/size-down only), journaled | S | E5-S5, E4-S1 | `schema_rejects_increase` / `decision_in_journal` | honba |
 | E5-S8 rest | Write routes gated (E11-S7) | S | E2-S2, E5-S4 | see E11-S7 | honba |
+| E5-S10 | Local in-process LLM runtime (llama-cpp-python / GGUF runner) and EBNF->GBNF grammar constraint for zero-syntax-hallucination screening (Design.md §13) | M | E5-S1, ADR 0009 | `grammar_masks_invalid_tokens` / `ask_runs_offline_zero_syntax_errors` | honba |
+| E5-S11 | Financial domain alignment for tiny models (1B-3B): synthetic financial dataset (3k Indian market NL queries), QLoRA SFT, and compiler-reward RLVR (GRPO via parser & screener evaluator) | M | E5-S10 | `benchmark_screener_accuracy_gt_90pct` / `rlvr_rewards_compiler_pass` | honba |
 | E5-S6, E5-S9 | Deferred (webhook, report builder) | | | | |
 
 ### E6, E7, E8, E9
@@ -352,7 +355,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 | D9 | Sampler: Rust seeded sampler vs Optuna extra; pinned version | E4-S5 | Rust sampler; Optuna optional |
 | D10 | Python adapters (ADR 0010) vs Rust `ExecutionGateway`/`MarketDataFeed` ports: who bridges, which side owns the loop | E10-S8, E3-S7 | ADR before E10-S8 |
 | D11 | Minimal auth before non-loopback serve | E11-S8, E5-S3 | Bearer token plus scope map |
-| D12 | ADR 0009 (agentic MCP and local LLM) is still **Proposed**; reconcile with ADR 0014 (MCP tools generated from Rust) and accept or amend | E5 | Amend then accept |
+| D12 | ADR 0009 (agentic MCP and local LLM) reconciliation: accept local in-process Llama runtime and the layered alignment strategy (GBNF -> SFT -> RLVR) per Design.md §13 | E5, E5-S10, E5-S11 | Accept with GBNF + RLVR |
 | D13 | Is arbitrage a product goal (E8)? | E8 | Unscheduled unless yes |
 | D14 | Tick/depth data source for L2 (bars only today; `/depth` empty) | E3-S1b | Decide before L2; else stay L1 |
 | D15 | Root CLAUDE.md wording for the pack pattern; clean-room log for OpenAlgo/QuantDinger-inspired work; `honba-python` split re-evaluation (needs `honba-py` on crates.io) | housekeeping | Owner approval |
@@ -389,6 +392,7 @@ Existing numbering: `backtesting/01..06`, `ai_research/01..06` (several are one-
 | `ai_research/07_verify_generated_strategy.py` | LLM-written strategy through verifier then backtest | E5-S5 |
 | `ai_research/08_mcp_tools_from_schema.py` | List and call MCP tools generated from `mcp_tools.json` | E5-S1 |
 | `ai_research/09_typed_llm_decision.py` | Veto/size-down schema, decision journaled | E5-S7 |
+| `ai_research/03_nl_screener.py` | Natural language screener with Tier 1 grammar and Tier 2 Python predicate execution | E5-S10 |
 | `ai_research/10_gated_order_flow.py` | Approval queue plus risk refusal on simulated orders | E5-S4, E2-S2 |
 
 Each example ships with its own test under `honba-examples/tests/` (unit for helpers, integration running the script on synthetic data).
