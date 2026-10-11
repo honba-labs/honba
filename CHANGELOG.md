@@ -171,6 +171,20 @@
 - Free-text result fields (symbol, name, message, etc.) wrapped in the trust envelope
   (`honba.ai.trust.wrap_untrusted`) before an agent sees them.
 
+### Approval queue for order placements (E5-S4, ADR 0018 decision 7)
+
+- New `ApprovalQueue` type in `honba-api-rest` (bounded FIFO, configurable max size).
+- `AppState::with_approval_queue(max_size)` enables the queue on `POST /orders`.
+- When enabled, placements are enqueued and return `200 { status: "queued", queue_position }`
+  instead of proceeding to the risk stage.
+- `GET /approval/queue` lists pending orders with their position, instrument, side, qty, price.
+- `POST /approval/approve` approves the oldest pending order and re-runs it through the risk
+  stage to the simulator gateway.
+- `POST /approval/reject` rejects the oldest pending order.
+- Cancel (`DELETE /orders/{id}`) and close (`POST /positions/close`) bypass the queue entirely.
+- The approval queue integrates with the existing risk stage: an approved order re-enters the
+  risk gate before reaching the simulator.
+
 ### Run lifecycle types: `RunStatus::Cancelled`, `error` on run responses (E4-S3 / E11-S3, ADR 0017, q1)
 
 - `RunStatus` gains `cancelled` (`pending -> running -> completed | failed | cancelled`, plus

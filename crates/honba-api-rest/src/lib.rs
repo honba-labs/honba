@@ -28,6 +28,7 @@ use tower_http::{
     trace::TraceLayer,
 };
 
+mod approval;
 mod dispatch;
 mod executor;
 mod journal;
@@ -43,6 +44,7 @@ mod state;
 mod streams;
 mod trades;
 
+pub use approval::ApprovalQueue;
 pub use dispatch::{build_target, dispatch, dispatch_stream, DispatchError};
 pub use executor::BacktestExecutor;
 pub use honba_api::JournalWriter;
@@ -163,6 +165,9 @@ pub fn api_router_with_config(state: AppState, config: &ApiConfig) -> Router {
         .route("/orders", post(post_orders).get(get_orders))
         .route("/orders/:id", delete(delete_order))
         .route("/positions/close", post(post_close_positions))
+        .route("/approval/queue", get(orders::get_approval_queue))
+        .route("/approval/approve", post(orders::post_approve_order))
+        .route("/approval/reject", post(orders::post_reject_order))
         .route("/screener/scan", get(screener::get_screener_scan))
         .route("/journals/:id", get(runs::get_journal_by_id))
         .fallback(unknown_route)

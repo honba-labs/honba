@@ -297,7 +297,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 | E5-S2 | Trust envelope: broker/LLM/instrument text wrapped and marked untrusted | S | none | `wraps_untrusted_text` / `mcp_tool_output_marked` | honba |
 | E5-S1 (DONE) | Thin Python MCP server over generated `mcp_tools.json` (11 tools: backtest, sweep, verify_strategy, compile_strategy, list_strategies, screen, get_instruments, get_bars, get_backtest, get_backtest_journal, get_sweep); toolset filter; read-only kill switch | M | E5-S2 | `toolset_filter` / `mcp_call_matches_rest_response` | honba |
 | E5-S3 | Scope map (read:market, read:account, write:orders, research) with CI drift test; audit by token id | S | E5-S1, E11-S8 min | `scope_for_every_endpoint` / `drift_test_fails_on_new_route` | honba |
-| E5-S4 | Approval queue for placements; cancel/modify bypass | M | E2-S2, E5-S3 | `placement_held`, `cancel_bypasses` / `approve_flows_through_risk_to_sim` | honba |
+| E5-S4 (DONE) | Approval queue for placements; cancel/modify bypass | M | E2-S2, E5-S3 | `placement_held`, `cancel_bypasses` / `approve_flows_through_risk_to_sim` | honba |
 | E5-S7 | Typed LLM decisions (veto/size-down only), journaled | S | E5-S5, E4-S1 | `schema_rejects_increase` / `decision_in_journal` | honba |
 | E5-S8 rest | Write routes gated (E11-S7) | S | E2-S2, E5-S4 | see E11-S7 | honba |
 | E5-S6, E5-S9 | Deferred (webhook, report builder) | | | | |
@@ -449,4 +449,4 @@ Checked about 25 verdicts against code, git log and ls/grep (read-only). Counts:
 | E3-S3 | PARTIAL, "cost model wired to fills" | Rust `CostSchedule` unused by `honba-sim`; only Python `fill_costs_from_model` path | PARTIAL (Python only) |
 
 Verdicts confirmed by the spot-check: E3-S1 (L1 only; sim stubs), E11-S5 (indicators and ATR only; screener evaluator not exported to WASM),
-E5-S1 (DONE) (11 tool schemas, MCP server with CLI `honba mcp serve`); E1-S1, E0-S7, E0-S1..S3, E11-S1/S2, E10-S1, E9 (all not started), E5-S4/S5/S6/S7.
+E5-S1 (DONE) (11 tool schemas, MCP server with CLI `honba mcp serve`); E1-S1, E0-S7, E0-S1..S3, E11-S1/S2, E10-S1, E9 (all not started), E5-S4 (DONE), E5-S5/S6/S7.

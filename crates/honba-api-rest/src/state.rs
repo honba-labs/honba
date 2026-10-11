@@ -14,7 +14,9 @@ use honba_entities::Currency;
 use honba_messages::{ErrorDetail, TradingState};
 use honba_ports::{BarReader, DepthReader, InstrumentMaster, QuoteReader};
 
-use crate::{BacktestExecutor, RunService, RunServiceConfig, RunStore, StrategyRegistry};
+use crate::{
+    ApprovalQueue, BacktestExecutor, RunService, RunServiceConfig, RunStore, StrategyRegistry,
+};
 
 /// App state for REST API.
 #[derive(Clone)]
@@ -43,6 +45,11 @@ pub struct AppState {
     /// Set in process by the composition root; the operator route that changes it stays 501
     /// until E11-S8. `Halted` refuses placements while cancel and close still pass.
     pub trading_state: TradingState,
+    /// Approval queue for order placements (E5-S4).
+    ///
+    /// When enabled, `POST /orders` is held here until approved by an operator.
+    /// Cancel and modify bypass the queue.
+    pub approval_queue: Option<Arc<ApprovalQueue>>,
 }
 
 impl AppState {
@@ -62,7 +69,17 @@ impl AppState {
             runs: None,
             account_currency: Currency::Inr,
             trading_state: TradingState::Active,
+            approval_queue: None,
         }
+    }
+
+    /// Enables the approval queue for order placements (E5-S4).
+    ///
+    /// When enabled, `POST /orders` is held in the queue until approved by an operator.
+    /// Cancel and modify bypass the queue. `max_size` bounds the queue (default 100).
+    pub fn with_approval_queue(mut self, max_size: usize) -> Self {
+        self.approval_queue = Some(Arc::new(ApprovalQueue::new(max_size)));
+        self
     }
 
     /// Sets the operator trading state the write routes evaluate against.

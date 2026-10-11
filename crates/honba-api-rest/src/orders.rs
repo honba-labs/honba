@@ -1,5 +1,5 @@
-//! The `POST /orders` risk gate (ADR 0018 decision 7): approval queue (E5-S4, none
-//! configured) -> risk stage -> execution gateway (simulator only until E3-S7).
+//! The `POST /orders` risk gate (ADR 0018 decision 7): approval queue (E5-S4) ->
+//! risk stage -> execution gateway (simulator only until E3-S7).
 //!
 //! The handler builds a [`RiskRequest`] from the request body plus the ports the
 //! composition root already wires: rules come from the `null` profile over the
@@ -11,14 +11,16 @@
 //! and `ts = 0`. Known limits: with no sim clock composed yet the rate rule cannot
 //! be exercised and orders carry no timestamp.
 //!
-//! A refusal is the 422 of ADR 0018 decision 5 and never reaches the gateway.
-//! The decision 6 audit record and the `order_id` idempotency key of ADR 0019
-//! decision 3 both arrive with the E11-S7 write ledger; here the id is a fixed
-//! placeholder and nothing is audited. `DELETE /orders/{id}` and
-//! `POST /positions/close` cannot add exposure, so they are never risk-checked
-//! and are allowed in every state; at this seam both acknowledge without a
-//! store, and close does not yet generate the reduce-only orders the ledger
-//! will submit.
+//! When the approval queue is enabled (E5-S4), placements are held in the queue
+//! until approved by an operator. Cancel and modify bypass the queue.
+//! A refusal from the risk stage is the 422 of ADR 0018 decision 5 and never
+//! reaches the gateway. The decision 6 audit record and the `order_id`
+//! idempotency key of ADR 0019 decision 3 both arrive with the E11-S7 write
+//! ledger; here the id is a fixed placeholder and nothing is audited.
+//! `DELETE /orders/{id}` and `POST /positions/close` cannot add exposure, so
+//! they are never risk-checked and are allowed in every state; at this seam
+//! both acknowledge without a store, and close does not yet generate the
+//! reduce-only orders the ledger will submit.
 
 use std::sync::Arc;
 
@@ -31,6 +33,7 @@ use honba_messages::{
     ErrorCode, ErrorDetail, InstrumentId, OrderId, OrderSide, OrderType, UnixNanos,
 };
 use honba_risk::{ProfileRulesSource, RiskCheck, RiskDecision, RiskLimits, RiskRequest, RiskStage};
+use serde_json::json;
 
 use crate::market::{failure, success};
 use crate::state::AppState;
@@ -105,9 +108,9 @@ async fn last_price(state: &AppState, instrument_id: &InstrumentId) -> Option<f6
     crate::market::quote_last(state, instrument_id).await
 }
 
-/// `Access::Write` (`POST /orders`): gate, then route. The gateway of E11-S7
-/// stays 501 until its store exists; today an approved order is acknowledged
-/// with 200 and no state changes.
+/// `Access::Write` (`POST /orders`): approval queue (E5-S4) -> risk stage -> gateway.
+/// The gateway of E11-S7 stays 501 until its store exists; today an approved order
+/// is acknowledged with 200 and no state changes.
 ///
 /// `order_id` is a fixed placeholder until the E11-S7 write ledger keys orders
 /// by the caller's idempotency key (ADR 0019 decision 3).
@@ -149,6 +152,27 @@ pub(crate) async fn post_orders(
             );
         }
     };
+
+    // E5-S4: If approval queue is enabled, enqueue the order and return 202
+    if let Some(queue) = &state.approval_queue {
+        let position = match queue.enqueue(order_id.clone(), req.clone()) {
+            Ok(pos) => pos,
+            Err(detail) => return failure(StatusCode::TOO_MANY_REQUESTS, detail),
+        };
+        #[derive(serde::Serialize)]
+        struct QueuedResponse {
+            status: &'static str,
+            queue_position: usize,
+            message: &'static str,
+        }
+        return success(QueuedResponse {
+            status: "queued",
+            queue_position: position,
+            message: "Order held in approval queue; awaiting operator approval",
+        });
+    }
+
+    // No approval queue: proceed directly to risk stage
     let request = RiskRequest {
         order_id,
         instrument_id,
@@ -180,4 +204,64 @@ pub(crate) async fn delete_order(Path(_id): Path<String>) -> Response {
 /// E11-S7 ledger will generate the reduce-only orders it evaluates.
 pub(crate) async fn post_close_positions() -> Response {
     success(serde_json::json!({"status": "closing"}))
+}
+
+/// GET /approval/queue: list pending orders in the approval queue (E5-S4).
+pub(crate) async fn get_approval_queue(State(state): State<Arc<AppState>>) -> Response {
+    if let Some(queue) = &state.approval_queue {
+        let pending = queue.pending();
+        success(json!({"queue": pending}))
+    } else {
+        success(json!({"queue": []}))
+    }
+}
+
+/// POST /approval/approve: approve the oldest pending order (E5-S4).
+pub(crate) async fn post_approve_order(State(state): State<Arc<AppState>>) -> Response {
+    if let Some(queue) = &state.approval_queue {
+        if let Some(req) = queue.approve_oldest() {
+            // Re-process the approved order through the risk stage
+            let order_id = honba_messages::OrderId::new("approved");
+            post_orders(State(state.clone()), crate::ApiJson(req), order_id).await
+        } else {
+            failure(
+                StatusCode::NOT_FOUND,
+                ErrorDetail::new(ErrorCode::NotFound, "no pending orders in approval queue"),
+            )
+        }
+    } else {
+        failure(
+            StatusCode::BAD_REQUEST,
+            ErrorDetail::new(
+                ErrorCode::ValidationInvalidRequest,
+                "approval queue is not enabled",
+            ),
+        )
+    }
+}
+
+/// POST /approval/reject: reject the oldest pending order (E5-S4).
+pub(crate) async fn post_reject_order(State(state): State<Arc<AppState>>) -> Response {
+    if let Some(queue) = &state.approval_queue {
+        if let Some(_req) = queue.reject_oldest() {
+            // Order rejected; return the rejection to the client
+            success(json!({
+                "status": "rejected",
+                "message": "Order rejected by operator"
+            }))
+        } else {
+            failure(
+                StatusCode::NOT_FOUND,
+                ErrorDetail::new(ErrorCode::NotFound, "no pending orders in approval queue"),
+            )
+        }
+    } else {
+        failure(
+            StatusCode::BAD_REQUEST,
+            ErrorDetail::new(
+                ErrorCode::ValidationInvalidRequest,
+                "approval queue is not enabled",
+            ),
+        )
+    }
 }
