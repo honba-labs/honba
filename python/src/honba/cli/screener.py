@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 from typing import Annotated, Literal
 
 import typer
@@ -278,6 +279,14 @@ def scan_cmd(
     fetch: Annotated[
         str, typer.Option("--fetch", "-F", help="Missing-data policy: auto, never, force")
     ] = "auto",
+    asof: Annotated[
+        str | None,
+        typer.Option(
+            "--asof",
+            "-A",
+            help="Point-in-time evaluation date (YYYY-MM-DD) for historical backtest screening",
+        ),
+    ] = None,
     filters: Annotated[list[str] | None, typer.Argument(help="Trailing filter words")] = None,
 ) -> None:
     """Run a scan and render results (or print the request JSON)."""
@@ -322,7 +331,15 @@ def scan_cmd(
         ],
     )
 
-    response = source.scan(req)
+    asof_date: dt.date | None = None
+    if asof:
+        try:
+            asof_date = dt.date.fromisoformat(asof)
+        except ValueError:
+            err_console.print(f"[red]Invalid --asof date:[/red] {asof!r} (expected YYYY-MM-DD)")
+            raise typer.Exit(code=1)
+
+    response = source.scan(req, asof=asof_date)
 
     if format.strip().lower() == "json":
         typer.echo(response.model_dump_json(by_alias=True, indent=2))
@@ -344,7 +361,11 @@ def scan_cmd(
             *(Column(c, c, align="right", style="green") for c in response.columns),
         ],
         parse_format(format),
-        title=f"Screener Results ({response.total} matched)",
+        title=(
+            f"Screener Results ({response.total} matched as of {asof_date})"
+            if asof_date
+            else f"Screener Results ({response.total} matched)"
+        ),
     )
 
 
