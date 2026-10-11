@@ -2,6 +2,43 @@
 
 ## [Unreleased]
 
+### Overfitting validation gates (E4-S6)
+
+- `honba-analytics::validation`: Implemented statistical overfitting gates (ADR 0024):
+  - Deflated Sharpe Ratio (`dsr`): Computes expected maximum Sharpe ratio under multiple trials via Euler-Mascheroni variance estimation and returns p-value adjusted for selection bias (`dsr_known_values`).
+  - Probability of Backtest Overfitting (`pbo`): Combinatorial Symmetric Cross-Validation (CSCV) over split blocks measuring the probability that the optimal in-sample configuration underperforms the out-of-sample median.
+  - Walk-Forward Efficiency (`wfe`): Out-of-sample to in-sample annualized Sharpe ratio efficiency.
+  - Holdout evaluation (`HoldoutGate`): Evaluates performance drop on unseen holdout splits, gating strategies whose holdout Sharpe degrades beyond allowed thresholds.
+  - Block-bootstrap Monte Carlo (`BlockBootstrapGate`): Stationary block bootstrap over return streams generating empirical confidence bounds for Sharpe ratio and maximum drawdown (`bootstrap_seeded`).
+  - Cost-stress test (`CostStressGate`): Re-evaluates strategy returns under 2x friction/slippage to reject razor-thin margin artifacts.
+- Attached `ValidationBlock` containing structured `GateResult` items to `BacktestResponse` and `SweepResponse` (`result_carries_validation_block`).
+- TS / JSON Schema codegen synchronization for `ValidationBlock`, `GateResult`, and `GateStatus`.
+
+### Chunked streaming datasets and dataset IDs (E4-S7)
+
+- `honba-feed::streaming`: Implemented streaming Parquet datasets (ADR 0024):
+  - `StreamDataset` and `StreamingChunkIterator`: Reads time-partitioned Parquet slices in deterministic batches, eliminating memory spikes on multi-year universes (`chunks_cover_slice`).
+  - Deterministic `dataset_id`: SHA-256 fingerprint computed across sorted chunk paths, timestamps, and schema metadata to enforce cache invalidation across backtest reruns.
+  - Integrated into `honba-sweep` allowing parameter sweeps over streamed dataset slices (`sweep_over_streamed_dataset`).
+
+### Session calendar multi-timeframe aggregation (E4-S8)
+
+- `honba-indicators::mtf`: Implemented session-aware higher timeframe (HTF) bar aggregator (ADR 0024):
+  - `MtfAggregator`: Aggregates lower-timeframe bars (e.g. 1m, 5m, 15m) into session-anchored higher-timeframe bars (`1H`, `4H`, `1D`).
+  - `CalendarSession`: Tracks Indian market trading hours (09:15 to 15:30 IST) and calendar session boundaries.
+  - Zero look-ahead bias: Emits higher-timeframe bars strictly upon period completion (`htf_bar_only_when_complete`).
+  - Integration testing with strategy event loops (`mtf_strategy_run`).
+
+### Unified 1D bars lakehouse view and fundamentals indexing
+
+- `honba-data`: Registered unified `bars_1d` DuckDB view bridging NIFTY50 and mid-cap Parquet partitions for seamless cross-universe queries.
+- Ensured unique constraint indexes on company symbols and fiscal periods in DuckDB financial fundamentals storage.
+
+### MCP scope drift test and TradingState exposure (E5-S3)
+
+- `honba-codegen`: Added automated CI scope drift check ensuring all endpoints declared in `honba-messages::endpoints` have explicit scope bindings in the MCP gateway (`test_mcp_scope_drift`).
+- `honba.risk`: Exposed `TradingState.can_transition_to` in Python control plane.
+
 ### AI strategy verifier (E5-S5)
 
 - `honba.ai.verification`: new package implementing static AST scan + resource-limited sandbox for untrusted strategy code (ADR 0022, D7).

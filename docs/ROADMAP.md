@@ -12,6 +12,7 @@ capabilities/schema, WASM hardening, ADR 0014/0015, golden vectors validated aga
 E5-S5 done (2026-10-11): AI strategy verifier (ADR 0022).
 E11-S8 done (2026-10-11): Minimal auth (Bearer token, scope map, file token store, audit log) (ADR 0023).
 E5-S10, E5-S11 added (2026-10-11): In-process Llama runtime (GBNF constraints) and financial domain alignment (SFT + RLVR compiler rewards).
+E4-S6, E4-S7, E4-S8 done (2026-10-11): Overfitting validation gates (DSR, PBO, CSCV, holdout, MC, cost-stress), chunked streaming datasets, and session MTF aggregation (ADR 0024, commit e7da809).
 The two superseded documents are kept in `docs/archive/` for history and are not updated.
 
 Story verdicts come from the 2026-10-06 audit (a scratch file, `ROADMAP_AUDIT.md`, model output, not kept in the repo) after a spot-check
@@ -32,7 +33,7 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | E1 Instruments and adapters | 1 | 2 | 3 | Adapter Protocol and contract suite exist; no option metadata, instrument master impl, session or feed |
 | E2 Safe engine | 1 | 4 | 6 | Kill switch, audit log and fill feedback loop work; no risk stage, no order FSM, no reconciliation |
 | E3 Execution realism | 0 | 2 | 5 | Bar-fill (L1) simulator and Python next-open simulator only |
-| E4 Research pipeline | 3 | 1 | 3 | Journal v1, result cache, look-ahead test, sweep CLI/REST, Calmar/Sortino/Omega fitness shipped; gates, CLI or REST runner open |
+| E4 Research pipeline | 8 | 0 | 0 | Complete: journal v1, cache, hyperparameters, CLI/REST runner, look-ahead, sweep fitness, overfitting gates, streaming datasets, MTF aggregation |
 | E5 Agent and API | 1 | 1 | 7 | AI strategy verifier shipped (ADR 0022); MCP server, scopes, approval queue shipped; sandbox open |
 | E6 Indicators | n/a | 0 | 1 | Batches 1-2 (O(1) rolling) done; batches 3-4 and render contract (S5) not started |
 | E7 Scale and ops | 0 | 0 | 5 | Pull-based; E7-S4 is superseded by `honba-sweep` (E10-S5) |
@@ -79,6 +80,9 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | Python SDK | `honba.client` (`HttpTransport`, `InprocTransport` via `honba._honba.api_request`), parity tests `python/tests/integration/test_client_parity.py` |
 | E4-S1 journal schema v1 and result cache | ADR 0020, `JournalHeader`/`JournalV1` NDJSON roundtrip (`honba-engine`), `CacheKey`/`ResultCache` (`honba-api`), `BacktestExecutor` caching with unit tests `journal_schema_roundtrip`, `cache_key_changes_with_costs` and integration test `rerun_hits_cache` |
 | E4-S4 look-ahead truncation property | `crates/honba-strategy/src/tests/look_ahead.rs` `truncation_property` and `truncation_property_detects_a_peeking_strategy`; Python `test_prefilter_vs_event_driven_fixture.py` |
+| E4-S6 overfitting gates | ADR 0024, `crates/honba-analytics/src/validation.rs`: DSR, PBO (CSCV), walk-forward, holdout, block-bootstrap MC, cost-stress; `ValidationBlock` in backtest/sweep results; unit + integration tests `dsr_known_values`, `bootstrap_seeded`, `result_carries_validation_block` |
+| E4-S7 streaming datasets | ADR 0024, `crates/honba-feed/src/streaming.rs`: `StreamDataset`, `StreamingChunkIterator`, chunk manifests, dataset IDs; unit + integration tests `chunks_cover_slice`, `sweep_over_streamed_dataset` |
+| E4-S8 session MTF aggregation | ADR 0024, `crates/honba-indicators/src/mtf.rs`: `MtfAggregator`, `CalendarSession`, HTF bar emission on period completion; unit + integration tests `htf_bar_only_when_complete`, `mtf_strategy_run` |
 | E4-S5 sweep fitness & REST | `honba-sweep` `CalmarFitness`, `SortinoFitness`, `OmegaFitness`, `fitness_ranking_stable`; `POST /sweeps`, `GET /sweeps/{id}`, `GET /sweeps/{id}/journal` (422 per-trial); `crates/honba-api-rest/tests/rest_sweep.rs` |
 | E11-S5 part 1 | `crates/honba-api-wasm`: `indicator_series`, `ohlc_indicator_series` (ATR), conformance vectors (d1c9db3, e9fd98e) |
 | E6 batches 1-2 | commits 6372528, 510e0d4, efca4bd, 7c9a325, 6a91432 |
@@ -289,9 +293,9 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 | E4-S3 (DONE) | Finish runner: `honba backtest` CLI, `POST/GET /backtests` with `run_id`, `assumptions.not_modelled` + timing rule, `--wait`/`--stream`, MCP run tools; manifest-driven | M | ADR 0017 (accepted), E3-S1a | `result_has_not_modelled`, `cli_exit_codes` / `rest_backtest_roundtrip_matches_session` (parity defined on the Rust-registered strategy subset; other strategies are 422) | honba |
 | E4-S4 (DONE) | Look-ahead guarantee: truncating future data never changes earlier decisions; vectorized vs event-driven parity | M | E4-S3 | `truncation_property` / `prefilter_vs_event_driven_fixture` | honba |
 | E4-S5 (DONE) | REST `POST /sweeps`, `GET /sweeps/{id}`; more fitness (Calmar, Sortino, Omega); journal per trial | M | E4-S1, E4-S3 | `fitness_ranking_stable` / `sweep_rest_equals_library` | honba |
-| E4-S6 | Gates in Rust `honba-analytics`: DSR, PBO, walk-forward efficiency, one-shot holdout (reads trial count), block-bootstrap MC, 2x cost-stress | L -> split | E4-S1, E4-S5, E3-S3 | `dsr_known_values`, `bootstrap_seeded` / `result_carries_validation_block` | honba |
-| E4-S7 | Chunked streaming batches and dataset ids | M | E10-S4 | `chunks_cover_slice` / `sweep_over_streamed_dataset` | honba |
-| E4-S8 | Multi-timeframe aggregation on session calendar | M | E4-S4 | `htf_bar_only_when_complete` / `mtf_strategy_run` | honba |
+| E4-S6 (DONE) | Gates in Rust `honba-analytics`: DSR, PBO, walk-forward efficiency, one-shot holdout (reads trial count), block-bootstrap MC, 2x cost-stress | L -> split | E4-S1, E4-S5, E3-S3 | `dsr_known_values`, `bootstrap_seeded` / `result_carries_validation_block` | honba |
+| E4-S7 (DONE) | Chunked streaming batches and dataset ids | M | E10-S4 | `chunks_cover_slice` / `sweep_over_streamed_dataset` | honba |
+| E4-S8 (DONE) | Multi-timeframe aggregation on session calendar | M | E4-S4 | `htf_bar_only_when_complete` / `mtf_strategy_run` | honba |
 | E10-S4 rest | Streaming Parquet half of E10-S4 is E4-S7 | | | | |
 
 ### E5 Agent and API surfaces
