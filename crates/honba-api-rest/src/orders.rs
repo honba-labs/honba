@@ -220,9 +220,9 @@ pub(crate) async fn get_approval_queue(State(state): State<Arc<AppState>>) -> Re
 pub(crate) async fn post_approve_order(State(state): State<Arc<AppState>>) -> Response {
     if let Some(queue) = &state.approval_queue {
         if let Some(req) = queue.approve_oldest() {
-            // Re-process the approved order through the risk stage
+            // Re-process the approved order through the risk stage BYPASSING the queue
             let order_id = honba_messages::OrderId::new("approved");
-            post_orders(State(state.clone()), crate::ApiJson(req), order_id).await
+            post_orders_direct(state.clone(), crate::ApiJson(req), order_id).await
         } else {
             failure(
                 StatusCode::NOT_FOUND,
@@ -237,6 +237,62 @@ pub(crate) async fn post_approve_order(State(state): State<Arc<AppState>>) -> Re
                 "approval queue is not enabled",
             ),
         )
+    }
+}
+
+// Internal version of post_orders that bypasses the approval queue (for approved orders)
+async fn post_orders_direct(
+    state: Arc<AppState>,
+    crate::ApiJson(req): crate::ApiJson<OrdersRequest>,
+    order_id: OrderId,
+) -> Response {
+    let (instrument_id, side, quantity, price) = match parse_order(&req) {
+        Ok(v) => v,
+        Err(detail) => {
+            return failure(StatusCode::UNPROCESSABLE_ENTITY, detail);
+        }
+    };
+    let instrument = match known_instrument(&state, &instrument_id).await {
+        Ok(instrument) => instrument,
+        Err(detail) => {
+            return failure(StatusCode::INTERNAL_SERVER_ERROR, detail);
+        }
+    };
+    let reference_price = match last_price(&state, &instrument_id).await {
+        Some(px) => Some(px),
+        None => price,
+    };
+    let profile = Arc::new(NullMarketProfile::default());
+    let mut stage = match RiskStage::new(
+        RiskLimits::default(),
+        state.account_currency,
+        Arc::new(ProfileRulesSource::new(profile, instrument)),
+    ) {
+        Ok(stage) => stage,
+        Err(e) => {
+            return failure(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                ErrorDetail::new(ErrorCode::InternalError, e.to_string()),
+            );
+        }
+    };
+    let request = RiskRequest {
+        order_id,
+        instrument_id,
+        side,
+        quantity,
+        price,
+        trigger_price: None,
+        reference_price,
+        adv: None,
+        position: 0.0,
+        trading_state: state.trading_state,
+        ts: UnixNanos::new(0),
+        last_feed_ts: None,
+    };
+    match stage.check(&request) {
+        RiskDecision::Approved => success(serde_json::json!({"status": "acknowledged"})),
+        RiskDecision::Refused(refusal) => refusal_response(&refusal),
     }
 }
 

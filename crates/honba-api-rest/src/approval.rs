@@ -104,29 +104,33 @@ impl ApprovalQueue {
     /// Approve the oldest pending order.
     ///
     /// Returns the approved order request, or None if no pending orders.
+    /// The approved order is removed from the queue.
     pub fn approve_oldest(&self) -> Option<OrdersRequest> {
         let mut inner = self.lock();
+        let pos = inner
+            .items
+            .iter()
+            .position(|q| q.status == QueueStatus::Pending)?;
         inner
             .items
-            .iter_mut()
-            .find(|q| q.status == QueueStatus::Pending)
-            .map(|q| {
-                q.status = QueueStatus::Approved;
-                q.request.clone()
-            })
+            .remove(pos)
+            .map(|item: QueuedOrder| item.request)
     }
 
     /// Reject the oldest pending order.
+    ///
+    /// Returns the rejected order request, or None if no pending orders.
+    /// The rejected order is removed from the queue.
     pub fn reject_oldest(&self) -> Option<OrdersRequest> {
         let mut inner = self.lock();
+        let pos = inner
+            .items
+            .iter()
+            .position(|q| q.status == QueueStatus::Pending)?;
         inner
             .items
-            .iter_mut()
-            .find(|q| q.status == QueueStatus::Pending)
-            .map(|q| {
-                q.status = QueueStatus::Rejected;
-                q.request.clone()
-            })
+            .remove(pos)
+            .map(|item: QueuedOrder| item.request)
     }
 
     /// Approve a specific order by queue_id.

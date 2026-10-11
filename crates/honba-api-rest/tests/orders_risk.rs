@@ -1,5 +1,6 @@
 //! `POST /orders`, `DELETE /orders/{id}` and `POST /positions/close` through the real
-//! router: the risk gate of ADR 0018 decision 7 (E2-S2 r5b).
+//! router: the risk gate of ADR 0018 decision 7 (E2-S2 r5b) and the approval queue
+//! (E5-S4, E11-S7).
 //!
 //! No network and no wall clock: the state is an in-memory dataset plus one instrument.
 
@@ -167,4 +168,148 @@ async fn cancel_and_close_allowed_when_halted() {
     let (status, body) = call(app, Method::POST, "/positions/close", None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["data"]["status"], json!("closing"));
+}
+
+#[tokio::test]
+async fn approval_queue_holds_placements() {
+    // When approval queue is enabled, POST /orders enqueues the order
+    let app = api_router_with(state().with_approval_queue(10));
+    let (status, body) = call(
+        app.clone(),
+        Method::POST,
+        "/orders",
+        Some(order("X", "NSE", "buy", 25.0, Some(100.0))),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["data"]["status"], json!("queued"));
+    assert_eq!(body["data"]["queue_position"], json!(1));
+    assert!(body["data"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("approval queue"));
+
+    // GET /approval/queue returns the queued order
+    let (status, body) = call(app.clone(), Method::GET, "/approval/queue", None).await;
+    assert_eq!(status, StatusCode::OK);
+    let queue = body["data"]["queue"].as_array().unwrap();
+    assert_eq!(queue.len(), 1);
+    assert_eq!(queue[0]["queue_id"], json!("rest"));
+    assert_eq!(queue[0]["status"], json!("pending"));
+    assert_eq!(queue[0]["instrument_id"], json!("X.NSE"));
+    assert_eq!(queue[0]["side"], json!("buy"));
+    assert_eq!(queue[0]["qty"], json!(25.0));
+    assert_eq!(queue[0]["price"], json!(100.0));
+}
+
+#[tokio::test]
+async fn approve_flows_through_risk_to_sim() {
+    // Approve a queued order: it re-enters the risk stage and is acknowledged
+    let app = api_router_with(state().with_approval_queue(10));
+    let (status, body) = call(
+        app.clone(),
+        Method::POST,
+        "/orders",
+        Some(order("X", "NSE", "buy", 25.0, Some(100.0))),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["data"]["status"], json!("queued"));
+
+    // Approve it
+    let (status, body) = call(app.clone(), Method::POST, "/approval/approve", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["data"]["status"], json!("acknowledged"));
+
+    // Queue is now empty
+    let (status, body) = call(app, Method::GET, "/approval/queue", None).await;
+    assert_eq!(status, StatusCode::OK);
+    let queue = body["data"]["queue"].as_array().unwrap();
+    assert_eq!(queue.len(), 0);
+}
+
+#[tokio::test]
+async fn reject_removes_from_queue() {
+    // Reject a queued order: it is removed and returns rejected status
+    let app = api_router_with(state().with_approval_queue(10));
+    let (status, body) = call(
+        app.clone(),
+        Method::POST,
+        "/orders",
+        Some(order("X", "NSE", "buy", 25.0, Some(100.0))),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["data"]["status"], json!("queued"));
+
+    // Reject it
+    let (status, body) = call(app.clone(), Method::POST, "/approval/reject", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["data"]["status"], json!("rejected"));
+    assert_eq!(body["data"]["message"], json!("Order rejected by operator"));
+
+    // Queue is now empty
+    let (status, body) = call(app, Method::GET, "/approval/queue", None).await;
+    assert_eq!(status, StatusCode::OK);
+    let queue = body["data"]["queue"].as_array().unwrap();
+    assert_eq!(queue.len(), 0);
+}
+
+#[tokio::test]
+async fn cancel_and_close_bypass_queue_even_when_halted() {
+    // With approval queue enabled and trading halted
+    let app = api_router_with(
+        state()
+            .with_approval_queue(10)
+            .with_trading_state(TradingState::Halted),
+    );
+
+    // A placement is queued (not refused by risk because queue catches it first)
+    let (status, body) = call(
+        app.clone(),
+        Method::POST,
+        "/orders",
+        Some(order("X", "NSE", "buy", 25.0, Some(100.0))),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["data"]["status"], json!("queued"));
+
+    // Cancelling and closing bypass the queue entirely
+    let (status, body) = call(app.clone(), Method::DELETE, "/orders/o1", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["data"]["status"], json!("cancelled"));
+    let (status, body) = call(app, Method::POST, "/positions/close", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["data"]["status"], json!("closing"));
+}
+
+#[tokio::test]
+async fn approval_queue_full_returns_429() {
+    // Queue with size 1: second placement returns 429
+    let app = api_router_with(state().with_approval_queue(1));
+    let (status, body) = call(
+        app.clone(),
+        Method::POST,
+        "/orders",
+        Some(order("X", "NSE", "buy", 25.0, Some(100.0))),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["data"]["status"], json!("queued"));
+
+    // Second order should fail with queue full
+    let (status, body) = call(
+        app,
+        Method::POST,
+        "/orders",
+        Some(order("X", "NSE", "buy", 25.0, Some(100.0))),
+    )
+    .await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(body["error"]["code"], json!("rate_limited"));
+    assert_eq!(
+        body["error"]["context"]["reason"],
+        json!("approval_queue_full")
+    );
 }

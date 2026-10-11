@@ -328,7 +328,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 | E11-S4 | SSE for run progress and journals (resume-from-sequence), WS for events later; schema for streamed events | M | ADR D6, E4-S3 | `resume_from_seq`, `event_schema` / `sse_backtest_progress_inproc_and_http` | honba | **DONE** (ADR 0021, commits 523bca5) |
 | E11-S5 rest | WASM: screener eval export (Rust evaluator exists in `honba-indicators`, not exported), backtest replay; wasm-pack CI step never exercised | M | E4-S3 | conformance vectors `screener_scan.json` / browser-free node run | honba |
 | E11-S6 | Frontend client from OpenAPI, TS drift check in CI (currently local only) | S | none | `ts_matches_openapi` / frontend build | honba + honba-frontend |
-| E11-S7 | Write endpoints behind risk and approval queue | M | E2-S2, E5-S4 | `order_refused_by_risk` / `post_order_flows_to_sim_only` | honba |
+| E11-S7 (DONE) | Write endpoints behind risk and approval queue | M | E2-S2, E5-S4 | `order_refused_by_risk` / `post_order_flows_to_sim_only` / approval queue tests | honba |
 | E11-S8 | Auth, scopes, secrets, audit (minimum viable before non-loopback `serve`) | L | ADR D11 | `token_scope_enforced` / `write_needs_second_factor` | honba |
 
 ---
