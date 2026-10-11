@@ -37,6 +37,45 @@ impl SymbolGrammar for IndiaSymbolGrammar {
     fn normalize(&self, raw: &str) -> String {
         raw.trim().to_uppercase()
     }
+
+    fn validate(&self, raw: &str) -> crate::Result<()> {
+        let norm = self.normalize(raw);
+        if norm.is_empty() {
+            return Err(crate::MarketError::InvalidSymbol {
+                symbol: raw.to_string(),
+                reason: "symbol cannot be empty".to_string(),
+            });
+        }
+        Ok(())
+    }
+
+    fn resolve_instrument(&self, raw: &str) -> crate::Result<Instrument> {
+        let norm = self.normalize(raw);
+        let (exchange_code, symbol) = match norm.split_once(':') {
+            Some((ex, sym)) => (ex, sym),
+            None => ("NSE", norm.as_str()),
+        };
+        let exchange = honba_messages::Exchange::new(exchange_code);
+
+        // Try F&O contract parsing first
+        if let Ok(contract) = crate::india::fno::parse_fno_symbol(symbol) {
+            let lot_size = crate::india::fno::default_fno_lot_size(contract.underlying());
+            let tick_size = 0.05;
+            return Ok(contract.to_instrument(exchange, lot_size, tick_size));
+        }
+
+        // Validate basic cash equity symbol
+        self.validate(symbol)?;
+
+        let id = honba_messages::InstrumentId::new(symbol, exchange);
+        Ok(Instrument::new(
+            id,
+            InstrumentKind::Equity,
+            Currency::Inr,
+            1.0,
+            0.05,
+        ))
+    }
 }
 
 /// Margin model for Indian markets (SEBI peak margin guidelines).

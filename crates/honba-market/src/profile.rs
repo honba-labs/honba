@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use honba_entities::Currency;
+use honba_entities::{Currency, Instrument};
 
 use crate::calendar::MarketCalendar;
 use crate::costs::CostSchedule;
@@ -40,6 +40,11 @@ pub trait MarketProfile: Send + Sync {
 
     /// Settlement rules and cycle timing.
     fn settlement_rules(&self) -> &dyn SettlementRules;
+
+    /// Resolves an instrument symbol using this market's symbol grammar.
+    fn resolve_instrument(&self, symbol: &str) -> Result<Instrument> {
+        self.symbol_grammar().resolve_instrument(symbol)
+    }
 }
 
 /// Thread-safe registry mapping market codes to `MarketProfile` instances.

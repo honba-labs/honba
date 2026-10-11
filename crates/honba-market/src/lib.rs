@@ -71,6 +71,11 @@ pub use india::costs::stt::SttRates;
 #[cfg(feature = "india")]
 pub use india::error::IndiaError;
 #[cfg(feature = "india")]
+pub use india::fno::{
+    default_fno_lot_size, format_fno_symbol, parse_fno_symbol, FnoContract, FnoExpiry,
+    FnoParseError,
+};
+#[cfg(feature = "india")]
 pub use india::profile::IndiaMarketProfile;
 #[cfg(feature = "india")]
 pub use india::universes::nifty50::{Nifty50, NIFTY50_SIZE};

@@ -1,7 +1,7 @@
 """Domain models for Honba (pure domain models, no I/O)."""
 
 from honba.domain.bar import Bar
-from honba.domain.instrument import Instrument, InstrumentId, InstrumentKind
+from honba.domain.instrument import Instrument, InstrumentId, InstrumentKind, OptionType
 from honba.domain.money import Currency, Money
 from honba.domain.order import OrderIntent, OrderSide, OrderStatus, OrderType, TimeInForce
 from honba.domain.portfolio import Account, Portfolio
@@ -18,6 +18,7 @@ __all__ = [
     "InstrumentId",
     "InstrumentKind",
     "Money",
+    "OptionType",
     "OrderIntent",
     "OrderSide",
     "OrderStatus",

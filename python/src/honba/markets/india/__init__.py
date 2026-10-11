@@ -10,6 +10,7 @@ from honba.markets.india.costs import (
     nse_equity_intraday_breakdown,
     nse_equity_intraday_cost,
 )
+from honba.markets.india.fno import parse_fno_symbol, resolve_fno_instrument
 from honba.markets.india.settlement import (
     INDIA_EXCHANGES,
     nse_equity_settlement_days,
@@ -50,7 +51,9 @@ __all__ = [
     "nse_equity_intraday_breakdown",
     "nse_equity_intraday_cost",
     "nse_equity_settlement_days",
+    "parse_fno_symbol",
     "register_universe_history",
+    "resolve_fno_instrument",
     "resolve_universe",
     "save_universe_history",
     "settlement_days_for",

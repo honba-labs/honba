@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### F&O instruments and grammar (E1-S2)
+
+- `honba-entities::instrument`: Extended `Instrument` with derivative contract metadata:
+  - Added optional fields: `expiry` (`Option<NaiveDate>`), `strike` (`Option<f64>`), `option_type` (`Option<OptionType>`), and `underlying` (`Option<String>`).
+  - Added `OptionType` enum (`Call` / `Put`) with serialization aliases (`ce`, `CE`, `pe`, `PE`) and standard two-letter code methods (`code()`, `from_code()`).
+  - Added builder methods: `with_derivative`, `with_expiry`, `with_strike`, `with_option_type`, `with_underlying`, and `is_derivative()` predicate.
+  - Mirrored derivative attributes, `OptionType`, and `is_derivative` in Python `honba.domain.Instrument`.
+- `honba-market::india::fno`: Implemented Indian National Stock Exchange (NSE) F&O symbol grammar:
+  - `FnoExpiry`: Parsers and formatters for monthly (`YYMMM`, e.g. `24OCT`) and weekly (`YYMDD`, e.g. `24O17`, `24109`) contract expiries, resolving nominal expiry dates via `LastThursdayExpiry`.
+  - `FnoContract`: Structured representation of Futures and Options with canonical formatting, lot size lookup, and instrument conversion (`to_instrument`).
+  - `parse_fno_symbol` & `format_fno_symbol`: Grammar parser and serializer covering monthly/weekly index futures, equity futures, index options, and equity options.
+  - Right-to-left parsing resolving CE/PE suffix ambiguities (e.g. `CESC`, `CENTURYPLY`, `PETRONET` vs `CESC24OCT180CE`).
+  - `IndiaSymbolGrammar::resolve_instrument`: Direct resolution of cash equities, futures, and options into fully populated `Instrument` entities.
+  - Acceptance suite: `symbol_round_trip_property`, `ce_suffix_ambiguity`, `weekly_vs_monthly`, and `catalog_resolves_fno_symbol` through `MarketRegistry`.
+- `honba-py`: Exposed `FnoContract` and `parse_fno_symbol` in the native `honba._honba` extension module with synchronized type stubs in `_honba.pyi` (`stubtest` verified 0 errors).
+
 ### Overfitting validation gates (E4-S6)
 
 - `honba-analytics::validation`: Implemented statistical overfitting gates (ADR 0024):

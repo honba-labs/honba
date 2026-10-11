@@ -235,4 +235,13 @@ pub trait SymbolGrammar: Send + Sync {
             Ok(())
         }
     }
+
+    /// Resolves a raw symbol into an [`Instrument`] with appropriate metadata, if supported by the grammar.
+    fn resolve_instrument(&self, raw: &str) -> Result<Instrument> {
+        let _ = raw;
+        Err(MarketError::InvalidSymbol {
+            symbol: raw.to_string(),
+            reason: "instrument resolution not supported by this grammar".to_string(),
+        })
+    }
 }

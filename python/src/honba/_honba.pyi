@@ -11,6 +11,7 @@ __all__ = [
     "STRATEGY_API_VERSION",
     "Bar",
     "Fill",
+    "FnoContract",
     "InstrumentId",
     "NextOpenSimulator",
     "OrderIntent",
@@ -30,6 +31,7 @@ __all__ = [
     "initialize_runtime",
     "next_open_fill_cost",
     "nse_equity_settlement_days",
+    "parse_fno_symbol",
     "run_strategy",
     "runtime_info",
     "runtime_start",
@@ -120,6 +122,12 @@ def nse_equity_settlement_days(as_of: str | None = None) -> int:
     Mirrors ``IndiaMarketProfile::equity_settlement_days_as_of`` in
     ``crates/honba-market/src/india/profile.rs``; wrap it with
     ``honba.markets.india.settlement_days_for``.
+    """
+
+def parse_fno_symbol(symbol: str) -> FnoContract:
+    """Parse an Indian F&O contract ticker symbol into structured contract metadata.
+
+    Raises ``ValueError`` if the symbol does not conform to the NSE F&O grammar.
     """
 
 def run_strategy(
@@ -213,6 +221,18 @@ class NextOpenSimulator:
     def drain_events(self) -> list[dict[str, Any]]: ...
     def drain_fills(self) -> list[dict[str, Any]]: ...
     def drain_rejections(self) -> list[dict[str, Any]]: ...
+
+@final
+class FnoContract:
+    underlying: str
+    kind: str
+    expiry_year: int
+    expiry_month: int
+    expiry_day: int | None
+    is_weekly: bool
+    strike: float | None
+    option_type: str | None
+    symbol: str
 
 @final
 class InstrumentId:
@@ -370,6 +390,7 @@ class TradingState:
     def __hash__(self) -> int: ...
     def __eq__(self, other: object, /) -> bool: ...
     def __int__(self) -> int: ...
+    def can_transition_to(self, next: TradingState) -> bool: ...
 
 @final
 class RiskLimits:

@@ -13,6 +13,7 @@ E5-S5 done (2026-10-11): AI strategy verifier (ADR 0022).
 E11-S8 done (2026-10-11): Minimal auth (Bearer token, scope map, file token store, audit log) (ADR 0023).
 E5-S10, E5-S11 added (2026-10-11): In-process Llama runtime (GBNF constraints) and financial domain alignment (SFT + RLVR compiler rewards).
 E4-S6, E4-S7, E4-S8 done (2026-10-11): Overfitting validation gates (DSR, PBO, CSCV, holdout, MC, cost-stress), chunked streaming datasets, and session MTF aggregation (ADR 0024, commit e7da809).
+E1-S2 done (2026-10-11): F&O instruments & grammar (india::fno), OptionType, right-to-left resolution, acceptance suite, Python bindings and stubs.
 The two superseded documents are kept in `docs/archive/` for history and are not updated.
 
 Story verdicts come from the 2026-10-06 audit (a scratch file, `ROADMAP_AUDIT.md`, model output, not kept in the repo) after a spot-check
@@ -30,7 +31,7 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | Epic | Done | Partial | Not started | One-line state |
 |---|---|---|---|---|
 | E0 Contract spine | 8 | 0 | 0 | Complete: wire types, codegen, versions, money, market packs, manifest, `honba verify` |
-| E1 Instruments and adapters | 1 | 2 | 3 | Adapter Protocol and contract suite exist; no option metadata, instrument master impl, session or feed |
+| E1 Instruments and adapters | 2 | 1 | 3 | Adapter Protocol, contract suite, and F&O grammar shipped; instrument master, session, feed open |
 | E2 Safe engine | 1 | 4 | 6 | Kill switch, audit log and fill feedback loop work; no risk stage, no order FSM, no reconciliation |
 | E3 Execution realism | 0 | 2 | 5 | Bar-fill (L1) simulator and Python next-open simulator only |
 | E4 Research pipeline | 8 | 0 | 0 | Complete: journal v1, cache, hyperparameters, CLI/REST runner, look-ahead, sweep fitness, overfitting gates, streaming datasets, MTF aggregation |
@@ -41,7 +42,7 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | E9 Frontend and AlgoDesigner | 0 | 1 | 7 | Greenfield; generated TS types only |
 | E10 Async core | 6 | 1 | 1 | Ports, shell, engine output, Arc dataset, sweep, determinism test and Python runtime bridge (ADR 0015) shipped; connectors open |
 | E11 Versioned API | 4 | 1 | 2 | Read API, SDK and WASM indicators shipped; SSE streaming shipped; write endpoints and auth shipped |
-| **Total (74)** | **23** | **14** | **37** | |
+| **Total (74)** | **24** | **13** | **37** | |
 
 ### 1.1 What is shipped (evidence)
 
@@ -249,7 +250,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 | ID | Scope | Size | Deps | Acceptance (unit / integration) | Owner |
 |---|---|---|---|---|---|
 | E1-S1b | Second adapter passes the contract suite on recorded fixtures; migration note per adapter | M | E1-S1 | `test_contract_suite[dhan]` / `test_adapter_wiring_recorded_fixture` | honba-adapters (ask first) |
-| E1-S2 | `Instrument` gains optional expiry, strike, option type, underlying; `india::fno` grammar parse/format (equity, futures, options, index) | M | E0-S7 | `symbol_round_trip_property`, `ce_suffix_ambiguity`, `weekly_vs_monthly` / `catalog_resolves_fno_symbol` through market registry; Python binding + stub | honba |
+| E1-S2 (DONE) | `Instrument` gains optional expiry, strike, option type, underlying; `india::fno` grammar parse/format (equity, futures, options, index) | M | E0-S7 | `symbol_round_trip_property`, `ce_suffix_ambiguity`, `weekly_vs_monthly` / `catalog_resolves_fno_symbol` through market registry; Python binding + stub | honba |
 | E1-S3 | `InstrumentMaster` impl over Parquet catalog: `snapshot(as_of)`, effective-dated lot/tick/freeze | M | E1-S2 | `resolve_as_of_old_symbol` / `backtest_resolves_expired_contract` | honba |
 | E1-S4 | Product/price-type/TIF table mapping per adapter | S | first real adapter | `mapping_round_trip_property` / `adapter_rejects_unsupported_combo` | honba-adapters |
 | E1-S5 | `SessionProvider`, rate limiter, secret store impl (Python side) | M | E1-S1b | `token_expiry_fake_clock`, `bucket_refill` / `limits_hold_across_workers`, `no_secret_in_logs` | honba (+adapters) |
@@ -447,7 +448,7 @@ Checked about 25 verdicts against code, git log and ls/grep (read-only). Counts:
 | E10-S5 | PARTIAL | Runner, report, tests complete; only REST route missing, tracked in E4-S5 | DONE |
 | E10-S7 | PARTIAL, "bridges visible" | No `honba.event_loop`; `auto-initialize` already absent and `pyo3-async-runtimes` present | PARTIAL (ADR 0015 plus dependency only) |
 | E2-S6 | PARTIAL, "(a) OrderState FSM and client ids done; simulator emits ack events" | Only `OrderStatus` enum and `drain_rejections`/`drain_fills`; no FSM, no `client_order_id`, no ack events | PARTIAL (only reject/cancel queue) |
-| E1-S2 | PARTIAL, "Instrument has option fields; round-trip tests" | `Instrument` has no expiry/strike; `india/fno/mod.rs` is 8 bytes | PARTIAL (trait only) |
+| E1-S2 | DONE | `Instrument` has derivative fields; `india/fno` parse/format and acceptance tests shipped | DONE |
 | E3-S2 | PARTIAL, "FillModel/LatencyModel traits" | Only a config enum in `honba-config`; `sim/{latency,cost,simulator}` are stubs | NOT STARTED |
 | E2-S9 | PARTIAL, "StateCache stub in execution.rs" | `engine/src/cache/mod.rs` is a 10-byte stub; `execution.rs` has no cache | NOT STARTED |
 | E4-S2 | PARTIAL, "manifest params with `range=a:b:step`" | One-line Parameter declarations, `hyperparameters()`, manifest validation and grid generation | DONE |

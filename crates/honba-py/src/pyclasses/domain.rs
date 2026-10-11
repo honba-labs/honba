@@ -572,12 +572,73 @@ pub fn nse_equity_settlement_days(as_of: Option<&str>) -> PyResult<usize> {
     }
 }
 
+/// Parsed Indian F&O contract details returned by `parse_fno_symbol`.
+#[pyclass(name = "FnoContract", module = "honba")]
+#[derive(Clone, Debug)]
+pub struct RFnoContract {
+    #[pyo3(get)]
+    pub underlying: String,
+    #[pyo3(get)]
+    pub kind: String,
+    #[pyo3(get)]
+    pub expiry_year: i32,
+    #[pyo3(get)]
+    pub expiry_month: u32,
+    #[pyo3(get)]
+    pub expiry_day: Option<u32>,
+    #[pyo3(get)]
+    pub is_weekly: bool,
+    #[pyo3(get)]
+    pub strike: Option<f64>,
+    #[pyo3(get)]
+    pub option_type: Option<String>,
+    #[pyo3(get)]
+    pub symbol: String,
+}
+
+#[pymethods]
+impl RFnoContract {
+    fn __repr__(&self) -> String {
+        format!("FnoContract({})", self.symbol)
+    }
+
+    fn __str__(&self) -> String {
+        self.symbol.clone()
+    }
+}
+
+/// Parse an Indian F&O contract symbol into its structured components.
+#[pyfunction]
+pub fn parse_fno_symbol(symbol: &str) -> PyResult<RFnoContract> {
+    let contract = honba_market::india::fno::parse_fno_symbol(symbol)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+    let symbol_formatted = contract.format_symbol();
+    let expiry = contract.expiry();
+    Ok(RFnoContract {
+        underlying: contract.underlying().to_string(),
+        kind: match contract.kind() {
+            honba_entities::InstrumentKind::Future => "future".to_string(),
+            honba_entities::InstrumentKind::Option => "option".to_string(),
+            _ => "unknown".to_string(),
+        },
+        expiry_year: expiry.year(),
+        expiry_month: expiry.month(),
+        expiry_day: expiry.day(),
+        is_weekly: expiry.is_weekly(),
+        strike: contract.strike(),
+        option_type: contract.option_type().map(|ot| ot.code().to_string()),
+        symbol: symbol_formatted,
+    })
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<RInstrumentId>()?;
     m.add_class::<RQuoteTick>()?;
     m.add_class::<RBar>()?;
     m.add_class::<RFill>()?;
     m.add_class::<ROrderIntent>()?;
+    m.add_class::<RFnoContract>()?;
     m.add_function(wrap_pyfunction!(nse_equity_settlement_days, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_fno_symbol, m)?)?;
     Ok(())
 }

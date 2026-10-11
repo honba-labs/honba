@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import math
 from dataclasses import dataclass
 from enum import Enum
@@ -34,12 +35,36 @@ class InstrumentKind(Enum):
     MUTUAL_FUND = "mutual_fund"
 
 
+class OptionType(Enum):
+    """The type of an option contract: Call or Put (mirrors ``honba_entities::OptionType``)."""
+
+    CALL = "call"
+    PUT = "put"
+
+    @property
+    def code(self) -> str:
+        """Return standard two-letter code ('CE' for Call, 'PE' for Put)."""
+        return "CE" if self is OptionType.CALL else "PE"
+
+    @classmethod
+    def from_code(cls, code: str) -> OptionType:
+        """Parse a string code ('CE'/'CALL' or 'PE'/'PUT')."""
+        c = code.strip().upper()
+        if c in ("CE", "CALL"):
+            return cls.CALL
+        if c in ("PE", "PUT"):
+            return cls.PUT
+        raise ValueError(f"unknown option type code {code!r}")
+
+
 @dataclass(frozen=True, slots=True)
 class Instrument:
     """Static metadata for a tradable instrument (mirrors ``honba_entities::Instrument``).
 
     ``lot_size`` is the minimum tradable quantity and ``tick_size`` the minimum price
     increment; both must be finite and > 0. ``currency`` is the ISO settlement currency.
+    For derivative contracts, ``expiry``, ``strike``, ``option_type``, and ``underlying``
+    provide contract specifications.
     """
 
     instrument_id: InstrumentId
@@ -47,12 +72,21 @@ class Instrument:
     lot_size: float
     tick_size: float
     currency: str = "INR"
+    expiry: datetime.date | None = None
+    strike: float | None = None
+    option_type: OptionType | None = None
+    underlying: str | None = None
 
     def __post_init__(self) -> None:
         for name in ("lot_size", "tick_size"):
             value = getattr(self, name)
             if not (math.isfinite(value) and value > 0):
                 raise ValueError(f"{name} must be positive, got {value}")
+
+    @property
+    def is_derivative(self) -> bool:
+        """True when this instrument is a derivative contract (Future or Option)."""
+        return self.kind in (InstrumentKind.FUTURE, InstrumentKind.OPTION)
 
     def stake_quantity(self, quantity: float) -> float:
         """Round a desired quantity **up** to the next lot multiple (ADR 0011).

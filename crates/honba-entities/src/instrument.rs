@@ -2,6 +2,7 @@
 
 use std::fmt;
 
+use chrono::NaiveDate;
 use honba_messages::InstrumentId;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -587,7 +588,8 @@ impl Money {
 }
 
 /// The kind of instrument.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum InstrumentKind {
     /// A cash equity.
@@ -610,6 +612,45 @@ pub enum InstrumentKind {
     MutualFund,
 }
 
+/// The type of an option contract: Call or Put.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum OptionType {
+    /// A call option (CE in Indian markets).
+    #[serde(alias = "ce", alias = "CE", alias = "Call", alias = "CALL")]
+    Call,
+    /// A put option (PE in Indian markets).
+    #[serde(alias = "pe", alias = "PE", alias = "Put", alias = "PUT")]
+    Put,
+}
+
+impl OptionType {
+    /// Returns the standard two-letter code (`CE` for Call, `PE` for Put).
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::Call => "CE",
+            Self::Put => "PE",
+        }
+    }
+
+    /// Parses a string slice into an `OptionType` (`CE`/`Call` or `PE`/`Put`).
+    pub fn from_code(s: &str) -> Option<Self> {
+        if s.eq_ignore_ascii_case("ce") || s.eq_ignore_ascii_case("call") {
+            Some(Self::Call)
+        } else if s.eq_ignore_ascii_case("pe") || s.eq_ignore_ascii_case("put") {
+            Some(Self::Put)
+        } else {
+            None
+        }
+    }
+}
+
+impl fmt::Display for OptionType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.code())
+    }
+}
+
 /// Static metadata for a tradable instrument.
 ///
 /// ```
@@ -626,13 +667,22 @@ pub enum InstrumentKind {
 /// assert_eq!(inst.kind(), InstrumentKind::Equity);
 /// assert_eq!(inst.tick_size(), 0.05);
 /// ```
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Instrument {
     id: InstrumentId,
     kind: InstrumentKind,
     currency: Currency,
     lot_size: f64,
     tick_size: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<String>")]
+    expiry: Option<NaiveDate>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    strike: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    option_type: Option<OptionType>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    underlying: Option<String>,
 }
 
 impl Instrument {
@@ -652,6 +702,10 @@ impl Instrument {
             currency,
             lot_size,
             tick_size,
+            expiry: None,
+            strike: None,
+            option_type: None,
+            underlying: None,
         }
     }
 
@@ -678,6 +732,70 @@ impl Instrument {
     /// Returns the minimum price increment.
     pub fn tick_size(&self) -> f64 {
         self.tick_size
+    }
+
+    /// Returns the expiration date for derivative contracts, if applicable.
+    pub fn expiry(&self) -> Option<NaiveDate> {
+        self.expiry
+    }
+
+    /// Returns the strike price for options contracts, if applicable.
+    pub fn strike(&self) -> Option<f64> {
+        self.strike
+    }
+
+    /// Returns the option type (Call or Put) for options contracts, if applicable.
+    pub fn option_type(&self) -> Option<OptionType> {
+        self.option_type
+    }
+
+    /// Returns the underlying symbol for derivative contracts, if applicable.
+    pub fn underlying(&self) -> Option<&str> {
+        self.underlying.as_deref()
+    }
+
+    /// Returns `true` if this instrument is a derivative contract (Future or Option).
+    pub fn is_derivative(&self) -> bool {
+        matches!(self.kind, InstrumentKind::Future | InstrumentKind::Option)
+    }
+
+    /// Builder method to attach derivative contract metadata (expiry, strike, option type, underlying).
+    pub fn with_derivative(
+        mut self,
+        expiry: Option<NaiveDate>,
+        strike: Option<f64>,
+        option_type: Option<OptionType>,
+        underlying: Option<String>,
+    ) -> Self {
+        self.expiry = expiry;
+        self.strike = strike;
+        self.option_type = option_type;
+        self.underlying = underlying;
+        self
+    }
+
+    /// Builder method to set the contract expiration date.
+    pub fn with_expiry(mut self, expiry: NaiveDate) -> Self {
+        self.expiry = Some(expiry);
+        self
+    }
+
+    /// Builder method to set the option strike price.
+    pub fn with_strike(mut self, strike: f64) -> Self {
+        self.strike = Some(strike);
+        self
+    }
+
+    /// Builder method to set the option type (Call or Put).
+    pub fn with_option_type(mut self, option_type: OptionType) -> Self {
+        self.option_type = Some(option_type);
+        self
+    }
+
+    /// Builder method to set the underlying asset symbol.
+    pub fn with_underlying(mut self, underlying: impl Into<String>) -> Self {
+        self.underlying = Some(underlying.into());
+        self
     }
 
     /// Rounds a desired quantity **up** to the next lot multiple (ADR 0011).
