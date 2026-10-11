@@ -61,20 +61,24 @@ Pure and dependency-free (`ast` only), mirroring `adapters/boundary.py`. It retu
 with a stable `code`, a message and a line/column:
 
 - **`forbidden_import`** — any `ast.Import` / `ast.ImportFrom` (level 0) whose top-level module is
-  not on the allowlist. Allowlist: `honba`, `numpy`, `pandas`, and a fixed set of pure stdlib
-  modules (`math`, `statistics`, `collections`, `dataclasses`, `typing`, `typing_extensions`,
+  not on the allowlist. Allowlist: a fixed set of pure stdlib modules
+  (`math`, `statistics`, `collections`, `dataclasses`, `typing`, `typing_extensions`,
   `itertools`, `functools`, `operator`, `enum`, `abc`, `decimal`, `fractions`, `numbers`, `bisect`,
-  `heapq`, `array`, `copy`, `json`, `re`, `string`, `random`). `os`, `sys`, `socket`, `subprocess`,
-  `ctypes`, `importlib`, `builtins`, `shutil`, `pathlib`, `io`, `resource`, `signal`,
-  `multiprocessing`, `threading`, `asyncio`, `http`, `urllib`, `requests`, `httpx`, `pickle`,
-  `marshal`, `runpy`, `pty`, `platform`, `glob`, `gc`, `inspect` and every other module are refused
-  by omission. `time` and `datetime` are deliberately absent: a verifiable strategy is wall-clock
-  free.
+  `heapq`, `array`, `copy`, `json`, `re`, `string`, `random`, `__future__`), the numeric stack
+  (`numpy`, `pandas`), and a **vetted list of `honba` submodules** (`honba.domain`, `honba.entities`,
+  `honba.strategies.base`, `honba.strategies.config`, `honba.strategies.indicators`,
+  `honba.strategies.manifest`, `honba.strategies.sizing`, `honba.backtest`). The loader,
+  verification, `ai`, adapters and `data` packages are deliberately excluded because they expose
+  `os`/`sys`/`importlib`/HTTP clients as attributes. `time` and `datetime` are deliberately absent:
+  a verifiable strategy is wall-clock free.
 - **`forbidden_name`** — a call to `eval`, `exec`, `compile`, `__import__`, `open`, `input`,
-  `breakpoint`, `globals`, `locals`, `vars`, `exit` or `quit`.
+  `breakpoint`, `globals`, `locals`, `vars`, `exit`, `quit`, `getattr`, `setattr`, `delattr`,
+  or `type`. The match is restricted to bare `ast.Name` so `df.eval(...)` is not a false positive.
 - **`forbidden_dunder`** — an attribute access to `__globals__`, `__subclasses__`, `__bases__`,
-  `__mro__`, `__builtins__`, `__import__`, `__loader__`, `__code__`, `__closure__`, `f_globals` or
-  `f_locals`.
+  `__mro__`, `__builtins__`, `__import__`, `__loader__`, `__code__`, `__closure__`, `f_globals`,
+  `f_locals`, `__class__`, `__dict__`, `__reduce__`, `__reduce_ex__`, `__getattribute__`,
+  `__self__`, `__func__`, `__wrapped__`, `gi_frame`, `cr_frame`, `tb_frame`. This catches the
+  `().__class__.__mro__` chain and similar climbs.
 - **`syntax_error`** — `ast.parse` raises; the finding carries the message and location.
 
 The allowlist is the security boundary; the name/dunder denylist catches the common escapes that
@@ -89,28 +93,39 @@ here); in every other setting it adds a runtime dependency the research loop doe
 sandbox is:
 
 - A fresh interpreter launched as `[sys.executable, "-B", "-m", "honba.ai.verification._bootstrap"]`
-  with a controlled environment: `PYTHONPATH` pinned to the running `honba` package's parent,
-  `PYTHONHASHSEED=0`, `PYTHONNOUSERSITE=1`, `HOME`/`TMPDIR` pointed at the sandbox's own temporary
-  directory, and no inherited `PYTHONSTARTUP`/`PYTHONWARNINGS`. The job (source, config, serialized
-  bars, limits) arrives as JSON on stdin; the result leaves as one sentinel-prefixed JSON line on
-  stdout, so anything the strategy prints is ignored.
-- Resource limits are set in the child before the interpreter is replaced with the strategy, via
-  `resource.setrlimit`: `RLIMIT_CPU` (CPU seconds), `RLIMIT_AS` (address space → memory), `RLIMIT_FSIZE`
-  (bytes written), `RLIMIT_NOFILE` (open files), `RLIMIT_NPROC` (processes), `RLIMIT_CORE=0`. Defaults
-  are generous enough to import `numpy`/`pandas`; the red-team corpus raises them just past a
-  deliberate bomb. `RLIMIT_CPU` kills a runaway loop; `RLIMIT_AS` turns an allocation bomb into a
-  catchable `MemoryError`; over-limit kills surface to the parent as a signal return code.
+  with a controlled environment: only `PATH`, `PYTHONPATH` pinned to the running `honba` package's
+  parent, `PYTHONHASHSEED=0`, `LANG` and `TMPDIR` (the sandbox's own temporary directory) are set;
+  nothing else is inherited, so no `PYTHONSTARTUP`/`PYTHONWARNINGS`/`PYTHONUSERBASE` leaks in. `HOME`
+  is deliberately left unset so the interpreter still finds the user-site packages (`httpx`,
+  `numpy`, …) the core imports. The job (source, config, serialized bars, limits) arrives as JSON on
+  stdin; the **verdict is written to a parent-provided result file path** (`result.ndjson` in the
+  sandbox temp dir) which the child opens with `os.open(O_WRONLY|O_CREAT|O_TRUNC)` and writes a
+  single sentinel-prefixed JSON line. Child stdout/stderr are redirected to capped log files under
+  `RLIMIT_FSIZE` and are never trusted; they are captured for diagnostics only. This prevents a
+  strategy from forging the verdict by writing to its own stdout.
+- Resource limits are set inside the child before the strategy is imported, via
+  `resource.setrlimit`: `RLIMIT_CPU` (CPU seconds), `RLIMIT_AS` (address space → memory),
+  `RLIMIT_FSIZE` (bytes written), `RLIMIT_NOFILE` (open files), `RLIMIT_CORE=0`. `RLIMIT_AS` is
+  computed as the child's own baseline `VmSize` (read after `honba` is imported) plus
+  `address_space_mb`, so the limit accommodates the numeric stack instead of fighting it. Process
+  creation is **not** limited with `RLIMIT_NPROC`: it is per-uid, so a low value is unreliable and
+  can break thread creation; `fork`/`exec` are refused by the audit hook instead (§ runtime guards).
+  `RLIMIT_CPU` kills a runaway loop; `RLIMIT_AS` turns an allocation bomb into a catchable
+  `MemoryError`; over-limit kills surface to the parent as a signal return code.
 - The parent also enforces a wall-clock `timeout_s` on the child (belt and braces for a strategy
   blocked in C without consuming CPU).
 
 **No network / no process / no filesystem escape** is enforced at runtime by a `sys.addaudithook`
 installed in the child before the strategy is imported: it raises on `socket.*`, `subprocess.*`,
-`os.system`, `os.exec*`, `os.spawn*`, `os.fork`, `os.posix_spawn`, `ctypes.*`, and on `open`/
-`os.remove`/`os.rename`/`os.mkdir`/`os.chmod`/`os.link`/`os.symlink` whose target is outside the
-sandbox's temporary directory. Imports stay allowed (the hook fires on the dangerous *events*, not
-on reading site-packages), so `numpy`/`pandas` and `honba` still load. This is defense in depth: the
-static allowlist already refuses `import socket` and `import os`, and the audit hook catches the
-same operations if the allowlist is ever weakened.
+`ctypes.*`, `marshal.*`, `pty.*`, `os.system`, `os.exec*`, `os.spawn*`, `os.fork`, `os.forkpty`,
+`os.posix_spawn`, `os.kill`, `os.chdir`, `os.chflags`, `os.chmod`, `os.chown`, `os.link`,
+`os.mkdir`, `os.mknod`, `os.remove`, `os.removexattr`, `os.rename`, `os.rmdir`, `os.setxattr`,
+`os.symlink`, `os.system`, `os.truncate`, `os.unsetenv`, `os.utime`, `mmap.__new__`,
+`pickle.find_class`, and on `open`/`os.open`/`os.remove`/`os.rename`/`os.mkdir`/`os.chmod`/
+`os.link`/`os.symlink`/`os.truncate`/`os.utime` (writes). Imports stay allowed (the hook fires on
+the dangerous *events*, not on reading site-packages), so `numpy`/`pandas` and `honba` still load.
+This is defense in depth: the static allowlist already refuses `import socket` and `import os`, and
+the audit hook catches the same operations if the allowlist is ever weakened.
 
 ### 4. Deterministic smoke
 
