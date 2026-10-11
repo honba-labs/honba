@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### AI strategy verifier (E5-S5)
+
+- `honba.ai.verification`: new package implementing static AST scan + resource-limited sandbox for untrusted strategy code (ADR 0022, D7).
+- Static scan (`scan_source`): import allowlist (stdlib + `numpy`/`pandas` + vetted `honba` submodules), forbidden builtin calls (`eval`/`exec`/`getattr`/`setattr`/`delattr`/`type`/`open`/`__import__`), forbidden dunder attributes (`__class__`/`__mro__`/`__globals__`/`__subclasses__`/`__dict__`/`__reduce__`/frame attrs). Returns typed `Finding` with stable string `code` and location.
+- Sandbox (`run_in_sandbox`): fresh subprocess with `resource.setrlimit` (`RLIMIT_CPU`, `RLIMIT_AS`, `RLIMIT_FSIZE`, `RLIMIT_NOFILE`, `RLIMIT_CORE`), `sys.addaudithook` denying `socket.*`, `subprocess.*`, `ctypes.*`, `marshal.*`, `pty.*`, `os.*` mutations, `pickle.find_class`, `mmap.__new__`. Verdict written to a parent-provided result file (not stdout) to prevent forgery.
+- Deterministic smoke: two `replay` runs over identical bars must produce identical intent digests; mismatch is `nondeterministic`.
+- Look-ahead check (`check_look_ahead`): ports the E4-S4 truncation property (Rust `assert_truncation_property`) — for every prefix the prefix run's intents must equal the full run's intents truncated at the prefix. Vectorized strategies are caught via the optional `build_strategy(bars)` hook.
+- Public API: `verify_source`, `verify_strategy_file`, `scan_source`, `run_in_sandbox`, `check_look_ahead`, plus `VerificationReport`, `SandboxOutcome`, `LookAheadReport`, `SandboxLimits`, `Finding`, `FindingCode`.
+- Unit tests (45) cover the static scan denylist/allowlist; integration tests (37) cover suite parity, look-ahead, and a red-team corpus (forbidden imports, dunder climbs, `eval`, infinite loop, memory bomb, network/process/write attempts, verdict forgery, nondeterminism).
+- Acceptance: `ast_rejects_forbidden_import` / `generated_strategy_passes_same_suite_as_handwritten`.
+
 ### Durable risk state and idempotent fill ledger (E2-S11)
 
 - `honba-risk`: Implemented `FillFingerprint`, `FillRecord`, and `FillLedger` in `crates/honba-risk/src/ledger.rs`. Incoming fills are fingerprinted deterministically via SHA-256 over order ID, trade/venue IDs, instrument, side, quantity, price, and event timestamp, deduplicating repeated fills (`fingerprint_dedup`).

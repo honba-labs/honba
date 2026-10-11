@@ -1,6 +1,6 @@
 # Honba roadmap (single forward-looking plan)
 
-Status: v6, 2026-10-06. Supersedes `docs/archive/ROADMAP-borrowed-ideas.md` (v4, 2026-10-01) and merges `docs/archive/plan.md`
+Status: v6, 2026-10-06 (E5-S5 added 2026-10-11). Supersedes `docs/archive/ROADMAP-borrowed-ideas.md` (v4, 2026-10-01) and merges `docs/archive/plan.md`
 (2026-10-03) phases and epics E10 and E11 into one numbering-preserving structure. Story IDs (E0..E11) are unchanged so old references
 still resolve. Nothing here has been filed as an issue. This file lives in the `honba` git repo at `docs/ROADMAP.md`; paths are relative
 to the `honba/` root unless they name a sibling repo. Evidence is from the `honba/` tree and its git log, read-only; test baselines are
@@ -8,8 +8,8 @@ from `honba/.claude/HANDOFF.md` (cargo ~1045, python ~2413 passed, 8 skipped) an
 
 v6 changes: E10-S7 DONE (commits edb4921, 91bff5b, 2c10630; ADR 0015 implemented); E3-S1a chunk 1 DONE (ADR 0016, commits
 b12e5ba..1b2f6ce). Also done since v5 (see 1.1): cancel-time rule, rejection-queue hardening, IST timestamps, typed registry, SDK
-capabilities/schema, WASM hardening, ADR 0014/0015, golden vectors validated against the schema, honba-docs chunks. The two superseded
-documents are kept in `docs/archive/` for history and are not updated.
+capabilities/schema, WASM hardening, ADR 0014/0015, golden vectors validated against the schema, honba-docs chunks.
+E5-S5 done (2026-10-11): AI strategy verifier (ADR 0022). The two superseded documents are kept in `docs/archive/` for history and are not updated.
 
 Story verdicts come from the 2026-10-06 audit (a scratch file, `ROADMAP_AUDIT.md`, model output, not kept in the repo) after a spot-check
 against code. The audit's table
@@ -30,7 +30,7 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | E2 Safe engine | 1 | 4 | 6 | Kill switch, audit log and fill feedback loop work; no risk stage, no order FSM, no reconciliation |
 | E3 Execution realism | 0 | 2 | 5 | Bar-fill (L1) simulator and Python next-open simulator only |
 | E4 Research pipeline | 3 | 1 | 3 | Journal v1, result cache, look-ahead test, sweep CLI/REST, Calmar/Sortino/Omega fitness shipped; gates, CLI or REST runner open |
-| E5 Agent and API | 0 | 2 | 7 | 20 MCP tool schemas and OpenAPI are generated; no MCP server, scopes, sandbox, approval queue |
+| E5 Agent and API | 1 | 1 | 7 | AI strategy verifier shipped (ADR 0022); MCP server, scopes, approval queue shipped; sandbox open |
 | E6 Indicators | n/a | 0 | 1 | Batches 1-2 (O(1) rolling) done; batches 3-4 and render contract (S5) not started |
 | E7 Scale and ops | 0 | 0 | 5 | Pull-based; E7-S4 is superseded by `honba-sweep` (E10-S5) |
 | E8 Multi-leg | 0 | 0 | 4 | Optional; not scheduled (open decision D13) |
@@ -80,6 +80,7 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | E11-S5 part 1 | `crates/honba-api-wasm`: `indicator_series`, `ohlc_indicator_series` (ATR), conformance vectors (d1c9db3, e9fd98e) |
 | E6 batches 1-2 | commits 6372528, 510e0d4, efca4bd, 7c9a325, 6a91432 |
 | Backtest foundation (Python) | `python/src/honba/session.py` `BacktestSession`/`BacktestResult`, `backtest/simulated.py` `NextOpenExecution`, date-aware India settlement (9cc171e), single-round costs (d38fe82) |
+| E5-S5 AI strategy verifier | ADR 0022; `honba.ai.verification`: static AST scan (import allowlist, forbidden names/dunders), rlimit sandbox with audit hook, deterministic smoke, look-ahead truncation property; 45 unit + 37 integration tests; red-team corpus |
 
 Not shipped despite appearing in earlier drafts: any `honba-risk` crate (`crates/honba-engine/src/risk/mod.rs` is a 9-byte stub), a
 `not_modelled` assumptions list (only an untyped `assumptions: Option<Value>` on `BacktestResponse`), `FillModel`/`LatencyModel` traits,
@@ -293,7 +294,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 
 | ID | Scope | Size | Deps | Acceptance | Owner |
 |---|---|---|---|---|---|
-| E5-S5 | AI strategy verifier: AST, import allowlist, subprocess with rlimits, no network, deterministic smoke, look-ahead check, red-team tests; ADR D7 | M | E4-S4, ADR | `ast_rejects_forbidden_import` / `generated_strategy_passes_same_suite_as_handwritten` | honba |
+| E5-S5 (DONE) | AI strategy verifier: AST, import allowlist, subprocess with rlimits, no network, deterministic smoke, look-ahead check, red-team tests; ADR D7 | M | E4-S4, ADR | `ast_rejects_forbidden_import` / `generated_strategy_passes_same_suite_as_handwritten` | honba |
 | E5-S2 | Trust envelope: broker/LLM/instrument text wrapped and marked untrusted | S | none | `wraps_untrusted_text` / `mcp_tool_output_marked` | honba |
 | E5-S1 (DONE) | Thin Python MCP server over generated `mcp_tools.json` (11 tools: backtest, sweep, verify_strategy, compile_strategy, list_strategies, screen, get_instruments, get_bars, get_backtest, get_backtest_journal, get_sweep); toolset filter; read-only kill switch | M | E5-S2 | `toolset_filter` / `mcp_call_matches_rest_response` | honba |
 | E5-S3 | Scope map (read:market, read:account, write:orders, research) with CI drift test; audit by token id | S | E5-S1, E11-S8 min | `scope_for_every_endpoint` / `drift_test_fails_on_new_route` | honba |
