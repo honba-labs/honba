@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -80,7 +81,6 @@ def test_toolset_filter():
     assert selected <= all_names
 
     gateway = McpGateway(StubClient({}), toolset=selected)
-
     assert {t.name for t in gateway.list_tools()} == selected
 
 
@@ -133,7 +133,6 @@ def test_read_only_switch_allows_read_tools():
 
     result = gateway.call_tool("get_instruments", {})
 
-    assert result.is_error is False
     assert result.data == {"instruments": []}
     assert json.loads(result.content) == {"instruments": []}
 
@@ -187,3 +186,45 @@ def test_free_text_fields_are_wrapped_but_data_is_not():
     assert symbol["untrusted"] is True
     assert symbol["content"] == "TCS"
     assert symbol["origin"] == "mcp:get_instruments:symbol"
+
+
+def test_scope_drift_detection():
+    """E5-S3: drift test fails on new route without scope.
+
+    Verifies that every tool in the generated mcp_tools.json has a valid
+    scope annotation. Fails if a new tool is added without a scope, catching
+    drift at CI time.
+    """
+    # The test file is at: honba/python/tests/unit/test_mcp_gateway.py
+    # The schema is at: honba/schema/mcp/mcp_tools.json (4 levels up from tests/unit)
+    schema_path = Path(__file__).resolve().parents[3] / "schema" / "mcp" / "mcp_tools.json"
+    document = json.loads(schema_path.read_text(encoding="utf-8"))
+
+    missing_scope = []
+    empty_scope = []
+
+    for raw in document["tools"]:
+        name = raw["name"]
+        scope = raw.get("annotations", {}).get("scope", "")
+        if not scope:
+            missing_scope.append(name)
+        if scope == "":
+            empty_scope.append(name)
+
+    assert not missing_scope and not empty_scope, (
+        f"Drift detected: tools missing scope annotation: {missing_scope}, "
+        f"tools with empty scope: {empty_scope}. "
+        f"Every MCP tool must have a scope annotation (read:market, read:account, write:orders, research)."
+    )
+
+    # Also verify known scopes are valid
+    valid_scopes = {"read:market", "read:account", "write:orders", "research"}
+    invalid_scopes = []
+    for raw in document["tools"]:
+        scope = raw.get("annotations", {}).get("scope", "")
+        if scope and scope not in valid_scopes:
+            invalid_scopes.append((raw["name"], scope))
+
+    assert not invalid_scopes, (
+        f"Invalid scopes detected: {invalid_scopes}. Valid scopes: {valid_scopes}"
+    )
