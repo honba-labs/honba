@@ -247,3 +247,47 @@ def housekeeping_cmd() -> None:
     console.print(
         f"[green]Ledger consolidated: merged {consolidated_entries} overlapping/contiguous records.[/green]"
     )
+
+
+@app.command("fundamentals")
+def fundamentals_cmd(
+    universe: Annotated[
+        str,
+        typer.Option(
+            "--universe",
+            "-u",
+            help="Target universe: large_cap (Nifty 100), mid_cap (Nifty Midcap 150), or all (250 stocks)",
+        ),
+    ] = "all",
+    workers: Annotated[
+        int,
+        typer.Option("--workers", "-w", help="Number of concurrent download threads"),
+    ] = 8,
+    limit: Annotated[
+        int | None,
+        typer.Option("--limit", "-l", help="Limit number of companies to download"),
+    ] = None,
+    db_path: Annotated[
+        str | None,
+        typer.Option("--db-path", help="Custom DuckDB destination path"),
+    ] = None,
+) -> None:
+    """Download yearly and quarterly financial statements and ratios into DuckDB."""
+    from pathlib import Path
+
+    from honba.data.loaders.fundamentals import download_fundamentals_to_duckdb
+    from honba.screener.store import find_data_root
+
+    dest = Path(db_path) if db_path else find_data_root() / "fundamentals.duckdb"
+    console.print(
+        f"[bold cyan]Downloading {universe.upper()} Fundamentals into {dest}...[/bold cyan]"
+    )
+    res = download_fundamentals_to_duckdb(
+        universe_category=universe,
+        db_path=dest,
+        max_workers=workers,
+        limit=limit,
+    )
+    console.print(
+        f"[bold green]Done! Total companies in DuckDB: {res['companies_total']}[/bold green]"
+    )

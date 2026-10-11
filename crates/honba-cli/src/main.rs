@@ -5,6 +5,7 @@ mod schema;
 mod serve;
 #[cfg(test)]
 mod tests;
+mod trading_state;
 mod verify;
 
 use anyhow::Result;
@@ -56,7 +57,7 @@ enum Commands {
         #[arg(long)]
         mcp: Option<PathBuf>,
     },
-    /// Serve the read-only REST API over a directory of SYMBOL.EXCHANGE.parquet bar files
+    /// Serve the REST API over a directory of Parquet bar files
     Serve {
         /// Directory holding the Parquet bar files
         #[arg(long)]
@@ -72,6 +73,13 @@ enum Commands {
         trading_state: TradingState,
         #[command(flatten)]
         runs: serve::RunsArgs,
+        #[command(flatten)]
+        auth: serve::AuthArgs,
+    },
+    /// Manage trading state (ADR 0018, E2-S1 rest)
+    TradingState {
+        #[command(subcommand)]
+        command: trading_state::TradingStateCommands,
     },
     /// Verify a strategy manifest and print its compiled IR as JSON
     Verify {
@@ -159,7 +167,9 @@ fn main() -> Result<()> {
             cors_origin,
             trading_state,
             runs,
-        } => serve::run(&data_dir, addr, &cors_origin, trading_state, &runs),
+            auth,
+        } => serve::run(&data_dir, addr, &cors_origin, trading_state, &runs, &auth),
+        Commands::TradingState { command } => trading_state::run(command),
         Commands::Verify { manifest } => verify::run(&manifest),
     }
 }
