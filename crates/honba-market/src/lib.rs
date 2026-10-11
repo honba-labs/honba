@@ -26,6 +26,7 @@
 //!   - `null`: Zero-dependency, offline test pack (`NullCalendar`, `NullCostSchedule`, `NullMarketProfile`).
 //!   - `india` (`#[cfg(feature = "india")]`): Real-world Indian market pack (NSE/BSE, STT, NIFTY 50).
 
+pub mod aggregator;
 pub mod calendar;
 pub mod costs;
 pub mod error;
@@ -40,6 +41,7 @@ pub mod universes;
 pub mod india;
 
 // Re-export core generic contracts at crate root
+pub use aggregator::SessionBarAggregator;
 pub use calendar::{HolidaySource, MarketCalendar, Session, TradingCalendar};
 pub use costs::{Charge, CostModelSource, CostSchedule, FeeBreakdown, MarketSegment};
 pub use error::{MarketError, Result};

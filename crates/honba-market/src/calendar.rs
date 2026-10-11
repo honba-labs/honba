@@ -117,3 +117,27 @@ pub trait MarketCalendar: Send + Sync {
 
 /// Backward compatibility alias for [`MarketCalendar`].
 pub use MarketCalendar as TradingCalendar;
+
+impl<T: MarketCalendar + ?Sized> MarketCalendar for std::sync::Arc<T> {
+    fn session(&self) -> Session {
+        (**self).session()
+    }
+    fn is_holiday(&self, date: NaiveDate) -> bool {
+        (**self).is_holiday(date)
+    }
+    fn is_trading_day(&self, date: NaiveDate) -> bool {
+        (**self).is_trading_day(date)
+    }
+}
+
+impl<T: MarketCalendar + ?Sized> MarketCalendar for Box<T> {
+    fn session(&self) -> Session {
+        (**self).session()
+    }
+    fn is_holiday(&self, date: NaiveDate) -> bool {
+        (**self).is_holiday(date)
+    }
+    fn is_trading_day(&self, date: NaiveDate) -> bool {
+        (**self).is_trading_day(date)
+    }
+}

@@ -109,6 +109,7 @@ fn a_sweep_outcome_completes_a_running_sweep_manifest() {
     let report = SweepReportResponse {
         ranked: vec![json!({"trial": 0})],
         best: None,
+        validation: None,
     };
     m.complete(
         RunOutcome::Sweep {
@@ -131,6 +132,7 @@ fn an_outcome_of_the_wrong_kind_is_refused_and_changes_nothing() {
                 report: SweepReportResponse {
                     ranked: vec![],
                     best: None,
+                    validation: None,
                 },
             },
             "b",

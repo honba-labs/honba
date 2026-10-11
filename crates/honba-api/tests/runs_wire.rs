@@ -20,6 +20,7 @@ fn a_response_without_error_omits_the_field() {
         status: RunStatus::Pending,
         metrics: None,
         assumptions: None,
+        validation: None,
         error: None,
     };
     let value = serde_json::to_value(&r).unwrap();
@@ -39,6 +40,7 @@ fn a_failed_backtest_response_round_trips_its_error() {
         status: RunStatus::Failed,
         metrics: None,
         assumptions: None,
+        validation: None,
         error: Some(error.clone()),
     };
     let back: BacktestResponse = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
@@ -149,6 +151,7 @@ fn a_run_id_survives_a_json_response_and_refuses_traversal() {
         status: RunStatus::Pending,
         metrics: None,
         assumptions: None,
+        validation: None,
         error: None,
     };
     let back: BacktestResponse = serde_json::from_value(serde_json::to_value(r).unwrap()).unwrap();

@@ -845,5 +845,9 @@ fn sweep_report_to_response(report: SweepReport) -> SweepReportResponse {
 
     let best = ranked.first().cloned();
 
-    SweepReportResponse { ranked, best }
+    SweepReportResponse {
+        ranked,
+        best,
+        validation: None,
+    }
 }

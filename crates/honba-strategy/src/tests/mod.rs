@@ -7,6 +7,7 @@ mod ir;
 mod ledger;
 mod look_ahead;
 mod manifest;
+mod mtf;
 mod runner_errors;
 mod runner_events;
 mod runner_rejections;

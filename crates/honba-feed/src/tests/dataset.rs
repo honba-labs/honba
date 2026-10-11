@@ -430,3 +430,68 @@ fn a_feed_over_an_empty_dataset_yields_nothing() {
 
     assert!(feed.next().expect("an empty feed does not fail").is_none());
 }
+
+#[test]
+fn chunks_cover_slice() {
+    let timestamps: Vec<u64> = (1..=25).map(|i| i * 10).collect();
+    let closes: Vec<f64> = (1..=25).map(|i| i as f64 * 1.5).collect();
+    let original = slice_with_closes("TCS", &timestamps, &closes);
+    assert_eq!(original.len(), 25);
+
+    let chunks = original.chunks(7);
+    assert_eq!(chunks.len(), 4);
+    assert_eq!(chunks[0].len(), 7);
+    assert_eq!(chunks[1].len(), 7);
+    assert_eq!(chunks[2].len(), 7);
+    assert_eq!(chunks[3].len(), 4);
+
+    let total_reconstructed: usize = chunks.iter().map(|c| c.len()).sum();
+    assert_eq!(total_reconstructed, original.len());
+
+    let mut cursor = 0;
+    for chunk in &chunks {
+        for i in 0..chunk.len() {
+            let chunk_bar = chunk.bar(i).expect("bar exists in chunk");
+            let orig_bar = original.bar(cursor).expect("bar exists in orig");
+            assert_eq!(chunk_bar, orig_bar);
+            cursor += 1;
+        }
+    }
+    assert_eq!(cursor, original.len());
+}
+
+#[test]
+fn streamed_dataset_feed_replays_all_chunks_deterministically() {
+    let timestamps: Vec<u64> = (1..=20).map(|i| i * 10).collect();
+    let closes_tcs: Vec<f64> = (1..=20).map(|i| 100.0 + i as f64).collect();
+    let closes_infy: Vec<f64> = (1..=20).map(|i| 200.0 + i as f64).collect();
+
+    let ds = Dataset::from_slices(vec![
+        slice_with_closes("TCS", &timestamps, &closes_tcs),
+        slice_with_closes("INFY", &timestamps, &closes_infy),
+    ])
+    .expect("valid")
+    .with_id(honba_messages::DatasetId::new("NSE:NIFTY50:1m:test_hash"));
+
+    assert_eq!(
+        ds.id().map(|id| id.as_str()),
+        Some("NSE:NIFTY50:1m:test_hash")
+    );
+
+    let mut standard_feed = DatasetFeed::new(&ds, UnixNanos::from_u64(42));
+    let mut streamed_feed =
+        crate::dataset::StreamedDatasetFeed::new(&ds, 6, UnixNanos::from_u64(42));
+
+    let mut standard_msgs = Vec::new();
+    while let Some(msg) = standard_feed.next().expect("valid") {
+        standard_msgs.push(msg);
+    }
+
+    let mut streamed_msgs = Vec::new();
+    while let Some(msg) = streamed_feed.next().expect("valid") {
+        streamed_msgs.push(msg);
+    }
+
+    assert_eq!(streamed_msgs.len(), 40);
+    assert_eq!(streamed_msgs.len(), standard_msgs.len());
+}

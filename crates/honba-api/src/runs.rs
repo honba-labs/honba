@@ -230,6 +230,7 @@ impl RunManifest {
                 .assumptions
                 .clone()
                 .filter(|_| self.status.is_terminal()),
+            validation: None,
             error: self
                 .error
                 .clone()

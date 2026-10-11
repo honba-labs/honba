@@ -222,6 +222,17 @@
             }
           ],
           "description": "Current lifecycle state."
+        },
+        "validation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ValidationBlock"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Statistical overfitting validation block (E4-S6)."
         }
       },
       "required": [
@@ -592,6 +603,43 @@
       ],
       "type": "object"
     },
+    "CostStressResult": {
+      "description": "Result of cost-stress testing.",
+      "properties": {
+        "baseline_sharpe": {
+          "description": "Baseline ($1\\times$ cost) annualized Sharpe ratio.",
+          "format": "double",
+          "type": "number"
+        },
+        "passed": {
+          "description": "Whether alpha remains positive under $2\\times$ cost stress.",
+          "type": "boolean"
+        },
+        "retention_2x": {
+          "description": "Ratio of $2\\times$ Sharpe to baseline Sharpe ($\\text{Sharpe}_{2\\times} / \\text{Sharpe}_{1\\times}$).",
+          "format": "double",
+          "type": "number"
+        },
+        "stress_2x_sharpe": {
+          "description": "Stressed ($2\\times$ cost) annualized Sharpe ratio.",
+          "format": "double",
+          "type": "number"
+        },
+        "stress_3x_sharpe": {
+          "description": "Severe stressed ($3\\times$ cost) annualized Sharpe ratio.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "baseline_sharpe",
+        "passed",
+        "retention_2x",
+        "stress_2x_sharpe",
+        "stress_3x_sharpe"
+      ],
+      "type": "object"
+    },
     "Currency": {
       "description": "A currency in which instruments are denominated.\n\n``` use honba_entities::Currency;\n\nassert_eq!(Currency::Inr.code(), \"INR\"); assert_eq!(Currency::Inr.to_string(), \"INR\"); ```",
       "oneOf": [
@@ -733,6 +781,49 @@
       "required": [
         "asks",
         "bids"
+      ],
+      "type": "object"
+    },
+    "DsrResult": {
+      "description": "Result of Deflated Sharpe Ratio validation.",
+      "properties": {
+        "dsr": {
+          "description": "Deflated Sharpe Ratio value ($\\Phi(z) \\in [0.0, 1.0]$).",
+          "format": "double",
+          "type": "number"
+        },
+        "expected_max_sharpe": {
+          "description": "Expected maximum Sharpe ratio under the null hypothesis ($SR_0$).",
+          "format": "double",
+          "type": "number"
+        },
+        "observed_sharpe": {
+          "description": "The unadjusted observed Sharpe ratio.",
+          "format": "double",
+          "type": "number"
+        },
+        "passed": {
+          "description": "Whether DSR exceeds the required significance threshold.",
+          "type": "boolean"
+        },
+        "standard_error": {
+          "description": "Standard error of the observed Sharpe ratio accounting for skewness & kurtosis.",
+          "format": "double",
+          "type": "number"
+        },
+        "z_stat": {
+          "description": "Test statistic $z = (\\widehat{SR} - SR_0) / \\text{SE}$.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "dsr",
+        "expected_max_sharpe",
+        "observed_sharpe",
+        "passed",
+        "standard_error",
+        "z_stat"
       ],
       "type": "object"
     },
@@ -1722,6 +1813,37 @@
         }
       ]
     },
+    "HoldoutResult": {
+      "description": "Result of one-shot holdout validation.",
+      "properties": {
+        "holdout_sharpe": {
+          "description": "Out-of-sample holdout Sharpe ratio.",
+          "format": "double",
+          "type": "number"
+        },
+        "passed": {
+          "description": "Whether the holdout validation passed.",
+          "type": "boolean"
+        },
+        "retention_ratio": {
+          "description": "Retention ratio $\\text{Sharpe}_{\\text{Holdout}} / \\text{Sharpe}_{\\text{Train}}$.",
+          "format": "double",
+          "type": "number"
+        },
+        "train_sharpe": {
+          "description": "In-sample training Sharpe ratio.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "holdout_sharpe",
+        "passed",
+        "retention_ratio",
+        "train_sharpe"
+      ],
+      "type": "object"
+    },
     "HttpMethod": {
       "description": "The HTTP methods the API exposes.",
       "oneOf": [
@@ -2130,6 +2252,63 @@
       "required": [
         "amount",
         "currency"
+      ],
+      "type": "object"
+    },
+    "MonteCarloResult": {
+      "description": "Results from block-bootstrap Monte Carlo analysis.",
+      "properties": {
+        "block_size": {
+          "description": "Block size used for resampling.",
+          "format": "uint",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "drawdown_95": {
+          "description": "95th percentile worst-case maximum drawdown (VaR 95%).",
+          "format": "double",
+          "type": "number"
+        },
+        "drawdown_99": {
+          "description": "99th percentile worst-case maximum drawdown (VaR 99%).",
+          "format": "double",
+          "type": "number"
+        },
+        "median_max_drawdown": {
+          "description": "Median maximum peak-to-trough drawdown across all simulated paths.",
+          "format": "double",
+          "type": "number"
+        },
+        "passed": {
+          "description": "Whether the strategy passed the Monte Carlo stability gate.",
+          "type": "boolean"
+        },
+        "prob_loss": {
+          "description": "Probability of ending with negative return (loss probability).",
+          "format": "double",
+          "type": "number"
+        },
+        "prob_ruin": {
+          "description": "Probability of hitting or exceeding the ruin drawdown threshold.",
+          "format": "double",
+          "type": "number"
+        },
+        "simulations_run": {
+          "description": "Number of simulated paths evaluated.",
+          "format": "uint",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "block_size",
+        "drawdown_95",
+        "drawdown_99",
+        "median_max_drawdown",
+        "passed",
+        "prob_loss",
+        "prob_ruin",
+        "simulations_run"
       ],
       "type": "object"
     },
@@ -2594,6 +2773,38 @@
       },
       "required": [
         "default"
+      ],
+      "type": "object"
+    },
+    "PboResult": {
+      "description": "Result of Probability of Backtest Overfitting analysis.",
+      "properties": {
+        "combinations_evaluated": {
+          "description": "Number of symmetric cross-validation combinations evaluated.",
+          "format": "uint",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "median_oos_percentile": {
+          "description": "Median relative rank of the best In-Sample model out-of-sample ($\\in [0.0, 1.0]$).",
+          "format": "double",
+          "type": "number"
+        },
+        "passed": {
+          "description": "Whether PBO is below the acceptable threshold.",
+          "type": "boolean"
+        },
+        "pbo": {
+          "description": "Probability of Backtest Overfitting ($PBO \\in [0.0, 1.0]$).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "combinations_evaluated",
+        "median_oos_percentile",
+        "passed",
+        "pbo"
       ],
       "type": "object"
     },
@@ -3500,7 +3711,7 @@
               "description": "The journal message."
             },
             "seq": {
-              "description": "The record's 0-based line index in `events.ndjson`.",
+              "description": "The record's 0-based line index in `events.ndjson` industries.",
               "format": "uint64",
               "minimum": 0.0,
               "type": "integer"
@@ -3552,6 +3763,17 @@
           "description": "Trials ranked best-first by the fitness function.",
           "items": true,
           "type": "array"
+        },
+        "validation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ValidationBlock"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Statistical overfitting validation block across sweep trials (E4-S6)."
         }
       },
       "required": [
@@ -3966,6 +4188,92 @@
       ],
       "type": "object"
     },
+    "ValidationBlock": {
+      "description": "Comprehensive statistical validation block for a backtest or parameter sweep.",
+      "properties": {
+        "cost_stress": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CostStressResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Cost-stress friction sensitivity result."
+        },
+        "dsr": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DsrResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Deflated Sharpe Ratio validation result."
+        },
+        "holdout": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HoldoutResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "One-shot holdout validation result."
+        },
+        "monte_carlo": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MonteCarloResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Block-bootstrap Monte Carlo drawdown and ruin simulation result."
+        },
+        "passed": {
+          "description": "Overall verdict: true only if all evaluated gates passed.",
+          "type": "boolean"
+        },
+        "pbo": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PboResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Probability of Backtest Overfitting validation result (for multi-trial sweeps)."
+        },
+        "walk_forward": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WalkForwardResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Walk-Forward Efficiency validation result."
+        },
+        "warnings": {
+          "description": "Human-readable warnings and failure reasons.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "passed"
+      ],
+      "type": "object"
+    },
     "ValueType": {
       "description": "Type of metric value.",
       "oneOf": [
@@ -4016,6 +4324,49 @@
     "VenueOrderId": {
       "description": "A venue-assigned order identifier (the exchange or broker's id, as opposed to the client-assigned [`OrderId`]).",
       "type": "string"
+    },
+    "WalkForwardResult": {
+      "description": "Result of Walk-Forward Analysis.",
+      "properties": {
+        "is_annual_return": {
+          "description": "In-sample annualized return.",
+          "format": "double",
+          "type": "number"
+        },
+        "is_sharpe": {
+          "description": "In-sample Sharpe ratio.",
+          "format": "double",
+          "type": "number"
+        },
+        "oos_annual_return": {
+          "description": "Out-of-sample annualized return.",
+          "format": "double",
+          "type": "number"
+        },
+        "oos_sharpe": {
+          "description": "Out-of-sample Sharpe ratio.",
+          "format": "double",
+          "type": "number"
+        },
+        "passed": {
+          "description": "Whether the strategy passes walk-forward stability requirements.",
+          "type": "boolean"
+        },
+        "wfe": {
+          "description": "Walk-Forward Efficiency ratio ($WFE = \\text{Return}_{OOS} / \\text{Return}_{IS}$).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "is_annual_return",
+        "is_sharpe",
+        "oos_annual_return",
+        "oos_sharpe",
+        "passed",
+        "wfe"
+      ],
+      "type": "object"
     }
   },
   "$id": "https://honba.dev/schema/domain.json",

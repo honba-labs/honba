@@ -1,5 +1,7 @@
 //! Unit tests for this crate, one file per area.
 
+mod aggregator;
+
 mod calendar;
 mod costs;
 mod expiry;

@@ -150,6 +150,9 @@ pub struct BacktestResponse {
     /// What the run did *not* model, stated explicitly.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub assumptions: Option<serde_json::Value>,
+    /// Statistical overfitting validation block (E4-S6).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub validation: Option<honba_analytics::ValidationBlock>,
     /// Why the run failed; present only when `status` is `failed`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<ErrorDetail>,
@@ -178,6 +181,9 @@ pub struct SweepReportResponse {
     /// Best trial's parameter set.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub best: Option<serde_json::Value>,
+    /// Statistical overfitting validation block across sweep trials (E4-S6).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub validation: Option<honba_analytics::ValidationBlock>,
 }
 
 /// Orders response.
@@ -223,7 +229,7 @@ pub enum StreamFrame {
     },
     /// One journal record.
     Record {
-        /// The record's 0-based line index in `events.ndjson`.
+        /// The record's 0-based line index in `events.ndjson` industries.
         seq: u64,
         /// The journal message.
         message: Message,

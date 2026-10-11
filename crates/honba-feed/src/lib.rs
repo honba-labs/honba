@@ -10,7 +10,10 @@ pub mod export;
 pub mod import;
 pub mod reader;
 
-pub use dataset::{ColumnarSlice, ColumnarSliceBuilder, Dataset, DatasetBuildError, DatasetFeed};
+pub use dataset::{
+    ColumnarSlice, ColumnarSliceBuilder, Dataset, DatasetBuildError, DatasetChunk, DatasetFeed,
+    StreamedDatasetFeed,
+};
 pub use export::{
     CsvReportWriter, ExportError, JsonReportWriter, MarkdownReportWriter, ReportWriter,
 };

@@ -48,6 +48,7 @@ class BacktestResponse:
     metrics: BacktestMetrics | None = None
     run_id: str
     status: RunStatus
+    validation: ValidationBlock | None = None
 
 class BacktestRunConfig:
     account: AccountConfig | None = None
@@ -99,6 +100,13 @@ class CompiledStrategy:
     id: str
     ir: StrategyIr
 
+class CostStressResult:
+    baseline_sharpe: float
+    passed: bool
+    retention_2x: float
+    stress_2x_sharpe: float
+    stress_3x_sharpe: float
+
 Currency = Literal["INR", "USD", "EUR", "GBP"]
 
 DataSourceConfig = dict[str, Any]
@@ -113,6 +121,14 @@ class DepthQuery:
 class DepthResponse:
     asks: list[DepthLevel]
     bids: list[DepthLevel]
+
+class DsrResult:
+    dsr: float
+    expected_max_sharpe: float
+    observed_sharpe: float
+    passed: bool
+    standard_error: float
+    z_stat: float
 
 ErrorCategory = Literal["validation", "not_found", "auth", "rate_limit", "risk", "order", "market_data", "transport", "internal", "unsupported"]
 
@@ -228,6 +244,12 @@ FillModel = Literal["bar_fill", "bar_fill_through", "none"]
 
 FilterOp = Literal["eq", "neq", "gt", "gte", "lt", "lte", "between", "in", "not_in", "like", "has", "crosses_above", "crosses_below"]
 
+class HoldoutResult:
+    holdout_sharpe: float
+    passed: bool
+    retention_ratio: float
+    train_sharpe: float
+
 HttpMethod = Literal["GET", "POST", "DELETE"]
 
 class InstrumentId:
@@ -288,6 +310,16 @@ class Money:
     amount: int
     currency: str
 
+class MonteCarloResult:
+    block_size: int
+    drawdown_95: float
+    drawdown_99: float
+    median_max_drawdown: float
+    passed: bool
+    prob_loss: float
+    prob_ruin: float
+    simulations_run: int
+
 class Order:
     cancel_requested: bool | None = None
     instrument_id: InstrumentId
@@ -347,6 +379,12 @@ class ParameterSpec:
     min: float | None = None
     range: str | None = None
     step: float | None = None
+
+class PboResult:
+    combinations_evaluated: int
+    median_oos_percentile: float
+    passed: bool
+    pbo: float
 
 class Position:
     avg_price: float
@@ -494,6 +532,7 @@ class Subscriptions:
 class SweepReportResponse:
     best: Any = None
     ranked: list[Any]
+    validation: ValidationBlock | None = None
 
 class SweepRequest:
     bar_spec: str | None = None
@@ -543,6 +582,24 @@ class UnixNanos:
     iso: str
     unix_nanos: str
 
+class ValidationBlock:
+    cost_stress: CostStressResult | None = None
+    dsr: DsrResult | None = None
+    holdout: HoldoutResult | None = None
+    monte_carlo: MonteCarloResult | None = None
+    passed: bool
+    pbo: PboResult | None = None
+    walk_forward: WalkForwardResult | None = None
+    warnings: list[str] | None = None
+
 ValueType = Literal["NUMBER", "STRING", "ENUM", "BOOL", "DATE", "MONEY"]
 
 VenueOrderId = str
+
+class WalkForwardResult:
+    is_annual_return: float
+    is_sharpe: float
+    oos_annual_return: float
+    oos_sharpe: float
+    passed: bool
+    wfe: float

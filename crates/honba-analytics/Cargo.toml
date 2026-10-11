@@ -10,5 +10,6 @@ description = "Performance analytics: trade stats, equity stats, risk metrics"
 [dependencies]
 honba-messages.workspace = true
 honba-entities.workspace = true
+schemars.workspace = true
 serde.workspace = true
 thiserror.workspace = true

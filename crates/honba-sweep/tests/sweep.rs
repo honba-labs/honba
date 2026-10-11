@@ -628,3 +628,32 @@ async fn determinism_under_threads(worker_threads: usize) {
         "the ranking must be byte-identical across worker thread counts"
     );
 }
+
+#[tokio::test]
+async fn sweep_over_streamed_dataset() {
+    let data = two_instruments();
+    let trials = vec![sma(1, "ALPHA", 2, 5), sma(2, "BETA", 3, 7)];
+    let plan = plan_of(trials.clone(), 2);
+
+    // Run sweep over full dataset
+    let full_report = run(&plan, Arc::new(data.clone())).await.unwrap();
+
+    // Partition dataset into chunks
+    let chunks = data.chunks(20);
+    assert!(
+        chunks.len() > 1,
+        "dataset was partitioned into multiple chunks"
+    );
+
+    // Verify streaming chunks replay correctly in individual engines
+    for chunk in &chunks {
+        let chunk_plan = plan_of(trials.clone(), 1);
+        let chunk_report = run(&chunk_plan, Arc::new(chunk.dataset.clone()))
+            .await
+            .unwrap();
+        assert_eq!(chunk_report.len(), 2);
+    }
+
+    assert_eq!(full_report.len(), 2);
+    assert!(!full_report.ranking().is_empty());
+}

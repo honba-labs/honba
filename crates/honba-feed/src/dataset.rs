@@ -14,7 +14,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use honba_engine::DataFeed;
-use honba_messages::{Bar, BarSpecification, BarType, Event, InstrumentId, Message, UnixNanos};
+use honba_messages::{
+    Bar, BarSpecification, BarType, DatasetId, Event, InstrumentId, Message, UnixNanos,
+};
 use thiserror::Error;
 
 use crate::import::parquet_source::{ParquetBarSource, ParquetError};
@@ -150,10 +152,111 @@ impl ColumnarSlice {
         )
     }
 
+    /// Extracts a contiguous subslice from `[start, start + len)`.
+    ///
+    /// Returns `None` if `start + len > self.len()`.
+    pub fn subslice(&self, start: usize, len: usize) -> Option<Self> {
+        if start + len > self.len() {
+            return None;
+        }
+        let inner = &self.0;
+        Some(Self(Arc::new(SliceInner {
+            instrument: inner.instrument.clone(),
+            bar_spec: inner.bar_spec,
+            ts: inner.ts[start..start + len].to_vec(),
+            open: inner.open[start..start + len].to_vec(),
+            high: inner.high[start..start + len].to_vec(),
+            low: inner.low[start..start + len].to_vec(),
+            close: inner.close[start..start + len].to_vec(),
+            volume: inner.volume[start..start + len].to_vec(),
+        })))
+    }
+
+    /// Partitions the slice into contiguous chunks of at most `chunk_size` bars.
+    ///
+    /// # Panics
+    /// Panics if `chunk_size == 0`.
+    pub fn chunks(&self, chunk_size: usize) -> Vec<Self> {
+        assert!(chunk_size > 0, "chunk_size must be positive");
+        if self.is_empty() {
+            return Vec::new();
+        }
+        let mut result = Vec::new();
+        let total = self.len();
+        let mut offset = 0;
+        while offset < total {
+            let len = chunk_size.min(total - offset);
+            result.push(self.subslice(offset, len).expect("valid subslice bounds"));
+            offset += len;
+        }
+        result
+    }
+
     /// Reports whether two handles point at the same columns.
     #[cfg(test)]
     pub(crate) fn ptr_eq(left: &Self, right: &Self) -> bool {
         Arc::ptr_eq(&left.0, &right.0)
+    }
+}
+
+impl PartialEq for Dataset {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.id == other.0.id && self.0.slices == other.0.slices
+    }
+}
+
+/// A chunk partition of a dataset.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DatasetChunk {
+    /// Zero-based chunk index.
+    pub index: usize,
+    /// Total number of chunks in the partition.
+    pub total_chunks: usize,
+    /// The dataset partition for this chunk.
+    pub dataset: Dataset,
+}
+
+/// A sync [`DataFeed`] that replays a [`Dataset`] in chunked streaming batches.
+pub struct StreamedDatasetFeed {
+    chunks: Vec<DatasetChunk>,
+    current_chunk: usize,
+    current_feed: Option<DatasetFeed>,
+    ts_init: UnixNanos,
+}
+
+impl StreamedDatasetFeed {
+    /// Creates a feed that replays `dataset` chunk by chunk.
+    pub fn new(dataset: &Dataset, chunk_size: usize, ts_init: UnixNanos) -> Self {
+        let chunks = dataset.chunks(chunk_size);
+        let current_feed = chunks
+            .first()
+            .map(|c| DatasetFeed::new(&c.dataset, ts_init));
+        Self {
+            chunks,
+            current_chunk: 0,
+            current_feed,
+            ts_init,
+        }
+    }
+}
+
+impl DataFeed for StreamedDatasetFeed {
+    fn next(&mut self) -> honba_engine::Result<Option<Message>> {
+        while let Some(feed) = &mut self.current_feed {
+            if let Some(msg) = feed.next()? {
+                return Ok(Some(msg));
+            }
+            self.current_chunk += 1;
+            if self.current_chunk < self.chunks.len() {
+                self.current_feed = Some(DatasetFeed::new(
+                    &self.chunks[self.current_chunk].dataset,
+                    self.ts_init,
+                ));
+            } else {
+                self.current_feed = None;
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -375,6 +478,7 @@ pub struct Dataset(Arc<DatasetInner>);
 /// The single allocation behind every [`Dataset`] handle.
 #[derive(Debug)]
 struct DatasetInner {
+    id: Option<DatasetId>,
     slices: Vec<ColumnarSlice>,
 }
 
@@ -387,7 +491,10 @@ impl Default for Dataset {
 impl Dataset {
     /// Creates an empty dataset.
     pub fn new() -> Self {
-        Self(Arc::new(DatasetInner { slices: Vec::new() }))
+        Self(Arc::new(DatasetInner {
+            id: None,
+            slices: Vec::new(),
+        }))
     }
 
     /// Builds a dataset from slices, ordered by instrument id.
@@ -395,6 +502,14 @@ impl Dataset {
     /// The input order is irrelevant: slices are sorted by
     /// [`InstrumentId`], and a repeated instrument is an error.
     pub fn from_slices(slices: Vec<ColumnarSlice>) -> Result<Dataset, DatasetBuildError> {
+        Self::from_slices_with_id(slices, None)
+    }
+
+    /// Builds a dataset from slices with an explicit [`DatasetId`].
+    pub fn from_slices_with_id(
+        slices: Vec<ColumnarSlice>,
+        id: Option<DatasetId>,
+    ) -> Result<Dataset, DatasetBuildError> {
         let mut slices = slices;
         slices.sort_by(|left, right| left.instrument().cmp(right.instrument()));
         for pair in slices.windows(2) {
@@ -404,7 +519,56 @@ impl Dataset {
                 ));
             }
         }
-        Ok(Self(Arc::new(DatasetInner { slices })))
+        Ok(Self(Arc::new(DatasetInner { id, slices })))
+    }
+
+    /// Sets the dataset ID, returning the updated dataset.
+    pub fn with_id(mut self, id: DatasetId) -> Self {
+        if let Some(inner) = Arc::get_mut(&mut self.0) {
+            inner.id = Some(id);
+            self
+        } else {
+            Self(Arc::new(DatasetInner {
+                id: Some(id),
+                slices: self.0.slices.clone(),
+            }))
+        }
+    }
+
+    /// Returns the dataset ID if configured.
+    pub fn id(&self) -> Option<&DatasetId> {
+        self.0.id.as_ref()
+    }
+
+    /// Partitions the dataset into chunk partitions with at most `chunk_size` bars per slice.
+    ///
+    /// # Panics
+    /// Panics if `chunk_size == 0`.
+    pub fn chunks(&self, chunk_size: usize) -> Vec<DatasetChunk> {
+        assert!(chunk_size > 0, "chunk_size must be positive");
+        if self.is_empty() {
+            return Vec::new();
+        }
+        let per_slice_chunks: Vec<Vec<ColumnarSlice>> =
+            self.0.slices.iter().map(|s| s.chunks(chunk_size)).collect();
+        let max_chunks = per_slice_chunks.iter().map(|c| c.len()).max().unwrap_or(0);
+        let mut chunks = Vec::with_capacity(max_chunks);
+        for chunk_idx in 0..max_chunks {
+            let mut chunk_slices = Vec::new();
+            for slice_chunks in &per_slice_chunks {
+                if let Some(c) = slice_chunks.get(chunk_idx) {
+                    chunk_slices.push(c.clone());
+                }
+            }
+            let ds = Dataset::from_slices_with_id(chunk_slices, self.0.id.clone())
+                .expect("partition slices are sorted and unique");
+            chunks.push(DatasetChunk {
+                index: chunk_idx,
+                total_chunks: max_chunks,
+                dataset: ds,
+            });
+        }
+        chunks
     }
 
     /// Reads one Parquet file per instrument and builds a dataset from them.

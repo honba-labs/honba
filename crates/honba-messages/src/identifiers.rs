@@ -165,3 +165,39 @@ impl fmt::Display for TradeId {
         f.write_str(&self.0)
     }
 }
+
+/// A dataset identifier combining exchange, symbol/universe, timeframe, and bounds (E4-S7).
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
+pub struct DatasetId(String);
+
+impl DatasetId {
+    /// Creates a dataset id from any string-like value.
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    /// Returns the dataset id as a string slice.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl From<&str> for DatasetId {
+    fn from(value: &str) -> Self {
+        Self::new(value)
+    }
+}
+
+impl From<String> for DatasetId {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
+impl fmt::Display for DatasetId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
