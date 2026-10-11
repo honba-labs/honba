@@ -13,6 +13,16 @@
 - Unit tests (45) cover the static scan denylist/allowlist; integration tests (37) cover suite parity, look-ahead, and a red-team corpus (forbidden imports, dunder climbs, `eval`, infinite loop, memory bomb, network/process/write attempts, verdict forgery, nondeterminism).
 - Acceptance: `ast_rejects_forbidden_import` / `generated_strategy_passes_same_suite_as_handwritten`.
 
+### Minimal auth before non-loopback serve (E11-S8)
+
+- `honba-api-rest::auth`: Bearer token authentication with scope enforcement (ADR 0023, D11).
+- `FileTokenStore`: TOML-backed token store with SHA-256 token hashes, scopes, labels, optional expiry; hot-reload on file change.
+- Four scopes: `read:market` (instruments, quotes, bars, depth, screener), `read:account` (reserved), `write:orders` (orders, approval, positions), `research` (strategies, backtests, sweeps, journals). Public routes: `/capabilities`, `/health`, `/schema`.
+- Auth middleware as axum layer: validates `Authorization: Bearer <token>`, checks required scope per route, returns `401 unauthorized` or `403 forbidden` with stable error codes (`missing_token`, `invalid_token`, `expired`, `forbidden`).
+- Audit log (NDJSON): every auth decision logged with `token_id`, route, method, decision (granted/denied), reason, required scope, token scopes, client IP.
+- CLI: `--tokens-file` enables auth (suppresses non-loopback warning); `--audit-log-file` optional (defaults to `audit.log` in journals dir).
+- Composition: `AuthConfig` in `ApiConfig`; `AuthLayer` wraps `FileTokenStore`; router gets `auth_middleware` when tokens file provided.
+
 ### Durable risk state and idempotent fill ledger (E2-S11)
 
 - `honba-risk`: Implemented `FillFingerprint`, `FillRecord`, and `FillLedger` in `crates/honba-risk/src/ledger.rs`. Incoming fills are fingerprinted deterministically via SHA-256 over order ID, trade/venue IDs, instrument, side, quantity, price, and event timestamp, deduplicating repeated fills (`fingerprint_dedup`).

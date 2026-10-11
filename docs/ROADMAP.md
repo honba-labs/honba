@@ -1,6 +1,6 @@
 # Honba roadmap (single forward-looking plan)
 
-Status: v6, 2026-10-06 (E5-S5 added 2026-10-11). Supersedes `docs/archive/ROADMAP-borrowed-ideas.md` (v4, 2026-10-01) and merges `docs/archive/plan.md`
+Status: v6, 2026-10-06 (E5-S5 added 2026-10-11, E11-S8 added 2026-10-11). Supersedes `docs/archive/ROADMAP-borrowed-ideas.md` (v4, 2026-10-01) and merges `docs/archive/plan.md`
 (2026-10-03) phases and epics E10 and E11 into one numbering-preserving structure. Story IDs (E0..E11) are unchanged so old references
 still resolve. Nothing here has been filed as an issue. This file lives in the `honba` git repo at `docs/ROADMAP.md`; paths are relative
 to the `honba/` root unless they name a sibling repo. Evidence is from the `honba/` tree and its git log, read-only; test baselines are
@@ -9,7 +9,9 @@ from `honba/.claude/HANDOFF.md` (cargo ~1045, python ~2413 passed, 8 skipped) an
 v6 changes: E10-S7 DONE (commits edb4921, 91bff5b, 2c10630; ADR 0015 implemented); E3-S1a chunk 1 DONE (ADR 0016, commits
 b12e5ba..1b2f6ce). Also done since v5 (see 1.1): cancel-time rule, rejection-queue hardening, IST timestamps, typed registry, SDK
 capabilities/schema, WASM hardening, ADR 0014/0015, golden vectors validated against the schema, honba-docs chunks.
-E5-S5 done (2026-10-11): AI strategy verifier (ADR 0022). The two superseded documents are kept in `docs/archive/` for history and are not updated.
+E5-S5 done (2026-10-11): AI strategy verifier (ADR 0022).
+E11-S8 done (2026-10-11): Minimal auth (Bearer token, scope map, file token store, audit log) (ADR 0023).
+The two superseded documents are kept in `docs/archive/` for history and are not updated.
 
 Story verdicts come from the 2026-10-06 audit (a scratch file, `ROADMAP_AUDIT.md`, model output, not kept in the repo) after a spot-check
 against code. The audit's table
@@ -36,7 +38,7 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | E8 Multi-leg | 0 | 0 | 4 | Optional; not scheduled (open decision D13) |
 | E9 Frontend and AlgoDesigner | 0 | 1 | 7 | Greenfield; generated TS types only |
 | E10 Async core | 6 | 1 | 1 | Ports, shell, engine output, Arc dataset, sweep, determinism test and Python runtime bridge (ADR 0015) shipped; connectors open |
-| E11 Versioned API | 3 | 2 | 2 | Read API, SDK and WASM indicators shipped; SSE streaming shipped; writes, auth open |
+| E11 Versioned API | 4 | 1 | 2 | Read API, SDK and WASM indicators shipped; SSE streaming shipped; write endpoints and auth shipped |
 | **Total (74)** | **23** | **14** | **37** | |
 
 ### 1.1 What is shipped (evidence)
@@ -81,6 +83,7 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | E6 batches 1-2 | commits 6372528, 510e0d4, efca4bd, 7c9a325, 6a91432 |
 | Backtest foundation (Python) | `python/src/honba/session.py` `BacktestSession`/`BacktestResult`, `backtest/simulated.py` `NextOpenExecution`, date-aware India settlement (9cc171e), single-round costs (d38fe82) |
 | E5-S5 AI strategy verifier | ADR 0022; `honba.ai.verification`: static AST scan (import allowlist, forbidden names/dunders), rlimit sandbox with audit hook, deterministic smoke, look-ahead truncation property; 45 unit + 37 integration tests; red-team corpus |
+| E11-S8 Minimal auth | ADR 0023; `honba-api-rest::auth`: Bearer token + scope map (read:market, read:account, write:orders, research); FileTokenStore (TOML, SHA-256 hashes, hot-reload); audit log (NDJSON); auth middleware; CLI `--tokens-file` / `--audit-log-file`; non-loopback warning suppressed when auth enabled |
 
 Not shipped despite appearing in earlier drafts: any `honba-risk` crate (`crates/honba-engine/src/risk/mod.rs` is a 9-byte stub), a
 `not_modelled` assumptions list (only an untyped `assumptions: Option<Value>` on `BacktestResponse`), `FillModel`/`LatencyModel` traits,
@@ -330,7 +333,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 | E11-S5 rest | WASM: screener eval export (Rust evaluator exists in `honba-indicators`, not exported), backtest replay; wasm-pack CI step never exercised | M | E4-S3 | conformance vectors `screener_scan.json` / browser-free node run | honba |
 | E11-S6 | Frontend client from OpenAPI, TS drift check in CI (currently local only) | S | none | `ts_matches_openapi` / frontend build | honba + honba-frontend |
 | E11-S7 (DONE) | Write endpoints behind risk and approval queue | M | E2-S2, E5-S4 | `order_refused_by_risk` / `post_order_flows_to_sim_only` / approval queue tests | honba |
-| E11-S8 | Auth, scopes, secrets, audit (minimum viable before non-loopback `serve`) | L | ADR D11 | `token_scope_enforced` / `write_needs_second_factor` | honba |
+| E11-S8 (DONE) | Auth, scopes, secrets, audit (minimum viable before non-loopback `serve`) | L | ADR D11 | `token_scope_enforced` / `write_needs_second_factor` | honba |
 
 ---
 
