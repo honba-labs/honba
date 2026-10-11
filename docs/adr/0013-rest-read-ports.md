@@ -6,7 +6,7 @@ Date: 2026-10-06. Status: accepted. Roadmap story: E11-S3 (parts 1 and 2).
 
 `honba-api-rest` answered `GET /instruments` and `GET /bars/{id}` with empty
 placeholders and had an empty `AppState`. Wiring it to real data must not let
-`honba-data` (Parquet, files) leak into handlers, and must not give the REST
+`honba-feed` (Parquet, files) leak into handlers, and must not give the REST
 crate its own idea of what an instrument or a bar query is.
 
 ## Decision
@@ -17,17 +17,17 @@ crate its own idea of what an instrument or a bar query is.
   construction) answers `GET /bars/{id}`. Both are `Send + Sync`, held as
   `Arc<dyn ...>`.
 - **The adapter is `honba_data::DatasetReader`** (L5 -> L2, an inward edge,
-  added to `ALLOWED_PROD["honba-data"]`). It serves an immutable `Dataset`, so
+  added to `ALLOWED_PROD["honba-feed"]`). It serves an immutable `Dataset`, so
   answers are deterministic: instruments in `InstrumentId` order, bars in
   ascending `ts_event`.
 - **Query parsing and wire mapping are pure and live in `honba-api` (L6)**:
   `BarsQuery::resolve`, `InstrumentsQuery::matches`, `parse_instrument_id`,
   `instrument_json`. Every transport (REST now, MCP/WASM later) rejects a bad
   query with the same `validation_invalid_request` detail naming `context.field`.
-- **`honba-api-rest` depends on `honba-ports` for the traits and on `honba-data`
+- **`honba-api-rest` depends on `honba-ports` for the traits and on `honba-feed`
   only in `AppState`'s constructors** (`from_reader`, `from_parquet_dir`). That
   is the composition root, which the layering allows (`honba-api-rest` was
-  already permitted `honba-data`; `honba-ports` is added). Handlers see ports only.
+  already permitted `honba-feed`; `honba-ports` is added). Handlers see ports only.
 - **Quotes and depth are two more read ports in `honba-ports`**: `QuoteReader`
   (`read_quote(id, as_of) -> Option<QuoteTick>`, inclusive `as_of`, `None` = latest) and
   `DepthReader` (`read_depth(id, levels) -> DepthSnapshot`). They are separate from `BarReader` because a

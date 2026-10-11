@@ -5,7 +5,7 @@ Accepted
 
 ## Context
 Unit tests were spread across inline `#[cfg(test)] mod tests { ... }` blocks at the bottom of implementation files
-(engine, entities, messages, strategy, py), while `honba-data` already kept them in `src/tests/`. Six crates (sim,
+(engine, entities, messages, strategy, py), while `honba-feed` already kept them in `src/tests/`. Six crates (sim,
 cli, testing, indicators, analytics, market) had no unit tests, and sim, py and cli had no integration tests. Test
 data (`InstrumentId::new("X", Venue::new("NSE"))`, ad-hoc bar builders) was copy-pasted across files.
 

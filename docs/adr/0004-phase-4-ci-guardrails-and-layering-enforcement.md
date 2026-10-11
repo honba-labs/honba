@@ -14,7 +14,7 @@ L3  honba-engine
 L4  honba-sim
     honba-strategy
 L5  honba-analytics
-    honba-data
+    honba-feed
 L6  honba-testing (dev fixtures)
 L7  honba-py (cdylib)
     honba-cli (binary)

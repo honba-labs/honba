@@ -57,7 +57,7 @@ Everything a run needs *as a wire type* already exists; nothing exists *as a ser
   bound in `python/src/honba/ai/mcp/tools.py:51`), and nothing to poll or read a journal.
 - Layering: `scripts/dependency_graph.py` enforces `ALLOWED_PROD`/`ALLOWED_DEV` per crate and fails
   on an unregistered crate (`scripts/dependency_graph.py:209`). `ALLOWED_PROD["honba-api-rest"]` is
-  `honba-api`, `honba-messages`, `honba-entities`, `honba-data`, `honba-market`, `honba-ports`
+  `honba-api`, `honba-messages`, `honba-entities`, `honba-feed`, `honba-market`, `honba-ports`
   (its `Cargo.toml` uses all but `honba-market`); `ALLOWED_DEV["honba-api-rest"]` is
   `{honba-testing}`. `tempfile` is not a dependency of any crate.
 
