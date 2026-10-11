@@ -87,6 +87,39 @@ _SUPPORTED: frozenset[Capability] = frozenset(
 )
 
 
+def _load_instruments_from_store() -> tuple[Instrument, ...]:
+    """Dynamically load instruments from honba-data lakehouse (DuckDB or catalog)."""
+    try:
+        from honba.screener.store import find_data_root
+
+        data_root = find_data_root()
+        db_path = data_root / "fundamentals.duckdb"
+        if db_path.is_file():
+            import duckdb
+
+            with duckdb.connect(str(db_path), read_only=True) as con:
+                rows = con.execute("SELECT symbol FROM companies ORDER BY symbol").fetchall()
+                if rows:
+                    insts = list(_INSTRUMENTS)
+                    seen = {i.instrument_id for i in insts}
+                    for r in rows:
+                        iid = InstrumentId(r[0], "NSE")
+                        if iid not in seen:
+                            insts.append(
+                                Instrument(
+                                    iid,
+                                    InstrumentKind.EQUITY,
+                                    lot_size=1.0,
+                                    tick_size=0.05,
+                                )
+                            )
+                            seen.add(iid)
+                    return tuple(insts)
+    except (OSError, RuntimeError, ValueError, KeyError):
+        pass
+    return _INSTRUMENTS
+
+
 class FakeAdapter(Adapter):
     """An adapter that trades a fixed price series against an in-memory book.
 
@@ -111,7 +144,10 @@ class FakeAdapter(Adapter):
         self._opening_balance = opening_balance
         self._cash = opening_balance
         self._bars_per_request = bars_per_request
-        self._instruments = {i.instrument_id: i for i in instruments or _INSTRUMENTS}
+        chosen_instruments = (
+            instruments if instruments is not None else _load_instruments_from_store()
+        )
+        self._instruments = {i.instrument_id: i for i in chosen_instruments}
         self._cursors = {iid: 0 for iid in self._instruments if iid in _SERIES}
         self._connected = False
         self._ts = _EPOCH_NS
@@ -159,12 +195,12 @@ class FakeAdapter(Adapter):
 
     async def instruments(self) -> list[Instrument]:
         self.require_connected()
-        return list(_INSTRUMENTS)
+        return list(self._instruments.values())
 
     async def search_instruments(self, query: str) -> list[Instrument]:
         self.require_connected()
         needle = query.strip().upper()
-        return [i for i in _INSTRUMENTS if needle in i.instrument_id.symbol]
+        return [i for i in self._instruments.values() if needle in i.instrument_id.symbol]
 
     async def quote(self, instrument_id: InstrumentId) -> QuoteTick:
         self.require_connected()
@@ -194,6 +230,26 @@ class FakeAdapter(Adapter):
         if timeframe not in {"1m", "5m", "1d"}:
             raise AdapterError(f"fake adapter does not serve timeframe {timeframe!r}")
         self._require_instrument(instrument_id)
+        if timeframe.lower() == "1d":
+            try:
+                from honba.screener.store import DateInterval, ParquetBarStore
+
+                store = ParquetBarStore()
+                start_date = start.date() if isinstance(start, dt.datetime) else start
+                end_date = end.date() if isinstance(end, dt.datetime) else end
+                real_bars = store.read(instrument_id, "1D", DateInterval(start_date, end_date))
+                if real_bars:
+                    start_ns = int(start.timestamp() * 1e9)
+                    end_ns = int(end.timestamp() * 1e9)
+                    matching = [b for b in real_bars if start_ns <= b.ts < end_ns]
+                    if matching:
+                        return (
+                            matching[: self._bars_per_request]
+                            if self._bars_per_request
+                            else matching
+                        )
+            except (OSError, RuntimeError, ValueError, KeyError):
+                pass
         if instrument_id not in _SERIES:
             # For injected instruments, return one bar at the touch price
             if instrument_id not in self._instruments:
@@ -474,6 +530,23 @@ class FakeAdapter(Adapter):
         if instrument_id in _SERIES:
             return self._series(instrument_id)[self._cursor(instrument_id) % 4]
         if instrument_id in self._instruments:
+            try:
+                from honba.screener.store import DateInterval, ParquetBarStore
+
+                store = ParquetBarStore()
+                now_date = dt.date(2026, 1, 1)
+                bars = store.read(
+                    instrument_id,
+                    "1D",
+                    DateInterval(
+                        now_date - dt.timedelta(days=90), now_date + dt.timedelta(days=365)
+                    ),
+                )
+                if bars:
+                    close = bars[-1].close
+                    return (round(close - 0.05, 2), round(close + 0.05, 2))
+            except (OSError, RuntimeError, ValueError, KeyError):
+                pass
             return (10.0, 10.0)
         raise AdapterError(f"unknown instrument {instrument_id}")
 

@@ -52,15 +52,17 @@ def find_data_root(start_path: Path | None = None) -> Path:
 
     1. ``$HONBA_DATA_DIR`` (:data:`DATA_DIR_ENV`), when set and non-empty;
     2. the nearest project root at or above ``start_path`` (default: cwd) that has
-       ``honba/data``, or ``data`` next to ``crates/``, ``Cargo.toml`` or ``pyproject.toml``;
-    3. ``<start_path>/data`` (it is not created; writers create it lazily).
+       ``honba-data/data``, ``honba/data``, or ``data`` next to ``crates/``, ``Cargo.toml`` or ``pyproject.toml``;
+    3. sibling ``honba-data/data`` if within multi-repo workspace (honba-labs);
+    4. ``<start_path>/data`` (it is not created; writers create it lazily).
     """
     env = os.environ.get(DATA_DIR_ENV, "").strip()
     if env:
         return Path(env).expanduser().resolve()
     cur = (start_path or Path.cwd()).resolve()
     for p in [cur, *cur.parents]:
-        # Check if this directory is the repo root containing 'data' or 'honba/data'
+        if (p / "honba-data" / "data").is_dir():
+            return (p / "honba-data" / "data").resolve()
         if (p / "honba" / "data").is_dir():
             return (p / "honba" / "data").resolve()
         if (p / "data").is_dir() and (
@@ -69,6 +71,8 @@ def find_data_root(start_path: Path | None = None) -> Path:
             or (p / "pyproject.toml").is_file()
         ):
             return (p / "data").resolve()
+    if (cur.parent / "honba-data" / "data").is_dir():
+        return (cur.parent / "honba-data" / "data").resolve()
     return cur / "data"
 
 

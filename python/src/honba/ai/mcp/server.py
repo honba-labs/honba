@@ -103,8 +103,8 @@ def build_server(gateway: McpGateway) -> Any:
         RuntimeError: the ``mcp`` package is not installed.
     """
     try:
-        from mcp.server import (
-            Server,  # pyright: ignore[reportMissingImports,reportAttributeAccessIssue]
+        from mcp.server import (  # pyright: ignore[reportMissingImports]
+            Server,  # pyright: ignore[reportAttributeAccessIssue]
         )
     except ImportError as exc:  # pragma: no cover - depends on the optional extra
         raise RuntimeError(
