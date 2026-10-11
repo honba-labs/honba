@@ -114,10 +114,18 @@ def tokenize(text: str) -> list[Token]:
             continue
 
         one = text[i]
-        if one in (">", "<", "=", "(", ")", ","):
+        if one in (">", "<", "=", "(", ")"):
             tokens.append(Token("SYMBOL", one, i))
             i += 1
             continue
+
+        if one == ",":
+            if i > 0 and text[i - 1].isdigit() and i + 1 < n and text[i + 1].isdigit():
+                pass
+            else:
+                tokens.append(Token("SYMBOL", one, i))
+                i += 1
+                continue
 
         # Match word or number or punctuation chunk
         # If quoted string:
@@ -138,7 +146,11 @@ def tokenize(text: str) -> list[Token]:
         while (
             i < n
             and not text[i].isspace()
-            and text[i] not in (">", "<", "=", "(", ")", ",", '"', "'")
+            and text[i] not in (">", "<", "=", "(", ")", '"', "'")
+            and not (
+                text[i] == ","
+                and not (i > 0 and text[i - 1].isdigit() and i + 1 < n and text[i + 1].isdigit())
+            )
         ):
             # Special check: stop if >=, <=, != is ahead
             if text[i : i + 2] in (">=", "<=", "!="):
@@ -287,6 +299,7 @@ class Parser:
                 "like",
                 "contains",
                 "near",
+                "exceeding",
                 ">",
                 ">=",
                 "<",
@@ -380,7 +393,7 @@ class Parser:
             self.advance()
             vals = self._parse_comma_values()
             return FilterOp.NOT_IN, vals
-        if phrase == "in":
+        if phrase == "in" and self.peek(1).value.lower() != "excess":
             self.advance()
             vals = self._parse_comma_values()
             return FilterOp.IN, vals
@@ -482,7 +495,13 @@ class Parser:
             self.advance()
             return FilterOp.NEQ
 
-        if curr in ("above", "over", ">"):
+        if three in ("in excess of",):
+            self.advance()
+            self.advance()
+            self.advance()
+            return FilterOp.GT
+
+        if curr in ("above", "over", ">", "exceeding"):
             self.advance()
             return FilterOp.GT
         if curr == ">=":

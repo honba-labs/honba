@@ -277,3 +277,19 @@ def test_error_caret_reporting(catalog):
     err = str(exc_info.value)
     assert "^" in err
     assert "Cr" in err
+
+
+def test_natural_language_market_cap_and_comma_numbers(catalog):
+    queries = [
+        "market_cap > 25000Cr",
+        "market cap > 25,000 Cr",
+        "market cap exceeding 25000 Cr",
+        "market cap in excess of 25000 Cr",
+        "mcap > 25000Cr",
+    ]
+    for q in queries:
+        group = parse_filters(q, catalog=catalog, market="india")
+        pred = group.items[0]
+        assert pred.key == "market_cap_basic"
+        assert pred.op == FilterOp.GT
+        assert pred.value == pytest.approx(250_000_000_000.0)

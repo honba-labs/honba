@@ -87,6 +87,9 @@ def parse_quantity(text: str, market: str | None = None) -> Quantity:
             remaining = remaining[len(matched) :].strip()
             break
 
+    # Strip digit separators (thousands commas like "25,000" or Indian numbering "25,00,000")
+    remaining = re.sub(r"(?<=\d),(?=\d)", "", remaining)
+
     # Extract number and suffix
     num_match = re.match(r"^([\+\-]?(?:\d+(?:\.\d*)?|\.\d+))\s*(.*)$", remaining)
     if not num_match:
