@@ -62,6 +62,19 @@ pub(crate) struct RunsArgs {
     pub keep_days: u64,
 }
 
+/// Auth configuration (ADR 0023, E11-S8).
+#[derive(clap::Args, Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AuthArgs {
+    /// Path to tokens.toml file. When provided, Bearer token auth is enabled.
+    /// The file is hot-reloaded on changes.
+    #[arg(long)]
+    pub tokens_file: Option<PathBuf>,
+    /// Path to audit log file. If provided, auth decisions are logged here (NDJSON).
+    /// Defaults to `audit.log` in the journals directory if `--tokens-file` is set.
+    #[arg(long)]
+    pub audit_log_file: Option<PathBuf>,
+}
+
 impl RunsArgs {
     /// The run-service tunables these flags spell.
     pub(crate) fn service_config(&self) -> RunServiceConfig {
@@ -90,11 +103,23 @@ pub fn run(
     cors_origins: &[String],
     trading_state: TradingState,
     runs: &RunsArgs,
+    auth: &AuthArgs,
 ) -> Result<()> {
-    let config = ApiConfig::default()
+    let mut config = ApiConfig::default()
         .with_cors_origins(cors_origins)
         .map_err(|e| anyhow::anyhow!(e))
         .context("invalid --cors-origin (cors)")?;
+
+    if let Some(tokens_file) = &auth.tokens_file {
+        config.auth.tokens_file = Some(tokens_file.clone());
+        if let Some(audit_log_file) = &auth.audit_log_file {
+            config.auth.audit_log_path = Some(audit_log_file.clone());
+        } else if auth.tokens_file.is_some() {
+            // Default audit log next to journals dir
+            config.auth.audit_log_path = Some(runs.journals_dir.join("audit.log"));
+        }
+    }
+
     let state = AppState::from_parquet_dir(data_dir)
         .with_context(|| format!("loading data directory {}", data_dir.display()))?
         .with_trading_state(trading_state)
@@ -109,8 +134,11 @@ pub fn run(
         let listener = tokio::net::TcpListener::bind(addr)
             .await
             .with_context(|| format!("binding {addr}"))?;
-        if let Some(warning) = non_loopback_warning(addr) {
-            eprintln!("{warning}");
+        // Only warn about non-loopback if auth is NOT enabled
+        if auth.tokens_file.is_none() {
+            if let Some(warning) = non_loopback_warning(addr) {
+                eprintln!("{warning}");
+            }
         }
         println!("listening on http://{}", listener.local_addr()?);
         std::io::stdout().flush()?;

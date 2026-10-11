@@ -1,0 +1,452 @@
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
+
+use axum::{
+    extract::{Request, State},
+    http::{header::AUTHORIZATION, HeaderMap, StatusCode},
+    middleware::Next,
+    response::{IntoResponse, Json, Response},
+    Router,
+};
+use honba_api::ApiResponse;
+use honba_messages::{ErrorCode, ErrorDetail, ResponseEnvelope};
+use serde::{Deserialize, Serialize};
+use tracing::info;
+/// Token info returned by successful validation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenInfo {
+    /// Unique identifier for the token (first 8 chars of SHA-256)
+    pub token_id: String,
+    /// Scopes granted to this token (e.g., "read:market", "write:orders", "research")
+    pub scopes: Vec<String>,
+}
+
+/// Auth error codes (matching Python AuthErrorCode)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthErrorCode {
+    MissingToken,
+    InvalidToken,
+    Expired,
+    Forbidden,
+}
+
+impl std::fmt::Display for AuthErrorCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AuthErrorCode::MissingToken => write!(f, "missing_token"),
+            AuthErrorCode::InvalidToken => write!(f, "invalid_token"),
+            AuthErrorCode::Expired => write!(f, "expired"),
+            AuthErrorCode::Forbidden => write!(f, "forbidden"),
+        }
+    }
+}
+
+/// Auth configuration
+#[derive(Debug, Clone, Default)]
+pub struct AuthConfig {
+    /// Path to tokens.toml file; when Some, Bearer token auth is enabled
+    pub tokens_file: Option<PathBuf>,
+    /// Path to audit log file; when Some, auth decisions are logged here
+    pub audit_log_path: Option<PathBuf>,
+}
+
+/// Token record as stored in the token file
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
+pub struct TokenRecord {
+    token_id: String,
+    token_hash: String, // "sha256:<hex>"
+    scopes: Vec<String>,
+    label: String,
+    expires_at: Option<String>,
+    created_at: String,
+}
+
+impl TokenRecord {
+    fn matches_token(&self, token: &str) -> bool {
+        if token.is_empty() {
+            return false;
+        }
+        let computed = sha256_hex(token);
+        let expected = self
+            .token_hash
+            .strip_prefix("sha256:")
+            .unwrap_or(&self.token_hash);
+        computed == expected
+    }
+
+    fn is_expired(&self) -> bool {
+        if let Some(expires_at) = &self.expires_at {
+            if let Ok(expiry) = chrono::DateTime::parse_from_rfc3339(expires_at) {
+                return chrono::Utc::now() >= expiry;
+            }
+            true
+        } else {
+            false
+        }
+    }
+}
+
+/// File-backed token store
+#[derive(Debug, Clone)]
+pub struct FileTokenStore {
+    path: PathBuf,
+    records: Arc<RwLock<Vec<TokenRecord>>>,
+    last_mtime: Arc<RwLock<std::time::SystemTime>>,
+}
+
+impl FileTokenStore {
+    /// Creates a new file-backed token store and loads the initial token file.
+    pub fn new(path: PathBuf) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let store = Self {
+            path,
+            records: Arc::new(RwLock::new(Vec::new())),
+            last_mtime: Arc::new(RwLock::new(std::time::SystemTime::UNIX_EPOCH)),
+        };
+        store.reload()?;
+        Ok(store)
+    }
+
+    fn reload(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let mtime = std::fs::metadata(&self.path)?.modified()?;
+        {
+            let mut last = self.last_mtime.write().unwrap();
+            if *last == mtime {
+                return Ok(());
+            }
+            *last = mtime;
+        }
+
+        let content = std::fs::read_to_string(&self.path)?;
+        let data: HashMap<String, Vec<TokenRecord>> = toml::from_str(&content)?;
+        let records = data.get("tokens").cloned().unwrap_or_default();
+        info!(
+            "Loaded {} token(s) from {}",
+            records.len(),
+            self.path.display()
+        );
+        *self.records.write().unwrap() = records;
+        Ok(())
+    }
+
+    /// Validates a plain token and returns its info.
+    ///
+    /// Returns `Ok(TokenInfo)` on success, or an `AuthErrorCode` on failure
+    /// (missing, invalid, or expired token).
+    pub fn validate(&self, token: &str) -> Result<TokenInfo, AuthErrorCode> {
+        self.reload().ok(); // Best effort
+
+        if token.is_empty() {
+            return Err(AuthErrorCode::MissingToken);
+        }
+
+        let records = self.records.read().unwrap();
+        for record in records.iter() {
+            if record.matches_token(token) {
+                if record.is_expired() {
+                    return Err(AuthErrorCode::Expired);
+                }
+                return Ok(TokenInfo {
+                    token_id: record.token_id.clone(),
+                    scopes: record.scopes.clone(),
+                });
+            }
+        }
+        Err(AuthErrorCode::InvalidToken)
+    }
+}
+
+/// The auth layer that wraps a token store
+#[derive(Clone)]
+pub struct AuthLayer {
+    store: FileTokenStore,
+    audit_log_path: Option<PathBuf>,
+}
+
+impl AuthLayer {
+    /// Creates a new auth layer with the given token store and audit log path.
+    pub fn new(store: FileTokenStore, audit_log_path: Option<PathBuf>) -> Self {
+        Self {
+            store,
+            audit_log_path,
+        }
+    }
+
+    fn required_scope(_method: &str, path: &str) -> Option<&'static str> {
+        // Public routes
+        if matches!(path, "/capabilities" | "/health" | "/schema") {
+            return None;
+        }
+
+        // Prefix matches
+        if path.starts_with("/instruments")
+            || path.starts_with("/quotes")
+            || path.starts_with("/bars/")
+            || path.starts_with("/depth/")
+        {
+            return Some("read:market");
+        }
+        if path == "/screener/scan" {
+            return Some("read:market");
+        }
+        if path == "/strategies" || path == "/strategies/verify" {
+            return Some("research");
+        }
+        if path.starts_with("/backtests")
+            || path.starts_with("/sweeps")
+            || path.starts_with("/journals/")
+        {
+            return Some("research");
+        }
+        if path == "/orders" || path.starts_with("/orders/") || path == "/positions/close" {
+            return Some("write:orders");
+        }
+        if path.starts_with("/approval/") {
+            return Some("write:orders");
+        }
+        None
+    }
+}
+
+/// Audit log entry for auth decisions
+#[derive(Debug)]
+struct AuditEntry<'a> {
+    token_id: Option<&'a str>,
+    route: &'a str,
+    method: &'a str,
+    decision: &'a str,
+    reason: Option<&'a str>,
+    required_scope: Option<&'a str>,
+    token_scopes: Option<&'a [String]>,
+    client_ip: Option<&'a str>,
+}
+
+impl AuthLayer {
+    fn audit(&self, entry: AuditEntry<'_>) {
+        if let Some(audit_path) = &self.audit_log_path {
+            let json = serde_json::json!({
+                "ts": chrono::Utc::now().to_rfc3339(),
+                "event": "auth.decision",
+                "token_id": entry.token_id.unwrap_or("unknown"),
+                "route": entry.route,
+                "method": entry.method,
+                "decision": entry.decision,
+                "reason": entry.reason,
+                "required_scope": entry.required_scope,
+                "token_scopes": entry.token_scopes,
+                "client_ip": entry.client_ip,
+            });
+            let line = serde_json::to_string(&json).unwrap();
+            let _ = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(audit_path)
+                .and_then(|mut f| {
+                    std::io::Write::write_all(&mut f, format!("{}\n", line).as_bytes())
+                });
+        }
+    }
+
+    /// Extract token info from request, enforcing scope.
+    /// Returns None if route is public.
+    pub async fn extract(
+        &self,
+        method: &str,
+        path: &str,
+        headers: &HeaderMap,
+        client_ip: Option<&str>,
+    ) -> Result<Option<TokenInfo>, (StatusCode, Json<ResponseEnvelope<serde_json::Value>>)> {
+        let required = Self::required_scope(method, path);
+        if required.is_none() {
+            return Ok(None);
+        }
+        let required = required.unwrap();
+
+        let auth_header = headers
+            .get(AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.strip_prefix("Bearer "))
+            .map(|s| s.trim());
+
+        let token = match auth_header {
+            Some(t) if !t.is_empty() => t,
+            _ => {
+                self.audit(AuditEntry {
+                    token_id: None,
+                    route: path,
+                    method,
+                    decision: "denied",
+                    reason: Some("missing_token"),
+                    required_scope: Some(required),
+                    token_scopes: None,
+                    client_ip,
+                });
+                let detail = ErrorDetail::new(
+                    ErrorCode::Unauthorized,
+                    "Authorization header missing or not Bearer",
+                );
+                return Err((
+                    StatusCode::UNAUTHORIZED,
+                    Json(ResponseEnvelope::error(detail)),
+                ));
+            }
+        };
+
+        match self.store.validate(token) {
+            Ok(info) => {
+                if !info.scopes.iter().any(|s| s == required) {
+                    self.audit(AuditEntry {
+                        token_id: Some(&info.token_id),
+                        route: path,
+                        method,
+                        decision: "denied",
+                        reason: Some("forbidden"),
+                        required_scope: Some(required),
+                        token_scopes: Some(&info.scopes),
+                        client_ip,
+                    });
+                    let detail = ErrorDetail::new(
+                        ErrorCode::Forbidden,
+                        format!("Token does not have required scope: {}", required),
+                    )
+                    .with_context(serde_json::json!({
+                        "required_scope": required,
+                        "token_scopes": info.scopes,
+                        "token_id": info.token_id,
+                    }));
+                    return Err((StatusCode::FORBIDDEN, Json(ResponseEnvelope::error(detail))));
+                }
+
+                self.audit(AuditEntry {
+                    token_id: Some(&info.token_id),
+                    route: path,
+                    method,
+                    decision: "granted",
+                    reason: None,
+                    required_scope: Some(required),
+                    token_scopes: Some(&info.scopes),
+                    client_ip,
+                });
+                Ok(Some(info))
+            }
+            Err(code) => {
+                let (reason, status) = match code {
+                    AuthErrorCode::Expired => ("expired", StatusCode::UNAUTHORIZED),
+                    AuthErrorCode::InvalidToken => ("invalid_token", StatusCode::UNAUTHORIZED),
+                    _ => ("invalid_token", StatusCode::UNAUTHORIZED),
+                };
+                self.audit(AuditEntry {
+                    token_id: None,
+                    route: path,
+                    method,
+                    decision: "denied",
+                    reason: Some(reason),
+                    required_scope: Some(required),
+                    token_scopes: None,
+                    client_ip,
+                });
+                let detail = ErrorDetail::new(
+                    ErrorCode::Unauthorized,
+                    format!("Token validation failed: {}", code),
+                );
+                Err((status, Json(ResponseEnvelope::error(detail))))
+            }
+        }
+    }
+}
+
+/// Extract client IP from request
+fn client_ip(req: &Request) -> Option<String> {
+    req.headers()
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.split(',').next())
+        .map(|s| s.trim().to_string())
+        .or_else(|| {
+            req.extensions()
+                .get::<std::net::SocketAddr>()
+                .map(|addr| addr.ip().to_string())
+        })
+}
+
+/// Axum middleware that enforces auth
+pub async fn auth_middleware(
+    State(auth_layer): State<Arc<AuthLayer>>,
+    req: Request,
+    next: Next,
+) -> Response {
+    let method = req.method().as_str().to_string();
+    let path = req.uri().path().to_string();
+    let headers = req.headers().clone();
+    let ip = client_ip(&req);
+
+    // Check auth before proceeding
+    match auth_layer
+        .extract(&method, &path, &headers, ip.as_deref())
+        .await
+    {
+        Ok(Some(token_info)) => {
+            // Insert token info into extensions for handlers that need it
+            let mut req = req;
+            req.extensions_mut().insert(token_info);
+            next.run(req).await
+        }
+        Ok(None) => {
+            // Public route
+            next.run(req).await
+        }
+        Err((status, json)) => (status, json).into_response(),
+    }
+}
+
+/// Extension trait to add auth to router
+pub trait AuthRouterExt {
+    fn with_auth(self, auth_layer: Arc<AuthLayer>) -> Self;
+}
+
+impl<S: Clone + Send + Sync + 'static> AuthRouterExt for Router<S> {
+    fn with_auth(self, auth_layer: Arc<AuthLayer>) -> Self {
+        self.layer(axum::middleware::from_fn_with_state(
+            auth_layer,
+            auth_middleware,
+        ))
+    }
+}
+
+fn sha256_hex(input: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(input.as_bytes());
+    hex::encode(hasher.finalize())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sha256_hex() {
+        let hash = sha256_hex("test");
+        assert_eq!(hash.len(), 64);
+    }
+
+    #[test]
+    fn test_required_scope() {
+        assert_eq!(AuthLayer::required_scope("GET", "/capabilities"), None);
+        assert_eq!(
+            AuthLayer::required_scope("GET", "/instruments"),
+            Some("read:market")
+        );
+        assert_eq!(
+            AuthLayer::required_scope("GET", "/bars/ABC"),
+            Some("read:market")
+        );
+        assert_eq!(
+            AuthLayer::required_scope("POST", "/orders"),
+            Some("write:orders")
+        );
+        assert_eq!(AuthLayer::required_scope("GET", "/unknown"), None);
+    }
+}

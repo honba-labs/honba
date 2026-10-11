@@ -7,6 +7,7 @@
 //! Provides read-only endpoints as specified in Phase 2 (E11-S3, E11-S4).
 //! All responses are wrapped in the versioned envelope from `honba-api`.
 
+use crate::auth::AuthRouterExt;
 use axum::http::{HeaderValue, Method};
 use axum::{
     async_trait,
@@ -29,6 +30,7 @@ use tower_http::{
 };
 
 mod approval;
+mod auth;
 mod dispatch;
 mod executor;
 mod journal;
@@ -45,6 +47,7 @@ mod streams;
 mod trades;
 
 pub use approval::ApprovalQueue;
+pub use auth::{AuthConfig, AuthLayer, FileTokenStore, TokenInfo};
 pub use dispatch::{build_target, dispatch, dispatch_stream, DispatchError};
 pub use executor::BacktestExecutor;
 pub use honba_api::JournalWriter;
@@ -96,13 +99,16 @@ where
     }
 }
 
-/// Server configuration beyond the data: today only the CORS allow-list.
+/// Server configuration beyond the data: today only the CORS allow-list and auth.
 ///
 /// The default sends no CORS headers at all, so browsers refuse cross-origin reads; origins
 /// are opt-in, one explicit entry each (never a wildcard).
+/// Auth is optional: when `tokens_file` is provided, Bearer token auth is enforced.
 #[derive(Clone, Debug, Default)]
 pub struct ApiConfig {
     cors_origins: Vec<HeaderValue>,
+    /// Auth configuration; when `tokens_file` is Some, Bearer token auth is enforced
+    pub auth: AuthConfig,
 }
 
 impl ApiConfig {
@@ -144,7 +150,7 @@ pub fn api_router_with(state: AppState) -> Router {
 /// Create the API router serving `state` under `config`.
 pub fn api_router_with_config(state: AppState, config: &ApiConfig) -> Router {
     let state = Arc::new(state);
-    Router::new()
+    let router = Router::new()
         .route("/capabilities", get(get_capabilities))
         .route("/health", get(get_health))
         .route("/schema", get(get_schema))
@@ -175,7 +181,17 @@ pub fn api_router_with_config(state: AppState, config: &ApiConfig) -> Router {
         .with_state(state)
         .layer(CompressionLayer::new())
         .layer(cors_layer(config))
-        .layer(TraceLayer::new_for_http())
+        .layer(TraceLayer::new_for_http());
+
+    // Add auth middleware if configured
+    if let Some(tokens_file) = &config.auth.tokens_file {
+        let audit_log_path = config.auth.audit_log_path.clone();
+        let store = FileTokenStore::new(tokens_file.clone()).expect("failed to load token file");
+        let auth_layer = Arc::new(AuthLayer::new(store, audit_log_path));
+        router.with_auth(auth_layer)
+    } else {
+        router
+    }
 }
 
 /// An unknown route is a 404 `not_found` envelope, never an empty body.
@@ -231,7 +247,8 @@ pub async fn serve_with_config(
     config: &ApiConfig,
     shutdown: impl std::future::Future<Output = ()> + Send + 'static,
 ) -> std::io::Result<()> {
-    axum::serve(listener, api_router_with_config(state, config))
+    let router = api_router_with_config(state, config);
+    axum::serve(listener, router)
         .with_graceful_shutdown(shutdown)
         .await
 }
