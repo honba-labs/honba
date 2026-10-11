@@ -310,7 +310,7 @@ fully inside the covered range must make no external call.
 
 Behind a `BarStore` port, so the engine is an implementation detail. Recommended default:
 
-- **Bars:** the Parquet catalog already in `honba-data`, as append-only immutable segments partitioned by
+- **Bars:** the Parquet catalog already in `honba-feed`, as append-only immutable segments partitioned by
   bar spec/symbol/year. Reads dedupe on `(venue, symbol, bar spec, ts_event)`.
 - **Coverage ledger:** a small transactional table in the same embedded SQL store as the metric facts (section 14.3;
   DuckDB by default, which also reads the Parquet bars natively). One row per fetched range: `venue`, `symbol`, the bar

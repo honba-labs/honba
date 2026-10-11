@@ -180,7 +180,7 @@ use honba_api::{
     RunStatus,
 };
 use honba_api_rest::{BacktestExecutor, RunService, RunServiceConfig, StrategyRegistry};
-use honba_data::{ColumnarSliceBuilder, Dataset, DatasetReader};
+use honba_feed::{ColumnarSliceBuilder, Dataset, DatasetReader};
 use honba_messages::{BarAggregation, BarSpecification, PriceType};
 
 /// 2024-01-01T00:00:00Z in nanoseconds.

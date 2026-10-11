@@ -8,8 +8,8 @@ use std::sync::Arc;
 
 use arrow::array::{ArrayRef, Float64Array, Int64Array};
 use arrow::record_batch::RecordBatch;
-use honba_data::import::parquet_source::bar_schema;
-use honba_data::{DatasetReader, ReaderError};
+use honba_feed::import::parquet_source::bar_schema;
+use honba_feed::{DatasetReader, ReaderError};
 use honba_messages::{
     BarAggregation, BarSpecification, Exchange, InstrumentId, PriceType, UnixNanos,
 };

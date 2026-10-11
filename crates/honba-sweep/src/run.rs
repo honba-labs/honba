@@ -12,7 +12,7 @@
 
 use std::sync::Arc;
 
-use honba_data::Dataset;
+use honba_feed::Dataset;
 use tokio::task::JoinSet;
 
 use crate::error::{Result, SweepError};
@@ -36,7 +36,7 @@ use crate::trial::{guard_trial, run_trial_with, TrialConfig};
 ///
 /// ```
 /// use std::sync::Arc;
-/// use honba_data::{ColumnarSliceBuilder, Dataset};
+/// use honba_feed::{ColumnarSliceBuilder, Dataset};
 /// use honba_messages::{BarAggregation, BarSpecification, Exchange, InstrumentId, PriceType, UnixNanos};
 /// use honba_sweep::{SharpeFitness, StrategySpec, SweepPlan, TrialParams};
 ///

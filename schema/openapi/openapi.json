@@ -630,7 +630,7 @@
         "oneOf": [
           {
             "additionalProperties": false,
-            "description": "Parquet files under a local root, read through `honba-data`.",
+            "description": "Parquet files under a local root, read through `honba-feed`.",
             "properties": {
               "local": {
                 "additionalProperties": false,

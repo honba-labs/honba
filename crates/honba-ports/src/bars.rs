@@ -66,7 +66,7 @@ impl BarRequest {
 /// Read-only access to stored historical bars.
 ///
 /// This is the query side of market data: the REST and MCP surfaces read through it, and the
-/// implementation (a Parquet catalogue in `honba-data`, a vendor history API, a cache) stays at
+/// implementation (a Parquet catalogue in `honba-feed`, a vendor history API, a cache) stays at
 /// the edge. It only reads, so the port is `Send + Sync` and one instance is shared behind an
 /// `Arc`.
 #[async_trait]

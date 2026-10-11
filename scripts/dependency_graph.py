@@ -23,7 +23,7 @@ import tomllib
 # L2: honba-market, honba-ports, honba-risk
 # L3: honba-engine, honba-indicators, honba-async
 # L4: honba-sim, honba-strategy
-# L5: honba-analytics, honba-data, honba-sweep, honba-codegen, honba-config
+# L5: honba-analytics, honba-feed, honba-sweep, honba-codegen, honba-config
 # L6: honba-api, honba-testing
 # L7: honba-py, honba-cli, honba-api-rest, honba-api-wasm
 # Brokers are not crates: they live in the honba-adapters repo (Python).
@@ -48,7 +48,7 @@ ALLOWED_PROD = {
         "honba-risk",  # StrategyRunner gate
     },
     "honba-analytics": {"honba-messages", "honba-entities"},
-    "honba-data": {
+    "honba-feed": {
         "honba-messages",
         "honba-entities",
         "honba-engine",
@@ -61,7 +61,7 @@ ALLOWED_PROD = {
         "honba-engine",
         "honba-strategy",
         "honba-sim",
-        "honba-data",
+        "honba-feed",
         "honba-analytics",
     },
     "honba-config": {"honba-messages", "honba-strategy", "honba-risk"},  # RiskLimits re-export
@@ -98,7 +98,7 @@ ALLOWED_PROD = {
         "honba-market",
         "honba-engine",
         "honba-analytics",
-        "honba-data",
+        "honba-feed",
         "honba-strategy",
         "honba-testing",
         "honba-sim",
@@ -111,7 +111,7 @@ ALLOWED_PROD = {
         "honba-api",
         "honba-messages",
         "honba-entities",
-        "honba-data",
+        "honba-feed",
         "honba-market",
         "honba-ports",
         "honba-risk",  # write-route gate
@@ -143,14 +143,14 @@ ALLOWED_DEV = {
     "honba-sim": set(),
     "honba-strategy": {
         "honba-analytics",
-        "honba-data",
+        "honba-feed",
         "honba-market",  # tests name InstrumentRules for a RulesSource
         "honba-sim",
         "honba-testing",
     },
     "honba-testing": set(),
     "honba-analytics": set(),
-    "honba-data": set(),
+    "honba-feed": set(),
     "honba-codegen": set(),
     "honba-config": set(),
     "honba-api": set(),
@@ -172,7 +172,7 @@ CORE_CRATES = {
     "honba-sim",
     "honba-strategy",
     "honba-analytics",
-    "honba-data",
+    "honba-feed",
     "honba-testing",
 }
 
@@ -195,7 +195,7 @@ SYNC_KERNEL_CRATES = {
 ASYNC_BOUNDARY_CRATES = {
     "honba-async",
     "honba-sweep",
-    "honba-data",
+    "honba-feed",
     "honba-testing",
     "honba-py",
     "honba-cli",

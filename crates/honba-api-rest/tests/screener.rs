@@ -5,7 +5,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use axum::Router;
 use honba_api_rest::{api_router_with, build_target, AppState};
-use honba_data::{ColumnarSliceBuilder, Dataset, DatasetReader};
+use honba_feed::{ColumnarSliceBuilder, Dataset, DatasetReader};
 use honba_messages::{
     BarAggregation, BarSpecification, Exchange, InstrumentId, PriceType, UnixNanos,
 };
@@ -16,7 +16,7 @@ const DAY: u64 = 86_400_000_000_000;
 /// 2024-01-01T00:00:00Z.
 const T0: u64 = 1_704_067_200_000_000_000;
 
-fn daily(symbol: &str, closes: &[f64]) -> honba_data::ColumnarSlice {
+fn daily(symbol: &str, closes: &[f64]) -> honba_feed::ColumnarSlice {
     let spec = BarSpecification::new(1, BarAggregation::Day, PriceType::Last);
     let mut builder =
         ColumnarSliceBuilder::new(InstrumentId::new(symbol, Exchange::new("NSE")), spec);
@@ -43,7 +43,7 @@ fn falling() -> Vec<f64> {
     (0..20).map(|i| 200.0 - f64::from(i)).collect()
 }
 
-fn app_with(slices: Vec<honba_data::ColumnarSlice>) -> Router {
+fn app_with(slices: Vec<honba_feed::ColumnarSlice>) -> Router {
     let dataset = Dataset::from_slices(slices).unwrap();
     api_router_with(AppState::from_reader(DatasetReader::from_dataset(dataset)))
 }

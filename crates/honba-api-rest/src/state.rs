@@ -2,15 +2,15 @@
 //!
 //! Handlers see only the read ports owned by `honba-ports` ([`InstrumentMaster`],
 //! [`BarReader`], [`QuoteReader`], [`DepthReader`]); which adapter answers is decided here, at the composition
-//! root. This crate names `honba-data` only to build those adapters.
+//! root. This crate names `honba-feed` only to build those adapters.
 
 use std::fmt;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use honba_api::StrategyCatalog;
-use honba_data::{DatasetReader, ReaderError};
 use honba_entities::Currency;
+use honba_feed::{DatasetReader, ReaderError};
 use honba_messages::{ErrorDetail, TradingState};
 use honba_ports::{BarReader, DepthReader, InstrumentMaster, QuoteReader};
 

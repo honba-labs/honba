@@ -25,7 +25,7 @@
 //!
 //! This crate defines traits and one error taxonomy. It contains no I/O: nothing here opens a
 //! socket, reads a file, spawns a task or reads the wall clock. Implementations live at the edges
-//! (broker adapters, `honba-data`, `honba-async`); the fakes that make the ports testable live in
+//! (broker adapters, `honba-feed`, `honba-async`); the fakes that make the ports testable live in
 //! `honba-testing`, together with the shared contract suite every implementation must pass.
 //!
 //! # Thread-safety rule

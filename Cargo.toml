@@ -10,7 +10,7 @@ members = [
     "crates/honba-sim",
     "crates/honba-py",
     "crates/honba-analytics",
-    "crates/honba-data",
+    "crates/honba-feed",
     "crates/honba-cli",
     "crates/honba-market",
     "crates/honba-risk",
@@ -41,7 +41,7 @@ honba-testing = { path = "crates/honba-testing" }
 honba-sim = { path = "crates/honba-sim" }
 honba-py = { path = "crates/honba-py" }
 honba-analytics = { path = "crates/honba-analytics" }
-honba-data = { path = "crates/honba-data" }
+honba-feed = { path = "crates/honba-feed" }
 honba-market = { path = "crates/honba-market" }
 honba-risk = { path = "crates/honba-risk" }
 honba-config = { path = "crates/honba-config" }

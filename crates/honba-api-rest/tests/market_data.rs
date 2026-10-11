@@ -12,8 +12,8 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use axum::Router;
 use honba_api_rest::{api_router_with, AppState};
-use honba_data::import::parquet_source::bar_schema;
-use honba_data::{ColumnarSliceBuilder, Dataset, DatasetReader};
+use honba_feed::import::parquet_source::bar_schema;
+use honba_feed::{ColumnarSliceBuilder, Dataset, DatasetReader};
 use honba_messages::{
     BarAggregation, BarSpecification, Exchange, InstrumentId, PriceType, UnixNanos,
 };
@@ -25,7 +25,7 @@ const MINUTE: u64 = 60_000_000_000;
 /// 2024-01-01T00:00:00Z.
 const T0: u64 = 1_704_067_200_000_000_000;
 
-fn slice(symbol: &str, exchange: &str, count: u64) -> honba_data::ColumnarSlice {
+fn slice(symbol: &str, exchange: &str, count: u64) -> honba_feed::ColumnarSlice {
     let spec = BarSpecification::new(1, BarAggregation::Minute, PriceType::Last);
     let mut builder =
         ColumnarSliceBuilder::new(InstrumentId::new(symbol, Exchange::new(exchange)), spec);

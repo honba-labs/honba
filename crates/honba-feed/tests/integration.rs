@@ -1,4 +1,4 @@
-//! Integration tests for honba-data crate.
+//! Integration tests for honba-feed crate.
 
 use std::fs::File;
 use std::sync::Arc;
@@ -9,8 +9,8 @@ use arrow::record_batch::RecordBatch;
 use parquet::arrow::ArrowWriter;
 
 use honba_analytics::{EquityStats, PerformanceReport, TradeStats};
-use honba_data::export::{CsvReportWriter, JsonReportWriter, MarkdownReportWriter, ReportWriter};
-use honba_data::import::parquet_source::{bar_schema, ParquetBarSource, ParquetError};
+use honba_feed::export::{CsvReportWriter, JsonReportWriter, MarkdownReportWriter, ReportWriter};
+use honba_feed::import::parquet_source::{bar_schema, ParquetBarSource, ParquetError};
 use honba_messages::{BarAggregation, BarSpecification, Exchange, InstrumentId, PriceType};
 
 fn sample_report() -> PerformanceReport {

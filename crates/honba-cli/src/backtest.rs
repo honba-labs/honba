@@ -5,9 +5,9 @@ use anyhow::Context;
 use serde::Deserialize;
 
 use honba_analytics::{PerformanceReport, RoundTrip};
-use honba_data::{MarkdownReportWriter, ReportWriter};
 use honba_engine::{DataFeed, Handler};
 use honba_entities::Trade;
+use honba_feed::{MarkdownReportWriter, ReportWriter};
 use honba_messages::{Exchange, InstrumentId};
 use honba_sim::BarFillEngine;
 use honba_strategy::{SmaCrossover, Strategy, StrategyRunner};

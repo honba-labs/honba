@@ -785,7 +785,7 @@ impl BacktestExecutor {
         let bars = self.read_bars_for_sweep(&instrument, spec)?;
         let bar_spec = parse_timeframe(&spec.bar_spec)
             .map_err(|e| invalid("bar_spec", "invalid_bar_spec", e.message))?;
-        let mut builder = honba_data::ColumnarSliceBuilder::new(instrument.clone(), bar_spec);
+        let mut builder = honba_feed::ColumnarSliceBuilder::new(instrument.clone(), bar_spec);
         for bar in &bars {
             builder
                 .push_bar(bar)
@@ -794,7 +794,7 @@ impl BacktestExecutor {
         let slice = builder
             .finish()
             .map_err(|e| internal("dataset", e.to_string()))?;
-        let dataset = honba_data::Dataset::from_slices(vec![slice])
+        let dataset = honba_feed::Dataset::from_slices(vec![slice])
             .map_err(|e| internal("dataset", e.to_string()))?;
 
         let rt = tokio::runtime::Builder::new_current_thread()

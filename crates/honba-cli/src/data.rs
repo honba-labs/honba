@@ -1,6 +1,6 @@
 use anyhow::{bail, Context, Result};
 
-use honba_data::ParquetBarSource;
+use honba_feed::ParquetBarSource;
 use honba_market::india::exchange::resolve_instrument;
 
 pub fn load(source: &str, symbol: &str, exchange: Option<&str>) -> Result<()> {

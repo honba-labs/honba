@@ -11,9 +11,9 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use honba_data::{ColumnarSlice, ColumnarSliceBuilder, Dataset, DatasetFeed};
 use honba_engine::{AlgoError, Engine, Result as EngineResult};
 use honba_entities::Money;
+use honba_feed::{ColumnarSlice, ColumnarSliceBuilder, Dataset, DatasetFeed};
 use honba_messages::{
     Bar, BarAggregation, BarSpecification, Exchange, InstrumentId, PriceType, UnixNanos,
 };

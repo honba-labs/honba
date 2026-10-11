@@ -3,7 +3,7 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use honba_api::ENDPOINTS;
-use honba_data::DatasetReader;
+use honba_feed::DatasetReader;
 use honba_ports::BarRequest;
 use serde_json::Value;
 use tower::util::ServiceExt;

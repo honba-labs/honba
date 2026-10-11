@@ -28,7 +28,7 @@ use crate::import::parquet_source::{ParquetBarSource, ParquetError};
 /// ([`DatasetBuildError`]) instead of storing them.
 ///
 /// ```
-/// use honba_data::{ColumnarSliceBuilder, Dataset};
+/// use honba_feed::{ColumnarSliceBuilder, Dataset};
 /// use honba_messages::{BarAggregation, BarSpecification, Exchange, InstrumentId, PriceType, UnixNanos};
 ///
 /// let id = InstrumentId::new("TCS", Exchange::new("NSE"));
@@ -45,7 +45,7 @@ use crate::import::parquet_source::{ParquetBarSource, ParquetError};
 /// let dataset = Dataset::from_slices(vec![slice])?;
 /// assert_eq!(dataset.bar_count(), 2);
 /// assert!(dataset.slice(&id).is_some());
-/// # Ok::<(), honba_data::DatasetBuildError>(())
+/// # Ok::<(), honba_feed::DatasetBuildError>(())
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 pub struct ColumnarSlice(Arc<SliceInner>);
@@ -353,10 +353,10 @@ struct Row {
 /// with `Arc<Dataset>` across the threads of a sweep.
 ///
 /// ```
-/// use honba_data::{ColumnarSliceBuilder, Dataset};
+/// use honba_feed::{ColumnarSliceBuilder, Dataset};
 /// use honba_messages::{BarAggregation, BarSpecification, Exchange, InstrumentId, PriceType, UnixNanos};
 ///
-/// fn slice(symbol: &str, ts: u64) -> honba_data::ColumnarSlice {
+/// fn slice(symbol: &str, ts: u64) -> honba_feed::ColumnarSlice {
 ///     let spec = BarSpecification::new(1, BarAggregation::Minute, PriceType::Last);
 ///     let mut builder = ColumnarSliceBuilder::new(InstrumentId::new(symbol, Exchange::new("NSE")), spec);
 ///     builder.push(UnixNanos::from_u64(ts), 1.0, 1.0, 1.0, 1.0, 1.0).unwrap();
@@ -367,7 +367,7 @@ struct Row {
 /// let order: Vec<&str> = dataset.instruments().map(|id| id.symbol()).collect();
 /// assert_eq!(order, vec!["INFY", "TCS"]);
 /// assert_eq!(dataset.bar_count(), 2);
-/// # Ok::<(), honba_data::DatasetBuildError>(())
+/// # Ok::<(), honba_feed::DatasetBuildError>(())
 /// ```
 #[derive(Clone, Debug)]
 pub struct Dataset(Arc<DatasetInner>);

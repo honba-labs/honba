@@ -115,7 +115,7 @@ fn data_load_rejects_unsupported_sources() {
 fn write_bars_parquet(path: &Path) {
     use arrow::array::{ArrayRef, Float64Array, Int64Array};
     use arrow::record_batch::RecordBatch;
-    use honba_data::import::parquet_source::bar_schema;
+    use honba_feed::import::parquet_source::bar_schema;
     use parquet::arrow::ArrowWriter;
     use std::sync::Arc;
 

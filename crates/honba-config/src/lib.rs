@@ -50,7 +50,7 @@ impl Default for DataSourceConfig {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum DataSourceConfig {
-    /// Parquet files under a local root, read through `honba-data`.
+    /// Parquet files under a local root, read through `honba-feed`.
     Local {
         /// Directory holding the Parquet catalog.
         root: String,

@@ -6,7 +6,7 @@ use honba_api::{
     JournalWriter, ResolvedBacktest, ResolvedRequest, ResolvedSweep, RunExecutor, RunJob, RunKind,
     RunOutcome,
 };
-use honba_data::{ColumnarSliceBuilder, Dataset, DatasetReader};
+use honba_feed::{ColumnarSliceBuilder, Dataset, DatasetReader};
 use honba_messages::{
     BarAggregation, BarSpecification, ErrorCode, ErrorDetail, Event, Exchange, InstrumentId,
     Message, PriceType, UnixNanos, SCHEMA_VERSION,
