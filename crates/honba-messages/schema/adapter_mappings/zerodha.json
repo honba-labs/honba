@@ -1,0 +1,40 @@
+{
+  "adapter": "zerodha",
+  "description": "Zerodha Kite Connect v3 canonical<->broker mapping tables (E1-S4). Canonical keys are the snake_case wire spellings of the core enums in honba-messages.",
+  "products": {
+    "canonical_to_broker": {
+      "delivery": "CNC",
+      "intraday": "MIS",
+      "carry": "NRML"
+    },
+    "broker_to_canonical": {
+      "CNC": "delivery",
+      "MIS": "intraday",
+      "NRML": "carry"
+    }
+  },
+  "order_types": {
+    "canonical_to_broker": {
+      "market": "MARKET",
+      "limit": "LIMIT",
+      "stop_market": "SL-M",
+      "stop_limit": "SL"
+    },
+    "broker_to_canonical": {
+      "MARKET": "market",
+      "LIMIT": "limit",
+      "SL-M": "stop_market",
+      "SL": "stop_limit"
+    }
+  },
+  "time_in_force": {
+    "canonical_to_broker": {
+      "day": "DAY",
+      "ioc": "IOC"
+    },
+    "broker_to_canonical": {
+      "DAY": "day",
+      "IOC": "ioc"
+    }
+  }
+}

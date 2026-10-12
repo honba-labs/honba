@@ -1,0 +1,45 @@
+{
+  "adapter": "dhan",
+  "description": "DhanHQ v2 canonical<->broker mapping tables (E1-S4). Canonical keys are the snake_case wire spellings of the core enums in honba-messages. broker_aliases are extra broker spellings that decode to a canonical value but are not its canonical encoding.",
+  "products": {
+    "canonical_to_broker": {
+      "delivery": "CNC",
+      "intraday": "INTRADAY",
+      "carry": "MARGIN"
+    },
+    "broker_to_canonical": {
+      "CNC": "delivery",
+      "INTRADAY": "intraday",
+      "MARGIN": "carry"
+    },
+    "broker_aliases": {
+      "MTF": "carry",
+      "CO": "intraday",
+      "BO": "intraday"
+    }
+  },
+  "order_types": {
+    "canonical_to_broker": {
+      "market": "MARKET",
+      "limit": "LIMIT",
+      "stop_market": "STOP_LOSS_MARKET",
+      "stop_limit": "STOP_LOSS"
+    },
+    "broker_to_canonical": {
+      "MARKET": "market",
+      "LIMIT": "limit",
+      "STOP_LOSS_MARKET": "stop_market",
+      "STOP_LOSS": "stop_limit"
+    }
+  },
+  "time_in_force": {
+    "canonical_to_broker": {
+      "day": "DAY",
+      "ioc": "IOC"
+    },
+    "broker_to_canonical": {
+      "DAY": "day",
+      "IOC": "ioc"
+    }
+  }
+}

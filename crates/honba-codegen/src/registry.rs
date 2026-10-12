@@ -42,6 +42,7 @@ pub const WIRE_ENUMS: &[&str] = &[
     "OrderType",
     "OrderStatus",
     "TimeInForce",
+    "Product",
     "BarAggregation",
     "PriceType",
     "AggressorSide",
@@ -118,6 +119,7 @@ pub fn register_all(set: &mut SchemaSet) {
     set.add_type::<honba_messages::OrderType>("OrderType");
     set.add_type::<honba_messages::OrderStatus>("OrderStatus");
     set.add_type::<honba_messages::TimeInForce>("TimeInForce");
+    set.add_type::<honba_messages::Product>("Product");
     set.add_type::<honba_messages::BarAggregation>("BarAggregation");
     set.add_type::<honba_messages::PriceType>("PriceType");
     set.add_type::<honba_messages::AggressorSide>("AggressorSide");

@@ -177,6 +177,7 @@ class EventOrder(TypedDict):
     order_id: OrderId
     order_type: OrderType
     price: NotRequired[float | None]
+    product: NotRequired[Product | None]
     quantity: float
     side: OrderSide
     status: OrderStatus
@@ -326,6 +327,7 @@ class Order:
     order_id: OrderId
     order_type: OrderType
     price: float | None = None
+    product: Product | None = None
     quantity: float
     side: OrderSide
     status: OrderStatus
@@ -400,6 +402,8 @@ class PositionsResponse:
     positions: list[Position]
 
 PriceType = Literal["bid", "ask", "mid", "last"]
+
+Product = Literal["delivery", "intraday", "carry"]
 
 class QuoteTick:
     ask_price: float

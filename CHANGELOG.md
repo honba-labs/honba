@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Canonical product enum and adapter mapping tables (E1-S4)
+
+- `honba-messages::orders`: new `Product` fieldless wire enum (`delivery`, `intraday`, `carry`),
+  the market-neutral product vocabulary from ADR 0010. `Order` gains an additive optional
+  `product` field (`skip_serializing_if = "Option::is_none"`): a v1 reader without it decodes to
+  `None`, so `schema_version` is not bumped (ADR 0012 rule 1). `Product` is now a published wire
+  enum, so it appears in the JSON Schema, OpenAPI and Python stubs.
+- `honba-messages::orders::mapping`: a declarative per-adapter mapping format. Each adapter ships
+  one JSON file under `crates/honba-messages/schema/adapter_mappings/` (`zerodha.json`,
+  `dhan.json`) listing canonical<->broker tables for `Product`, `OrderType` and `TimeInForce`,
+  plus optional `broker_aliases` for broker spellings that decode but are never emitted (Dhan
+  `MTF`/`CO`/`BO`). The files are embedded with `include_str!`; `AdapterMapping` and
+  `MappingError` expose typed lookups, and an unsupported combo (Zerodha trailing-stop, GTC)
+  is a typed error, never a silent default. No adapter crate changes: the Python adapters keep
+  their local tables until the follow-up migration.
+- Tests: `crates/honba-messages/src/tests/mappings.rs` asserts, for every adapter and every wire
+  variant, `canonical -> broker -> canonical` and `broker -> canonical -> broker` round trips,
+  rejects unsupported combos with a typed error, and checks aliases resolve to their canonical
+  encoding.
+
 ### Cost schedule wired into simulator fills (E3-S3)
 
 - `honba-sim::cost`: new `ScheduleFillCost`, the single adapter from a market

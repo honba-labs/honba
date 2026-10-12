@@ -87,6 +87,26 @@ crate::enum_with_all! {
     }
 }
 
+crate::enum_with_all! {
+    /// The holding period a broker applies to a position (ADR 0010).
+    ///
+    /// This is the market-neutral vocabulary, not a broker's product codes:
+    /// Zerodha's `CNC`/`MIS`/`NRML` and Dhan's `CNC`/`INTRADAY`/`MARGIN` live
+    /// in the declarative mapping tables (`crate::orders::mapping`), never in
+    /// the core enum.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+    #[serde(rename_all = "snake_case")]
+    #[non_exhaustive]
+    pub enum Product {
+        /// Held overnight and settled into the demat account.
+        Delivery,
+        /// Squared off before the end of the trading day.
+        Intraday,
+        /// Carried forward under a margin/derivatives product.
+        Carry,
+    }
+}
+
 /// A client order.
 ///
 /// ```
@@ -145,6 +165,11 @@ pub struct Order {
     pub(crate) trail_percent: Option<f64>,
     pub(crate) status: OrderStatus,
     pub(crate) time_in_force: TimeInForce,
+    /// Broker product the order is placed under (ADR 0010); `None` when the
+    /// venue does not distinguish. Additive field: a reader without it decodes
+    /// as `None` (ADR 0012 rule 1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) product: Option<Product>,
     pub(crate) ts_event: UnixNanos,
     pub(crate) ts_init: UnixNanos,
     /// A cancel was asked for and not yet answered (ADR 0019); only valid
@@ -173,6 +198,8 @@ struct OrderRepr {
     trail_percent: Option<f64>,
     status: OrderStatus,
     time_in_force: TimeInForce,
+    #[serde(default)]
+    product: Option<Product>,
     ts_event: UnixNanos,
     ts_init: UnixNanos,
     #[serde(default)]
@@ -195,6 +222,7 @@ impl TryFrom<OrderRepr> for Order {
             trail_percent: r.trail_percent,
             status: r.status,
             time_in_force: r.time_in_force,
+            product: r.product,
             ts_event: r.ts_event,
             ts_init: r.ts_init,
             cancel_requested: r.cancel_requested,
@@ -230,6 +258,7 @@ impl Order {
             trail_percent: None,
             status: OrderStatus::Initialized,
             time_in_force,
+            product: None,
             ts_event,
             ts_init,
             cancel_requested: false,
@@ -332,6 +361,11 @@ impl Order {
         self.time_in_force
     }
 
+    /// Returns the broker product, if any.
+    pub fn product(&self) -> Option<Product> {
+        self.product
+    }
+
     /// Returns the exchange timestamp.
     pub fn ts_event(&self) -> UnixNanos {
         self.ts_event
@@ -383,6 +417,12 @@ impl Order {
     /// Sets the status, returning `self` for chaining.
     pub fn with_status(mut self, status: OrderStatus) -> Self {
         self.status = status;
+        self
+    }
+
+    /// Sets the broker product, returning `self` for chaining.
+    pub fn with_product(mut self, product: Product) -> Self {
+        self.product = Some(product);
         self
     }
 

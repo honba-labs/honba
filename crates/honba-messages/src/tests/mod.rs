@@ -6,6 +6,7 @@ mod error_taxonomy;
 mod errors;
 mod event;
 mod identifiers;
+mod mappings;
 mod order;
 mod order_state;
 mod tick;

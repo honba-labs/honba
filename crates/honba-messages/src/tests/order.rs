@@ -49,6 +49,45 @@ fn all_lists_every_variant_once() {
     assert_eq!(OrderType::ALL.len(), 5);
     assert_eq!(OrderStatus::ALL.len(), 8);
     assert_eq!(TimeInForce::ALL.len(), 5);
+    assert_eq!(
+        Product::ALL,
+        &[Product::Delivery, Product::Intraday, Product::Carry]
+    );
+}
+
+#[test]
+fn product_serializes_snake_case() {
+    for (product, wire) in [
+        (Product::Delivery, "delivery"),
+        (Product::Intraday, "intraday"),
+        (Product::Carry, "carry"),
+    ] {
+        assert_eq!(
+            serde_json::to_value(product).unwrap(),
+            serde_json::json!(wire)
+        );
+    }
+}
+
+#[test]
+fn order_product_is_optional_and_omitted_when_absent() {
+    let plain = order();
+    assert_eq!(plain.product(), None);
+    assert!(serde_json::to_value(&plain)
+        .unwrap()
+        .get("product")
+        .is_none());
+
+    let held = order().with_product(Product::Intraday);
+    assert_eq!(held.product(), Some(Product::Intraday));
+    let json = serde_json::to_value(&held).unwrap();
+    assert_eq!(json["product"], "intraday");
+    let back: Order = serde_json::from_value(json).unwrap();
+    assert_eq!(back, held);
+
+    // A v1 record without the additive field still decodes to `None`.
+    let legacy: Order = serde_json::from_value(serde_json::to_value(order()).unwrap()).unwrap();
+    assert_eq!(legacy.product(), None);
 }
 
 #[test]

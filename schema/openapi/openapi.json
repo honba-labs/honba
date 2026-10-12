@@ -1310,6 +1310,17 @@
                   "null"
                 ]
               },
+              "product": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/Product"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Broker product the order is placed under (ADR 0010); `None` when the venue does not distinguish. Additive field: a reader without it decodes as `None` (ADR 0012 rule 1)."
+              },
               "quantity": {
                 "format": "double",
                 "type": "number"
@@ -2335,6 +2346,17 @@
               "null"
             ]
           },
+          "product": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Product"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Broker product the order is placed under (ADR 0010); `None` when the venue does not distinguish. Additive field: a reader without it decodes as `None` (ADR 0012 rule 1)."
+          },
           "quantity": {
             "format": "double",
             "type": "number"
@@ -2905,6 +2927,32 @@
             "description": "Use the last traded price.",
             "enum": [
               "last"
+            ],
+            "type": "string"
+          }
+        ]
+      },
+      "Product": {
+        "description": "The holding period a broker applies to a position (ADR 0010).\n\nThis is the market-neutral vocabulary, not a broker's product codes: Zerodha's `CNC`/`MIS`/`NRML` and Dhan's `CNC`/`INTRADAY`/`MARGIN` live in the declarative mapping tables (`crate::orders::mapping`), never in the core enum.",
+        "oneOf": [
+          {
+            "description": "Held overnight and settled into the demat account.",
+            "enum": [
+              "delivery"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Squared off before the end of the trading day.",
+            "enum": [
+              "intraday"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Carried forward under a margin/derivatives product.",
+            "enum": [
+              "carry"
             ],
             "type": "string"
           }
