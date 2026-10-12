@@ -11,6 +11,7 @@ mod next_open_session_open;
 mod next_open_settlement;
 mod paper;
 mod scripted;
+mod target;
 
 use honba_messages::{
     Bar, BarAggregation, BarSpecification, BarType, Event, Exchange, InstrumentId, Order, OrderId,

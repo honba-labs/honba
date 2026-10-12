@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+### Target-position (smart order), per-instrument serialisation (E3-S5)
+
+- `honba_sim::target::TargetPosition`: turns a desired position into the signed delta order for
+  the current position. The delta floors to whole lots towards zero (a target is never overshot)
+  and caps at the instrument's freeze quantity; `from_profile` reads lot and freeze from the active
+  `MarketProfile`'s rules (as `instrument_rules().rules_for`), `from_rules` / `with_lot_size` set
+  them directly (default lot 1, no freeze). `delta(&Position, target)` is the pure computation,
+  `order(...)` builds the market order and refuses a `side_hint` that contradicts the delta's side.
+- `honba_sim::target::SmartOrderController`: `submit_target_position(&current, target, side_hint?,
+  ts)` emits at most one order per instrument and serialises per instrument through
+  `PerInstrumentLock` (`HashMap<InstrumentId, bool>` with `acquire` / `release`). When the target is
+  already met, or the instrument already has an outstanding target order, it returns `None` (the
+  request is deferred, never doubled); the caller calls `release` once the order fills, is rejected
+  or is cancelled.
+- Tests: unit `target_delta_computed` (lot 75: flat -> 100 buys 75; long 150 -> 0 sells 150;
+  at-target is no order; a contradicting side hint errors), `target_delta_reads_lot_from_a_market_profile`,
+  `target_delta_caps_at_the_freeze_without_splitting`, `invalid_lot_size_is_refused`,
+  `per_instrument_lock_serialises_acquire_and_release`,
+  `controller_defers_while_an_order_is_outstanding`; integration `target_position_run` (a
+  `NextOpenSim` run: flat -> target 100 fills a buy of 100, a re-emitted target is deferred until
+  release, then target 0 fills the sell of 100 and the run ends flat).
+- Deferred: splitting a target across several clips to respect a freeze quantity (lot/freeze
+  splitter, E3-S6) — the delta is capped to one lot-aligned clip meanwhile; position-cache
+  invalidation and the live-gateway/FSM wiring (E2-S6).
+
 ### Margin model and MIS auto square-off (E3-S4)
 
 - `honba_sim::margin`: the pieces shared by the simulators. `MarginQuery` reads a position's

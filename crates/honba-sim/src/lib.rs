@@ -12,6 +12,7 @@ pub mod margin;
 pub mod next_open;
 pub mod paper;
 pub mod scripted;
+pub mod target;
 
 pub use bar_fill::{BarFillEngine, FillCosts, FillCostsError};
 pub use cost::ScheduleFillCost;
@@ -23,6 +24,7 @@ pub use margin::{
 pub use next_open::{FillCostFn, NextOpenSim};
 pub use paper::{OrderLedger, PaperExecution};
 pub use scripted::{Behavior, ScriptedExecution, VenueAction};
+pub use target::{PerInstrumentLock, SmartOrderController, TargetPosition};
 
 #[cfg(test)]
 mod tests;
