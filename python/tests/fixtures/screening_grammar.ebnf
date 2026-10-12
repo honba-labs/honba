@@ -1,0 +1,30 @@
+filters    := or_expr
+or_expr    := and_expr { "or" and_expr }
+and_expr   := term { "and" term }
+term       := "either" or_expr "end"
+            | filter
+filter     := metric [ "on" TIMEFRAME ] [ "for" PERIOD ] predicate
+predicate  := cmp quantity
+            | "between" quantity "and" quantity
+            | ("in" | "not in") value { "," value }
+            | ("contains" | "like") text
+            | ("crosses above" | "crosses below") operand
+            | ("at" | "near") preset_target
+            | "within" quantity "of" preset_target
+cmp        := "above" | "over" | "greater than" | "more than" | ">"
+            | "at least" | "no less than" | ">="
+            | "below" | "under" | "less than" | "<"
+            | "at most" | "no more than" | "<="
+            | "equals" | "is" | "="
+            | "is not" | "not equal to" | "!="
+quantity   := NUMBER [ SUFFIX ]
+operand    := quantity | metric
+metric     := IDENTIFIER
+TIMEFRAME  := "daily" | "weekly" | "monthly"
+PERIOD     := "1d" | "5d" | "1m" | "3m" | "6m" | "1y"
+SUFFIX     := "Cr" | "Lk" | "Mn" | "Bn" | "Tn" | "%"
+NUMBER     := DIGIT+ ("." DIGIT+)?
+DIGIT      := "0" .. "9"
+IDENTIFIER := LETTER (LETTER | DIGIT | "_")*
+LETTER     := "a" .. "z" | "A" .. "Z"
+%ignore " " | "\t" | "\n" | "\r"

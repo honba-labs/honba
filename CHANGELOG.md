@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Local LLM runtime and GBNF grammar (E5-S10)
+
+- `honba.ai.gbnf`: EBNF→GBNF converter (`ebnf_to_gbnf`, `build_grammar`) for a Lark-like EBNF subset
+  (alternatives `|`, literals `"..."`, optional `[...]`, groups `(...)`, repetition `+`/`*`, `%ignore`).
+  Used to constrain LLM output to valid filter syntax.
+- `honba.ai.local_llm.LocalLlm`: In-process LLM runner that loads GGUF models via `llama-cpp-python`
+  when installed and a `model_path` is provided; otherwise operates in deterministic stub mode.
+  `ask(prompt)` returns completions; with `grammar` parameter, uses GBNF for constrained sampling.
+  Optional dependency added as `llm` extra (`llama-cpp-python`).
+- Tests: unit `grammar_masks_invalid_tokens` (GBNF from screening grammar excludes code-injection tokens);
+  integration `ask_runs_offline_zero_syntax_errors` (stub mode returns valid filter per grammar).
+
 ### Sandbox adapter (paper on live data) (E3-S7)
 
 - `honba_sim::sandbox::SandboxAdapter`: paper-trades on a live-style feed through the same
