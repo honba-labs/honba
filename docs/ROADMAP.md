@@ -12,10 +12,15 @@ capabilities/schema, WASM hardening, ADR 0014/0015, golden vectors validated aga
 E5-S5 done (2026-10-11): AI strategy verifier (ADR 0022).
 E11-S8 done (2026-10-11): Minimal auth (Bearer token, scope map, file token store, audit log) (ADR 0023).
 E5-S10, E5-S11 added (2026-10-11): In-process Llama runtime (GBNF constraints) and financial domain alignment (SFT + RLVR compiler rewards).
+E5-S10/S11 done (2026-10-12): GBNF→LLM grammar, local llama-cpp runner, synthetic dataset, QLoRA scaffold, GRPO compiler reward (`c9579d2`, `827627f`).
 E4-S6, E4-S7, E4-S8 done (2026-10-11): Overfitting validation gates (DSR, PBO, CSCV, holdout, MC, cost-stress), chunked streaming datasets, and session MTF aggregation (ADR 0024, commit e7da809).
 E1-S2 done (2026-10-11): F&O instruments & grammar (india::fno), OptionType, right-to-left resolution, acceptance suite, Python bindings and stubs.
 E6 batch 4, E1-S3, E3-S3 done (2026-10-12): plain-sum indicators O(1) (`00c75af`, `6f23282`); InstrumentMaster dated snapshots over a Parquet
 catalog (`a3d09c7`, `a208daf`); market CostSchedule wired into simulator fills with effective-dated schedules and `edge_after_costs` (`9b8b64f`, `cf69d81`).
+E1-S4/S5/S6, E3-S2/S4/S5/S6/S7, E5-S10/S11 done (2026-10-12): product/TIF enums + adapter mappings; session/rate/secret store; feed connector
+contract; seeded fill/latency; margin + MIS square-off; target-position smart order + serialisation; lot/freeze splitter; sandbox paper-on-live;
+GBNF + local LLM runner; synthetic dataset + QLoRA + GRPO compiler reward (commits `9a7731a`, `0df5b75`, `bc3b20b`, `695a549`, `1ffa180`, `599fb22`,
+`6f8d509`, `71de25f`, `c9579d2`, `827627f`).
 The two superseded documents are kept in `docs/archive/` for history and are not updated.
 
 Story verdicts come from the 2026-10-06 audit (a scratch file, `ROADMAP_AUDIT.md`, model output, not kept in the repo) after a spot-check
@@ -33,18 +38,18 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | Epic | Done | Partial | Not started | One-line state |
 |---|---|---|---|---|
 | E0 Contract spine | 8 | 0 | 0 | Complete: wire types, codegen, versions, money, market packs, manifest, `honba verify` |
-| E1 Instruments and adapters | 3 | 0 | 3 | Adapter Protocol, contract suite, F&O grammar and dated instrument master shipped; session, feed open |
+| E1 Instruments and adapters | 6 | 0 | 0 | Adapter Protocol, contract suite, F&O grammar, dated master, session/rate/secret, feed connector shipped |
 | E2 Safe engine | 1 | 4 | 6 | Kill switch, audit log and fill feedback loop work; no risk stage, no order FSM, no reconciliation |
-| E3 Execution realism | 1 | 1 | 5 | Bar-fill (L1) simulator, Rust and Python next-open simulators, and cost-schedule fills shipped |
+| E3 Execution realism | 6 | 0 | 1 | Bar-fill (L1), Rust/Python next-open, cost-schedule fills, fill/latency, margin/MIS, target-position, lot/freeze, sandbox shipped |
 | E4 Research pipeline | 8 | 0 | 0 | Complete: journal v1, cache, hyperparameters, CLI/REST runner, look-ahead, sweep fitness, overfitting gates, streaming datasets, MTF aggregation |
-| E5 Agent and API | 1 | 1 | 7 | AI strategy verifier shipped (ADR 0022); MCP server, scopes, approval queue shipped; sandbox open |
+| E5 Agent and API | 3 | 1 | 5 | AI verifier, MCP server, scopes, approval queue, GBNF+LLM, synthetic+QLoRA+RLVR shipped; sandbox open |
 | E6 Indicators | n/a | 0 | 1 | Batches 1-4 (O(1) rolling, plain sums) done; render contract (S5) not started |
 | E7 Scale and ops | 0 | 0 | 5 | Pull-based; E7-S4 is superseded by `honba-sweep` (E10-S5) |
 | E8 Multi-leg | 0 | 0 | 4 | Optional; not scheduled (open decision D13) |
 | E9 Frontend and AlgoDesigner | 0 | 1 | 7 | Greenfield; generated TS types only |
 | E10 Async core | 6 | 1 | 1 | Ports, shell, engine output, Arc dataset, sweep, determinism test and Python runtime bridge (ADR 0015) shipped; connectors open |
 | E11 Versioned API | 4 | 1 | 2 | Read API, SDK and WASM indicators shipped; SSE streaming shipped; write endpoints and auth shipped |
-| **Total (74)** | **26** | **11** | **37** | |
+| **Total (74)** | **29** | **8** | **37** | |
 
 ### 1.1 What is shipped (evidence)
 
@@ -146,10 +151,10 @@ thin; no live feed or broker exists in Rust.
 | Canonical typed models, shared golden vectors | KEEP | Core of E0; 128 vectors validated against generated schema | E0-S2 |
 | Strict symbol grammar with round-trip tests | ADOPT | Trait exists but `india::fno` is an 8-byte stub and `Instrument` has no expiry/strike; needed before options and the instrument master | E1-S2 |
 | Instrument master with dated snapshots | ADOPT | Only the `InstrumentMaster` port exists; backtests need resolve-as-of; build over the Parquet catalog, not a broker table | E1-S3 |
-| Table-driven product and price-type mapping | DEFER | Adapters are Python and map their own types; revisit when the first real adapter passes the suite, then fold into the contract suite | E1-S4 |
-| Smart order (target position, per-symbol lock) | DEFER | Needs lot splitter and a live gateway; backtests already use intents | E3-S5 |
-| Lot and freeze-quantity splitter | ADOPT | `NextOpenExecution` floors to lot only; real splitter needs instrument master rules | E3-S6 |
-| Sandbox behind the same interface (no global mode flag) | ADOPT | Principle kept; implementation waits for one order FSM and L1/L2 simulator parity | E3-S7 |
+| Table-driven product and price-type mapping | DONE | Canonical `Product` enum + per-adapter JSON mappings in `honba-messages`; `mapping_round_trip_property` / `adapter_rejects_unsupported_combo` | E1-S4 |
+| Smart order (target position, per-symbol lock) | DONE | Target-position delta + per-instrument serialisation in `honba-sim` | E3-S5 |
+| Lot and freeze-quantity splitter | DONE | Lot/freeze splitter in `honba-sim::lot` | E3-S6 |
+| Sandbox behind the same interface (no global mode flag) | DONE | `SandboxAdapter` paper on live data, same matching core and FSM | E3-S7 |
 | Webhook pipeline (stages, idempotency, cool-off) | DEFER | Premise (hosted order ingestion) needs auth (E11-S8) and risk stage first; no demand signal | E5-S6 |
 | MCP metadata, toolsets, read-only kill switch, scope map | ADOPT (changed) | Tool schemas are now generated from the endpoint registry (`schema/mcp/mcp_tools.json`, `readOnlyHint` from `WRITE_PATHS`); remaining work is scope map plus drift test and a thin Python MCP server | E5-S1, E5-S3 |
 | Trust envelope for untrusted broker text | ADOPT | Nothing built; do with MCP server | E5-S2 |
@@ -165,7 +170,7 @@ thin; no live feed or broker exists in Rust.
 | Order request/ack state machine, client order ids | ADOPT | Only `OrderStatus` enum and an `OrderRejection` queue exist (ADR 0008 decision 13); no FSM, no ack events | E2-S6 |
 | Reconciliation on start/reconnect | DEFER | Needs live adapter, cache (E2-S9), FSM | E2-S7 |
 | Component lifecycle FSM | DROP | `EngineHandle` supervisor and `Command::Stop` in `honba-async` cover start/stop/health; no second consumer | was E2-S8 |
-| Pluggable seeded fill/latency/margin models | ADOPT | Only config enum `FillModel::BarFill` and flat/bps costs exist; no traits | E3-S2, E3-S4 |
+| Pluggable seeded fill/latency/margin models | DONE | `FillModel`/`LatencyModel` traits + margin model in `honba-sim` | E3-S2, E3-S4 |
 | Data catalog with streaming Parquet batches | ADOPT (smaller) | `Dataset`/`ColumnarSlice` cover shared reads; remaining value is chunked streaming and dataset ids | E4-S7 |
 | Cache persistence, crash-only restart | DEFER | No live sessions yet | E7-S3 |
 | Message bus and engine replacement | DROP | Unchanged; recorder tap is `AuditLog` plus streaming (E11-S4) | E7-S5 |
