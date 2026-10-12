@@ -191,3 +191,49 @@ fn a_failing_cost_function_propagates_its_error() {
     assert!(s.on_bar(&b).is_err());
     assert_eq!(s.working_orders().len(), 1);
 }
+
+#[test]
+fn with_schedule_rounds_each_leg_once_and_charges_by_side() {
+    use std::sync::Arc;
+
+    use honba_market::MarketSegment;
+
+    use super::TwoLegSchedule;
+
+    let mut s = NextOpenSim::new(inr(10_000))
+        .unwrap()
+        .with_schedule(Arc::new(TwoLegSchedule), MarketSegment::from("equity"));
+    s.set_position(&any_instrument(), 1.0).unwrap();
+    feed(&mut s, 100.0, 1);
+    s.submit(market("B", OrderSide::Buy, 1.0, 1)).unwrap();
+    s.submit(market("S", OrderSide::Sell, 1.0, 1)).unwrap();
+    feed(&mut s, 100.0, 2);
+    let fills = s.drain_fills().unwrap();
+    let cost_of = |side: OrderSide| fills.iter().find(|f| f.side() == side).unwrap().costs();
+    // round(0.006) + round(0.006) = 1 + 1 = 2 minor units, not round(0.012) = 1.
+    assert_eq!(cost_of(OrderSide::Buy), minor(2));
+    // round(0.016) + round(0.006) = 2 + 1 = 3.
+    assert_eq!(cost_of(OrderSide::Sell), minor(3));
+    assert_eq!(s.fees(), minor(5));
+}
+
+#[test]
+fn schedule_fill_cost_exposes_the_breakdown_and_the_rounded_total() {
+    use std::sync::Arc;
+
+    use crate::cost::ScheduleFillCost;
+    use honba_market::MarketSegment;
+
+    use super::TwoLegSchedule;
+
+    let cost = ScheduleFillCost::new(
+        Arc::new(TwoLegSchedule),
+        MarketSegment::from("equity"),
+        Currency::Inr,
+    );
+    assert_eq!(cost.breakdown(OrderSide::Buy, 1.0, 100.0).charges.len(), 2);
+    assert_eq!(cost.total(OrderSide::Buy, 1.0, 100.0).unwrap(), minor(2));
+    assert_eq!(cost.total(OrderSide::Sell, 1.0, 100.0).unwrap(), minor(3));
+    assert_eq!(cost.currency(), Currency::Inr);
+    assert_eq!(cost.segment().as_str(), "equity");
+}

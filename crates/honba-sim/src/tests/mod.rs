@@ -14,6 +14,28 @@ use honba_messages::{
     OrderSide, OrderType, PriceType, TimeInForce, UnixNanos,
 };
 
+/// A test cost schedule with two legs whose amounts are chosen so that rounding each leg once
+/// differs from rounding the sum: a leg of `0.006` major units is one minor unit.
+///
+/// The "main" leg is side-aware (buy `0.006`, sell `0.016`) and the "fixed" leg is always
+/// `0.006`, so a buy costs `1 + 1 = 2` minor units and a sell `2 + 1 = 3`.
+pub(crate) struct TwoLegSchedule;
+
+impl honba_market::CostSchedule for TwoLegSchedule {
+    fn compute_costs(
+        &self,
+        _segment: &honba_market::MarketSegment,
+        side: OrderSide,
+        _notional: f64,
+    ) -> honba_market::FeeBreakdown {
+        let main = if side == OrderSide::Buy { 0.006 } else { 0.016 };
+        honba_market::FeeBreakdown::from_charges(vec![
+            honba_market::Charge::new("main", main),
+            honba_market::Charge::new("fixed", 0.006),
+        ])
+    }
+}
+
 /// A placeholder instrument for tests where the instrument does not matter.
 fn any_instrument() -> InstrumentId {
     InstrumentId::new("X", Exchange::new("TEST"))

@@ -120,6 +120,25 @@ fn drain_empties_the_fill_buffer() {
 }
 
 #[test]
+fn a_schedule_cost_model_charges_by_side_per_fill() {
+    use std::sync::Arc;
+
+    use honba_market::MarketSegment;
+
+    use super::TwoLegSchedule;
+
+    let mut exec =
+        BarFillEngine::with_schedule(Arc::new(TwoLegSchedule), MarketSegment::from("equity"));
+    observe(&mut exec, 100.0, 1);
+    exec.submit(market("B", OrderSide::Buy, 1.0, 1)).unwrap();
+    exec.submit(market("S", OrderSide::Sell, 1.0, 2)).unwrap();
+    let fills = exec.drain_fills().unwrap();
+    // buy: 0.006 + 0.006 rounds per leg to 2 minor units; sell: 0.016 + 0.006 to 3.
+    assert_eq!(fills[0].costs().minor(), 2);
+    assert_eq!(fills[1].costs().minor(), 3);
+}
+
+#[test]
 fn clones_share_prices_and_fills() {
     let mut observer = BarFillEngine::new();
     let mut executor = observer.clone();

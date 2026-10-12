@@ -13,14 +13,19 @@ use honba_engine::{
     AlgoError, EngineOutput, ExecutionEngine, Handler, LegacyDrains, OrderRejection, Result,
 };
 use honba_entities::{Currency, ExecutionEvent, Money, Trade};
+use honba_market::costs::{CostSchedule, MarketSegment};
 use honba_messages::{Bar, Event, InstrumentId, Order, OrderId, OrderSide, OrderType, UnixNanos};
+use std::sync::Arc;
+
+use crate::cost::ScheduleFillCost;
 
 /// Quantities closer than this are equal (float residue from fractional fills).
 const QTY_EPS: f64 = 1e-9;
 
 /// `(side, quantity, price) -> cost` of one fill, in the simulator's currency and never
-/// negative (a negative value is an error that leaves the order working). Injected so that market
-/// cost schedules stay above `honba-sim`; the Python counterpart is `FillCostFn`.
+/// negative (a negative value is an error that leaves the order working). Injected so a caller
+/// can price fills (see [`NextOpenSim::with_schedule`] and [`ScheduleFillCost`]) without the simulator
+/// hard-coding a market; the Python counterpart is `FillCostFn`.
 pub type FillCostFn = Box<dyn Fn(OrderSide, f64, f64) -> Result<Money> + Send>;
 
 struct Working {
@@ -108,6 +113,21 @@ impl NextOpenSim {
     #[must_use]
     pub fn with_costs(mut self, cost_fn: FillCostFn) -> Self {
         self.cost_fn = cost_fn;
+        self
+    }
+
+    /// Charges each fill from a market [`CostSchedule`], itemized per named charge.
+    ///
+    /// The schedule is evaluated on `abs(quantity * price)` for `side`, and every charge is
+    /// rounded to minor units once before the legs are summed ([`ScheduleFillCost`]); funding
+    /// cuts therefore include the cost. Wires into the same hook as [`Self::with_costs`].
+    #[must_use]
+    pub fn with_schedule(
+        mut self,
+        schedule: Arc<dyn CostSchedule>,
+        segment: MarketSegment,
+    ) -> Self {
+        self.cost_fn = ScheduleFillCost::new(schedule, segment, self.currency).into_fn();
         self
     }
 

@@ -2,6 +2,34 @@
 
 ## [Unreleased]
 
+### Cost schedule wired into simulator fills (E3-S3)
+
+- `honba-sim::cost`: new `ScheduleFillCost`, the single adapter from a market
+  `CostSchedule` bound to a `MarketSegment` and settlement currency into a per-fill cost. It
+  exposes the itemized `FeeBreakdown` (`breakdown`) and the total `Money` (`total`, each named
+  charge rounded to minor units once and then summed, ADR 0011), plus `into_fn` for the
+  simulator's `FillCostFn`. `honba-py`'s `next_open` now delegates to it instead of duplicating
+  the rounding.
+- `honba-sim`: `NextOpenSim::with_schedule(Arc<dyn CostSchedule>, MarketSegment)` wires the
+  schedule into the existing `FillCostFn` hook (funding cuts therefore include the cost).
+  `BarFillEngine` gains an additive `with_schedule` cost model that sees the fill's side; the
+  default stays `FillCosts`, and `with_costs` is unchanged.
+- `honba-market::costs`: generic `DatedCostScheduleSource` (effective-dated
+  `Vec<(NaiveDate, Arc<dyn CostSchedule>)>`) implementing `CostModelSource` — `schedule_for(date)`
+  returns the latest entry at or before `date` and errors when none is in force (empty source or
+  a date before the first entry). Also `FeeBreakdown::total_bps(notional)` and
+  `edge_after_costs(gross_bps, &FeeBreakdown, notional)` to net charges out of a gross edge.
+  India convenience `nse_cash_equity_delivery_source()` yields the current
+  `NseCashEquitySchedule::delivery()` for the documented FY 2025-26 effective date.
+  **Historical statutory rates are still to be sourced**: the dated source holds only this single
+  current entry, so earlier dates intentionally have no schedule.
+- Layering: `honba-sim` now depends on `honba-market` with default features off (generic cost
+  contracts only, never the `india` pack); `scripts/dependency_graph.py` records the edge.
+- Tests: `charges_effective_dated` and `edge_after_costs`/`total_bps` (unit); the
+  `india_costs_in_backtest_match_python_costmodel` integration test drives real `NextOpenSim`
+  fills under the India delivery schedule and matches golden minor-unit totals recorded from the
+  Python `nse_equity_delivery_fill_cost` (`crates/honba-market/tests/fixtures/india_delivery_fill_cost_golden.json`).
+
 ### Instrument master with dated snapshots (E1-S3)
 
 - `honba-ports`: added `DatedInstrument` (`instrument`, `freeze_qty`, `effective_from`,

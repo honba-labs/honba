@@ -4,7 +4,10 @@ use std::sync::{Arc, Mutex};
 
 use honba_engine::{AlgoError, ExecutionEngine, Handler, LegacyDrains, OrderRejection, Result};
 use honba_entities::{Currency, ExecutionEvent, Money, Trade};
+use honba_market::costs::{CostSchedule, MarketSegment};
 use honba_messages::{Event, Order, OrderId, OrderSide, OrderType, UnixNanos};
+
+use crate::cost::ScheduleFillCost;
 
 /// Largest accepted flat cost per fill.
 pub const MAX_FLAT_COST: f64 = 1e9;
@@ -77,6 +80,34 @@ impl FillCosts {
     }
 }
 
+/// The per-fill cost model of a [`BarFillEngine`].
+///
+/// The default is a side-agnostic flat + bps [`FillCosts`]; a market
+/// [`CostSchedule`] may be installed instead, which sees the fill's side.
+#[derive(Clone)]
+enum CostModel {
+    /// A side-agnostic flat + bps cost.
+    Flat(FillCosts),
+    /// A side-aware market cost schedule bound to one segment.
+    Schedule {
+        schedule: Arc<dyn CostSchedule>,
+        segment: MarketSegment,
+    },
+}
+
+impl CostModel {
+    /// The cost of one fill in `currency`.
+    fn of(&self, side: OrderSide, quantity: f64, price: f64, currency: Currency) -> Result<Money> {
+        match self {
+            CostModel::Flat(costs) => costs.of(quantity, price, currency),
+            CostModel::Schedule { schedule, segment } => {
+                ScheduleFillCost::new(Arc::clone(schedule), segment.clone(), currency)
+                    .total(side, quantity, price)
+            }
+        }
+    }
+}
+
 #[derive(Clone)]
 struct RestingTrailingStop {
     order: Order,
@@ -135,7 +166,7 @@ struct Inner {
 #[derive(Clone)]
 pub struct BarFillEngine {
     inner: Arc<Mutex<Inner>>,
-    costs: FillCosts,
+    costs: CostModel,
     /// The currency costs settle in. An `Order` carries no currency (it is a
     /// market instruction, not a ledger entry), so the engine declares which
     /// currency its fills cost in — INR for the Indian market by default.
@@ -146,7 +177,7 @@ impl Default for BarFillEngine {
     fn default() -> Self {
         Self {
             inner: Arc::new(Mutex::new(Inner::default())),
-            costs: FillCosts::default(),
+            costs: CostModel::Flat(FillCosts::default()),
             currency: Currency::Inr,
         }
     }
@@ -161,7 +192,18 @@ impl BarFillEngine {
     /// Creates an engine that charges `costs` on every fill.
     pub fn with_costs(costs: FillCosts) -> Self {
         Self {
-            costs,
+            costs: CostModel::Flat(costs),
+            ..Self::default()
+        }
+    }
+
+    /// Creates an engine that charges `schedule` (bound to `segment`) on every fill.
+    ///
+    /// The schedule sees the fill's side; each named charge is rounded to minor
+    /// units once before the legs are summed ([`ScheduleFillCost`]).
+    pub fn with_schedule(schedule: Arc<dyn CostSchedule>, segment: MarketSegment) -> Self {
+        Self {
+            costs: CostModel::Schedule { schedule, segment },
             ..Self::default()
         }
     }
@@ -245,7 +287,9 @@ impl Handler for BarFillEngine {
                 }
             });
             for (order, price) in triggered {
-                let costs = self.costs.of(order.quantity(), price, self.currency)?;
+                let costs = self
+                    .costs
+                    .of(order.side(), order.quantity(), price, self.currency)?;
                 let ts = UnixNanos::from_u64(inner.next_ts.max(b.ts_event().as_u64()));
                 inner.next_ts = ts.as_u64() + 1;
                 let trade = Trade::new(
@@ -286,7 +330,9 @@ impl ExecutionEngine for BarFillEngine {
         let price = inner.last_price.unwrap_or(0.0);
         // Costs first: a fill whose cost cannot be represented is refused
         // before it consumes a timestamp or reaches the fill buffer.
-        let costs = self.costs.of(order.quantity(), price, self.currency)?;
+        let costs = self
+            .costs
+            .of(order.side(), order.quantity(), price, self.currency)?;
         let ts = UnixNanos::from_u64(inner.next_ts.max(order.ts_event().as_u64()));
         inner.next_ts = ts.as_u64() + 1;
         let trade = Trade::new(

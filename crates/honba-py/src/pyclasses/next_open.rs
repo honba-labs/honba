@@ -21,7 +21,7 @@ use honba_messages::{
     Bar, BarAggregation, BarSpecification, BarType, Exchange, InstrumentId, Order, OrderId,
     OrderSide, OrderType, PriceType, TimeInForce, UnixNanos,
 };
-use honba_sim::{FillCostFn, NextOpenSim};
+use honba_sim::{FillCostFn, NextOpenSim, ScheduleFillCost};
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule, PyString, PyTuple};
@@ -351,23 +351,14 @@ impl CostSpec {
 /// Adapts a [`CostSchedule`] to the simulator's fill-cost function: the notional is
 /// `abs(quantity * price)`, every charge leg is rounded to minor units once (half away from zero)
 /// and the legs are summed, like Python `nse_equity_delivery_fill_cost`.
+///
+/// A thin wrapper over `honba_sim::ScheduleFillCost`, which is the single implementation.
 pub fn schedule_cost_fn(
     schedule: Box<dyn CostSchedule>,
     segment: MarketSegment,
     currency: Currency,
 ) -> FillCostFn {
-    Box::new(move |side, qty, price| {
-        let fees = schedule.compute_costs(&segment, side, (qty * price).abs());
-        let mut total = 0_i64;
-        for charge in &fees.charges {
-            let leg = Money::from_major_f64(charge.amount, currency)
-                .map_err(|e| AlgoError::Component(format!("cost leg {}: {e}", charge.name)))?;
-            total = total
-                .checked_add(leg.minor())
-                .ok_or_else(|| AlgoError::Component("fill cost overflow".into()))?;
-        }
-        Ok(Money::new(total, currency))
-    })
+    ScheduleFillCost::new(Arc::from(schedule), segment, currency).into_fn()
 }
 
 fn parse_side(side: &str) -> OrderSide {

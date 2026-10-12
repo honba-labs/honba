@@ -17,3 +17,8 @@ honba-entities.workspace = true
 chrono.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+honba-engine.workspace = true
+honba-sim.workspace = true
+serde_json.workspace = true

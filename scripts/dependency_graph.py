@@ -39,7 +39,14 @@ ALLOWED_PROD = {
     "honba-engine": {"honba-messages", "honba-entities", "honba-risk"},  # Engine::submit gate
     "honba-indicators": {"honba-messages", "honba-entities"},
     "honba-async": {"honba-messages", "honba-engine", "honba-ports"},
-    "honba-sim": {"honba-messages", "honba-entities", "honba-engine"},
+    "honba-sim": {
+        "honba-messages",
+        "honba-entities",
+        "honba-engine",
+        # Generic cost schedules only (never the `india` pack): the simulator charges a
+        # `CostSchedule` per fill (E3-S3).
+        "honba-market",
+    },
     "honba-strategy": {
         "honba-engine",
         "honba-indicators",
@@ -135,7 +142,8 @@ ALLOWED_PROD = {
 ALLOWED_DEV = {
     "honba-messages": set(),
     "honba-entities": set(),
-    "honba-market": set(),
+    # Integration test drives a simulator fill with the India schedule (E3-S3).
+    "honba-market": {"honba-engine", "honba-sim"},
     "honba-ports": {"honba-testing"},
     "honba-risk": set(),
     "honba-engine": {"honba-sim", "honba-market"},  # tests name InstrumentRules for a RulesSource

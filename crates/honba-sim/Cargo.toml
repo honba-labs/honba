@@ -11,6 +11,9 @@ description = "Simulation and paper execution models for Honba"
 honba-messages.workspace = true
 honba-entities.workspace = true
 honba-engine.workspace = true
+# Generic cost schedules only: the `india` pack must never be enabled here (core crate rule),
+# so this is a direct path dependency with default features off rather than workspace inheritance.
+honba-market = { path = "../honba-market", default-features = false }
 thiserror.workspace = true
 
 
