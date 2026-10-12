@@ -64,7 +64,7 @@ pub use clock::Clock;
 pub use error::{PortError, PortResult};
 pub use execution::ExecutionGateway;
 pub use feed::MarketDataFeed;
-pub use master::InstrumentMaster;
+pub use master::{DatedInstrument, InstrumentMaster};
 pub use secret::SecretStore;
 pub use sink::Sink;
 pub use snapshot::{DepthLevel, DepthReader, DepthSnapshot, QuoteReader};

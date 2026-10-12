@@ -11,6 +11,7 @@ description = "Async trait ports for the Honba platform"
 honba-messages.workspace = true
 honba-entities.workspace = true
 async-trait.workspace = true
+chrono.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
