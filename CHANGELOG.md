@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Sandbox adapter (paper on live data) (E3-S7)
+
+- `honba_sim::sandbox::SandboxAdapter`: paper-trades on a live-style feed through the same
+  matching core and order FSM a backtest uses. It wraps a `LiveFeed` (the synchronous stand-in
+  for the async `honba_ports::MarketDataConnector`) and any `ExecutionEngine` + `Handler` core
+  (`BarFillEngine` or `NextOpenSim`): `advance` pulls the next feed event into the core, and
+  `place_order` records the order as `Submitted` in an `OrderState`, routes it to the core, and
+  applies every drained `ExecutionEvent` to that state. Its `virtual_funds` / `virtual_positions`
+  ledger is derived from the fills and held in the adapter, isolated from any real broker
+  adapter.
+- Tests: unit `virtual_funds_isolated` (the sandbox fills at the bar close while a real-like
+  adapter fills at its venue price plus a fee: the two ledgers diverge, and the sandbox never
+  touches the other); integration `sandbox_vs_backtest_same_fills` (the same order stream over the
+  same seeded bar slice books byte-identical `Trade` sequences in the sandbox and a `BarFillEngine`
+  backtest).
+- Deferred: wiring the async connector / `ExecutionGateway` ports (roadmap D10 ADR) and real
+  market data; the seam here is synchronous and offline.
+
 ### Lot and freeze-quantity splitter (E3-S6)
 
 - `honba_sim::lot`: `lot_aligned_size(quantity, lot_size)` floors a request to whole lots

@@ -12,6 +12,7 @@ pub mod lot;
 pub mod margin;
 pub mod next_open;
 pub mod paper;
+pub mod sandbox;
 pub mod scripted;
 pub mod target;
 
@@ -25,6 +26,7 @@ pub use margin::{
 };
 pub use next_open::{FillCostFn, NextOpenSim};
 pub use paper::{OrderLedger, PaperExecution};
+pub use sandbox::{LiveFeed, SandboxAdapter, SimulatedFeed};
 pub use scripted::{Behavior, ScriptedExecution, VenueAction};
 pub use target::{PerInstrumentLock, SmartOrderController, TargetPosition};
 
