@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Instrument master with dated snapshots (E1-S3)
+
+- `honba-ports`: added `DatedInstrument` (`instrument`, `freeze_qty`, `effective_from`,
+  `effective_to`) and two additive `InstrumentMaster` methods with provided defaults, so no
+  existing implementation breaks: `snapshot(as_of)` (default: wrap `list_instruments` with an
+  unbounded window and a unit freeze quantity) and `resolve_as_of(id, as_of)` (default:
+  `get_instrument(id)`).
+- `honba-feed::instruments`: `CatalogInstrumentMaster` reads a dated snapshot directory
+  `{root}/instruments/` holding one Parquet file per date named `YYYY-MM-DD.parquet`. Columns:
+  `symbol, exchange, kind, currency, lot_size, tick_size, freeze_qty, expiry, strike,
+  option_type, underlying`; the numerics accept any Arrow numeric type (data may arrive as
+  doubles) and `expiry` is a nullable `YYYY-MM-DD` string. A record is in force from its file
+  date; `resolve_as_of` returns the latest snapshot at or before `as_of`, or `None` once the
+  contract's `expiry < as_of`, and `snapshot` returns every in-force, non-expired record.
+  Reading is local and deterministic: no network and no wall clock, and test fixtures are
+  generated at test time rather than checked in.
+- Tests: `resolve_as_of_old_symbol` (unit, generated Parquet fixtures) and
+  `backtest_resolves_expired_contract` (integration, engine run) prove a symbol with a changing
+  lot size resolves to the old lot at an old date and the new lot later, and that an expired
+  contract neither resolves nor fills while a live one does.
+
 ### Typed LLM decisions and journaling (E5-S7)
 
 - `honba-engine::decision`: Implemented `LlmDecision` and `LlmDecisionKind` enforcing typed AI decision invariants:

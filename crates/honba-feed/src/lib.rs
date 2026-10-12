@@ -8,6 +8,8 @@ pub mod dataset;
 pub mod export;
 /// Data import sources and loaders
 pub mod import;
+/// Dated instrument snapshots (E1-S3).
+pub mod instruments;
 pub mod reader;
 
 pub use dataset::{
@@ -18,6 +20,7 @@ pub use export::{
     CsvReportWriter, ExportError, JsonReportWriter, MarkdownReportWriter, ReportWriter,
 };
 pub use import::parquet_source::{ParquetBarSource, ParquetError};
+pub use instruments::{snapshot_schema, CatalogError, CatalogInstrumentMaster};
 pub use reader::{DatasetReader, ReaderError};
 
 #[cfg(test)]
