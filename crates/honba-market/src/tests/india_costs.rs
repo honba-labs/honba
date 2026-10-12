@@ -3,7 +3,7 @@
 use honba_messages::OrderSide;
 
 use crate::india::costs::{NseCashEquitySchedule, CHARGE_IPFT};
-use crate::{CostSchedule, MarketSegment};
+use crate::{CostModelSource, CostSchedule, MarketSegment};
 
 fn seg() -> MarketSegment {
     MarketSegment::from("equity")
@@ -67,4 +67,19 @@ fn a_zero_notional_costs_nothing_and_a_negative_one_is_taken_absolute() {
     let pos = NseCashEquitySchedule::delivery().compute_costs(&seg(), OrderSide::Sell, 500.0);
     let neg = NseCashEquitySchedule::delivery().compute_costs(&seg(), OrderSide::Sell, -500.0);
     assert_eq!(pos, neg);
+}
+
+#[test]
+fn the_delivery_source_serves_the_current_schedule_from_its_effective_date() {
+    let source = crate::india::costs::nse_cash_equity_delivery_source();
+    let from = crate::india::costs::nse_cash_equity_delivery_effective_from();
+    let expected =
+        NseCashEquitySchedule::delivery().compute_costs(&seg(), OrderSide::Buy, 29_500.0);
+    let got = source
+        .schedule_for(from)
+        .unwrap()
+        .compute_costs(&seg(), OrderSide::Buy, 29_500.0);
+    assert_eq!(got, expected);
+    // Historical schedules are not sourced yet: the day before the effective date has none.
+    assert!(source.schedule_for(from.pred_opt().unwrap()).is_err());
 }

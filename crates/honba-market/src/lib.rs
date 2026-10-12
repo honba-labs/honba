@@ -43,7 +43,10 @@ pub mod india;
 // Re-export core generic contracts at crate root
 pub use aggregator::SessionBarAggregator;
 pub use calendar::{HolidaySource, MarketCalendar, Session, TradingCalendar};
-pub use costs::{Charge, CostModelSource, CostSchedule, FeeBreakdown, MarketSegment};
+pub use costs::{
+    edge_after_costs, Charge, CostModelSource, CostSchedule, DatedCostScheduleSource, FeeBreakdown,
+    MarketSegment,
+};
 pub use error::{MarketError, Result};
 pub use expiry::{ExpiryRules, LastThursdayExpiry};
 pub use null::{

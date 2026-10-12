@@ -1,11 +1,13 @@
 //! Generic transaction costs and named-charge fee schedules.
 
+use std::fmt;
+use std::sync::Arc;
+
 use chrono::NaiveDate;
 use honba_messages::OrderSide;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
-use crate::Result;
+use crate::{MarketError, Result};
 
 /// A named financial charge or tax line item on a transaction.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -69,6 +71,23 @@ impl FeeBreakdown {
             .find(|c| c.name == name)
             .map(|c| c.amount)
     }
+
+    /// The total cost as basis points of `notional` (10 000 bps = 100%), or 0
+    /// for a non-positive notional.
+    pub fn total_bps(&self, notional: f64) -> f64 {
+        if notional <= 0.0 {
+            0.0
+        } else {
+            self.total() / notional * 10_000.0
+        }
+    }
+}
+
+/// Nets `costs` out of a gross `gross_bps` edge: the strategy edge that
+/// survives after statutory charges are paid. For a non-positive notional
+/// there are no costs, so the gross edge passes through unchanged.
+pub fn edge_after_costs(gross_bps: f64, costs: &FeeBreakdown, notional: f64) -> f64 {
+    gross_bps - costs.total_bps(notional)
 }
 
 /// Generic market segment or product classification.
@@ -120,4 +139,54 @@ pub trait CostSchedule: Send + Sync {
 pub trait CostModelSource {
     /// Returns the cost schedule in force on the given date.
     fn schedule_for(&self, date: NaiveDate) -> Result<Box<dyn CostSchedule>>;
+}
+
+/// A cloneable view of an [`Arc`]ed schedule that can be handed out by value.
+#[derive(Clone)]
+struct SharedSchedule(Arc<dyn CostSchedule>);
+
+impl CostSchedule for SharedSchedule {
+    fn compute_costs(
+        &self,
+        segment: &MarketSegment,
+        side: OrderSide,
+        notional: f64,
+    ) -> FeeBreakdown {
+        self.0.compute_costs(segment, side, notional)
+    }
+}
+
+/// A [`CostModelSource`] over an effective-dated list of cost schedules.
+///
+/// A schedule is in force from its effective date until the date before the
+/// next entry: [`schedule_for`](CostModelSource::schedule_for) returns the
+/// latest entry at or before `date`, and errors when there is no such entry
+/// (a date before the first effective date, or an empty source). Entries may
+/// be supplied in any order; they are sorted on construction.
+pub struct DatedCostScheduleSource {
+    entries: Vec<(NaiveDate, Arc<dyn CostSchedule>)>,
+}
+
+impl DatedCostScheduleSource {
+    /// Builds a source from `(effective_date, schedule)` entries.
+    pub fn new(entries: Vec<(NaiveDate, Arc<dyn CostSchedule>)>) -> Self {
+        let mut entries = entries;
+        entries.sort_by_key(|(date, _)| *date);
+        Self { entries }
+    }
+}
+
+impl CostModelSource for DatedCostScheduleSource {
+    fn schedule_for(&self, date: NaiveDate) -> Result<Box<dyn CostSchedule>> {
+        self.entries
+            .iter()
+            .rev()
+            .find(|(from, _)| *from <= date)
+            .map(|(_, schedule)| {
+                Box::new(SharedSchedule(Arc::clone(schedule))) as Box<dyn CostSchedule>
+            })
+            .ok_or_else(|| {
+                MarketError::Custom(format!("no cost schedule is effective on or before {date}"))
+            })
+    }
 }
