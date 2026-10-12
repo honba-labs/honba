@@ -14,6 +14,8 @@ E11-S8 done (2026-10-11): Minimal auth (Bearer token, scope map, file token stor
 E5-S10, E5-S11 added (2026-10-11): In-process Llama runtime (GBNF constraints) and financial domain alignment (SFT + RLVR compiler rewards).
 E4-S6, E4-S7, E4-S8 done (2026-10-11): Overfitting validation gates (DSR, PBO, CSCV, holdout, MC, cost-stress), chunked streaming datasets, and session MTF aggregation (ADR 0024, commit e7da809).
 E1-S2 done (2026-10-11): F&O instruments & grammar (india::fno), OptionType, right-to-left resolution, acceptance suite, Python bindings and stubs.
+E6 batch 4, E1-S3, E3-S3 done (2026-10-12): plain-sum indicators O(1) (`00c75af`, `6f23282`); InstrumentMaster dated snapshots over a Parquet
+catalog (`a3d09c7`, `a208daf`); market CostSchedule wired into simulator fills with effective-dated schedules and `edge_after_costs` (`9b8b64f`, `cf69d81`).
 The two superseded documents are kept in `docs/archive/` for history and are not updated.
 
 Story verdicts come from the 2026-10-06 audit (a scratch file, `ROADMAP_AUDIT.md`, model output, not kept in the repo) after a spot-check
@@ -31,18 +33,18 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | Epic | Done | Partial | Not started | One-line state |
 |---|---|---|---|---|
 | E0 Contract spine | 8 | 0 | 0 | Complete: wire types, codegen, versions, money, market packs, manifest, `honba verify` |
-| E1 Instruments and adapters | 2 | 1 | 3 | Adapter Protocol, contract suite, and F&O grammar shipped; instrument master, session, feed open |
+| E1 Instruments and adapters | 3 | 0 | 3 | Adapter Protocol, contract suite, F&O grammar and dated instrument master shipped; session, feed open |
 | E2 Safe engine | 1 | 4 | 6 | Kill switch, audit log and fill feedback loop work; no risk stage, no order FSM, no reconciliation |
-| E3 Execution realism | 0 | 2 | 5 | Bar-fill (L1) simulator and Python next-open simulator only |
+| E3 Execution realism | 1 | 1 | 5 | Bar-fill (L1) simulator, Rust and Python next-open simulators, and cost-schedule fills shipped |
 | E4 Research pipeline | 8 | 0 | 0 | Complete: journal v1, cache, hyperparameters, CLI/REST runner, look-ahead, sweep fitness, overfitting gates, streaming datasets, MTF aggregation |
 | E5 Agent and API | 1 | 1 | 7 | AI strategy verifier shipped (ADR 0022); MCP server, scopes, approval queue shipped; sandbox open |
-| E6 Indicators | n/a | 0 | 1 | Batches 1-2 (O(1) rolling) done; batches 3-4 and render contract (S5) not started |
+| E6 Indicators | n/a | 0 | 1 | Batches 1-4 (O(1) rolling, plain sums) done; render contract (S5) not started |
 | E7 Scale and ops | 0 | 0 | 5 | Pull-based; E7-S4 is superseded by `honba-sweep` (E10-S5) |
 | E8 Multi-leg | 0 | 0 | 4 | Optional; not scheduled (open decision D13) |
 | E9 Frontend and AlgoDesigner | 0 | 1 | 7 | Greenfield; generated TS types only |
 | E10 Async core | 6 | 1 | 1 | Ports, shell, engine output, Arc dataset, sweep, determinism test and Python runtime bridge (ADR 0015) shipped; connectors open |
 | E11 Versioned API | 4 | 1 | 2 | Read API, SDK and WASM indicators shipped; SSE streaming shipped; write endpoints and auth shipped |
-| **Total (74)** | **24** | **13** | **37** | |
+| **Total (74)** | **26** | **11** | **37** | |
 
 ### 1.1 What is shipped (evidence)
 
@@ -84,6 +86,9 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | E4-S6 overfitting gates | ADR 0024, `crates/honba-analytics/src/validation.rs`: DSR, PBO (CSCV), walk-forward, holdout, block-bootstrap MC, cost-stress; `ValidationBlock` in backtest/sweep results; unit + integration tests `dsr_known_values`, `bootstrap_seeded`, `result_carries_validation_block` |
 | E4-S7 streaming datasets | ADR 0024, `crates/honba-feed/src/streaming.rs`: `StreamDataset`, `StreamingChunkIterator`, chunk manifests, dataset IDs; unit + integration tests `chunks_cover_slice`, `sweep_over_streamed_dataset` |
 | E4-S8 session MTF aggregation | ADR 0024, `crates/honba-indicators/src/mtf.rs`: `MtfAggregator`, `CalendarSession`, HTF bar emission on period completion; unit + integration tests `htf_bar_only_when_complete`, `mtf_strategy_run` |
+| E6 batch 4 plain-sum indicators | `python/src/honba/strategies/indicators/{moving_average/vwma,volume/chaikin_money_flow,volume/money_flow_index,trend/vortex,momentum/chande_momentum,momentum/ultimate_oscillator,volatility/chaikin_volatility}.py` now O(1) via `_rolling.RollingSum`; `python/tests/unit/test_indicators_rolling_batch4.py` (old-oracle + Fraction), hot-path guard extended; commits 00c75af, 6f23282 |
+| E1-S3 instrument master snapshots | `crates/honba-ports/src/master.rs` `DatedInstrument`, provided-default `snapshot(as_of)`/`resolve_as_of`; `crates/honba-feed/src/instruments.rs` `CatalogInstrumentMaster` over `{root}/instruments/YYYY-MM-DD.parquet`; tests `resolve_as_of_old_symbol`, `backtest_resolves_expired_contract` |
+| E3-S3 cost schedule in fills | `honba-market::DatedCostScheduleSource`, `edge_after_costs`, `FeeBreakdown::total_bps`; `honba-sim::cost::ScheduleFillCost`, `NextOpenSim::with_schedule`, `BarFillEngine::with_schedule`; tests `charges_effective_dated`, `india_costs_in_backtest_match_python_costmodel` (golden) |
 | E4-S5 sweep fitness & REST | `honba-sweep` `CalmarFitness`, `SortinoFitness`, `OmegaFitness`, `fitness_ranking_stable`; `POST /sweeps`, `GET /sweeps/{id}`, `GET /sweeps/{id}/journal` (422 per-trial); `crates/honba-api-rest/tests/rest_sweep.rs` |
 | E11-S5 part 1 | `crates/honba-api-wasm`: `indicator_series`, `ohlc_indicator_series` (ATR), conformance vectors (d1c9db3, e9fd98e) |
 | E6 batches 1-2 | commits 6372528, 510e0d4, efca4bd, 7c9a325, 6a91432 |
@@ -251,7 +256,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 |---|---|---|---|---|---|
 | E1-S1b | Second adapter passes the contract suite on recorded fixtures; migration note per adapter | M | E1-S1 | `test_contract_suite[dhan]` / `test_adapter_wiring_recorded_fixture` | honba-adapters (ask first) |
 | E1-S2 (DONE) | `Instrument` gains optional expiry, strike, option type, underlying; `india::fno` grammar parse/format (equity, futures, options, index) | M | E0-S7 | `symbol_round_trip_property`, `ce_suffix_ambiguity`, `weekly_vs_monthly` / `catalog_resolves_fno_symbol` through market registry; Python binding + stub | honba |
-| E1-S3 | `InstrumentMaster` impl over Parquet catalog: `snapshot(as_of)`, effective-dated lot/tick/freeze | M | E1-S2 | `resolve_as_of_old_symbol` / `backtest_resolves_expired_contract` | honba |
+| E1-S3 (DONE) | `InstrumentMaster` impl over Parquet catalog: `snapshot(as_of)`, effective-dated lot/tick/freeze | M | E1-S2 | `resolve_as_of_old_symbol` / `backtest_resolves_expired_contract` | honba |
 | E1-S4 | Product/price-type/TIF table mapping per adapter | S | first real adapter | `mapping_round_trip_property` / `adapter_rejects_unsupported_combo` | honba-adapters |
 | E1-S5 | `SessionProvider`, rate limiter, secret store impl (Python side) | M | E1-S1b | `token_expiry_fake_clock`, `bucket_refill` / `limits_hold_across_workers`, `no_secret_in_logs` | honba (+adapters) |
 | E1-S6 | Feed connector contract: reconnect, backoff, gap markers, watchdog, Terminal/Unrecoverable | M | E10-S1, E2-S3 | `backoff_schedule`, `terminal_error_stops` / `simulated_feed_drop_emits_gap_marker` | honba |
@@ -279,7 +284,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 | E3-S1b | L2 quote/tick matching: marketable orders walk top of book, resting limits, stops from ticks, IOC/FOK/day | L -> split | E2-S6, E3-S2, tick data decision | `limit_fills_on_trade_through` / L1 vs L2 conformance on same stream | honba |
 | E3-S1d | Differential oracle: naive reference matcher vs optimised sim | M | E3-S1b | `oracle_agrees_seeded_streams` / same | honba |
 | E3-S2 | `FillModel`, `LatencyModel` traits, seeded; slippage, ack delay, queue position; depth survival discount | M | E3-S1a | `seeded_slippage_reproducible` / `same_seed_byte_identical_fills` | honba |
-| E3-S3 | Wire Rust `CostSchedule` into fills (named charges on `Trade`); `edge_after_costs` | M | E0-S7 | `charges_effective_dated` / `india_costs_in_backtest_match_python_costmodel` golden | honba |
+| E3-S3 (DONE) | Wire Rust `CostSchedule` into fills; `edge_after_costs` (named charges on `Trade` deferred) | M | E0-S7 | `charges_effective_dated` / `india_costs_in_backtest_match_python_costmodel` golden | honba |
 | E3-S4 | Margin model and MIS square-off from `MarketProfile` | M | E3-S3, E2-S3 | `square_off_at_session_end` / `mis_run_flat_by_close` | honba |
 | E3-S5 | Target-position (smart order) with per-instrument serialisation | M | E3-S6, E2-S6 | `target_delta_computed` / `target_position_run` | honba |
 | E3-S6 | Lot and freeze-quantity splitter, lot-aware sizing | S | E1-S3 | `slice_above_freeze` / `order_sliced_in_sim` | honba |
@@ -318,7 +323,8 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 
 | ID | Scope | Size | Deps | Acceptance | Owner |
 |---|---|---|---|---|---|
-| E6 b3 | Monotonic-deque indicators (donchian, williams_r, stochastic, ...); batch 4 plain sums | M each | none | oracle vs old O(n) plus Fraction reference / shared vectors | honba |
+| E6 b3 (DONE) | Monotonic-deque indicators (donchian, williams_r, stochastic, ...) | M each | none | oracle vs old O(n) plus Fraction reference / shared vectors | honba |
+| E6 b4 (DONE) | Plain-sum indicators O(1): vwma, chaikin_money_flow, money_flow_index, vortex, cmo, ultimate_oscillator, chaikin_volatility | M | none | old-oracle + Fraction reference / `test_indicators_rolling_batch4.py` | honba |
 | E6-S5 | Indicator render contract (pane, plots, zones) | S/M | E9 start | `output_len_matches_input` / chart consumes via WASM | honba |
 | E7-S1 | Docs from schemas | S | continuous | docs build | honba-docs |
 | E7-S2/S3/S5 | Indexed state, cache persistence, recorder tap | M | pull-based | n/a | honba |
