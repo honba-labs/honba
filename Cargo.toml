@@ -53,6 +53,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 thiserror = "1"
 sha2 = "0.10"
+rand = "0.8"
 chrono = { version = ">=0.4.20, <0.4.40", features = ["serde"] }
 arrow = "53"
 parquet = { version = "53", features = ["arrow"] }

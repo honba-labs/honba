@@ -2,6 +2,8 @@
 
 mod bar_fill;
 mod execution_events;
+mod fill_model;
+mod latency;
 mod next_open;
 mod next_open_costs;
 mod next_open_session_open;

@@ -15,9 +15,13 @@ use honba_engine::{
 use honba_entities::{Currency, ExecutionEvent, Money, Trade};
 use honba_market::costs::{CostSchedule, MarketSegment};
 use honba_messages::{Bar, Event, InstrumentId, Order, OrderId, OrderSide, OrderType, UnixNanos};
+use rand::rngs::StdRng;
+use rand::SeedableRng;
 use std::sync::Arc;
 
 use crate::cost::ScheduleFillCost;
+use crate::fill_model::{FillModel, NoSlippage, SlippageModel};
+use crate::latency::{LatencyModel, NoLatency};
 
 /// Quantities closer than this are equal (float residue from fractional fills).
 const QTY_EPS: f64 = 1e-9;
@@ -60,6 +64,9 @@ pub struct NextOpenSim {
     /// `(session the proceeds become available, amount in minor units)`.
     receivables: Vec<(i64, i64)>,
     cost_fn: FillCostFn,
+    fill_model: Arc<dyn FillModel>,
+    latency_model: Arc<dyn LatencyModel>,
+    rng: StdRng,
     long_only: bool,
     lot_sizes: Vec<(InstrumentId, f64)>,
     positions: Vec<(InstrumentId, f64)>,
@@ -95,6 +102,10 @@ impl NextOpenSim {
             settlement_days: 0,
             receivables: Vec::new(),
             cost_fn: Box::new(|_, _, _| Ok(Money::new(0, Currency::Inr))),
+            fill_model: Arc::new(NoSlippage),
+            latency_model: Arc::new(NoLatency),
+            // Seed 0, not entropy: an unseeded simulator is still reproducible.
+            rng: StdRng::seed_from_u64(0),
             long_only: true,
             lot_sizes: Vec::new(),
             positions: Vec::new(),
@@ -136,6 +147,44 @@ impl NextOpenSim {
     pub fn with_long_only(mut self, long_only: bool) -> Self {
         self.long_only = long_only;
         self
+    }
+
+    /// Installs the slippage model applied to every fill (default [`NoSlippage`]).
+    ///
+    /// A stochastic model consumes the simulator's seeded stream; pair it with
+    /// [`Self::with_seed`] or use [`Self::with_slippage`] so a run repeats.
+    #[must_use]
+    pub fn with_fill_model(mut self, model: Arc<dyn FillModel>) -> Self {
+        self.fill_model = model;
+        self
+    }
+
+    /// Installs the latency model that delays each fill's timestamp (default
+    /// [`NoLatency`]).
+    #[must_use]
+    pub fn with_latency_model(mut self, model: Arc<dyn LatencyModel>) -> Self {
+        self.latency_model = model;
+        self
+    }
+
+    /// Seeds the simulator's random stream. Two runs with the same seed, orders
+    /// and bars book byte-identical fills.
+    #[must_use]
+    pub fn with_seed(mut self, seed: u64) -> Self {
+        self.rng = StdRng::seed_from_u64(seed);
+        self
+    }
+
+    /// Installs a [`SlippageModel`], seeding the simulator from its seed when it
+    /// has one.
+    #[must_use]
+    pub fn with_slippage(self, model: SlippageModel) -> Self {
+        let seed = model.seed();
+        let sim = self.with_fill_model(Arc::new(model));
+        match seed {
+            Some(seed) => sim.with_seed(seed),
+            None => sim,
+        }
     }
 
     /// Sets the settlement cycle: sale proceeds become available that many sessions after the
@@ -424,11 +473,15 @@ impl NextOpenSim {
                 want = qty; // a hair over the position is float residue: sell it all
             }
         }
+        // One slippage draw per order: the same price funds and books the fill.
+        let px = self
+            .fill_model
+            .price(order.side(), open.price, &mut self.rng);
         let (notional, cost) = if qty > 0.0 {
             // before dequeuing: a failure leaves the order working
             (
-                self.notional(qty, open.price)?,
-                self.costs(OrderSide::Sell, qty, open.price)?,
+                self.notional(qty, px)?,
+                self.costs(OrderSide::Sell, qty, px)?,
             )
         } else {
             (0, 0)
@@ -446,7 +499,7 @@ impl NextOpenSim {
             self.cash = cash;
             self.receivables
                 .push((self.session + self.settlement_days, proceeds));
-            self.book(&order, open, qty, notional, cost, qty >= want)
+            self.book(&order, open, px, qty, notional, cost, qty >= want)
         } else {
             Ok(())
         };
@@ -461,7 +514,10 @@ impl NextOpenSim {
         let first_try = *self.working[idx].first_try.get_or_insert(session);
         let order = self.working[idx].order.clone();
         let want = order.quantity();
-        let px = open.price;
+        // One slippage draw per order: the same price funds and books the fill.
+        let px = self
+            .fill_model
+            .price(order.side(), open.price, &mut self.rng);
         let available = self.cash - self.unsettled_minor();
         let qty = if self.buy_cost(want, px)? <= available {
             want
@@ -487,7 +543,7 @@ impl NextOpenSim {
         // The fill, then the remainder's rejection: one queue, in that order.
         let booked = if qty > 0.0 {
             self.cash = outlay;
-            self.book(&order, open, qty, notional, cost, qty >= want)
+            self.book(&order, open, px, qty, notional, cost, qty >= want)
         } else {
             Ok(())
         };
@@ -525,10 +581,12 @@ impl NextOpenSim {
         Ok(lo as f64 * lot)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn book(
         &mut self,
         order: &Order,
         open: &Open,
+        price: f64,
         qty: f64,
         notional: i64,
         cost: i64,
@@ -552,15 +610,20 @@ impl NextOpenSim {
             .traded_notional
             .checked_add(notional)
             .ok_or_else(|| err("traded notional overflow".into()))?;
+        let delay_ns = self
+            .latency_model
+            .total_delay_ms(&mut self.rng)
+            .saturating_mul(1_000_000);
+        let ts = UnixNanos::from_u64(open.ts.as_u64().saturating_add(delay_ns));
         let trade = Trade::new(
             OrderId::new(order.order_id().as_str()),
             order.instrument_id().clone(),
             order.side(),
             qty,
-            open.price,
+            price,
             self.currency,
-            open.ts,
-            open.ts,
+            ts,
+            ts,
         )
         .with_costs(Money::new(cost, self.currency));
         // One fill per order: its cumulative quantity is its own.

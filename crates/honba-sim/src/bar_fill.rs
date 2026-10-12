@@ -6,8 +6,12 @@ use honba_engine::{AlgoError, ExecutionEngine, Handler, LegacyDrains, OrderRejec
 use honba_entities::{Currency, ExecutionEvent, Money, Trade};
 use honba_market::costs::{CostSchedule, MarketSegment};
 use honba_messages::{Event, Order, OrderId, OrderSide, OrderType, UnixNanos};
+use rand::rngs::StdRng;
+use rand::SeedableRng;
 
 use crate::cost::ScheduleFillCost;
+use crate::fill_model::{FillModel, NoSlippage, SlippageModel};
+use crate::latency::{LatencyModel, NoLatency};
 
 /// Largest accepted flat cost per fill.
 pub const MAX_FLAT_COST: f64 = 1e9;
@@ -115,13 +119,27 @@ struct RestingTrailingStop {
     trough: f64,
 }
 
-#[derive(Default)]
 struct Inner {
     last_price: Option<f64>,
     resting_trailing: Vec<RestingTrailingStop>,
     events: Vec<ExecutionEvent>,
     legacy: LegacyDrains,
     next_ts: u64,
+    rng: StdRng,
+}
+
+impl Default for Inner {
+    fn default() -> Self {
+        Self {
+            last_price: None,
+            resting_trailing: Vec::new(),
+            events: Vec::new(),
+            legacy: LegacyDrains::default(),
+            next_ts: 0,
+            // Seed 0, not entropy: an unseeded engine is still reproducible.
+            rng: StdRng::seed_from_u64(0),
+        }
+    }
 }
 
 /// An execution engine that records the most recent bar close (as a
@@ -171,6 +189,10 @@ pub struct BarFillEngine {
     /// market instruction, not a ledger entry), so the engine declares which
     /// currency its fills cost in — INR for the Indian market by default.
     currency: Currency,
+    /// Applies slippage to each fill (default [`NoSlippage`]).
+    fill_model: Arc<dyn FillModel>,
+    /// Delays each fill's timestamp (default [`NoLatency`]).
+    latency_model: Arc<dyn LatencyModel>,
 }
 
 impl Default for BarFillEngine {
@@ -179,6 +201,8 @@ impl Default for BarFillEngine {
             inner: Arc::new(Mutex::new(Inner::default())),
             costs: CostModel::Flat(FillCosts::default()),
             currency: Currency::Inr,
+            fill_model: Arc::new(NoSlippage),
+            latency_model: Arc::new(NoLatency),
         }
     }
 }
@@ -212,6 +236,44 @@ impl BarFillEngine {
     pub fn with_currency(mut self, currency: Currency) -> Self {
         self.currency = currency;
         self
+    }
+
+    /// Installs the slippage model applied to every fill (default [`NoSlippage`]).
+    ///
+    /// A stochastic model consumes the engine's seeded stream; pair it with
+    /// [`Self::with_seed`] or use [`Self::with_slippage`] so a run repeats.
+    #[must_use]
+    pub fn with_fill_model(mut self, model: Arc<dyn FillModel>) -> Self {
+        self.fill_model = model;
+        self
+    }
+
+    /// Installs the latency model that delays each fill's timestamp (default
+    /// [`NoLatency`]).
+    #[must_use]
+    pub fn with_latency_model(mut self, model: Arc<dyn LatencyModel>) -> Self {
+        self.latency_model = model;
+        self
+    }
+
+    /// Seeds the engine's random stream. Two runs with the same seed, orders and
+    /// bars book byte-identical fills.
+    #[must_use]
+    pub fn with_seed(self, seed: u64) -> Self {
+        self.inner.lock().unwrap().rng = StdRng::seed_from_u64(seed);
+        self
+    }
+
+    /// Installs a [`SlippageModel`], seeding the engine from its seed when it
+    /// has one.
+    #[must_use]
+    pub fn with_slippage(self, model: SlippageModel) -> Self {
+        let seed = model.seed();
+        let engine = self.with_fill_model(Arc::new(model));
+        match seed {
+            Some(seed) => engine.with_seed(seed),
+            None => engine,
+        }
     }
 
     /// The settlement currency.
@@ -287,10 +349,16 @@ impl Handler for BarFillEngine {
                 }
             });
             for (order, price) in triggered {
+                let price = self.fill_model.price(order.side(), price, &mut inner.rng);
                 let costs = self
                     .costs
                     .of(order.side(), order.quantity(), price, self.currency)?;
-                let ts = UnixNanos::from_u64(inner.next_ts.max(b.ts_event().as_u64()));
+                let base = inner.next_ts.max(b.ts_event().as_u64());
+                let delay_ns = self
+                    .latency_model
+                    .total_delay_ms(&mut inner.rng)
+                    .saturating_mul(1_000_000);
+                let ts = UnixNanos::from_u64(base.saturating_add(delay_ns));
                 inner.next_ts = ts.as_u64() + 1;
                 let trade = Trade::new(
                     OrderId::new(order.order_id().as_str()),
@@ -327,13 +395,19 @@ impl ExecutionEngine for BarFillEngine {
             });
             return Ok(());
         }
-        let price = inner.last_price.unwrap_or(0.0);
+        let desired = inner.last_price.unwrap_or(0.0);
+        let price = self.fill_model.price(order.side(), desired, &mut inner.rng);
         // Costs first: a fill whose cost cannot be represented is refused
         // before it consumes a timestamp or reaches the fill buffer.
         let costs = self
             .costs
             .of(order.side(), order.quantity(), price, self.currency)?;
-        let ts = UnixNanos::from_u64(inner.next_ts.max(order.ts_event().as_u64()));
+        let base = inner.next_ts.max(order.ts_event().as_u64());
+        let delay_ns = self
+            .latency_model
+            .total_delay_ms(&mut inner.rng)
+            .saturating_mul(1_000_000);
+        let ts = UnixNanos::from_u64(base.saturating_add(delay_ns));
         inner.next_ts = ts.as_u64() + 1;
         let trade = Trade::new(
             OrderId::new(order.order_id().as_str()),

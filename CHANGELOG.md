@@ -2,6 +2,38 @@
 
 ## [Unreleased]
 
+### Seeded FillModel / LatencyModel (E3-S2)
+
+- `honba_sim::fill_model::FillModel`: `price(side, desired_price, rng) -> f64` turns the price a
+  fill *wanted* into the price it books. `NoSlippage` is the default identity. `SlippageModel` is
+  the seeded/fixed choice: `Static { bps, kind }` is a deterministic move `Adverse` (a buy pays
+  more, a sell receives less) or `Favorable`; `Seed { bps, seed }` draws a signed `Normal(0, bps)`
+  move from the simulator's stream, so the same seed books the same fills. The move is unbiased
+  (its mean is zero), not always adverse.
+- `honba_sim::latency::LatencyModel`: `ack_delay_ms(rng)` and `queue_delay_ms(rng)`, plus a
+  `total_delay_ms` helper that draws both in a fixed order. `NoLatency` is the default;
+  `SeededLatency { ack_max_ms, queue_max_ms }` draws uniform delays from the seeded stream. A
+  simulator moves each fill's `ts_event` back by the total delay.
+- `honba_sim::latency::depth_survival_discount(resting_depth, elapsed_ms)`: the one function
+  shared by signal sizing and simulated fills so the two cannot disagree. **Stub, returns `1.0`**:
+  no depth source exists yet (`/depth` returns none). The arguments are accepted now so the call
+  sites and wire shape do not change when a feed lands; per-instrument survival curves are
+  deferred with it.
+- `BarFillEngine` and `NextOpenSim` gain `with_fill_model`, `with_latency_model`, `with_seed` and
+  a `with_slippage(SlippageModel)` convenience that installs the model and seeds from its seed.
+  Both default to seed 0, so an unseeded engine is still reproducible; with no models installed
+  every existing fill is unchanged.
+- New dependency: `rand` 0.8 (`StdRng`, Box-Muller normal draws).
+- Tests: unit `no_slippage_is_the_identity`, `static_adverse_slippage_moves_against_the_side`,
+  `seeded_slippage_is_reproducible_and_seed_aware`, `seeded_slippage_is_unbiased_over_many_draws`,
+  `no_latency_is_zero`, `seeded_latency_is_reproducible_and_bounded`,
+  `depth_survival_discount_is_a_stub_returning_one`; integration `seeded_slippage_reproducible`
+  and `same_seed_byte_identical_fills` (two full `NextOpenSim` runs, serialized journals byte-equal,
+  a different seed differing).
+- Deferred: wiring `FillModel`/`LatencyModel` through `honba-config` (config-driven selection),
+  the L2 depth source that gives `depth_survival_discount` a real curve, and per-instrument
+  survival curves.
+
 ### Market-data connector contract (E1-S6)
 
 - `honba_ports::MarketDataConnector`: the live-feed port. `subscribe(SubscriptionParams) ->
