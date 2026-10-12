@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from collections import deque
-
 from honba.strategies.indicators._base import Indicator, indicator
+from honba.strategies.indicators._rolling import RollingSum
 from honba.strategies.indicators._util import check as _check
 
 
@@ -22,25 +21,28 @@ class UltimateOscillator(Indicator):
     def __init__(self, fast: int = 7, middle: int = 14, slow: int = 28) -> None:
         self.fast, self.middle, self.slow = _check(fast), _check(middle), _check(slow)
         self._prev: float | None = None
-        n = max(fast, middle, slow)
-        self._bp: deque[float] = deque(maxlen=n)
-        self._tr: deque[float] = deque(maxlen=n)
-
-    def _avg(self, n: int) -> float:
-        tr = sum(list(self._tr)[-n:])
-        return sum(list(self._bp)[-n:]) / tr if tr != 0 else 0.0
+        self._bp_fast, self._tr_fast = RollingSum(fast), RollingSum(fast)
+        self._bp_middle, self._tr_middle = RollingSum(middle), RollingSum(middle)
+        self._bp_slow, self._tr_slow = RollingSum(slow), RollingSum(slow)
+        self._need = max(fast, middle, slow)
+        self._fed = 0
 
     def update(self, high: float, low: float, close: float) -> float | None:
         prev, self._prev = self._prev, close
         if prev is None:
             return None
         lo, hi = min(low, prev), max(high, prev)
-        self._bp.append(close - lo)
-        self._tr.append(hi - lo)
-        if self._tr.maxlen is None or len(self._tr) < self._tr.maxlen:
+        bp, tr = close - lo, hi - lo
+        bf = self._bp_fast.update(bp)
+        tf = self._tr_fast.update(tr)
+        bm = self._bp_middle.update(bp)
+        tm = self._tr_middle.update(tr)
+        bs = self._bp_slow.update(bp)
+        ts = self._tr_slow.update(tr)
+        self._fed += 1
+        if self._fed < self._need:
             return None
-        return (
-            100.0
-            * (4 * self._avg(self.fast) + 2 * self._avg(self.middle) + self._avg(self.slow))
-            / 7.0
-        )
+        af = bf / tf if tf != 0 else 0.0
+        am = bm / tm if tm != 0 else 0.0
+        as_ = bs / ts if ts != 0 else 0.0
+        return 100.0 * (4.0 * af + 2.0 * am + as_) / 7.0

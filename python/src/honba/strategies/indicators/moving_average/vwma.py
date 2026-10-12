@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from collections import deque
-
 from honba.strategies.indicators._base import Indicator, indicator
+from honba.strategies.indicators._rolling import RollingSum
 from honba.strategies.indicators._util import check as _check
 
 
@@ -17,13 +16,12 @@ class Vwma(Indicator):
 
     def __init__(self, period: int = 20) -> None:
         self.period = _check(period)
-        self._w: deque[tuple[float, float]] = deque(maxlen=period)
+        self._cv = RollingSum(period)
+        self._vol = RollingSum(period)
 
     def update(self, close: float, volume: float) -> float | None:
-        self._w.append((close, volume))
-        if len(self._w) < self.period:
+        num = self._cv.update(close * volume)
+        vol = self._vol.update(volume)
+        if num is None:
             return None
-        vol = sum(v for _, v in self._w)
-        if vol == 0.0:
-            return float(close)
-        return sum(c * v for c, v in self._w) / vol
+        return float(close) if vol == 0.0 else num / vol

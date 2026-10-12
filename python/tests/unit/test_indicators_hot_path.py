@@ -28,6 +28,14 @@ CASES = {
     "covariance": ({"length": 50}, 2),
     "lsma": ({"period": 50}, 2),
     "linear_regression": ({"length": 50}, 3),  # + LinearRegressionValue.__init__
+    # plain-sum batch 4: one RollingSum.update (with two _unsafe calls) per sum
+    "vwma": ({"period": 50}, 7),  # 2 sums
+    "chaikin_money_flow": ({"period": 50}, 8),  # 2 sums + clv_volume
+    "money_flow_index": ({"period": 50}, 7),  # 2 sums
+    "vortex": ({"period": 50}, 11),  # 3 sums + VortexValue.__init__
+    "cmo": ({"length": 50}, 7),  # 2 sums
+    "ultimate_oscillator": ({"slow": 50}, 19),  # 6 sums
+    "chaikin_volatility": ({"length": 50}, 2),  # Ema only, deque history
 }
 PERIODS = [2, 5, 20, 300]
 
@@ -41,9 +49,10 @@ def _series(seed: int, n: int) -> list[float]:
     return out
 
 
-def _median_calls(ind, two: bool) -> int:
-    xs, ys = _series(1, N_WARM + N_MEASURE), _series(2, N_WARM + N_MEASURE)
-    feed = (lambda i: ind.update(xs[i], ys[i])) if two else (lambda i: ind.update(xs[i]))
+def _median_calls(ind, nin: int) -> int:
+    cols = [_series(s + 1, N_WARM + N_MEASURE) for s in range(nin)]
+    rows = list(zip(*cols))
+    feed = lambda i: ind.update(*rows[i])
     for i in range(N_WARM):
         feed(i)
     counts = []
@@ -72,5 +81,5 @@ def test_steady_state_update_is_a_few_calls(kind, period):
     params, limit = CASES[kind]
     (name,) = params
     ind = build_indicator(kind, **{name: period})
-    two = len(type(ind).inputs) == 2
-    assert _median_calls(ind, two) <= limit
+    nin = len(type(ind).inputs)
+    assert _median_calls(ind, nin) <= limit

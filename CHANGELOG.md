@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Plain-sum indicators (E6 batch 4)
+
+- Python `vwma`, `chaikin_money_flow`, `money_flow_index`, `vortex`, `cmo` (Chande momentum),
+  `ultimate_oscillator` and `chaikin_volatility` are now O(1) amortised per update instead of
+  O(period): each rolling window is one or more `RollingSum` helpers (two per indicator, three
+  for vortex, six for the ultimate oscillator), and chaikin volatility keeps its rate-of-change
+  history in a `deque(maxlen=roc_length+1)` instead of a `list` with `pop(0)`. Public API,
+  warm-up lengths, `reset()`, config and the degenerate results (zero window volume -> latest
+  close / 0.0, zero TR sum -> 0, flat windows) are unchanged.
+- Behaviour change, consistent with batches 1-3: a non-finite value, or one with `|x| > 1e150`,
+  in a rolling window makes the affected output NaN until the value has left the window, after
+  which that sum is rebuilt exactly. Only the sums whose window still holds the value report NaN
+  (e.g. vortex can report NaN in `plus` while `minus` remains finite). Chaikin volatility is
+  unaffected: it holds no sum.
+
 ### F&O instruments and grammar (E1-S2)
 
 - `honba-entities::instrument`: Extended `Instrument` with derivative contract metadata:

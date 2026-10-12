@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from collections import deque
-
 from honba.strategies.indicators._base import Indicator, indicator
+from honba.strategies.indicators._rolling import RollingSum
 from honba.strategies.indicators._util import check as _check
 
 from .accumulation_distribution import clv_volume
@@ -21,13 +20,12 @@ class ChaikinMoneyFlow(Indicator):
 
     def __init__(self, period: int = 20) -> None:
         self.period = _check(period)
-        self._mf: deque[float] = deque(maxlen=period)
-        self._vol: deque[float] = deque(maxlen=period)
+        self._mf = RollingSum(period)
+        self._vol = RollingSum(period)
 
     def update(self, high: float, low: float, close: float, volume: float) -> float | None:
-        self._mf.append(clv_volume(high, low, close, volume))
-        self._vol.append(volume)
-        if len(self._mf) < self.period:
+        mf = self._mf.update(clv_volume(high, low, close, volume))
+        vol = self._vol.update(volume)
+        if mf is None:
             return None
-        sv = sum(self._vol)
-        return sum(self._mf) / sv if sv else 0.0
+        return mf / vol if vol else 0.0

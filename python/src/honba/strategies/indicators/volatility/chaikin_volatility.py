@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections import deque
+
 from honba.strategies.indicators._base import Indicator, indicator
 from honba.strategies.indicators._util import check as _check
 from honba.strategies.indicators.moving_average.averages import Ema
@@ -21,15 +23,13 @@ class ChaikinVolatility(Indicator):
     def __init__(self, length: int = 10, roc_length: int = 10) -> None:
         self.length, self.roc_length = _check(length), _check(roc_length)
         self._ema = Ema(length)
-        self._hist: list[float] = []
+        self._hist: deque[float] = deque(maxlen=roc_length + 1)
 
     def update(self, high: float, low: float) -> float | None:
         e = self._ema.update(high - low)
         if e is None:
             return None
         self._hist.append(e)
-        if len(self._hist) > self.roc_length + 1:
-            self._hist.pop(0)
         if len(self._hist) <= self.roc_length:
             return None
         old = self._hist[0]
