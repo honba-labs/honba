@@ -2,6 +2,33 @@
 
 ## [Unreleased]
 
+### Session, rate limit and secret store (E1-S5)
+
+- `honba.adapters.session`: `Token` (a value whose `repr`/`str` redact the token) and
+  `SessionProvider`/`TokenSession`, the broker-token lifecycle. A token carries an
+  `expires_at` (unix nanoseconds); `is_expired(now_ns)` and `should_refresh(now_ns)` answer
+  against an injected clock (default 5-minute refresh margin), and async `ensure_valid(now_ns)`
+  runs a caller-supplied `refresh_fn` only when a refresh is due, coalescing concurrent
+  callers into one refresh. `invalidate()` forces the next refresh. No wall clock in tests.
+- `honba.adapters.rate_limit`: token-bucket `RateLimiter` (per adapter and per endpoint via
+  `RateLimiterRegistry`) with `available_tokens`, non-blocking `try_acquire` and async
+  `acquire`. Bucket state is pluggable behind the `SharedBucketStore` protocol:
+  `InMemoryBucket` for one process and `FileBackedBucket` (one JSON file per key, `fcntl`
+  flock + atomic temp-file write) so a limit holds across worker processes without Redis.
+- `honba.adapters.secrets`: `SecretStore` and `FileSecretStore`, an encrypted at-rest store
+  for broker tokens. Values are `cryptography.fernet.Fernet` ciphertext in a JSON object at
+  `0600`; `put`/`get`/`delete` never log and the store's `repr`/`str` redact the key. Keys are
+  32 raw bytes (base64url-encoded for Fernet); `rotate_key(new_key)` re-encrypts every entry.
+  An Argon2id `derive_key` is documented as a next step (`argon2-cffi` is not a dependency).
+- Tests: unit `token_expiry_fake_clock` (refresh only when due; concurrent `ensure_valid`
+  coalesces), `bucket_refill` / `limits_hold_across_instances_sharing_a_store`,
+  `no_secret_in_logs` (round-trip, `0600`, no plaintext in file or logs, rotation
+  re-encrypts), plus the `limits_hold_across_workers` integration test over
+  `FileBackedBucket`.
+- New optional `adapters` extra (`cryptography>=42.0`, also in `dev`).
+- Deliberately not wired into the Dhan/Zerodha adapters: that cross-repo migration is the
+  next step. TOTP auto-login stays a per-broker review (ROADMAP section 3.5/3.1, deferred).
+
 ### Canonical product enum and adapter mapping tables (E1-S4)
 
 - `honba-messages::orders`: new `Product` fieldless wire enum (`delivery`, `intraday`, `carry`),
