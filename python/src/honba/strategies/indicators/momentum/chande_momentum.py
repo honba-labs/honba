@@ -25,6 +25,6 @@ class ChandeMomentum(Indicator):
         d = close - prev
         up = self._up.update(d if d > 0 else 0.0)
         dn = self._dn.update(-d if d < 0 else 0.0)
-        if up is None:
+        if up is None or dn is None:
             return None
         return 100.0 * (up - dn) / (up + dn) if up + dn != 0 else 0.0

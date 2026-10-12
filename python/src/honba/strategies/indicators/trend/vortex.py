@@ -43,7 +43,7 @@ class Vortex(Indicator):
         p = self._plus.update(abs(high - pl))
         m = self._minus.update(abs(low - ph))
         t = self._tr.update(max(high - low, abs(high - pc), abs(low - pc)))
-        if p is None:
+        if p is None or m is None or t is None:
             return None
         if t <= 0:
             return VortexValue(0.0, 0.0)

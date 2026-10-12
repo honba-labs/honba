@@ -24,8 +24,6 @@ class UltimateOscillator(Indicator):
         self._bp_fast, self._tr_fast = RollingSum(fast), RollingSum(fast)
         self._bp_middle, self._tr_middle = RollingSum(middle), RollingSum(middle)
         self._bp_slow, self._tr_slow = RollingSum(slow), RollingSum(slow)
-        self._need = max(fast, middle, slow)
-        self._fed = 0
 
     def update(self, high: float, low: float, close: float) -> float | None:
         prev, self._prev = self._prev, close
@@ -39,8 +37,7 @@ class UltimateOscillator(Indicator):
         tm = self._tr_middle.update(tr)
         bs = self._bp_slow.update(bp)
         ts = self._tr_slow.update(tr)
-        self._fed += 1
-        if self._fed < self._need:
+        if bf is None or tf is None or bm is None or tm is None or bs is None or ts is None:
             return None
         af = bf / tf if tf != 0 else 0.0
         am = bm / tm if tm != 0 else 0.0

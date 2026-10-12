@@ -22,6 +22,6 @@ class Vwma(Indicator):
     def update(self, close: float, volume: float) -> float | None:
         num = self._cv.update(close * volume)
         vol = self._vol.update(volume)
-        if num is None:
+        if num is None or vol is None:
             return None
         return float(close) if vol == 0.0 else num / vol

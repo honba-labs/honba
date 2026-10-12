@@ -32,7 +32,7 @@ class MoneyFlowIndex(Indicator):
         raw = tp * volume
         pos = self._pos.update(raw if tp > prev else 0.0)
         neg = self._neg.update(raw if tp < prev else 0.0)
-        if pos is None:
+        if pos is None or neg is None:
             return None
         if neg == 0:
             return 50.0 if pos == 0 else 100.0
