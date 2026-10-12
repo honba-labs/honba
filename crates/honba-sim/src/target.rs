@@ -11,9 +11,9 @@
 //! order is working is deferred rather than doubled. The caller releases the instrument once its
 //! order has filled, been rejected or cancelled.
 //!
-//! Splitting a target across several clips to respect a freeze quantity is the lot/freeze splitter
-//! (E3-S6); until it lands the delta is capped to one lot-aligned clip here and the remainder is
-//! deferred, mirroring `NextOpenSim`'s floor-to-lot funding cut.
+//! [`TargetPosition::delta`] stays the single (first) lot-aligned clip; [`TargetPosition::delta_clips`]
+//! and [`TargetPosition::orders`] are the lot/freeze splitter (E3-S6), slicing a large target into
+//! several lot-aligned, freeze-capped clips whose fills aggregate to the lot-aligned delta.
 
 use std::collections::HashMap;
 
@@ -21,6 +21,8 @@ use honba_engine::{AlgoError, Result};
 use honba_entities::{Instrument, Position};
 use honba_market::{InstrumentRules, MarketProfile};
 use honba_messages::{InstrumentId, Order, OrderId, OrderSide, OrderType, TimeInForce, UnixNanos};
+
+use crate::lot::split_order;
 
 /// Quantities closer than this are equal (float residue).
 const QTY_EPS: f64 = 1e-9;
@@ -119,6 +121,18 @@ impl TargetPosition {
         Ok(self)
     }
 
+    /// Sets the freeze (maximum single-order) quantity the delta's clips cap at. Errors (state
+    /// unchanged) when `freeze_qty` is not a positive, finite number.
+    pub fn with_freeze(mut self, freeze_qty: f64) -> Result<Self> {
+        if !(freeze_qty.is_finite() && freeze_qty > 0.0) {
+            return Err(AlgoError::Component(format!(
+                "freeze_qty must be positive and finite, got {freeze_qty}"
+            )));
+        }
+        self.max_order_quantity = Some(freeze_qty);
+        Ok(self)
+    }
+
     /// Reads an instrument's rules from `profile` (its lot size and, when it has one, its freeze
     /// quantity).
     pub fn from_profile(profile: &dyn MarketProfile, instrument: &Instrument) -> Self {
@@ -146,8 +160,9 @@ impl TargetPosition {
     /// The signed quantity to trade to move `current` to `target`.
     ///
     /// The raw difference floors to a whole number of lots towards zero, so a target is never
-    /// overshot; the result is capped at the freeze when one is set (the remainder waits for the
-    /// lot/freeze splitter, E3-S6). A result within [`QTY_EPS`] of zero is returned as `0.0`.
+    /// overshot; the result is capped at the freeze when one is set (this is the first clip —
+    /// [`Self::delta_clips`] returns the lot/freeze-split sequence). A result within [`QTY_EPS`]
+    /// of zero is returned as `0.0`.
     pub fn delta(&self, current: &Position, target: f64) -> f64 {
         let raw = target - net_position(current);
         let lots = raw / self.lot_size;
@@ -210,6 +225,89 @@ impl TargetPosition {
             ts,
             ts,
         )))
+    }
+
+    /// The signed lot-aligned clips that move `current` to `target`, each no larger than the
+    /// freeze.
+    ///
+    /// The raw delta is lot-rounded exactly as [`Self::delta`] does; it is then sliced by
+    /// [`crate::lot::split_order`] into clips that are each a whole number of lots and no larger
+    /// than the freeze, so their fills aggregate to the same quantity one uncapped order would
+    /// trade. The clips are signed like the delta (buys positive, sells negative); the vector is
+    /// empty when already at target or when the delta is below one lot.
+    pub fn delta_clips(&self, current: &Position, target: f64) -> Vec<f64> {
+        let raw = target - net_position(current);
+        let lots = raw / self.lot_size;
+        let lots = if (lots - lots.round()).abs() <= LOT_TOLERANCE {
+            lots.round()
+        } else {
+            lots.trunc()
+        };
+        let magnitude = (lots * self.lot_size).abs();
+        if magnitude <= QTY_EPS {
+            return Vec::new();
+        }
+        let freeze = self.max_order_quantity.unwrap_or(f64::INFINITY);
+        let sign = raw.signum();
+        split_order(magnitude, self.lot_size, freeze)
+            .into_iter()
+            .map(|clip| sign * clip)
+            .collect()
+    }
+
+    /// The market orders that move `current` to `target`, sliced to respect lot and freeze.
+    ///
+    /// Each clip from [`Self::delta_clips`] becomes one market order: the first carries
+    /// `order_id`, the rest `order_id-2`, `order_id-3`, … `side_hint`, when given, must agree
+    /// with the delta's direction; a contradicting hint is an error rather than a silently
+    /// reversed order. Empty when already at target.
+    pub fn orders(
+        &self,
+        current: &Position,
+        target: f64,
+        order_id: &str,
+        side_hint: Option<OrderSide>,
+        ts: UnixNanos,
+    ) -> Result<Vec<Order>> {
+        let clips = self.delta_clips(current, target);
+        if clips.is_empty() {
+            return Ok(Vec::new());
+        }
+        let side = if clips[0] > 0.0 {
+            OrderSide::Buy
+        } else {
+            OrderSide::Sell
+        };
+        if let Some(hint) = side_hint {
+            if hint != side {
+                return Err(AlgoError::Component(format!(
+                    "side hint {hint:?} contradicts the target delta for {}",
+                    current.instrument_id().symbol()
+                )));
+            }
+        }
+        Ok(clips
+            .iter()
+            .enumerate()
+            .map(|(i, clip)| {
+                let id = if i == 0 {
+                    order_id.to_string()
+                } else {
+                    format!("{order_id}-{}", i + 1)
+                };
+                Order::new(
+                    OrderId::new(id),
+                    current.instrument_id().clone(),
+                    side,
+                    OrderType::Market,
+                    clip.abs(),
+                    None,
+                    TimeInForce::Day,
+                    ts,
+                    ts,
+                )
+            })
+            .collect())
     }
 }
 
@@ -279,6 +377,43 @@ impl SmartOrderController {
                 self.lock.release(&instrument);
                 Ok(None)
             }
+            Err(e) => {
+                self.lock.release(&instrument);
+                Err(e)
+            }
+        }
+    }
+
+    /// Submits the target `target` for the instrument of `current`, sliced to respect lot and
+    /// freeze.
+    ///
+    /// Returns an empty vector when already at target, and an empty vector (deferred) when the
+    /// instrument already has an outstanding order; otherwise returns the sequence of
+    /// lot-aligned, freeze-capped clip orders that move the position towards the target and
+    /// books the instrument until [`Self::release`]. Every clip must fill (or be cancelled)
+    /// before the instrument is released.
+    pub fn submit_target_orders(
+        &mut self,
+        current: &Position,
+        target: f64,
+        side_hint: Option<OrderSide>,
+        ts: UnixNanos,
+    ) -> Result<Vec<Order>> {
+        let instrument = current.instrument_id().clone();
+        if !self.lock.acquire(&instrument) {
+            return Ok(Vec::new());
+        }
+        self.seq += 1;
+        let order_id = format!("target-{}-{}", instrument.symbol(), self.seq);
+        match self
+            .sizing
+            .orders(current, target, &order_id, side_hint, ts)
+        {
+            Ok(orders) if orders.is_empty() => {
+                self.lock.release(&instrument);
+                Ok(Vec::new())
+            }
+            Ok(orders) => Ok(orders),
             Err(e) => {
                 self.lock.release(&instrument);
                 Err(e)

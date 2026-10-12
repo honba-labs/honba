@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### Lot and freeze-quantity splitter (E3-S6)
+
+- `honba_sim::lot`: `lot_aligned_size(quantity, lot_size)` floors a request to whole lots
+  (towards zero, never overshooting); `split_order(quantity, lot_size, freeze_qty)` slices a
+  request into lot-aligned clips no larger than the freeze (the largest lot-aligned clip the
+  freeze allows is taken repeatedly and the lot-aligned remainder closes the sequence), so the
+  clips sum to `lot_aligned_size(quantity, lot_size)`. A request below one lot (or a freeze
+  smaller than one lot) yields no clips; no freeze yields one clip.
+- `honba_sim::target::TargetPosition`: `with_freeze` sets the freeze cap directly;
+  `delta_clips(&Position, target)` is the signed lot/freeze-split sequence of the target delta
+  and `orders(...)` builds the corresponding clip orders (first carries the caller's id, the
+  rest `<id>-2`, `<id>-3`, …). `delta` is unchanged — it stays the single (first) lot-aligned
+  clip.
+- `honba_sim::target::SmartOrderController::submit_target_orders(...)`: the splitter path —
+  emits the clip orders under one per-instrument lock (deferred, like `submit_target_position`,
+  while a target is working), so their fills aggregate to the lot-aligned original.
+- Tests: unit `slice_above_freeze` (500 @ lot 75 / freeze 150 → `[150, 150, 150]`, each lot
+  aligned and `<= 150`, summing to `lot_aligned_size`; 300 @ lot 75 / freeze 100 → four clips of
+  75; non-aligned 200 → 150; below one lot → empty); integration `order_sliced_in_sim` (a
+  `NextOpenSim` run: target 300 @ lot 75 / freeze 100 submits `[75, 75, 75, 75]`, the engine
+  fills all four and the run holds 300).
+
 ### Target-position (smart order), per-instrument serialisation (E3-S5)
 
 - `honba_sim::target::TargetPosition`: turns a desired position into the signed delta order for
@@ -23,9 +45,8 @@
   `controller_defers_while_an_order_is_outstanding`; integration `target_position_run` (a
   `NextOpenSim` run: flat -> target 100 fills a buy of 100, a re-emitted target is deferred until
   release, then target 0 fills the sell of 100 and the run ends flat).
-- Deferred: splitting a target across several clips to respect a freeze quantity (lot/freeze
-  splitter, E3-S6) — the delta is capped to one lot-aligned clip meanwhile; position-cache
-  invalidation and the live-gateway/FSM wiring (E2-S6).
+- Deferred: position-cache invalidation and the live-gateway/FSM wiring (E2-S6). (The lot/freeze
+  splitter, E3-S6, has since landed.)
 
 ### Margin model and MIS auto square-off (E3-S4)
 

@@ -4,6 +4,7 @@ mod bar_fill;
 mod execution_events;
 mod fill_model;
 mod latency;
+mod lot;
 mod margin;
 mod next_open;
 mod next_open_costs;
