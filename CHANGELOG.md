@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Financial domain alignment for tiny models (E5-S11)
+
+- `honba.ai.alignment.SyntheticDataset`: Deterministic synthetic dataset generator (3k Indian market
+  NL queries) covering screener filters, factor signals, multi-condition queries, and symbol lookups.
+  Seeded generation ensures reproducibility; no network required.
+- `honba.ai.alignment.QLoRATrainer`: QLoRA SFT trainer scaffold. When `peft`/`bitsandbytes`/
+  `transformers`/`accelerate` are installed, runs a training step; otherwise logs a stub message and
+  returns `None`. Optional dependency added as `alignment` extra.
+- `honba.ai.alignment.GRPOReward`: Compiler-reward RLVR (GRPO-style) via screener parser.
+  `reward(completion, context)` returns 1.0 if completion parses without error, 0.0 otherwise.
+  `compiler_pass_rate(completions)` computes fraction of valid completions.
+- Tests: `benchmark_screener_accuracy_gt_90pct` validates dataset grammar quality (≥90% parse
+  success); `rlvr_rewards_compiler_pass` validates reward function distinguishes valid vs invalid
+  screener DSL completions.
+
 ### Local LLM runtime and GBNF grammar (E5-S10)
 
 - `honba.ai.gbnf`: EBNF→GBNF converter (`ebnf_to_gbnf`, `build_grammar`) for a Lark-like EBNF subset

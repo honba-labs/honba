@@ -14,9 +14,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 class LlmLike(Protocol):
     """Protocol for llama_cpp.Llama-like callable."""
 
-    def __call__(
-        self, prompt: str, max_tokens: int, stop: list[str]
-    ) -> dict[str, Any]: ...
+    def __call__(self, prompt: str, max_tokens: int, stop: list[str]) -> dict[str, Any]: ...
 
 
 class LocalLlm:

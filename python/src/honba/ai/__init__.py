@@ -1,5 +1,6 @@
 """AI module for Honba: MCP gateway, LLM integration, journal data, trust envelope, typed decisions."""
 
+from honba.ai.alignment import GRPOReward, QLoRATrainer, SyntheticDataset
 from honba.ai.decision import (
     DecisionKind,
     LlmDecision,
@@ -17,8 +18,11 @@ from honba.ai.trust import (
 
 __all__ = [
     "DecisionKind",
+    "GRPOReward",
     "LlmDecision",
     "LocalLlm",
+    "QLoRATrainer",
+    "SyntheticDataset",
     "TrustEnvelope",
     "apply_llm_decision",
     "build_grammar",
