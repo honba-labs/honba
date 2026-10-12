@@ -308,7 +308,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 | E5-S1 (DONE) | Thin Python MCP server over generated `mcp_tools.json` (11 tools: backtest, sweep, verify_strategy, compile_strategy, list_strategies, screen, get_instruments, get_bars, get_backtest, get_backtest_journal, get_sweep); toolset filter; read-only kill switch | M | E5-S2 | `toolset_filter` / `mcp_call_matches_rest_response` | honba |
 | E5-S3 | Scope map (read:market, read:account, write:orders, research) with CI drift test; audit by token id | S | E5-S1, E11-S8 min | `scope_for_every_endpoint` / `drift_test_fails_on_new_route` | honba |
 | E5-S4 (DONE) | Approval queue for placements; cancel/modify bypass | M | E2-S2, E5-S3 | `placement_held`, `cancel_bypasses` / `approve_flows_through_risk_to_sim` | honba |
-| E5-S7 | Typed LLM decisions (veto/size-down only), journaled | S | E5-S5, E4-S1 | `schema_rejects_increase` / `decision_in_journal` | honba |
+| E5-S7 (DONE) | Typed LLM decisions (veto/size-down only), journaled | S | E5-S5, E4-S1 | `schema_rejects_increase` / `decision_in_journal` | honba |
 | E5-S8 rest | Write routes gated (E11-S7) | S | E2-S2, E5-S4 | see E11-S7 | honba |
 | E5-S10 | Local in-process LLM runtime (llama-cpp-python / GGUF runner) and EBNF->GBNF grammar constraint for zero-syntax-hallucination screening (Design.md §13) | M | E5-S1, ADR 0009 | `grammar_masks_invalid_tokens` / `ask_runs_offline_zero_syntax_errors` | honba |
 | E5-S11 | Financial domain alignment for tiny models (1B-3B): synthetic financial dataset (3k Indian market NL queries), QLoRA SFT, and compiler-reward RLVR (GRPO via parser & screener evaluator) | M | E5-S10 | `benchmark_screener_accuracy_gt_90pct` / `rlvr_rewards_compiler_pass` | honba |

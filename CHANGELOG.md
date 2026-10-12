@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Typed LLM decisions and journaling (E5-S7)
+
+- `honba-engine::decision`: Implemented `LlmDecision` and `LlmDecisionKind` enforcing typed AI decision invariants:
+  - Safety invariant (`schema_rejects_increase`): An LLM or external agent is strictly permitted to `Approve` (maintain size), `Veto` (force quantity to 0.0), or `SizeDown` (`0 < decided_quantity < original_quantity`), but can *never* increase exposure (`decided_quantity > original_quantity`).
+  - Runtime validation checks for quantity increases, mismatched veto quantities, negative/NaN/infinite values, and symbol/side alignment.
+- `honba-engine::audit`: Journal v1 integration for AI governance:
+  - Added `AuditKind::LlmDecisionRecorded` variant and `AuditLog::record_llm_decision`.
+  - Serializes and deserializes structured AI decision audit lines (`"llm_decision_recorded"`) with `order_id`, `decision`, `original_qty`, `decided_qty`, `rationale`, and `confidence` into Journal v1 NDJSON streams (`decision_in_journal`).
+  - Added `ReplayLlmDecision` tracking on `ReplayState`.
+- `honba.ai.decision`: Python dataclasses and validation helpers (`LlmDecision`, `DecisionKind`, `validate_llm_decision`, `apply_llm_decision`) mirroring Rust safety invariants with full runtime and JSON validation.
+- `honba-examples`: Added `09_typed_llm_decision.py` demonstrating veto/size-down filtering, invariant rejection of hallucinated increases, and Journal v1 formatting.
+
+
 ### Plain-sum indicators (E6 batch 4)
 
 - Python `vwma`, `chaikin_money_flow`, `money_flow_index`, `vortex`, `cmo` (Chande momentum),

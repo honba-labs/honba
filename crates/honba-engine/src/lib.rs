@@ -20,6 +20,7 @@ pub mod audit;
 pub mod cache;
 pub mod clock;
 pub mod data;
+pub mod decision;
 pub mod engine;
 pub mod error;
 pub mod execution;
@@ -30,11 +31,12 @@ pub mod state;
 
 pub use audit::{
     AuditJournalReader, AuditJournalWriter, AuditKind, AuditLog, AuditRecord, JournalHeader,
-    JournalV1, ReplayOrder, ReplayState,
+    JournalV1, ReplayLlmDecision, ReplayOrder, ReplayState,
 };
 pub use cache::{CacheQuery, StateCache, TrackedOrder};
 pub use clock::Clock;
 pub use data::DataFeed;
+pub use decision::{LlmDecision, LlmDecisionError, LlmDecisionKind};
 pub use engine::Engine;
 pub use error::{AlgoError, Result};
 pub use execution::{ExecutionEngine, LegacyDrains, LegacyPortEvents, OrderRejection};

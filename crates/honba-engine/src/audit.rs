@@ -129,6 +129,19 @@ pub enum AuditKind {
         /// The content fingerprint of the fill.
         fingerprint: String,
     },
+    /// An AI/LLM decision on an order or intent was recorded (E5-S7).
+    LlmDecisionRecorded {
+        /// The client order identifier.
+        order_id: String,
+        /// The decision kind: "approve", "veto", or "size_down".
+        decision: String,
+        /// The original proposed quantity.
+        original_qty: f64,
+        /// The decided quantity (0.0 for veto, <= original for size_down).
+        decided_qty: f64,
+        /// Explanation provided by the LLM.
+        rationale: String,
+    },
 }
 
 /// An in-memory, append-only audit trail.
@@ -180,6 +193,21 @@ impl AuditLog {
         self.records.is_empty()
     }
 
+    /// Records an LLM decision into the audit log (E5-S7).
+    pub fn record_llm_decision(&mut self, decision: &crate::decision::LlmDecision) -> u64 {
+        self.record(AuditKind::LlmDecisionRecorded {
+            order_id: decision.order_id.clone(),
+            decision: match decision.decision {
+                crate::decision::LlmDecisionKind::Approve => "approve".to_string(),
+                crate::decision::LlmDecisionKind::Veto => "veto".to_string(),
+                crate::decision::LlmDecisionKind::SizeDown => "size_down".to_string(),
+            },
+            original_qty: decision.original_quantity,
+            decided_qty: decision.decided_quantity,
+            rationale: decision.rationale.clone(),
+        })
+    }
+
     /// Replays this log to reconstruct the final engine state.
     pub fn replay(&self) -> ReplayState {
         ReplayState::from_log(self)
@@ -196,6 +224,21 @@ impl AuditLog {
     }
 }
 
+/// An LLM decision reconstructed from audit replay (E5-S7).
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ReplayLlmDecision {
+    /// The client order identifier.
+    pub order_id: String,
+    /// The decision kind ("approve", "veto", "size_down").
+    pub decision: String,
+    /// The original proposed quantity.
+    pub original_qty: f64,
+    /// The decided quantity.
+    pub decided_qty: f64,
+    /// Rationale provided by the LLM.
+    pub rationale: String,
+}
+
 /// The engine state reconstructed by replaying an [`AuditLog`].
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ReplayState {
@@ -209,6 +252,8 @@ pub struct ReplayState {
     dispatches: u64,
     /// Rejections per order_id -> reason.
     rejections: HashMap<String, String>,
+    /// Reconstructed LLM decisions by order identifier.
+    llm_decisions: HashMap<String, ReplayLlmDecision>,
 }
 
 /// The state of an order reconstructed during audit replay.
@@ -328,6 +373,24 @@ impl ReplayState {
             AuditKind::StateChanged { to, .. } => {
                 self.trading_state = *to;
             }
+            AuditKind::LlmDecisionRecorded {
+                order_id,
+                decision,
+                original_qty,
+                decided_qty,
+                rationale,
+            } => {
+                self.llm_decisions.insert(
+                    order_id.clone(),
+                    ReplayLlmDecision {
+                        order_id: order_id.clone(),
+                        decision: decision.clone(),
+                        original_qty: *original_qty,
+                        decided_qty: *decided_qty,
+                        rationale: rationale.clone(),
+                    },
+                );
+            }
             AuditKind::IllegalTransition { .. }
             | AuditKind::VenueOrderIdDrift { .. }
             | AuditKind::DuplicateFillIgnored { .. } => {}
@@ -367,6 +430,16 @@ impl ReplayState {
     /// Rejection reason for `order_id`, if rejected.
     pub fn rejection(&self, order_id: &str) -> Option<&str> {
         self.rejections.get(order_id).map(|s| s.as_str())
+    }
+
+    /// Reconstructed LLM decisions map.
+    pub fn llm_decisions(&self) -> &HashMap<String, ReplayLlmDecision> {
+        &self.llm_decisions
+    }
+
+    /// Looks up an LLM decision by order identifier.
+    pub fn llm_decision(&self, order_id: &str) -> Option<&ReplayLlmDecision> {
+        self.llm_decisions.get(order_id)
     }
 }
 
@@ -711,6 +784,23 @@ impl AuditRecord {
                     "fingerprint": fingerprint,
                 })
             }
+            AuditKind::LlmDecisionRecorded {
+                order_id,
+                decision,
+                original_qty,
+                decided_qty,
+                rationale,
+            } => {
+                serde_json::json!({
+                    "seq": self.seq,
+                    "type": "llm_decision_recorded",
+                    "order_id": order_id,
+                    "decision": decision,
+                    "original_qty": original_qty,
+                    "decided_qty": decided_qty,
+                    "rationale": rationale,
+                })
+            }
         }
     }
 
@@ -863,6 +953,38 @@ impl AuditRecord {
                 AuditKind::IllegalTransition {
                     order_id,
                     error: honba_messages::IllegalTransition::InvalidQuantity { value: 0.0 },
+                }
+            }
+            "llm_decision_recorded" => {
+                let order_id = val
+                    .get("order_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let decision = val
+                    .get("decision")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let original_qty = val
+                    .get("original_qty")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
+                let decided_qty = val
+                    .get("decided_qty")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
+                let rationale = val
+                    .get("rationale")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                AuditKind::LlmDecisionRecorded {
+                    order_id,
+                    decision,
+                    original_qty,
+                    decided_qty,
+                    rationale,
                 }
             }
             other => return Err(format!("unknown record type {other}")),
