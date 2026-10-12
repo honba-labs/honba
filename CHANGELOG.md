@@ -2,6 +2,33 @@
 
 ## [Unreleased]
 
+### Market-data connector contract (E1-S6)
+
+- `honba_ports::MarketDataConnector`: the live-feed port. `subscribe(SubscriptionParams) ->
+  Subscription` establishes the session, `next_event() -> Result<Option<MarketEvent>>` drains it,
+  and `state() -> ConnectorState` reports the lifecycle
+  (`Connected` / `Connecting{attempt}` / `Reconnecting{attempt, backoff_ms}` /
+  `Disconnected{reason}` / `GapEmitted`). The port is `Send` and object-safe, like the other
+  mutable ports.
+- `honba_ports::MarketEvent`: the in-band stream item. Data variants `Bar` / `QuoteTick` /
+  `TradeTick` wrap the L0 messages; `GapMarker{expected_ts, actual_ts, symbol}` records a hole the
+  connector detected and `Reconnecting{attempt, backoff_ms}` records a reconnect, so a strategy
+  observes both without inferring them from a stall.
+- `PortError` gains `Retriable(String)`, `Terminal(String)` and `Unrecoverable(String)`.
+  `is_retryable` is `true` only for `Retriable` (plus the existing `Unavailable` / `Timeout` /
+  `Transport`); `Terminal` and `Unrecoverable` stop the connector and are never retried. The enum
+  also derives `Clone` so a connector can store and re-surface a stop.
+- `honba_ports::ExponentialBackoff { base_ms, cap_ms, jitter, seed }`: `next(attempt)` is
+  `base * 2^(attempt-1)` capped at `cap_ms`, reduced by seeded splitmix64 jitter. A fixed seed
+  gives the same schedule every run, so reconnects never touch a wall clock.
+- `honba_ports::FeedWatchdog { max_gap_ns, clock }`: `check(symbol, last_seen)` returns a
+  `GapMarker` once the injected `Clock` has run past `last_seen` by more than `max_gap_ns`.
+- Tests: unit `backoff_schedule` (exact seeded schedule), `watchdog_emits_gap_after_silence` (fake
+  clock), plus integration `simulated_feed_drop_emits_gap_marker`, `terminal_error_stops` (no
+  retry after `Terminal`) and `retriable_error_backs_off_and_reconnects` over a `SimulatedConnector`.
+- Deferred: the per-broker connector implementation and its auth/TOTP wiring (honba-adapters), and
+  the roadmap status flip for E1-S6.
+
 ### Session, rate limit and secret store (E1-S5)
 
 - `honba.adapters.session`: `Token` (a value whose `repr`/`str` redact the token) and

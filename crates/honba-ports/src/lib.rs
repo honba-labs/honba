@@ -15,6 +15,7 @@
 //! |---|---|
 //! | [`Clock`] | what time is it, and wait |
 //! | [`MarketDataFeed`] | the next market-data message |
+//! | [`MarketDataConnector`] | a live feed that reconnects and marks gaps |
 //! | [`ExecutionGateway`] | route an order, cancel, modify, next fill |
 //! | [`BarReader`] | the stored bars of one instrument over a range |
 //! | [`InstrumentMaster`] | what is this instrument, and what else is there |
@@ -49,8 +50,10 @@
 //! 3. The audit stream is always complete: [`Sink`] is append-only and flushable on demand.
 //! 4. `Ok(None)` means idle or exhausted, never a broken stream. A broken stream is an error.
 
+pub mod backoff;
 pub mod bars;
 pub mod clock;
+pub mod connector;
 pub mod error;
 pub mod execution;
 pub mod feed;
@@ -58,9 +61,14 @@ pub mod master;
 pub mod secret;
 pub mod sink;
 pub mod snapshot;
+pub mod watchdog;
 
+pub use backoff::ExponentialBackoff;
 pub use bars::{BarReader, BarRequest};
 pub use clock::Clock;
+pub use connector::{
+    ConnectorState, MarketDataConnector, MarketEvent, Subscription, SubscriptionParams,
+};
 pub use error::{PortError, PortResult};
 pub use execution::ExecutionGateway;
 pub use feed::MarketDataFeed;
@@ -68,6 +76,7 @@ pub use master::{DatedInstrument, InstrumentMaster};
 pub use secret::SecretStore;
 pub use sink::Sink;
 pub use snapshot::{DepthLevel, DepthReader, DepthSnapshot, QuoteReader};
+pub use watchdog::FeedWatchdog;
 
 #[cfg(test)]
 mod tests;

@@ -12,9 +12,15 @@ pub type PortResult<T> = std::result::Result<T, PortError>;
 /// never string-matched, and never collapsed into `anyhow`.
 ///
 /// [`PortError::is_retryable`] splits the taxonomy into the failures an edge
-/// may retry ([`PortError::Unavailable`], [`PortError::Timeout`],
-/// [`PortError::Transport`]) and the ones that need a decision from the caller.
-#[derive(Debug, Error, PartialEq, Eq)]
+/// may retry ([`PortError::Retriable`], [`PortError::Unavailable`],
+/// [`PortError::Timeout`], [`PortError::Transport`]) and the ones that need a
+/// decision from the caller.
+///
+/// The market-data connector adds two explicit stops: [`PortError::Terminal`]
+/// is permanent for the session (the caller must stop reconnecting) and
+/// [`PortError::Unrecoverable`] needs operator action (auth, permission). Both
+/// answer `false` from [`PortError::is_retryable`].
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum PortError {
     /// The port is not connected, not initialised, or temporarily out of service.
@@ -26,6 +32,15 @@ pub enum PortError {
     /// The underlying connection or socket failed.
     #[error("transport error: {0}")]
     Transport(String),
+    /// A transient connector failure: reconnect after the backoff has elapsed.
+    #[error("retriable: {0}")]
+    Retriable(String),
+    /// A permanent connector failure for this session: never retry.
+    #[error("terminal: {0}")]
+    Terminal(String),
+    /// A connector failure needing operator action (auth, permission): stop.
+    #[error("unrecoverable: {0}")]
+    Unrecoverable(String),
     /// The venue accepted the request and refused it.
     #[error("broker rejected: {code}: {message}")]
     Rejected {
@@ -48,13 +63,18 @@ pub enum PortError {
 impl PortError {
     /// Returns `true` when retrying the same call may succeed unchanged.
     ///
-    /// `Unavailable`, `Timeout` and `Transport` are transient: the edge should
-    /// back off and retry. Everything else is a decision for the caller —
-    /// fixing the request, falling back to another capability, or giving up.
+    /// `Retriable`, `Unavailable`, `Timeout` and `Transport` are transient: the
+    /// edge should back off and retry. `Terminal` and `Unrecoverable` are not —
+    /// the connector stops and the caller must not retry. Everything else is a
+    /// decision for the caller: fixing the request, falling back to another
+    /// capability, or giving up.
     pub fn is_retryable(&self) -> bool {
         matches!(
             self,
-            PortError::Unavailable(_) | PortError::Timeout | PortError::Transport(_)
+            PortError::Retriable(_)
+                | PortError::Unavailable(_)
+                | PortError::Timeout
+                | PortError::Transport(_)
         )
     }
 }

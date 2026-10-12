@@ -20,6 +20,21 @@ fn transport_is_retryable() {
 }
 
 #[test]
+fn retriable_is_retryable() {
+    assert!(PortError::Retriable("connection reset by peer".into()).is_retryable());
+}
+
+#[test]
+fn terminal_is_not_retryable() {
+    assert!(!PortError::Terminal("market closed".into()).is_retryable());
+}
+
+#[test]
+fn unrecoverable_is_not_retryable() {
+    assert!(!PortError::Unrecoverable("permission denied".into()).is_retryable());
+}
+
+#[test]
 fn rejected_is_not_retryable() {
     let err = PortError::Rejected {
         code: "E_MARGIN".into(),
@@ -58,6 +73,24 @@ fn timeout_display() {
 fn transport_display() {
     let err = PortError::Transport("connection reset".into());
     assert_eq!(err.to_string(), "transport error: connection reset");
+}
+
+#[test]
+fn retriable_display() {
+    let err = PortError::Retriable("connection reset by peer".into());
+    assert_eq!(err.to_string(), "retriable: connection reset by peer");
+}
+
+#[test]
+fn terminal_display() {
+    let err = PortError::Terminal("market closed".into());
+    assert_eq!(err.to_string(), "terminal: market closed");
+}
+
+#[test]
+fn unrecoverable_display() {
+    let err = PortError::Unrecoverable("permission denied".into());
+    assert_eq!(err.to_string(), "unrecoverable: permission denied");
 }
 
 #[test]
