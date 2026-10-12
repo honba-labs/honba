@@ -2,6 +2,38 @@
 
 ## [Unreleased]
 
+### Margin model and MIS auto square-off (E3-S4)
+
+- `honba_sim::margin`: the pieces shared by the simulators. `MarginQuery` reads a position's
+  `initial_margin` / `maintenance_margin` from the active `MarketProfile`'s `MarginModel`
+  (`MarginQuery::new` for a model, `MarginQuery::from_profile` for a profile). `MisPositions`
+  marks the instruments a run holds under an intraday (MIS) product, clearing the mark once the
+  net position is flat; `square_off_order` builds the closing market order.
+- MIS auto square-off: `BarFillEngine::on_session_close` and `NextOpenSim::on_session_close`
+  flatten every held MIS position with the opposite market order at the session close (the
+  simulator's close price — the engine's last observed bar close, the simulator's close bar),
+  so a run that would carry intraday risk overnight ends flat and its cash/PnL reflects the
+  square-off. A CNC (delivery) position is never squared off. `with_auto_square_off_mis(false)`
+  makes a held MIS position at the close an error instead.
+- `BarFillEngine` and `NextOpenSim` gain `with_margin_model` / `margin_query`,
+  `with_auto_square_off_mis` and position accessors (`BarFillEngine::position` /
+  `positions`). When no session calendar is wired, `default_session_close_ts` gives the
+  documented fallback close: 23:59:00 UTC of the reference day (or the next day when already
+  past it). No wall clock is read.
+- Tests: unit `square_off_at_session_end` (MIS closed, CNC held),
+  `session_close_without_auto_square_off_refuses_a_held_mis_position`,
+  `is_intraday_recognises_only_the_intraday_product`,
+  `default_session_close_is_2359_utc_of_the_reference_day`,
+  `margin_query_reads_initial_and_maintenance_from_a_model`,
+  `margin_query_reads_the_active_market_profile`,
+  `mis_positions_marks_intraday_and_clears_when_flat`; integration `mis_run_flat_by_close`
+  (a seeded bar flow with an MIS buy ends flat with the square-off fill at the session close
+  price).
+- Deferred: wiring the session close to a live `MarketProfile` calendar event (the caller drives
+  it, as with the existing session-open path), product-aware position keys (positions are
+  net-per-instrument, so a mixed MIS/CNC holding of one instrument is treated as intraday), and
+  the margin pre-check in the risk stage.
+
 ### Seeded FillModel / LatencyModel (E3-S2)
 
 - `honba_sim::fill_model::FillModel`: `price(side, desired_price, rng) -> f64` turns the price a

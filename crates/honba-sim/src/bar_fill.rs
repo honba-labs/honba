@@ -5,13 +5,17 @@ use std::sync::{Arc, Mutex};
 use honba_engine::{AlgoError, ExecutionEngine, Handler, LegacyDrains, OrderRejection, Result};
 use honba_entities::{Currency, ExecutionEvent, Money, Trade};
 use honba_market::costs::{CostSchedule, MarketSegment};
-use honba_messages::{Event, Order, OrderId, OrderSide, OrderType, UnixNanos};
+use honba_market::settlement::MarginModel;
+use honba_messages::{
+    Event, InstrumentId, Order, OrderId, OrderSide, OrderType, Product, UnixNanos,
+};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 
 use crate::cost::ScheduleFillCost;
 use crate::fill_model::{FillModel, NoSlippage, SlippageModel};
 use crate::latency::{LatencyModel, NoLatency};
+use crate::margin::{MisPositions, QTY_EPS};
 
 /// Largest accepted flat cost per fill.
 pub const MAX_FLAT_COST: f64 = 1e9;
@@ -119,9 +123,37 @@ struct RestingTrailingStop {
     trough: f64,
 }
 
+/// Net signed position in `instrument` from a position list.
+fn position_of(positions: &[(InstrumentId, f64)], instrument: &InstrumentId) -> f64 {
+    positions
+        .iter()
+        .find(|(i, _)| i == instrument)
+        .map_or(0.0, |(_, q)| *q)
+}
+
+/// Applies a fill's signed delta to the position list and refreshes the intraday marks.
+fn apply_position(
+    positions: &mut Vec<(InstrumentId, f64)>,
+    mis: &mut MisPositions,
+    instrument: &InstrumentId,
+    product: Option<Product>,
+    signed_delta: f64,
+) {
+    let held = position_of(positions, instrument) + signed_delta;
+    positions.retain(|(i, _)| i != instrument);
+    if held.abs() > QTY_EPS {
+        positions.push((instrument.clone(), held));
+    }
+    mis.apply(instrument, product, held);
+}
+
 struct Inner {
     last_price: Option<f64>,
     resting_trailing: Vec<RestingTrailingStop>,
+    /// Net signed positions, used to hold CNC overnight and square off MIS at the close.
+    positions: Vec<(InstrumentId, f64)>,
+    /// Instruments held under an intraday (MIS) product.
+    mis: MisPositions,
     events: Vec<ExecutionEvent>,
     legacy: LegacyDrains,
     next_ts: u64,
@@ -133,6 +165,8 @@ impl Default for Inner {
         Self {
             last_price: None,
             resting_trailing: Vec::new(),
+            positions: Vec::new(),
+            mis: MisPositions::new(),
             events: Vec::new(),
             legacy: LegacyDrains::default(),
             next_ts: 0,
@@ -193,6 +227,10 @@ pub struct BarFillEngine {
     fill_model: Arc<dyn FillModel>,
     /// Delays each fill's timestamp (default [`NoLatency`]).
     latency_model: Arc<dyn LatencyModel>,
+    /// The active market's margin model, for [`Self::margin_query`].
+    margin_model: Option<Arc<dyn MarginModel>>,
+    /// Flatten held intraday positions at [`Self::on_session_close`] (default true).
+    auto_square_off_mis: bool,
 }
 
 impl Default for BarFillEngine {
@@ -203,6 +241,8 @@ impl Default for BarFillEngine {
             currency: Currency::Inr,
             fill_model: Arc::new(NoSlippage),
             latency_model: Arc::new(NoLatency),
+            margin_model: None,
+            auto_square_off_mis: true,
         }
     }
 }
@@ -276,6 +316,130 @@ impl BarFillEngine {
         }
     }
 
+    /// Installs the active market's [`MarginModel`], queried through
+    /// [`Self::margin_query`].
+    #[must_use]
+    pub fn with_margin_model(mut self, model: Arc<dyn MarginModel>) -> Self {
+        self.margin_model = Some(model);
+        self
+    }
+
+    /// The installed margin model, if any.
+    pub fn margin_model(&self) -> Option<Arc<dyn MarginModel>> {
+        self.margin_model.clone()
+    }
+
+    /// A [`crate::MarginQuery`] over the installed margin model, if any.
+    pub fn margin_query(&self) -> Option<crate::margin::MarginQuery<'_>> {
+        self.margin_model
+            .as_ref()
+            .map(|m| crate::margin::MarginQuery::new(m.as_ref()))
+    }
+
+    /// Sets whether a held intraday (MIS) position is flattened at the session
+    /// close (default true). With it off, a held MIS position at
+    /// [`Self::on_session_close`] is an error instead.
+    #[must_use]
+    pub fn with_auto_square_off_mis(mut self, on: bool) -> Self {
+        self.auto_square_off_mis = on;
+        self
+    }
+
+    /// The net signed position in `instrument` (0 when flat).
+    pub fn position(&self, instrument: &InstrumentId) -> f64 {
+        position_of(&self.inner.lock().unwrap().positions, instrument)
+    }
+
+    /// Every non-flat position, in the order first opened.
+    pub fn positions(&self) -> Vec<(InstrumentId, f64)> {
+        self.inner.lock().unwrap().positions.clone()
+    }
+
+    /// Closes the current session at `ts`, flattening held intraday (MIS) positions at the
+    /// last observed bar close.
+    ///
+    /// With [`Self::with_auto_square_off_mis`] on (the default) every instrument marked
+    /// intraday is closed with the opposite [`crate::square_off_order`] at the engine's last
+    /// observed price, so the run ends flat; the fill surfaces through the usual drains. With
+    /// it off, a held MIS position is an error instead (state unchanged). A CNC (delivery)
+    /// position is never squared off. When no market calendar is wired, use
+    /// [`crate::margin::default_session_close_ts`] (23:59:00 UTC) for `ts`.
+    pub fn on_session_close(&mut self, ts: UnixNanos) -> Result<()> {
+        let mut inner = self.inner.lock().unwrap();
+        let inner = &mut *inner;
+        let held: Vec<InstrumentId> = inner.mis.intraday().to_vec();
+        if !held.is_empty() && !self.auto_square_off_mis {
+            return Err(AlgoError::Component(format!(
+                "{} intraday position(s) held at session close {} and auto square-off is off",
+                held.len(),
+                ts.as_u64()
+            )));
+        }
+        let price = match inner.last_price {
+            Some(price) => price,
+            None if held.is_empty() => {
+                inner.next_ts = inner.next_ts.max(ts.as_u64());
+                return Ok(());
+            }
+            None => {
+                return Err(AlgoError::Component(
+                    "no observed price to square off an MIS position".into(),
+                ))
+            }
+        };
+        for (seq, instrument) in held.iter().enumerate() {
+            let position = position_of(&inner.positions, instrument);
+            if position.abs() <= QTY_EPS {
+                inner.mis.clear(instrument);
+                continue;
+            }
+            let side = if position > 0.0 {
+                OrderSide::Sell
+            } else {
+                OrderSide::Buy
+            };
+            let qty = position.abs();
+            let costs = self.costs.of(side, qty, price, self.currency)?;
+            let base = inner.next_ts.max(ts.as_u64());
+            let fill_ts = UnixNanos::from_u64(base);
+            inner.next_ts = base + 1;
+            let trade = Trade::new(
+                OrderId::new(format!("__square_off_{seq}")),
+                instrument.clone(),
+                side,
+                qty,
+                price,
+                self.currency,
+                fill_ts,
+                fill_ts,
+            )
+            .with_costs(costs);
+            inner.events.push(ExecutionEvent::Fill {
+                trade,
+                cum_qty: qty,
+                complete: true,
+                venue_order_id: None,
+            });
+            apply_position(
+                &mut inner.positions,
+                &mut inner.mis,
+                instrument,
+                None,
+                if side == OrderSide::Buy { qty } else { -qty },
+            );
+        }
+        if let Some((instrument, qty)) = inner.mis.intraday().iter().find_map(|i| {
+            let q = position_of(&inner.positions, i);
+            (q.abs() > QTY_EPS).then(|| (i.clone(), q))
+        }) {
+            return Err(AlgoError::Component(format!(
+                "intraday position in {} ({qty}) is not flat after square-off",
+                instrument.symbol()
+            )));
+        }
+        Ok(())
+    }
+
     /// The settlement currency.
     pub fn currency(&self) -> Currency {
         self.currency
@@ -295,6 +459,7 @@ impl Handler for BarFillEngine {
     ) -> Result<honba_engine::EngineOutput> {
         if let Event::Bar(b) = event {
             let mut inner = self.inner.lock().unwrap();
+            let inner = &mut *inner;
             inner.last_price = Some(b.close());
             let iid = b.bar_type().instrument_id();
             let mut triggered = Vec::new();
@@ -377,6 +542,18 @@ impl Handler for BarFillEngine {
                     complete: true,
                     venue_order_id: None,
                 });
+                let signed = if order.side() == OrderSide::Buy {
+                    order.quantity()
+                } else {
+                    -order.quantity()
+                };
+                apply_position(
+                    &mut inner.positions,
+                    &mut inner.mis,
+                    order.instrument_id(),
+                    order.product(),
+                    signed,
+                );
             }
         }
         Ok(honba_engine::EngineOutput::None)
@@ -386,6 +563,7 @@ impl Handler for BarFillEngine {
 impl ExecutionEngine for BarFillEngine {
     fn submit(&mut self, order: Order) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
+        let inner = &mut *inner;
         if order.order_type() == OrderType::TrailingStop {
             let ref_px = inner.last_price.unwrap_or(0.0);
             inner.resting_trailing.push(RestingTrailingStop {
@@ -426,6 +604,18 @@ impl ExecutionEngine for BarFillEngine {
             complete: true,
             venue_order_id: None,
         });
+        let signed = if order.side() == OrderSide::Buy {
+            order.quantity()
+        } else {
+            -order.quantity()
+        };
+        apply_position(
+            &mut inner.positions,
+            &mut inner.mis,
+            order.instrument_id(),
+            order.product(),
+            signed,
+        );
         Ok(())
     }
 

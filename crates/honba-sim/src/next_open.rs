@@ -14,6 +14,7 @@ use honba_engine::{
 };
 use honba_entities::{Currency, ExecutionEvent, Money, Trade};
 use honba_market::costs::{CostSchedule, MarketSegment};
+use honba_market::settlement::MarginModel;
 use honba_messages::{Bar, Event, InstrumentId, Order, OrderId, OrderSide, OrderType, UnixNanos};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
@@ -22,6 +23,7 @@ use std::sync::Arc;
 use crate::cost::ScheduleFillCost;
 use crate::fill_model::{FillModel, NoSlippage, SlippageModel};
 use crate::latency::{LatencyModel, NoLatency};
+use crate::margin::{square_off_order, MisPositions};
 
 /// Quantities closer than this are equal (float residue from fractional fills).
 const QTY_EPS: f64 = 1e-9;
@@ -70,6 +72,12 @@ pub struct NextOpenSim {
     long_only: bool,
     lot_sizes: Vec<(InstrumentId, f64)>,
     positions: Vec<(InstrumentId, f64)>,
+    /// Instruments held under an intraday (MIS) product, squared off at the session close.
+    mis: MisPositions,
+    /// The active market's margin model, for [`Self::margin_query`].
+    margin: Option<Arc<dyn MarginModel>>,
+    /// Flatten held intraday positions at [`Self::on_session_close`] (default true).
+    auto_square_off_mis: bool,
     session: i64,
     session_ts: Option<u64>,
     /// The current session came from a session-open event (see [`Self::on_session_open`]).
@@ -109,6 +117,9 @@ impl NextOpenSim {
             long_only: true,
             lot_sizes: Vec::new(),
             positions: Vec::new(),
+            mis: MisPositions::new(),
+            margin: None,
+            auto_square_off_mis: true,
             session: -1,
             session_ts: None,
             from_open: false,
@@ -185,6 +196,39 @@ impl NextOpenSim {
             Some(seed) => sim.with_seed(seed),
             None => sim,
         }
+    }
+
+    /// Installs the active market's [`MarginModel`], queried through [`Self::margin_query`].
+    #[must_use]
+    pub fn with_margin_model(mut self, model: Arc<dyn MarginModel>) -> Self {
+        self.margin = Some(model);
+        self
+    }
+
+    /// The installed margin model, if any.
+    pub fn margin_model(&self) -> Option<Arc<dyn MarginModel>> {
+        self.margin.clone()
+    }
+
+    /// A [`crate::MarginQuery`] over the installed margin model, if any.
+    pub fn margin_query(&self) -> Option<crate::margin::MarginQuery<'_>> {
+        self.margin
+            .as_ref()
+            .map(|m| crate::margin::MarginQuery::new(m.as_ref()))
+    }
+
+    /// Sets whether a held intraday (MIS) position is flattened at the session close
+    /// (default true). With it off, a held MIS position at [`Self::on_session_close`] is an
+    /// error instead.
+    #[must_use]
+    pub fn with_auto_square_off_mis(mut self, on: bool) -> Self {
+        self.auto_square_off_mis = on;
+        self
+    }
+
+    /// The instruments currently held under an intraday (MIS) product.
+    pub fn mis_positions(&self) -> &[InstrumentId] {
+        self.mis.intraday()
     }
 
     /// Sets the settlement cycle: sale proceeds become available that many sessions after the
@@ -342,6 +386,109 @@ impl NextOpenSim {
         self.open_session(ts, bars)?;
         self.from_open = true;
         Ok(())
+    }
+
+    /// Closes the current session at `ts`, flattening held intraday (MIS) positions at the
+    /// close of their bar in `bars`.
+    ///
+    /// With [`Self::with_auto_square_off_mis`] on (the default) every instrument marked
+    /// intraday is closed with the opposite [`square_off_order`] at its bar's close, so the run
+    /// ends flat: the fill and the cash it moves surface through the usual drains and the
+    /// equity/PnL reflects the square-off. With it off, a held MIS position is an error instead
+    /// (state unchanged). A CNC (delivery) position is never squared off.
+    ///
+    /// `ts` must not precede the current session, and each held intraday instrument needs a bar
+    /// in `bars` to price the close. When no market calendar is wired, use
+    /// [`crate::margin::default_session_close_ts`] (23:59:00 UTC) for `ts`.
+    pub fn on_session_close(&mut self, ts: UnixNanos, bars: &[Bar]) -> Result<()> {
+        let ts_u = ts.as_u64();
+        if let Some(cur) = self.session_ts {
+            if ts_u < cur {
+                return Err(err(format!("session close {ts_u} is before session {cur}")));
+            }
+        }
+        let mut closes: Vec<(InstrumentId, f64)> = Vec::new();
+        for b in bars {
+            let id = b.bar_type().instrument_id();
+            if usable_open(b.close()) && !closes.iter().any(|(i, _)| i == id) {
+                closes.push((id.clone(), b.close()));
+            }
+        }
+        let held: Vec<InstrumentId> = self.mis.intraday().to_vec();
+        if !held.is_empty() && !self.auto_square_off_mis {
+            return Err(err(format!(
+                "{} intraday position(s) held at session close {ts_u} and auto square-off is off",
+                held.len()
+            )));
+        }
+        for (seq, instrument) in held.iter().enumerate() {
+            let position = self.position(instrument);
+            if position.abs() <= QTY_EPS {
+                self.mis.clear(instrument);
+                continue;
+            }
+            let Some(price) = closes
+                .iter()
+                .find(|(i, _)| i == instrument)
+                .map(|(_, p)| *p)
+            else {
+                return Err(err(format!(
+                    "no session-close price for {} to square off its MIS position",
+                    instrument.symbol()
+                )));
+            };
+            self.square_off(instrument, position, price, ts_u, seq)?;
+        }
+        self.session_ts = Some(ts_u);
+        if let Some((instrument, qty)) = self.mis.intraday().iter().find_map(|i| {
+            let q = self.position(i);
+            (q.abs() > QTY_EPS).then(|| (i.clone(), q))
+        }) {
+            return Err(err(format!(
+                "intraday position in {} ({qty}) is not flat after square-off",
+                instrument.symbol()
+            )));
+        }
+        Ok(())
+    }
+
+    /// Books the session-close fill that flattens `position` in `instrument` at `price`.
+    fn square_off(
+        &mut self,
+        instrument: &InstrumentId,
+        position: f64,
+        price: f64,
+        ts: u64,
+        seq: usize,
+    ) -> Result<()> {
+        let order = square_off_order(
+            &format!("__square_off_{seq}"),
+            instrument,
+            position,
+            UnixNanos::from_u64(ts),
+        );
+        let qty = position.abs();
+        let notional = self.notional(qty, price)?;
+        let cost = self.costs(order.side(), qty, price)?;
+        let delta = if order.side() == OrderSide::Buy {
+            -(notional
+                .checked_add(cost)
+                .ok_or_else(|| err("square-off cost overflow".into()))?)
+        } else {
+            notional
+                .checked_sub(cost)
+                .ok_or_else(|| err("square-off proceeds overflow".into()))?
+        };
+        self.cash = self
+            .cash
+            .checked_add(delta)
+            .ok_or_else(|| err("cash overflow".into()))?;
+        let open = Open {
+            instrument: instrument.clone(),
+            price,
+            ts: UnixNanos::from_u64(ts),
+        };
+        self.book(&order, &open, price, qty, notional, cost, true)
     }
 
     /// Observes one bar: it opens a session when its ts is later than the current one, opens its
@@ -602,6 +749,7 @@ impl NextOpenSim {
         if held.abs() > QTY_EPS {
             self.positions.push((order.instrument_id().clone(), held));
         }
+        self.mis.apply(order.instrument_id(), order.product(), held);
         self.fees = self
             .fees
             .checked_add(cost)
