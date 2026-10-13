@@ -61,6 +61,38 @@
         "trigger_price": 21950.0,
         "time_in_force": "ioc"
       }
+    },
+    {
+      "name": "trailing_stop_sell_amount",
+      "value": {
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "exchange": "NSE"
+        },
+        "side": "sell",
+        "quantity": 75.0,
+        "order_type": "trailing_stop",
+        "price": null,
+        "trigger_price": null,
+        "time_in_force": "day",
+        "trail_amount": 50.0
+      }
+    },
+    {
+      "name": "trailing_stop_buy_percent",
+      "value": {
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "exchange": "NSE"
+        },
+        "side": "buy",
+        "quantity": 75.0,
+        "order_type": "trailing_stop",
+        "price": null,
+        "trigger_price": null,
+        "time_in_force": "gtc",
+        "trail_percent": 1.5
+      }
     }
   ],
   "invalid": [
@@ -213,6 +245,134 @@
         "price": null,
         "trigger_price": null,
         "time_in_force": "day"
+      }
+    },
+    {
+      "name": "trailing_stop_without_trail",
+      "value": {
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "exchange": "NSE"
+        },
+        "side": "sell",
+        "quantity": 75.0,
+        "order_type": "trailing_stop",
+        "price": null,
+        "trigger_price": null,
+        "time_in_force": "day"
+      }
+    },
+    {
+      "name": "trailing_stop_with_both_trails",
+      "value": {
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "exchange": "NSE"
+        },
+        "side": "sell",
+        "quantity": 75.0,
+        "order_type": "trailing_stop",
+        "price": null,
+        "trigger_price": null,
+        "time_in_force": "day",
+        "trail_amount": 50.0,
+        "trail_percent": 1.5
+      }
+    },
+    {
+      "name": "trailing_stop_with_price",
+      "value": {
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "exchange": "NSE"
+        },
+        "side": "sell",
+        "quantity": 75.0,
+        "order_type": "trailing_stop",
+        "price": 22000.0,
+        "trigger_price": null,
+        "time_in_force": "day",
+        "trail_amount": 50.0
+      }
+    },
+    {
+      "name": "trailing_stop_with_trigger",
+      "value": {
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "exchange": "NSE"
+        },
+        "side": "sell",
+        "quantity": 75.0,
+        "order_type": "trailing_stop",
+        "price": null,
+        "trigger_price": 22000.0,
+        "time_in_force": "day",
+        "trail_amount": 50.0
+      }
+    },
+    {
+      "name": "trailing_stop_zero_amount",
+      "value": {
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "exchange": "NSE"
+        },
+        "side": "sell",
+        "quantity": 75.0,
+        "order_type": "trailing_stop",
+        "price": null,
+        "trigger_price": null,
+        "time_in_force": "day",
+        "trail_amount": 0.0
+      }
+    },
+    {
+      "name": "trailing_stop_percent_100",
+      "value": {
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "exchange": "NSE"
+        },
+        "side": "sell",
+        "quantity": 75.0,
+        "order_type": "trailing_stop",
+        "price": null,
+        "trigger_price": null,
+        "time_in_force": "day",
+        "trail_percent": 100.0
+      }
+    },
+    {
+      "name": "market_with_trail_amount",
+      "value": {
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "exchange": "NSE"
+        },
+        "side": "sell",
+        "quantity": 75.0,
+        "order_type": "market",
+        "price": null,
+        "trigger_price": null,
+        "time_in_force": "day",
+        "trail_amount": 50.0
+      }
+    },
+    {
+      "name": "limit_with_trail_percent",
+      "value": {
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "exchange": "NSE"
+        },
+        "side": "sell",
+        "quantity": 75.0,
+        "order_type": "limit",
+        "price": 22000.0,
+        "trigger_price": null,
+        "time_in_force": "day",
+        "trail_percent": 1.5
       }
     }
   ],

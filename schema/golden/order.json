@@ -103,6 +103,26 @@
       }
     },
     {
+      "name": "trailing_stop_sell_accepted",
+      "value": {
+        "order_id": "O-7",
+        "instrument_id": {
+          "symbol": "NIFTY50",
+          "exchange": "NSE"
+        },
+        "side": "sell",
+        "order_type": "trailing_stop",
+        "quantity": 75.0,
+        "price": null,
+        "trigger_price": null,
+        "trail_amount": 50.0,
+        "status": "accepted",
+        "time_in_force": "gtc",
+        "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"},
+        "ts_init": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}
+      }
+    },
+    {
       "name": "limit_buy_accepted_cancel_requested",
       "value": {
         "order_id": "O-6",

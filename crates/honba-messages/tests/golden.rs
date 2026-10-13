@@ -282,6 +282,11 @@ fn order_golden() {
                 ),
             ),
             (
+                "trailing_stop_sell_accepted",
+                order("O-7", Sell, TrailingStop, 75.0, None, None, Accepted, Gtc)
+                    .with_trail_amount(50.0),
+            ),
+            (
                 "limit_buy_accepted_cancel_requested",
                 order(
                     "O-6",

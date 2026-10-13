@@ -35,6 +35,11 @@ fn expected(name: &str) -> OrderIntent {
             time_in_force: TimeInForce::Ioc,
             ..OrderIntent::stop_limit_sell(nifty(), 75.0, 21_950.0, 21_940.0)
         },
+        "trailing_stop_sell_amount" => OrderIntent::trailing_stop_amount_sell(nifty(), 75.0, 50.0),
+        "trailing_stop_buy_percent" => OrderIntent {
+            time_in_force: TimeInForce::Gtc,
+            ..OrderIntent::trailing_stop_percent_buy(nifty(), 75.0, 1.5)
+        },
         other => panic!("no expected value for golden case {other}"),
     }
 }
@@ -90,4 +95,17 @@ fn stop_limit_intent_becomes_order_with_both_prices() {
     assert_eq!(order.order_type(), OrderType::StopLimit);
     assert_eq!(order.price(), Some(22_010.0));
     assert_eq!(order.trigger_price(), Some(22_000.0));
+}
+
+#[test]
+fn trailing_stop_intent_becomes_order_with_trail_and_no_prices() {
+    let intent = OrderIntent::trailing_stop_amount_sell(nifty(), 75.0, 50.0);
+    let order = intent
+        .into_order(OrderId::new("O-2"), UnixNanos::from_u64(5))
+        .unwrap();
+    assert_eq!(order.order_type(), OrderType::TrailingStop);
+    assert_eq!(order.price(), None);
+    assert_eq!(order.trigger_price(), None);
+    assert_eq!(order.trail_amount(), Some(50.0));
+    assert_eq!(order.trail_percent(), None);
 }
