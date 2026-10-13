@@ -74,6 +74,25 @@ fn a_limit_order_is_rejected_unsupported_at_its_submit_time() {
 }
 
 #[test]
+fn a_trailing_stop_is_rejected_unsupported_not_treated_as_a_stop() {
+    let mut s = sim(10_000);
+    let o = crate::tests::order(
+        "O-1",
+        OrderSide::Sell,
+        OrderType::TrailingStop,
+        3.0,
+        None,
+        7,
+    )
+    .with_trail_amount(5.0);
+    s.submit(o).unwrap();
+    let r = s.drain_rejections().unwrap();
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].reason.as_str(), "unsupported_order_type");
+    assert!(s.working_orders().is_empty());
+}
+
+#[test]
 fn an_order_without_a_side_is_an_error() {
     let mut s = sim(10_000);
     let o = crate::tests::order(

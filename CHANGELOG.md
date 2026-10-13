@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Trailing stop order type (wire parity)
+
+- `OrderType::TrailingStop` (`"trailing_stop"`) with optional `trail_amount` / `trail_percent` on
+  `Order` and `OrderIntent` (additive; `schema_version` unchanged, ADR 0012 rule 1). Golden vectors,
+  schema, OpenAPI, MCP schemas and `.pyi` regenerated; Python `wire` models carry the fields.
+  `BarFillSim` fills it; `NextOpenSim` rejects it (`unsupported_order_type`).
+
 ### WASM screener evaluation + backtest replay (E11-S5)
 
 - `honba_api_wasm::screener`: pure module wrapping the `honba_indicators::screener`

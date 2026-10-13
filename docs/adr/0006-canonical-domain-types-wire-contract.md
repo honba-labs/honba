@@ -71,6 +71,12 @@ Python. Before this ADR:
    - `OrderIntent` gains `trigger_price` and `stop_*` / `stop_limit_*` constructors. `price` is the limit price only.
      Invariants (both languages): market has neither price; limit needs `price`; stop-market needs `trigger_price`
      and no `price`; stop-limit needs both; side is buy or sell; quantity > 0; prices finite. The fields stay public
+   - Trailing stop (additive, `schema_version` unchanged per ADR 0012 rule 1): `order_type` `trailing_stop` plus
+     optional `trail_amount` (absolute price distance, finite > 0) and `trail_percent` (0 < p < 100) on `OrderIntent`
+     and `Order`, omitted from JSON when absent. A trailing stop is a market order once triggered, takes neither
+     `price` nor `trigger_price`, and needs exactly one trail field; every other type rejects both. SELL protects a
+     long (trails below the high-water mark), BUY protects a short. Status: wire/types complete in Rust, bindings and
+     Python; `BarFillSim` fills it, `NextOpenSim` rejects it with `unsupported_order_type`.
      and the constructors are infallible, so an `OrderIntent` *value* may be invalid; what is guaranteed is that an
      invalid intent never becomes an `Order`: deserialization rejects it, and `OrderIntent::into_order` (the only
      intent -> order path) validates and returns `Result<Order, IntentError>`. `StrategyRunner` does not submit a
