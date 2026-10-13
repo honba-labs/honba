@@ -47,7 +47,10 @@ mod streams;
 mod trades;
 
 pub use approval::ApprovalQueue;
-pub use auth::{AuthConfig, AuthLayer, FileTokenStore, TokenInfo};
+pub use auth::{
+    scope_for, unscoped_routes, AuthConfig, AuthLayer, FileTokenStore, RouteScope, TokenInfo,
+    ROUTE_SCOPES,
+};
 pub use dispatch::{build_target, dispatch, dispatch_stream, DispatchError};
 pub use executor::BacktestExecutor;
 pub use honba_api::JournalWriter;

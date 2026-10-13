@@ -1,5 +1,6 @@
 //! Unit tests for `honba-api-rest`, one file per area.
 
+mod auth_scope;
 mod bar_cap;
 mod capabilities;
 mod cors;

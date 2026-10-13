@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Route to scope map with drift guard (E5-S3)
+
+- `honba_api_rest::ROUTE_SCOPES`: one canonical table maps every route the router
+  serves to its required scope (`read:market`, `read:account`, `write:orders`,
+  `research`) or marks it public (ADR 0023 §2). `AuthLayer` scope enforcement is a
+  lookup in this table, not a set of prefix rules that can silently miss a route.
+- `scope_for`/`unscoped_routes` expose the lookup, and the drift guard
+  (`scope_for_every_endpoint`) fails if an endpoint in `honba_api::ENDPOINTS` has
+  no scope, so a new route cannot ship as an accidental public one.
+- The Python mirror (`honba.api.auth`) gains `PUBLIC_PATHS`, `SCOPES` and
+  `unscoped_routes`; an integration test checks the generated OpenAPI routes.
+- Tests: unit `scope_for_every_endpoint`; integration
+  `drift_test_fails_on_new_route` (plus a router probe).
+
 ### Financial domain alignment for tiny models (E5-S11)
 
 - `honba.ai.alignment.SyntheticDataset`: Deterministic synthetic dataset generator (3k Indian market

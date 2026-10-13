@@ -158,6 +158,143 @@ impl FileTokenStore {
     }
 }
 
+/// The scope a route requires, or that it is public (E5-S3, ADR 0023 §2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RouteScope {
+    /// No token is required; the route is health or metadata.
+    Public,
+    /// The caller's token must carry this scope.
+    Required(&'static str),
+}
+
+/// The canonical route-to-scope map (ADR 0023 §2).
+///
+/// Every route the router serves has exactly one row, so scope enforcement is a
+/// lookup rather than a set of prefix rules that can silently miss a new route.
+/// Paths use the `{param}` spelling of [`honba_api::ENDPOINTS`], so the drift
+/// guard can compare the two by key. The four scopes are `read:market`,
+/// `read:account`, `write:orders` and `research`; `read:account` is reserved for
+/// account routes not built yet.
+pub const ROUTE_SCOPES: &[(&str, &str, RouteScope)] = &[
+    ("GET", "/capabilities", RouteScope::Public),
+    ("GET", "/health", RouteScope::Public),
+    ("GET", "/schema", RouteScope::Public),
+    ("GET", "/instruments", RouteScope::Required("read:market")),
+    (
+        "GET",
+        "/instruments/{id}",
+        RouteScope::Required("read:market"),
+    ),
+    ("GET", "/quotes", RouteScope::Required("read:market")),
+    ("GET", "/bars/{id}", RouteScope::Required("read:market")),
+    ("GET", "/depth/{id}", RouteScope::Required("read:market")),
+    ("GET", "/screener/scan", RouteScope::Required("read:market")),
+    ("GET", "/strategies", RouteScope::Required("research")),
+    ("POST", "/strategies", RouteScope::Required("research")),
+    (
+        "POST",
+        "/strategies/verify",
+        RouteScope::Required("research"),
+    ),
+    ("POST", "/backtests", RouteScope::Required("research")),
+    ("GET", "/backtests/{id}", RouteScope::Required("research")),
+    (
+        "GET",
+        "/backtests/{id}/journal",
+        RouteScope::Required("research"),
+    ),
+    (
+        "GET",
+        "/backtests/{id}/events",
+        RouteScope::Required("research"),
+    ),
+    ("POST", "/sweeps", RouteScope::Required("research")),
+    ("GET", "/sweeps/{id}", RouteScope::Required("research")),
+    (
+        "GET",
+        "/sweeps/{id}/journal",
+        RouteScope::Required("research"),
+    ),
+    ("GET", "/journals/{id}", RouteScope::Required("research")),
+    ("POST", "/orders", RouteScope::Required("write:orders")),
+    ("GET", "/orders", RouteScope::Required("write:orders")),
+    (
+        "DELETE",
+        "/orders/{id}",
+        RouteScope::Required("write:orders"),
+    ),
+    (
+        "POST",
+        "/positions/close",
+        RouteScope::Required("write:orders"),
+    ),
+    (
+        "GET",
+        "/approval/queue",
+        RouteScope::Required("write:orders"),
+    ),
+    (
+        "POST",
+        "/approval/approve",
+        RouteScope::Required("write:orders"),
+    ),
+    (
+        "POST",
+        "/approval/reject",
+        RouteScope::Required("write:orders"),
+    ),
+];
+
+/// The scope required for a concrete request, or `None` when the route is not in
+/// [`ROUTE_SCOPES`].
+///
+/// `None` means the request matched no row: the router answers 404/405 for it,
+/// but the drift guard (`unscoped_routes`) forbids a registered endpoint from
+/// ever landing here.
+pub fn scope_for(method: &str, path: &str) -> Option<RouteScope> {
+    ROUTE_SCOPES
+        .iter()
+        .find(|(m, pattern, _)| m.eq_ignore_ascii_case(method) && path_matches(pattern, path))
+        .map(|(_, _, scope)| *scope)
+}
+
+/// Whether concrete request `path` matches a route `pattern` whose `{param}`
+/// segments are single-segment wildcards.
+fn path_matches(pattern: &str, path: &str) -> bool {
+    let mut want = pattern.split('/');
+    let mut got = path.split('/');
+    loop {
+        match (want.next(), got.next()) {
+            (None, None) => return true,
+            (Some(pat), Some(seg)) => {
+                let wildcard = pat.starts_with('{') && pat.ends_with('}');
+                if wildcard {
+                    if seg.is_empty() {
+                        return false;
+                    }
+                } else if pat != seg {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+    }
+}
+
+/// The routes in `routes` (given as `(METHOD, path)` pairs) with no row in
+/// [`ROUTE_SCOPES`].
+///
+/// The drift guard asserts this is empty for [`honba_api::ENDPOINTS`] and that a
+/// route added without a scope makes it non-empty, so a new endpoint cannot ship
+/// as an accidental public route.
+pub fn unscoped_routes(routes: &[(&str, &str)]) -> Vec<String> {
+    routes
+        .iter()
+        .filter(|(method, path)| scope_for(method, path).is_none())
+        .map(|(method, path)| format!("{method} {path}"))
+        .collect()
+}
+
 /// The auth layer that wraps a token store
 #[derive(Clone)]
 pub struct AuthLayer {
@@ -174,39 +311,13 @@ impl AuthLayer {
         }
     }
 
-    fn required_scope(_method: &str, path: &str) -> Option<&'static str> {
-        // Public routes
-        if matches!(path, "/capabilities" | "/health" | "/schema") {
-            return None;
+    fn required_scope(method: &str, path: &str) -> Option<&'static str> {
+        match scope_for(method, path) {
+            Some(RouteScope::Required(scope)) => Some(scope),
+            // Public, or a route the table does not know: the router answers
+            // 404/405 for the latter, and the drift guard keeps it that way.
+            Some(RouteScope::Public) | None => None,
         }
-
-        // Prefix matches
-        if path.starts_with("/instruments")
-            || path.starts_with("/quotes")
-            || path.starts_with("/bars/")
-            || path.starts_with("/depth/")
-        {
-            return Some("read:market");
-        }
-        if path == "/screener/scan" {
-            return Some("read:market");
-        }
-        if path == "/strategies" || path == "/strategies/verify" {
-            return Some("research");
-        }
-        if path.starts_with("/backtests")
-            || path.starts_with("/sweeps")
-            || path.starts_with("/journals/")
-        {
-            return Some("research");
-        }
-        if path == "/orders" || path.starts_with("/orders/") || path == "/positions/close" {
-            return Some("write:orders");
-        }
-        if path.starts_with("/approval/") {
-            return Some("write:orders");
-        }
-        None
     }
 }
 

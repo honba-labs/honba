@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import threading
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,6 +20,8 @@ except ImportError:  # pragma: no cover
     import tomli as tomllib  # type: ignore[import-not-found]
 
 __all__ = [
+    "PUBLIC_PATHS",
+    "SCOPES",
     "AuthError",
     "AuthErrorCode",
     "AuthLayer",
@@ -28,6 +31,7 @@ __all__ = [
     "TokenStore",
     "audit_log",
     "required_scope_for_route",
+    "unscoped_routes",
     "validate_token",
 ]
 
@@ -201,10 +205,21 @@ class FileTokenStore(TokenStore):
         )
 
 
+#: Routes that need no token (health and capability metadata).
+PUBLIC_PATHS = frozenset({"/capabilities", "/health", "/schema"})
+
+#: The scopes ADR 0023 §2 defines; a route may name no other.
+SCOPES = ("read:market", "read:account", "write:orders", "research")
+
+
 def required_scope_for_route(method: str, path: str) -> str | None:
-    """Return the required scope for a given route, or None if public."""
+    """Return the required scope for a given route, or None if public or unknown.
+
+    ``method`` is accepted for parity with the Rust server; on this surface the
+    scope is a property of the path (see ADR 0023 §2).
+    """
     # Exact matches first
-    if path in {"/capabilities", "/health", "/schema"}:
+    if path in PUBLIC_PATHS:
         return None
 
     # Prefix matches
@@ -221,6 +236,21 @@ def required_scope_for_route(method: str, path: str) -> str | None:
     if path.startswith("/approval/"):
         return "write:orders"
     return None
+
+
+def unscoped_routes(routes: Iterable[tuple[str, str]]) -> list[str]:
+    """Return ``"METHOD path"`` keys for routes that are neither public nor scoped.
+
+    The drift guard: every endpoint the OpenAPI spec exposes must resolve to a
+    scope, so a route added without one cannot ship as an accidental public route.
+    """
+    out: list[str] = []
+    for method, path in routes:
+        if path in PUBLIC_PATHS:
+            continue
+        if required_scope_for_route(method, path) is None:
+            out.append(f"{method} {path}")
+    return out
 
 
 def validate_token(store: TokenStore, token: str, required_scope: str) -> TokenInfo:
