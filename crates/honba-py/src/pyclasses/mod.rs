@@ -7,6 +7,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
 pub mod api;
+pub mod async_shell;
 pub mod codegen;
 pub mod domain;
 pub mod manifest;
@@ -18,6 +19,7 @@ pub mod wire;
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     api::register(m)?;
+    async_shell::register(m)?;
     codegen::register(m)?;
     domain::register(m)?;
     manifest::register(m)?;

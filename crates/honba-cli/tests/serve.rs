@@ -295,7 +295,7 @@ fn trading_state_gates_post_orders() {
     let (child, addr) = start(&["--data-dir", d, "--addr", "127.0.0.1:0"]);
     let (status, body) = post(addr, "/orders", order);
     assert_eq!(status, 200, "{body}");
-    assert_eq!(body["data"]["status"], Value::from("acknowledged"));
+    assert_eq!(body["data"]["status"], Value::from("submitted"));
     stop(child);
 
     // Halted: the same order is refused by the state rule before any shape rule.

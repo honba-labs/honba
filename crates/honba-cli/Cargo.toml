@@ -24,6 +24,7 @@ honba-messages        = { path = "../honba-messages" }
 honba-entities        = { path = "../honba-entities" }
 honba-market          = { path = "../honba-market" }
 honba-engine          = { path = "../honba-engine" }
+honba-async           = { path = "../honba-async" }
 honba-analytics       = { path = "../honba-analytics" }
 honba-feed            = { path = "../honba-feed" }
 honba-strategy        = { path = "../honba-strategy" }

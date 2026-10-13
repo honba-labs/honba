@@ -1,6 +1,7 @@
 //! Unit tests for this crate, one file per area.
 
 mod api;
+mod async_shell;
 mod codegen;
 mod manifest;
 mod next_open;

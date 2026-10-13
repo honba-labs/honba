@@ -97,7 +97,8 @@ ALLOWED_PROD = {
         "honba-codegen",
         # The in-process SDK transport drives the served router (no handler is reimplemented).
         "honba-api-rest",
-        "honba-risk",  # bindings (ADR 0018 decision 10)
+        "honba-risk",   # bindings (ADR 0018 decision 10)
+        "honba-async",  # operator Command binding (E2-S1 rest)
     },
     "honba-cli": {
         "honba-messages",
@@ -112,7 +113,8 @@ ALLOWED_PROD = {
         "honba-codegen",
         "honba-api",
         "honba-api-rest",
-        "honba-risk",  # CLI backtest assembler
+        "honba-risk",   # CLI backtest assembler
+        "honba-async",  # operator Command::State in `trading-state set`
     },
     "honba-api-rest": {
         "honba-api",

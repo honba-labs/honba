@@ -39,12 +39,14 @@ def test_to_dict_round_trips_through_from_dict() -> None:
         "max_notional": 1.5,
         "order_rate": {"max_orders": 2, "window_ms": 10},
         "max_participation": None,
+        "stale_after_ms": None,
     }
     assert RiskLimits.from_dict(limits.to_dict()) == limits
     assert RiskLimits().to_dict() == {
         "max_notional": None,
         "order_rate": None,
         "max_participation": None,
+        "stale_after_ms": None,
     }
 
 
@@ -111,7 +113,24 @@ def test_risk_module_reexports_the_native_types() -> None:
     assert risk.RiskStage is _honba.RiskStage
     assert risk.TradingState is _honba.TradingState
     assert risk.RiskDecision is _honba.RiskDecision
-    assert {"RiskLimits", "RiskStage", "TradingState", "RiskDecision"} <= set(risk.__all__)
+    assert risk.Command is _honba.Command
+    assert {
+        "Command",
+        "RiskLimits",
+        "RiskStage",
+        "TradingState",
+        "RiskDecision",
+    } <= set(risk.__all__)
+
+
+def test_command_state_matches_the_trading_state_wire_spelling() -> None:
+    from honba import risk
+
+    halted = risk.Command.state(risk.TradingState.HALTED)
+    assert "HALTED" in repr(halted)
+    reducing = risk.Command.state(risk.TradingState.REDUCING)
+    assert "REDUCING" in repr(reducing)
+    assert "STOP" in repr(risk.Command.stop())
 
 
 def test_limits_from_config_reads_the_risk_table() -> None:

@@ -25,5 +25,6 @@ honba-sim.workspace = true
 honba-risk.workspace = true
 honba-codegen.workspace = true
 honba-api-rest.workspace = true
+honba-async.workspace = true
 serde.workspace = true
 serde_json.workspace = true

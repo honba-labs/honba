@@ -10,6 +10,8 @@ access does (see :mod:`honba._native`).
 * :class:`RiskStage`: ``check(request)`` returns a :class:`RiskDecision` with ``approved``,
   ``code``, ``rule`` and ``context``.
 * :class:`TradingState`: ``ACTIVE`` / ``REDUCING`` / ``HALTED``; ``str()`` is the wire spelling.
+* :class:`Command`: the operator command a live shell accepts — ``Command.stop()`` and
+  ``Command.state(TradingState.REDUCING)`` (the Python spelling of ``honba_async::Command``).
 * :func:`limits_from_config`: reads ``[risk]`` from a run's parsed TOML table.
 
 ``honba._honba.run_strategy(..., risk=...)`` runs a reference strategy behind a stage; its spec is
@@ -26,9 +28,10 @@ from honba._native import native_attr
 from honba.entities.order import OrderSide
 
 if TYPE_CHECKING:
-    from honba._honba import RiskDecision, RiskLimits, RiskStage, TradingState
+    from honba._honba import Command, RiskDecision, RiskLimits, RiskStage, TradingState
 
 __all__ = [
+    "Command",
     "OrderRejected",
     "RiskDecision",
     "RiskLimits",
@@ -42,7 +45,7 @@ __all__ = [
 
 _POSITION_EPS = 1e-9  # as honba_risk::stage::POSITION_EPS
 
-_NATIVE = frozenset({"RiskDecision", "RiskLimits", "RiskStage", "TradingState"})
+_NATIVE = frozenset({"Command", "RiskDecision", "RiskLimits", "RiskStage", "TradingState"})
 
 
 def __getattr__(name: str) -> Any:

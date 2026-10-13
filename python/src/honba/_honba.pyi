@@ -10,6 +10,7 @@ __all__ = [
     "SCHEMA_VERSION",
     "STRATEGY_API_VERSION",
     "Bar",
+    "Command",
     "Fill",
     "FnoContract",
     "InstrumentId",
@@ -391,6 +392,16 @@ class TradingState:
     def __eq__(self, other: object, /) -> bool: ...
     def __int__(self) -> int: ...
     def can_transition_to(self, next: TradingState) -> bool: ...
+
+@final
+class Command:
+    """The operator command a live shell accepts (``honba_async::Command``); use the static
+    constructors ``stop()`` / ``state(TradingState)``."""
+
+    @staticmethod
+    def stop() -> Command: ...
+    @staticmethod
+    def state(trading_state: TradingState) -> Command: ...
 
 @final
 class RiskLimits:

@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### `Command` operator intents exposed in Python and CLI (E2-S1 rest)
+
+- `_honba.Command`: Python bindings for `honba_async::Command` with static constructors
+  `Command.stop()` and `Command.state(TradingState)`. `Command::State` carries the same
+  `TradingState` (`ACTIVE`/`REDUCING`/`HALTED`) the risk stage and engine enforce, so the
+  operator vocabulary and the enforcement vocabulary cannot drift apart.
+- `honba.risk` re-exports `Command`; `__all__` updated.
+- `honba._honba` stubs (`python/src/honba/_honba.pyi`) updated with `Command` type and
+  `__repr__`/`__str__`.
+- CLI `honba trading-state set <state>` now prints the exact `Command::State(TradingState)`
+  the async shell applies through `Engine::set_trading_state`; pure function `state_command`
+  tested in `honba-cli/src/tests/trading_state.rs`.
+
 ### Trailing stop order type (wire parity)
 
 - `OrderType::TrailingStop` (`"trailing_stop"`) with optional `trail_amount` / `trail_percent` on
