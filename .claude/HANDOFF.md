@@ -25,6 +25,13 @@ Approved repos: honba, honba-strategies, honba-frontend, honba-docs, honba-adapt
 
 ## Pending / Open Items
 1. Rust port of next-open simulator behind `ExecutionPort`.
-2. M4: Zerodha native Rust connector (`kiteconnect-rs` integration in `honba-ports`).
+2. ~~M4: Zerodha native Rust connector~~ DROPPED: crate `honba-broker-zerodha` removed (f3fc461, last in history d6b752e); Zerodha is Python-only in `honba-adapters` (24fe7a7), Rust behaviour ported with shared golden vectors.
 3. WASM remainder: screener predicate evaluation, backtest replay in wasm, OHLC indicators (ATR).
 4. REST remainder: strategies list/compile, backtests, sweeps, orders routes.
+
+## Trailing stop + declarative strategies (updated 2026-10-13)
+Done (Python, committed): `OrderType.TRAILING_STOP` + `OrderIntent.trail_amount|trail_percent` (6e01d81), opt-in per adapter via `AdapterCapabilities.order_types` (default excludes it; contract checks refusal); `DeclarativeStrategy`/`Entry` (d1eb190), `TargetWeightStrategy` (7eb0e08), composable `strategies/portfolio/` (Universe/Selector/WeightingScheme/RebalanceSchedule/`PortfolioStrategy`, config factory `from_params`; f0c17e1, d6b752e, 5a26497). Catalog `honba-strategies/portfolio/rebalancing/equal_weight`; examples 06/07; docs pages `strategies/strategy_styles.md`, `portfolio_construction.md`.
+IN PROGRESS: Rust/wire parity for trailing stop, chunk A (agent ac08e661aa5617655, resumed after a weekly rate limit that lost its first run; nothing was committed before): add `OrderType::TrailingStop` + trail fields in honba-messages/honba-strategy with the same validation table, regenerate codegen outputs (schema, OpenAPI, TS, .pyi, MCP), honba-py parsing, python `wire.OrderIntent/Order` carry trail fields, delete `PYTHON_ONLY_VARIANTS` in `python/tests/integration/test_wire_roundtrip.py`; sim/engine must REJECT it explicitly for now. Check `git log --grep trailing` to see how far it got.
+NEXT, chunk B: simulator/paper/backtest actually trail the stop (SELL protects long: high-water mark; BUY protects short: low-water mark; trigger fills as market), then let adapters opt in (check each broker's native trailing/super-order support before listing the type). No broker lists TRAILING_STOP today.
+Known gaps: no automatic OCO cancel for Entry stop/take-profit (busy() blocks should_exit while they rest); honba-frontend TS enums need the new order type after codegen; Alpha 30 point-in-time history is inception-dated only.
+Env rules: cargo with CARGO_TARGET_DIR=honba/target, never /tmp; pytest `--basetemp=$HOME/.cache/pytest-honba` then delete; one sonnet subagent at a time (never opus); commit by explicit path, no trailers; nothing pushed.
