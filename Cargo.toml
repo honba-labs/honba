@@ -75,3 +75,12 @@ http-body-util = "0.1"
 
 honba-api = { path = "crates/honba-api" }
 honba-api-rest = { path = "crates/honba-api-rest" }
+
+# Default dev build = release-level optimisation + small debug info.
+# opt-level 3 matches `--release`; `line-tables-only` keeps file:line in backtraces and profilers
+# (no variable info) at a fraction of full debuginfo size. debug-assertions and overflow-checks
+# stay on (dev defaults) so tests still catch invariant violations. `cargo test` uses this
+# profile too. Override per run with CARGO_PROFILE_DEV_DEBUG=0 (CI does) or CARGO_PROFILE_DEV_OPT_LEVEL=0.
+[profile.dev]
+opt-level = 3
+debug = "line-tables-only"

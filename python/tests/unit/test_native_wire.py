@@ -73,3 +73,29 @@ def test_order_intent_rejects_wrong_price_fields(kwargs):
 def test_order_intent_accepts_fok_and_gtd():
     for tif in ("fok", "gtd"):
         assert _honba.OrderIntent("X", "buy", 1.0, time_in_force=tif).time_in_force == tif
+
+
+def test_order_intent_trailing_stop_carries_trail_fields():
+    i = _honba.OrderIntent("NIFTY50", "sell", 75.0, "trailing_stop", trail_amount=50.0)
+    assert (i.order_type, i.price, i.trigger_price) == ("trailing_stop", None, None)
+    assert (i.trail_amount, i.trail_percent) == (50.0, None)
+    i = _honba.OrderIntent("NIFTY50", "buy", 75.0, "trailing_stop", trail_percent=1.5)
+    assert (i.trail_amount, i.trail_percent) == (None, 1.5)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"order_type": "trailing_stop"},
+        {"order_type": "trailing_stop", "trail_amount": 1.0, "trail_percent": 1.0},
+        {"order_type": "trailing_stop", "trail_amount": 1.0, "price": 1.0},
+        {"order_type": "trailing_stop", "trail_amount": 1.0, "trigger_price": 1.0},
+        {"order_type": "trailing_stop", "trail_amount": 0.0},
+        {"order_type": "trailing_stop", "trail_percent": 100.0},
+        {"order_type": "market", "trail_amount": 1.0},
+        {"order_type": "limit", "price": 1.0, "trail_percent": 1.0},
+    ],
+)
+def test_order_intent_rejects_wrong_trail_fields(kwargs):
+    with pytest.raises(ValueError):
+        _honba.OrderIntent("NIFTY50", "buy", 1.0, **kwargs)

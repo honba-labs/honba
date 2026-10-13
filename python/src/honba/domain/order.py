@@ -1,8 +1,8 @@
 """Order intents emitted by strategies (mirrors honba_strategy::OrderIntent).
 
 Parity note: ``OrderType.TRAILING_STOP`` and the ``trail_amount`` / ``trail_percent`` fields
-are Python-only for now. The Rust ``OrderType`` / ``OrderIntent`` do not have them yet
-(parity pending), so a trailing stop must not be sent across the ``_honba`` boundary.
+exist in Rust (``OrderType::TrailingStop``, ``OrderIntent``, ``Order``) and on the wire, with the
+same validation table, so a trailing stop crosses the ``_honba`` boundary losslessly.
 """
 
 from __future__ import annotations
@@ -79,7 +79,7 @@ def validate_intent(
     is buy or sell, prices are finite, and the order type decides which of
     ``price`` (limit) and ``trigger_price`` (stop) must be present.
 
-    Python-only extension (Rust parity pending): ``TRAILING_STOP`` takes no ``price`` and no
+    Trailing stop (same rules as Rust): ``TRAILING_STOP`` takes no ``price`` and no
     ``trigger_price`` and exactly one of ``trail_amount`` (absolute price distance, finite
     and > 0) or ``trail_percent`` (0 < p < 100). Every other order type rejects both
     ``trail_*`` fields.
