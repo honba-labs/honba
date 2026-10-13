@@ -170,6 +170,18 @@ pub struct BacktestEventsQuery {
     pub resume_from_seq: Option<u64>,
 }
 
+/// `GET /orders` query parameters.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct OrdersQuery {
+    /// Exchange filter.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exchange: Option<String>,
+    /// Symbol filter.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub symbol: Option<String>,
+}
+
 /// Orders request.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -192,4 +204,9 @@ pub struct OrdersRequest {
     /// Time in force: day, gtc, ioc, fok.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tif: Option<String>,
+    /// Client order id: the idempotency key (ADR 0019 decision 3). The ledger
+    /// records the order under it; a repeat of the same key is a duplicate
+    /// no-op that returns the first row.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_order_id: Option<String>,
 }

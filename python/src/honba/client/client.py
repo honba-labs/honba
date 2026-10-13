@@ -29,6 +29,7 @@ from honba.client.models import (
     Depth,
     Health,
     InstrumentInfo,
+    LedgerOrder,
     ScreenerResultRow,
 )
 from honba.client.transport import HttpTransport, InprocTransport, Transport
@@ -148,6 +149,14 @@ class Client:
         A bar-only data source has no book: ``MarketDataUnavailableApiError``.
         """
         return self._call(rq.depth(instrument_id, levels=levels), Depth)
+
+    def orders(
+        self, *, exchange: str | None = None, symbol: str | None = None
+    ) -> list[LedgerOrder]:
+        """``GET /orders``: the write ledger's risk-approved orders, oldest first,
+        filtered by ``exchange``/``symbol`` when given (E11-S7)."""
+        data = self._data(rq.orders(exchange=exchange, symbol=symbol))
+        return self._parse_list(data, "orders", LedgerOrder)
 
     def verify_strategy(self, manifest: Any) -> dict[str, Any]:
         """``POST /strategies/verify``: the verified IR (a JSON-shaped record).

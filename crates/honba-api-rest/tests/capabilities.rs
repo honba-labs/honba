@@ -82,11 +82,12 @@ fn the_strategy_routes_are_built() {
 async fn the_backtest_and_journal_routes_are_built_and_only_sweeps_and_trading_stay_flagged() {
     // ADR 0017 decision 7 shrinks the list to the four trading rows once sweeps (E4-S5) land;
     // ADR 0018 decision 7 (E2-S2 r5b) builds the risk gate for POST /orders, DELETE /orders/:id and POST /positions/close, so those
-    // leave the list too; the write ledger (GET /orders) stays flagged until E11-S7.
+    // leave the list too; E11-S7 builds the write ledger, so GET /orders leaves it as well
+    // and the flagged set is empty.
     let (_, body) = call("GET", "/capabilities").await;
     assert_eq!(
         strings(&body["data"]["capabilities"]["not_implemented"]),
-        ["GET /orders"]
+        Vec::<String>::new()
     );
     for route in [
         ("POST", "/backtests"),

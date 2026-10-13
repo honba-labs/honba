@@ -37,8 +37,8 @@ pub use market::{
     DEFAULT_DEPTH_LEVELS, DEFAULT_TIMEFRAME, MAX_DEPTH_LEVELS,
 };
 pub use requests::{
-    BacktestEventsQuery, BacktestRequest, BarsQuery, DepthQuery, InstrumentsQuery, OrdersRequest,
-    QuotesQuery, ScreenerQuery, StrategiesRequest, SweepRequest,
+    BacktestEventsQuery, BacktestRequest, BarsQuery, DepthQuery, InstrumentsQuery, OrdersQuery,
+    OrdersRequest, QuotesQuery, ScreenerQuery, StrategiesRequest, SweepRequest,
 };
 pub use responses::{
     BacktestMetrics, BacktestResponse, BacktestStatus, BarsResponse, CapabilitiesResponse,

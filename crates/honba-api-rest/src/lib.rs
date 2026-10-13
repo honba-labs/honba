@@ -56,6 +56,7 @@ pub use executor::BacktestExecutor;
 pub use honba_api::JournalWriter;
 pub use journal::NdjsonJournal;
 pub use market::{ApiQuery, ApiQueryRejection, MAX_BAR_ROWS};
+pub use orders::OrderLedger;
 pub use registry::StrategyRegistry;
 pub use retention::{evictions, RetentionPolicy};
 pub use run_store::{OsEntropy, RecoveryReport, RunClock, RunEntropy, RunStore, SystemClock};
@@ -261,11 +262,12 @@ pub async fn serve_with_config(
 /// ADR 0017 decision 7 shrinks the list to the trading rows once the sweeps
 /// (E4-S5) land; ADR 0018 decision 7 (E2-S2 r5b) risk-gates `POST /orders`,
 /// `DELETE /orders/{id}` and `POST /positions/close`, so those left the list.
-/// The write ledger `GET /orders` (E11-S7) remains.
+/// E11-S7 built the write ledger, so no route is left: the empty list is the
+/// honest signal that every registry endpoint answers for real.
 ///
 /// Remove a row when its handler is built; `tests/capabilities.rs` probes the router and fails
 /// if this list and the real answers disagree.
-pub const NOT_IMPLEMENTED_ENDPOINTS: &[(&str, &str)] = &[("GET", "/orders")];
+pub const NOT_IMPLEMENTED_ENDPOINTS: &[(&str, &str)] = &[];
 
 fn endpoint_key((method, path): &(&str, &str)) -> String {
     format!("{method} {path}")
@@ -311,23 +313,6 @@ async fn get_schema() -> Json<ResponseEnvelope<serde_json::Value>> {
         "version": honba_api::API_VERSION
     })))
 }
-
-/// The 501 answer of a route that is in the contract but not built yet.
-///
-/// A placeholder must never look like a success: an empty list or a made-up id
-/// would be read as real state by a client or an agent.
-fn not_implemented(what: &str) -> (StatusCode, Json<ResponseEnvelope<serde_json::Value>>) {
-    let detail = ErrorDetail::new(
-        ErrorCode::NotImplemented,
-        format!("{what} is not implemented yet"),
-    );
-    (
-        StatusCode::NOT_IMPLEMENTED,
-        Json(ApiResponse::error(detail)),
-    )
-}
-
-type NotImplemented = (StatusCode, Json<ResponseEnvelope<serde_json::Value>>);
 
 /// Lists the strategies compiled in this process, ordered by id.
 async fn get_strategies(
@@ -389,16 +374,19 @@ async fn get_sweep_by_id(State(state): State<Arc<AppState>>, Path(id): Path<Stri
     runs::get_sweep_by_id(State(state), Path(id)).await
 }
 
-async fn get_orders() -> NotImplemented {
-    not_implemented("listing orders")
+async fn get_orders(
+    State(state): State<Arc<AppState>>,
+    query: ApiQuery<honba_api::OrdersQuery>,
+) -> Response {
+    orders::get_orders(State(state), query).await
 }
 
 async fn post_orders(State(state): State<Arc<AppState>>, req: ApiJson<OrdersRequest>) -> Response {
     orders::post_orders(State(state), req, honba_messages::OrderId::new("rest")).await
 }
 
-async fn delete_order(Path(id): Path<String>) -> Response {
-    orders::delete_order(Path(id)).await
+async fn delete_order(State(state): State<Arc<AppState>>, Path(id): Path<String>) -> Response {
+    orders::delete_order(State(state), Path(id)).await
 }
 
 async fn post_close_positions() -> Response {

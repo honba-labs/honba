@@ -37,6 +37,7 @@ __all__ = [
     "health",
     "instrument",
     "instruments",
+    "orders",
     "quotes",
     "schema",
     "screener_scan",
@@ -128,6 +129,17 @@ def _id_path_segment(value: object) -> str:
 
 def instrument(instrument_id: str | InstrumentId) -> ApiRequest:
     return ApiRequest("GET", f"/instruments/{_id_path_segment(instrument_id)}")
+
+
+def orders(*, exchange: str | None = None, symbol: str | None = None) -> ApiRequest:
+    """``GET /orders``: the write ledger's orders, in insertion order, filtered by
+    ``exchange``/``symbol`` when given."""
+    query: dict[str, Any] = {}
+    if exchange is not None:
+        query["exchange"] = _non_empty("exchange", exchange)
+    if symbol is not None:
+        query["symbol"] = _non_empty("symbol", symbol)
+    return ApiRequest("GET", "/orders", query or None)
 
 
 _MAX_NS = 2**63 - 1

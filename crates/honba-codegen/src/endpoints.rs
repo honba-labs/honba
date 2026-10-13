@@ -53,6 +53,7 @@ fn request_type_for(method: &str, path: &str) -> Option<&'static str> {
         ("POST", "/backtests") => "BacktestRequest",
         ("POST", "/sweeps") => "SweepRequest",
         ("POST", "/orders") => "OrdersRequest",
+        ("GET", "/orders") => "OrdersQuery",
         ("GET", "/instruments") => "InstrumentsQuery",
         ("GET", "/quotes") => "QuotesQuery",
         ("GET", "/bars/{id}") => "BarsQuery",

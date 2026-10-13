@@ -361,7 +361,12 @@ OrderStatus = Literal["initialized", "submitted", "accepted", "partially_filled"
 
 OrderType = Literal["market", "limit", "stop_market", "stop_limit", "trailing_stop"]
 
+class OrdersQuery:
+    exchange: str | None = None
+    symbol: str | None = None
+
 class OrdersRequest:
+    client_order_id: str | None = None
     instrument_id: InstrumentId | None = None
     order_type: str | None = None
     price: float | None = None

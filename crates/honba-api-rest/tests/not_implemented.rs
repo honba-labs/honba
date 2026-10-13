@@ -32,9 +32,9 @@ async fn call(method: &str, uri: &str, body: Option<&str>) -> (StatusCode, Value
 async fn unbuilt_routes_answer_501_not_implemented_envelopes() {
     // ADR 0017 q2c: the backtest and journal routes are built and left this list on purpose;
     // the sweep routes are now built (E4-S5). ADR 0018 decision 7 (E2-S2 r5b): POST /orders,
-    // DELETE /orders/:id and POST /positions/close are risk-gated (the write ledger of
-    // E11-S7 stays 501 with GET /orders); the remainder follows with E11-S7.
-    let routes: [(&str, &str, Option<&str>); 1] = [("GET", "/orders", None)];
+    // DELETE /orders/:id and POST /positions/close are risk-gated; E11-S7 built the write
+    // ledger, so GET /orders left the list as well and no placeholder route remains.
+    let routes: [(&str, &str, Option<&str>); 0] = [];
     for (method, uri, body) in routes {
         let (status, parsed) = call(method, uri, body).await;
         assert_eq!(status, StatusCode::NOT_IMPLEMENTED, "{method} {uri}");

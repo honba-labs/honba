@@ -310,6 +310,11 @@ def test_inproc_server_side_422_names_the_field_when_the_client_check_is_bypasse
         inproc.bars("TCS.NSE", tf="banana")
 
 
+def test_inproc_orders_reads_the_empty_write_ledger(inproc: Client) -> None:
+    assert inproc.orders() == []
+    assert inproc.orders(exchange="NSE", symbol="TCS") == []
+
+
 def test_inproc_screener_scan_is_typed_and_evaluated_in_rust(inproc: Client) -> None:
     rows = inproc.screener_scan(SCAN_UNIVERSE, CLOSE_GT_60, tf="1m")
     assert [f"{r.instrument_id.symbol}.{r.instrument_id.exchange}" for r in rows] == ["TCS.NSE"]
@@ -333,11 +338,13 @@ def test_inproc_capabilities_are_typed_and_match_the_registry(inproc: Client) ->
     caps = inproc.capabilities()
     assert "GET /capabilities" in caps.endpoints and "GET /schema" in caps.endpoints
     assert set(caps.not_implemented) <= set(caps.endpoints)
-    assert "GET /orders" in caps.not_implemented and "GET /health" not in caps.not_implemented
-    # Built by ADR 0017: no longer flagged. Sweeps built by E4-S5.
+    assert "GET /health" not in caps.not_implemented
+    # Built by ADR 0017: no longer flagged. Sweeps built by E4-S5, the write
+    # ledger by E11-S7.
     assert "POST /backtests" not in caps.not_implemented
     assert "POST /sweeps" not in caps.not_implemented
     assert "GET /journals/{id}" not in caps.not_implemented
+    assert "GET /orders" not in caps.not_implemented
     assert {"india", "null"} <= set(caps.market_packs)
 
 
@@ -347,12 +354,12 @@ def test_inproc_schema_is_a_json_record_with_the_api_version(inproc: Client) -> 
 
 
 def test_inproc_501_placeholders(inproc: Client) -> None:
-    # GET /orders is the only built route still returning 501 (ADR 0017).
-    # POST /orders and DELETE /orders/{id} are risk-gated (E2-S2), not 501.
-    for method, path in [("GET", "/orders")]:
-        resp = inproc.transport.request(method, path)
-        assert resp.status == 501
-        assert resp.json["error"]["code"] == "not_implemented"
+    # E11-S7 built the write ledger, so GET /orders reads the empty ledger (200)
+    # instead of answering 501. POST /orders and DELETE /orders/{id} are
+    # risk-gated (E2-S2), not 501.
+    resp = inproc.transport.request("GET", "/orders")
+    assert resp.status == 200
+    assert resp.json["data"] == {"orders": []}
     from honba.client.errors import error_from_envelope
 
     # POST /sweeps is now implemented (E4-S5); expect 422 for empty body, not 501.
@@ -421,7 +428,9 @@ RAW_REQUESTS: list[tuple[str, str, dict[str, Any] | None, Any]] = [
     ("GET", "/backtests/abc", None, None),  # 404: ill-formed id
     ("GET", "/backtests/abc/journal", None, None),  # 404
     ("POST", "/sweeps", None, {}),  # 501
-    ("GET", "/orders", None, None),  # 501
+    ("GET", "/orders", None, None),  # 200: empty ledger
+    ("GET", "/orders", {"symbol": "TCS"}, None),  # 200: empty ledger filtered
+    ("GET", "/orders", {"charger": "1"}, None),  # 422: unknown query key
     ("POST", "/orders", None, {}),  # 501
     ("DELETE", "/orders/abc", None, None),  # 501
     ("POST", "/positions/close", None, None),  # 501
@@ -450,7 +459,9 @@ def test_raw_responses_are_identical_across_transports(
 
 def test_raw_501_and_422_envelopes_carry_the_documented_codes(inproc: Client, http: Client) -> None:
     for client in (inproc, http):
-        assert client.transport.request("GET", "/orders").json["error"]["code"] == "not_implemented"
+        got = client.transport.request("GET", "/orders")
+        assert got.status == 200
+        assert got.json["data"] == {"orders": []}
         got = client.transport.request("GET", "/depth/TCS.NSE", query={"depth": 51})
         assert got.status == 422
         assert got.json["error"]["code"] == "validation_invalid_request"

@@ -168,6 +168,7 @@ pub fn request_type_names() -> &'static [&'static str] {
         "SweepRequest",
         "BacktestEventsQuery",
         "OrdersRequest",
+        "OrdersQuery",
     ]
 }
 
@@ -182,6 +183,7 @@ pub fn register_requests(set: &mut SchemaSet) {
     set.add_type::<honba_api::BacktestRequest>("BacktestRequest");
     set.add_type::<honba_api::SweepRequest>("SweepRequest");
     set.add_type::<honba_api::OrdersRequest>("OrdersRequest");
+    set.add_type::<honba_api::OrdersQuery>("OrdersQuery");
     set.add_type::<honba_api::BacktestEventsQuery>("BacktestEventsQuery");
 }
 

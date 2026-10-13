@@ -2650,10 +2650,38 @@
           }
         ]
       },
+      "OrdersQuery": {
+        "additionalProperties": false,
+        "description": "`GET /orders` query parameters.",
+        "properties": {
+          "exchange": {
+            "description": "Exchange filter.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "symbol": {
+            "description": "Symbol filter.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "OrdersRequest": {
         "additionalProperties": false,
         "description": "Orders request.",
         "properties": {
+          "client_order_id": {
+            "description": "Client order id: the idempotency key (ADR 0019 decision 3). The ledger records the order under it; a repeat of the same key is a duplicate no-op that returns the first row.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "instrument_id": {
             "anyOf": [
               {
@@ -4951,6 +4979,32 @@
     "/orders": {
       "get": {
         "operationId": "get_orders",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "exchange",
+            "required": false,
+            "schema": {
+              "description": "Exchange filter.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "schema": {
+              "description": "Symbol filter.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {

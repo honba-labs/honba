@@ -127,6 +127,16 @@ def test_depth_levels_are_1_to_50() -> None:
         assert err.value.field == "depth"
 
 
+def test_orders_reads_the_write_ledger() -> None:
+    assert rq.orders() == rq.ApiRequest("GET", "/orders")
+    got = rq.orders(exchange="NSE", symbol="TCS")
+    assert got == rq.ApiRequest("GET", "/orders", {"exchange": "NSE", "symbol": "TCS"})
+    for field in ("exchange", "symbol"):
+        with pytest.raises(RequestValidationError) as err:
+            rq.orders(**{field: "  "})  # type: ignore[arg-type]
+        assert err.value.field == field
+
+
 def test_verify_strategy_posts_a_json_object() -> None:
     got = rq.verify_strategy({"name": "x"})
     assert got == rq.ApiRequest("POST", "/strategies/verify", body={"name": "x"})

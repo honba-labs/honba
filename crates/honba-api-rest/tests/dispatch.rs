@@ -67,8 +67,8 @@ async fn errors_keep_their_status_and_envelope() {
     assert_eq!(status, 422);
     assert_eq!(body["error"]["context"]["field"], "tf");
     let (status, body) = call("GET", "/orders", None).await;
-    assert_eq!(status, 501);
-    assert_eq!(body["error"]["code"], "not_implemented");
+    assert_eq!(status, 200);
+    assert_eq!(body["data"]["orders"], json!([]));
     let (status, body) = call("GET", "/no/such/route", None).await;
     assert_eq!(status, 404);
     assert_eq!(body["error"]["code"], "not_found");

@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from honba.wire.base import Str, _Wire
-from honba.wire.wire import Currency, Float, InstrumentId, NonNegativeFloat
+from honba.wire.wire import Currency, Float, InstrumentId, NonNegativeFloat, UnixNanos
 
 __all__ = [
     "TERMINAL_STATUSES",
@@ -25,6 +25,7 @@ __all__ = [
     "ErrorDetail",
     "Health",
     "InstrumentInfo",
+    "LedgerOrder",
     "RunStatus",
     "ScreenerResultRow",
 ]
@@ -90,6 +91,22 @@ class ScreenerResultRow(_Wire):
     instrument_id: InstrumentId
     metrics: dict[str, float | None]
     """Latest value of every metric the filter reads, by key as written; ``None`` while warming up."""
+
+
+class LedgerOrder(_Wire):
+    """One row of the write ledger (``GET /orders``): the orders the risk stage approved,
+    in insertion order (E11-S7, ADR 0019 decision 3)."""
+
+    order_id: Str
+    instrument_id: InstrumentId
+    side: Str
+    order_type: Str
+    quantity: Float
+    price: Float | None = None
+    status: Str
+    time_in_force: Str = "day"
+    ts_event: UnixNanos
+    ts_init: UnixNanos
 
 
 RunStatus = Literal["pending", "running", "completed", "failed", "cancelled"]

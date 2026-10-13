@@ -71,20 +71,22 @@ async fn an_unknown_instrument_is_a_422_carrying_risk_instrument_unknown() {
 }
 
 #[tokio::test]
-async fn an_approved_order_is_acknowledged_without_a_gateway_call() {
+async fn an_approved_order_returns_its_ledger_row() {
     let (status, parsed) = call(
         api_router_with(state_with_x()),
         Method::POST,
         "/orders",
         Some(
             &json!({"instrument_id": {"symbol": "X", "exchange": "NSE"},
-                    "side": "buy", "qty": 25.0, "price": 100.0})
+                    "side": "buy", "qty": 25.0, "price": 100.0,
+                    "client_order_id": "approved-order"})
             .to_string(),
         ),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(parsed["data"]["status"], json!("acknowledged"));
+    assert_eq!(parsed["data"]["order_id"], json!("approved-order"));
+    assert_eq!(parsed["data"]["status"], json!("submitted"));
 }
 
 #[tokio::test]

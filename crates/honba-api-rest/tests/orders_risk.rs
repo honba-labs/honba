@@ -112,22 +112,70 @@ async fn order_refused_by_risk() {
 
 #[tokio::test]
 async fn post_order_flows_to_sim_only() {
-    // An approved order is acknowledged; the execution gateway is not wired yet, so
-    // nothing is persisted and the (unbuilt) order ledger still answers 501.
+    // An approved order answers with its ledger row and is recorded, so
+    // `GET /orders` reads it back with the rest of the ledger.
     let app = api_router_with(state());
-    let (status, body) = call(
-        app.clone(),
-        Method::POST,
-        "/orders",
-        Some(order("X", "NSE", "buy", 25.0, Some(100.0))),
-    )
-    .await;
+    let mut placed = order("X", "NSE", "buy", 25.0, Some(100.0));
+    placed["client_order_id"] = json!("post-flow");
+    let (status, body) = call(app.clone(), Method::POST, "/orders", Some(placed)).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body["data"]["status"], json!("acknowledged"));
+    assert_eq!(body["data"]["order_id"], json!("post-flow"));
+    assert_eq!(body["data"]["status"], json!("submitted"));
 
     let (status, body) = call(app, Method::GET, "/orders", None).await;
-    assert_eq!(status, StatusCode::NOT_IMPLEMENTED);
-    assert_eq!(body["error"]["code"], json!("not_implemented"));
+    assert_eq!(status, StatusCode::OK);
+    let orders = body["data"]["orders"].as_array().unwrap();
+    assert_eq!(orders.len(), 1);
+    assert_eq!(orders[0]["order_id"], json!("post-flow"));
+    assert_eq!(
+        orders[0]["instrument_id"],
+        json!({"symbol": "X", "exchange": "NSE"})
+    );
+    assert_eq!(orders[0]["side"], json!("buy"));
+    assert_eq!(orders[0]["quantity"], json!(25.0));
+    assert_eq!(orders[0]["status"], json!("submitted"));
+}
+
+#[tokio::test]
+async fn a_repeated_idempotency_key_returns_the_first_row_and_adds_nothing() {
+    let app = api_router_with(state());
+    let mut placed = order("X", "NSE", "buy", 25.0, Some(100.0));
+    placed["client_order_id"] = json!("dup-key");
+    for _ in 0..2 {
+        let (status, body) = call(app.clone(), Method::POST, "/orders", Some(placed.clone())).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["data"]["order_id"], json!("dup-key"));
+        assert_eq!(body["data"]["status"], json!("submitted"));
+    }
+
+    let (status, body) = call(app, Method::GET, "/orders", None).await;
+    assert_eq!(status, StatusCode::OK);
+    let orders = body["data"]["orders"].as_array().unwrap();
+    assert_eq!(orders.len(), 1);
+}
+
+#[tokio::test]
+async fn the_ledger_keeps_every_acknowledged_order_and_treats_unknown_filters_as_empty() {
+    // One keyed order per idempotency key: ADR 0019 decision 3 deduplicates
+    // on the client order id, so the two submits are two rows.
+    let app = api_router_with(state());
+    let mut n = 0;
+    for (side, qty) in [("buy", 25.0), ("sell", 25.0)] {
+        n += 1;
+        let mut body = order("X", "NSE", side, qty, Some(100.0));
+        body["client_order_id"] = json!(format!("key-{n}"));
+        let (status, _) = call(app.clone(), Method::POST, "/orders", Some(body)).await;
+        assert_eq!(status, StatusCode::OK);
+    }
+
+    let (status, body) = call(app.clone(), Method::GET, "/orders", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["data"]["orders"].as_array().unwrap().len(), 2);
+
+    // An unknown query key is `validation_invalid_request`, never silently ignored.
+    let (status, body) = call(app, Method::GET, "/orders?charger=1", None).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(body["error"]["code"], json!("validation_invalid_request"));
 }
 
 #[tokio::test]
@@ -204,22 +252,20 @@ async fn approval_queue_holds_placements() {
 
 #[tokio::test]
 async fn approve_flows_through_risk_to_sim() {
-    // Approve a queued order: it re-enters the risk stage and is acknowledged
+    // Approve a queued order: it re-enters the risk stage, lands in the ledger
+    // and answers with its row.
     let app = api_router_with(state().with_approval_queue(10));
-    let (status, body) = call(
-        app.clone(),
-        Method::POST,
-        "/orders",
-        Some(order("X", "NSE", "buy", 25.0, Some(100.0))),
-    )
-    .await;
+    let mut placed = order("X", "NSE", "buy", 25.0, Some(100.0));
+    placed["client_order_id"] = json!("approve-flow");
+    let (status, body) = call(app.clone(), Method::POST, "/orders", Some(placed)).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["data"]["status"], json!("queued"));
 
     // Approve it
     let (status, body) = call(app.clone(), Method::POST, "/approval/approve", None).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body["data"]["status"], json!("acknowledged"));
+    assert_eq!(body["data"]["order_id"], json!("approve-flow"));
+    assert_eq!(body["data"]["status"], json!("submitted"));
 
     // Queue is now empty
     let (status, body) = call(app, Method::GET, "/approval/queue", None).await;

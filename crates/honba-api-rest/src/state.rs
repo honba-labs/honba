@@ -15,7 +15,8 @@ use honba_messages::{ErrorDetail, TradingState};
 use honba_ports::{BarReader, DepthReader, InstrumentMaster, QuoteReader};
 
 use crate::{
-    ApprovalQueue, BacktestExecutor, RunService, RunServiceConfig, RunStore, StrategyRegistry,
+    ApprovalQueue, BacktestExecutor, OrderLedger, RunService, RunServiceConfig, RunStore,
+    StrategyRegistry,
 };
 
 /// App state for REST API.
@@ -50,6 +51,9 @@ pub struct AppState {
     /// When enabled, `POST /orders` is held here until approved by an operator.
     /// Cancel and modify bypass the queue.
     pub approval_queue: Option<Arc<ApprovalQueue>>,
+    /// The write ledger every risk-approved placement lands in (E11-S7, ADR 0019
+    /// decision 3). `GET /orders` reads it; a restart empties it.
+    pub orders: OrderLedger,
 }
 
 impl AppState {
@@ -70,6 +74,7 @@ impl AppState {
             account_currency: Currency::Inr,
             trading_state: TradingState::Active,
             approval_queue: None,
+            orders: OrderLedger::default(),
         }
     }
 
