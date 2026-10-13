@@ -135,9 +135,12 @@ ALLOWED_PROD = {
     # predicates, and replay; it has no filesystem and must stay replay-only.
     # E11-S5: it names the screener domain types (honba-entities, L1) and builds
     # honba-messages bars (L0) to feed the honba-indicators evaluator (L3).
+    # E11-S5 (replay): it parses Journal v1 NDJSON with honba-engine's AuditLog /
+    # JournalV1 / ReplayState (L3). All are pure; the NDJSON crosses as a string.
     "honba-api-wasm": {
         "honba-messages",
         "honba-entities",
+        "honba-engine",
         "honba-indicators",
     },
 }

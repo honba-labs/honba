@@ -17,6 +17,7 @@ test-wasm:
 	wasm-pack build crates/honba-api-wasm --target nodejs --dev --out-dir ../../$(WASM_PKG)
 	node crates/honba-api-wasm/tests/js/indicator_conformance.mjs $(WASM_PKG)
 	node crates/honba-api-wasm/tests/js/screener_conformance.mjs $(WASM_PKG)
+	node crates/honba-api-wasm/tests/js/replay_conformance.mjs $(WASM_PKG)
 
 lint:
 	cargo clippy --workspace --all-targets -- -D warnings

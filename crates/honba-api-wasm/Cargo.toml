@@ -12,6 +12,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 honba-entities.workspace = true
+honba-engine.workspace = true
 honba-indicators.workspace = true
 honba-messages.workspace = true
 serde.workspace = true

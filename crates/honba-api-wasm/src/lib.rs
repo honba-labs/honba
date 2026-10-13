@@ -4,16 +4,17 @@
 
 //! WASM compute surface for Honba frontend.
 //!
-//! Pure compute only: indicators (close-only and OHLC) and screener evaluation now; backtest
-//! replay later. No tokio, no filesystem, no network. Depends only on pure L0-L4 crates.
+//! Pure compute only: indicators (close-only and OHLC), screener evaluation, and Journal v1
+//! backtest replay. No tokio, no filesystem, no network. Depends only on pure L0-L4 crates.
 //!
-//! The logic lives in plain Rust modules ([`indicators`], [`screener`]) that are tested natively;
-//! this file is only the `wasm-bindgen` layer over them. Series cross the boundary as
-//! `Float64Array`; a screen result crosses as a JSON string.
+//! The logic lives in plain Rust modules ([`indicators`], [`screener`], [`replay`]) that are
+//! tested natively; this file is only the `wasm-bindgen` layer over them. Series cross the
+//! boundary as `Float64Array`; a screen result and a journal replay cross as JSON strings.
 
 use wasm_bindgen::prelude::*;
 
 pub mod indicators;
+pub mod replay;
 pub mod screener;
 
 /// Full indicator series over `closes`, same length as the input, `NaN` during warm-up.
@@ -93,6 +94,29 @@ pub fn screener_scan_group(
 ) -> Result<String, JsError> {
     screener::scan_group_json(group_json, open, high, low, close, volume)
         .map_err(|e| JsError::new(&e))
+}
+
+/// Parses a Journal v1 NDJSON stream and returns its provenance header as JSON.
+///
+/// `journal_ndjson` is the whole journal in memory (the first non-empty line is the header,
+/// `type: "header"`; the rest are audit records). Returns the `JournalHeader` object as JSON.
+/// Throws a JavaScript `Error` on an empty stream, a missing or malformed header, a malformed
+/// record line, or an unsupported journal version.
+#[wasm_bindgen]
+pub fn journal_header(journal_ndjson: &str) -> Result<String, JsError> {
+    replay::journal_header_json(journal_ndjson).map_err(|e| JsError::new(&e))
+}
+
+/// Replays a Journal v1 NDJSON stream and returns the reconstructed state as compact JSON.
+///
+/// `journal_ndjson` is the whole journal in memory. Returns the stable shape
+/// `{"header": <JournalHeader>, "replay": {"trading_state", "dispatches", "positions", "orders",
+/// "rejections"}}`, with `positions`/`orders` sorted and `rejections` keyed by order id, so the
+/// frontend can show a backtest journal offline. Throws a JavaScript `Error` on the same inputs
+/// as [`journal_header`].
+#[wasm_bindgen]
+pub fn replay_journal(journal_ndjson: &str) -> Result<String, JsError> {
+    replay::replay_journal_json(journal_ndjson).map_err(|e| JsError::new(&e))
 }
 
 #[cfg(test)]
