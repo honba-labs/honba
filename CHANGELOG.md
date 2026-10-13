@@ -2,21 +2,24 @@
 
 ## [Unreleased]
 
-### WASM screener evaluation export (E11-S5)
+### WASM screener evaluation + backtest replay (E11-S5)
 
-- `honba_api_wasm::screener`: pure module (`evaluate_predicate_json`,
-  `evaluate_group_json`, `scan_predicate_json`, `scan_group_json`) wrapping the
-  `honba_indicators::screener` evaluator over OHLCV `Float64Array` slices (with
-  chronological `Bar` construction, 52-week window, and the bar-only divergence
-  contract). Validates predicate/group JSON, rejects non-finite and bad OHLCV.
-- `screener_scan_predicate` / `screener_scan_group` `#[wasm_bindgen]` exports;
-  return a JSON `{"result":bool,"metrics":{…}}` string or throw a `JsError`.
-- Conformance: `tests/screener_conformance.rs` runs `screener_scan.json` cases,
-  groups, unsupported and divergences; `tests/js/screener_conformance.mjs` does
-  the same through the real wasm pkg under node. `make test-wasm` now runs both.
-- `Makefile` `test-wasm` wired through the wasm screener harness; dependency
-  allowlist extended so `honba-api-wasm` may depend on `honba-messages` /
-  `honba-entities`. Backtest replay remains the other half of E11-S5.
+- `honba_api_wasm::screener`: pure module wrapping the `honba_indicators::screener`
+  evaluator over OHLCV `Float64Array` slices (`evaluate_predicate_json`,
+  `evaluate_group_json`, `scan_predicate_json`, `scan_group_json`). Validates
+  predicate/group JSON, rejects non-finite/bad OHLCV; `screener_scan_predicate` /
+  `screener_scan_group` `#[wasm_bindgen]` exports return
+  `{"result":bool,"metrics":{…}}` or throw a `JsError`. Conformance via
+  `screener_scan.json` (native + JS/Node).
+- `honba_api_wasm::replay`: pure journal replay (`journal_header_json`,
+  `replay_journal_json`, `journal_record_count`) over in-memory NDJSON
+  (`JournalV1::read_ndjson` / `ReplayState::from_log` with no fs/tokio). The
+  wasm exports `journal_header` / `replay_journal` return canonical JSON
+  (header fields, sorted `positions`/`orders`/`rejections`, `dispatches`,
+  `trading_state`); errors throw `JsError`.
+- `Makefile` `test-wasm` now runs both the screener and replay harnesses; the
+  dependency allowlist adds `honba-engine` so `honba-api-wasm` can name the
+  journal types while staying `wasm32-unknown-unknown` pure.
 
 ### Route to scope map with drift guard (E5-S3)
 
