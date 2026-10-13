@@ -4,15 +4,17 @@
 
 //! WASM compute surface for Honba frontend.
 //!
-//! Pure compute only: indicators (close-only and OHLC) now; screener evaluation and backtest replay later. No tokio,
-//! no filesystem, no network. Depends only on pure L0-L4 crates.
+//! Pure compute only: indicators (close-only and OHLC) and screener evaluation now; backtest
+//! replay later. No tokio, no filesystem, no network. Depends only on pure L0-L4 crates.
 //!
-//! The logic lives in plain Rust modules ([`indicators`]) that are tested natively; this file is
-//! only the `wasm-bindgen` layer over them. Slices cross the boundary as `Float64Array`.
+//! The logic lives in plain Rust modules ([`indicators`], [`screener`]) that are tested natively;
+//! this file is only the `wasm-bindgen` layer over them. Series cross the boundary as
+//! `Float64Array`; a screen result crosses as a JSON string.
 
 use wasm_bindgen::prelude::*;
 
 pub mod indicators;
+pub mod screener;
 
 /// Full indicator series over `closes`, same length as the input, `NaN` during warm-up.
 ///
@@ -53,6 +55,44 @@ pub fn ohlc_indicator_series(
 #[wasm_bindgen]
 pub fn list_indicators() -> String {
     indicators::list_indicators_json()
+}
+
+/// Evaluates one screener predicate over column-oriented bar arrays and reports the outcome.
+///
+/// `predicate_json` is a JSON `ScreenerFilterPredicate` (e.g.
+/// `{"key":"close","op":"gt","value":10}`). The five arrays are equal-length chronological bars.
+/// Returns the JSON string `{"result": bool, "metrics": {key: number|null}}` (`null` is a metric
+/// still in warm-up). Throws a JavaScript `Error` on malformed predicate JSON, unequal lengths,
+/// non-finite input, an inconsistent OHLC row, an unsupported metric, or an operator/operand
+/// mismatch.
+#[wasm_bindgen]
+pub fn screener_scan_predicate(
+    predicate_json: &str,
+    open: &[f64],
+    high: &[f64],
+    low: &[f64],
+    close: &[f64],
+    volume: &[f64],
+) -> Result<String, JsError> {
+    screener::scan_predicate_json(predicate_json, open, high, low, close, volume)
+        .map_err(|e| JsError::new(&e))
+}
+
+/// Evaluates an AND/OR (possibly nested) screener filter group over column-oriented bar arrays.
+///
+/// `group_json` is a JSON `ScreenerFilterGroup`. Returns the same JSON shape and throws the same
+/// way as [`screener_scan_predicate`], plus on group shape/size/operator errors.
+#[wasm_bindgen]
+pub fn screener_scan_group(
+    group_json: &str,
+    open: &[f64],
+    high: &[f64],
+    low: &[f64],
+    close: &[f64],
+    volume: &[f64],
+) -> Result<String, JsError> {
+    screener::scan_group_json(group_json, open, high, low, close, volume)
+        .map_err(|e| JsError::new(&e))
 }
 
 #[cfg(test)]

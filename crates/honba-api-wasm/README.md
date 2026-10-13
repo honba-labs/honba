@@ -46,6 +46,28 @@ default (`include_first_bar=False`) skips the first bar and warms up one bar lon
 
 The values come straight from `honba-indicators`; nothing is reimplemented here.
 
+## Screener
+
+| Export | Signature |
+|---|---|
+| `screener_scan_predicate(predicate_json, open, high, low, close, volume)` | `(string, Float64Array×5) -> string`; throws a JS `Error` on failure |
+| `screener_scan_group(group_json, open, high, low, close, volume)` | `(string, Float64Array×5) -> string`; throws a JS `Error` on failure |
+
+`screener_scan_*` evaluates a screener predicate, or an AND/OR (possibly nested) filter group, from
+`honba-indicators::screener` against equal-length chronological bars built from the five arrays
+(instrument `X` on `NSE`, one-day `Last` bars). It returns the JSON string
+`{"result":bool,"metrics":{key:number|null}}`, where a `null` metric is still in warm-up. For a
+predicate, `metrics` holds its key and any right-hand metric reference; for a group, every metric
+key it reads. The supported metrics are `open`, `high`, `low`, `close`, `volume`,
+`price_52_week_high`, `price_52_week_low`, `sma<N>` and `rsi`.
+
+The five arrays must be equal-length with finite values and consistent OHLC rows (`low <= high`,
+`open`/`close` inside the range, non-negative volume); anything else throws, as do malformed JSON,
+an unsupported metric, an operator/operand mismatch, or an out-of-limits filter tree. Unlike
+Python, an unsupported (e.g. fundamental) metric on a bar-only dataset is an error rather than
+`false`, so a fundamental never passes as a non-match (the pinned divergences live in
+`honba-indicators::screener`).
+
 ## Tests and checks
 
 - Unit: `cargo test -p honba-api-wasm` (`src/tests/`).
@@ -57,4 +79,8 @@ The values come straight from `honba-indicators`; nothing is reimplemented here.
 - OHLC conformance: `schema/conformance/ohlc_series.json` (ATR vectors generated once from the Python
   `Atr`) is run by `tests/ohlc_conformance.rs`, `python/tests/integration/test_ohlc_series_conformance.py`
   and the same node harness (`tests/js/indicator_conformance.mjs`).
+- Screener conformance: `schema/conformance/screener_scan.json` is run by
+  `tests/screener_conformance.rs` (native Rust) and by `make test-wasm`
+  (`tests/js/screener_conformance.mjs`). Tolerance: booleans exact; metrics integer-valued exact,
+  otherwise `tolerance.relative`.
 - Build: `make check-wasm` (`cargo check -p honba-api-wasm --target wasm32-unknown-unknown`).

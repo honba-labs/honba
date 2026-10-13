@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### WASM screener evaluation export (E11-S5)
+
+- `honba_api_wasm::screener`: pure module (`evaluate_predicate_json`,
+  `evaluate_group_json`, `scan_predicate_json`, `scan_group_json`) wrapping the
+  `honba_indicators::screener` evaluator over OHLCV `Float64Array` slices (with
+  chronological `Bar` construction, 52-week window, and the bar-only divergence
+  contract). Validates predicate/group JSON, rejects non-finite and bad OHLCV.
+- `screener_scan_predicate` / `screener_scan_group` `#[wasm_bindgen]` exports;
+  return a JSON `{"result":bool,"metrics":{…}}` string or throw a `JsError`.
+- Conformance: `tests/screener_conformance.rs` runs `screener_scan.json` cases,
+  groups, unsupported and divergences; `tests/js/screener_conformance.mjs` does
+  the same through the real wasm pkg under node. `make test-wasm` now runs both.
+- `Makefile` `test-wasm` wired through the wasm screener harness; dependency
+  allowlist extended so `honba-api-wasm` may depend on `honba-messages` /
+  `honba-entities`. Backtest replay remains the other half of E11-S5.
+
 ### Route to scope map with drift guard (E5-S3)
 
 - `honba_api_rest::ROUTE_SCOPES`: one canonical table maps every route the router

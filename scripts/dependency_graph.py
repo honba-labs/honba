@@ -133,7 +133,11 @@ ALLOWED_PROD = {
     },
     # Plan 4.4: pure L0-L4 only. The wasm surface computes indicators, screener
     # predicates, and replay; it has no filesystem and must stay replay-only.
+    # E11-S5: it names the screener domain types (honba-entities, L1) and builds
+    # honba-messages bars (L0) to feed the honba-indicators evaluator (L3).
     "honba-api-wasm": {
+        "honba-messages",
+        "honba-entities",
         "honba-indicators",
     },
 }
