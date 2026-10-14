@@ -59,6 +59,7 @@ from honba.adapters.models import (
     StreamMode,
     Subscription,
 )
+from honba.adapters.order_events import ReportReduction, reduce_order_report
 from honba.adapters.rate_limit import (
     BucketState,
     FileBackedBucket,
@@ -122,6 +123,7 @@ __all__ = [
     "RateLimitExceeded",
     "RateLimiter",
     "RateLimiterRegistry",
+    "ReportReduction",
     "RunMode",
     "SecretStore",
     "SessionError",
@@ -140,6 +142,7 @@ __all__ = [
     "default_registry",
     "find_boundary_violations",
     "format_violations",
+    "reduce_order_report",
     "register_adapter",
     "resolve_adapter",
     "resolve_execution_adapter",
