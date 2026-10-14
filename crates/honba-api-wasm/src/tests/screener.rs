@@ -106,7 +106,10 @@ fn non_finite_input_is_rejected_with_its_series_and_index() {
         &[1.0, 2.0],
     )
     .unwrap_err();
-    assert_eq!(err, "non-finite high input at index 1");
+    assert_eq!(
+        err,
+        "validation_invalid_request: non-finite high input at index 1"
+    );
 }
 
 #[test]
@@ -120,7 +123,10 @@ fn unequal_lengths_are_refused() {
         &[1.0, 2.0],
     )
     .unwrap_err();
-    assert!(err.contains("series lengths differ"), "{err}");
+    assert!(
+        err.contains("validation_invalid_request: series lengths differ"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -134,14 +140,20 @@ fn inconsistent_ohlc_rows_are_refused_before_bar_construction() {
         &[1.0],
     )
     .unwrap_err();
-    assert_eq!(err, "invalid bar at index 0: low is above high");
+    assert_eq!(
+        err,
+        "validation_invalid_request: invalid bar at index 0: low is above high"
+    );
 }
 
 #[test]
 fn malformed_json_is_refused_with_the_parser_message() {
     let [o, h, l, c, v] = one_bar();
     let err = scan_predicate_json("not json", &o, &h, &l, &c, &v).unwrap_err();
-    assert!(err.starts_with("invalid predicate:"), "{err}");
+    assert!(
+        err.starts_with("validation_invalid_request: invalid predicate:"),
+        "{err}"
+    );
     let err = scan_group_json(r#"{"operator":"XOR","items":[]}"#, &o, &h, &l, &c, &v).unwrap_err();
     assert!(err.contains("not AND or OR"), "{err}");
 }

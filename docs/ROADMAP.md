@@ -113,6 +113,7 @@ E10-S1..S8, E11-S1..S8). E6 batches 1-2, E7 and E8 are tracked separately below.
 | honba-docs chunks | documentation chunks in the `honba-docs` repo (not itemised here) |
 | E10-S6 determinism under threads | `crates/honba-sweep/tests/sweep.rs` `determinism_under_threads_{one,four,sixteen}_worker(s)` compare journal and ranking across thread counts |
 | E10-S6 extended to runs | `crates/honba-async/tests/shell.rs` `determinism_under_threads_{one,four,sixteen}_workers` compare the audit trail byte-for-byte at tokio `worker_threads` 1/4/16 (`EngineHandle` runs the engine as a task, so it really uses those threads); `crates/honba-api-rest/tests/runs_determinism.rs` `determinism_under_workers` covers the run-service pool |
+| Stable codes on every surface (§7 gap (d)) | WASM first: `honba-api-wasm` screener + replay refusals are `reason: message` pairs (ADR 0012 rule 4) reusing the REST `ErrorCode` for invalid input and the evaluator's own reasons; typed `IndicatorError`/`WasmScreenerError`/`ReplayError` `reason()` tables + `wasm_error_codes.rs` |
 | Blocking TS codegen drift | `.github/workflows/ci.yml` `codegen-drift-frontend` checks out `honba-frontend` beside `honba` and runs `make check-schema-ts check-client`; wired into `ci-ok` |
 | E11-S1 envelope and registry | `crates/honba-api`, `crates/honba-messages/src/endpoints.rs` (22 routes, `WRITE_PATHS`), `GET /capabilities` (cf1366e) |
 | E11-S2 timestamps as strings | ADR 0012 rule 4, commits 4006ff1, 9530251 |
@@ -494,7 +495,7 @@ A story is done only when all of the following hold (merges roadmap v4 DoD, `doc
 Architecture-level done (`docs/archive/plan.md` section 10), still open: (a) one strategy runs unchanged in-process, over REST and in `honba-examples`
 (section 6.1); (b) frontend computes indicators, screener and replay in WASM with no Python (replay and screener export open); (c) five
 codegen artifacts with blocking drift checks (met; the TS check now runs in CI via `codegen-drift-frontend`); (d) every surface error carries a stable code (met for
-REST); (e) determinism at 1/4/16 threads (met for sweeps and runs — `honba-async` `determinism_under_threads_*`).
+REST and WASM: `honba-api-wasm` refusals are `reason: message` pairs reusing the REST `ErrorCode` for input validation and the evaluator's own reasons); (e) determinism at 1/4/16 threads (met for sweeps and runs — `honba-async` `determinism_under_threads_*`).
 
 ---
 

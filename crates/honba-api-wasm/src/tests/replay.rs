@@ -174,7 +174,7 @@ fn positions_are_sorted_by_instrument() {
 #[test]
 fn empty_stream_is_refused() {
     let err = replay_journal_json("").unwrap_err();
-    assert!(err.contains("empty journal stream"), "{err}");
+    assert!(err.contains("empty_journal: empty journal stream"), "{err}");
     assert!(journal_header_json("").is_err());
 }
 
@@ -182,7 +182,10 @@ fn empty_stream_is_refused() {
 fn missing_header_is_refused() {
     let line = serde_json::json!({"seq": 0, "type": "event_dispatched", "ts_event": 1}).to_string();
     let err = replay_journal_json(&line).unwrap_err();
-    assert!(err.contains("missing journal v1 header"), "{err}");
+    assert!(
+        err.contains("missing_header: missing journal v1 header"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -197,7 +200,10 @@ fn unsupported_journal_version_is_refused() {
     })
     .to_string();
     let err = journal_header_json(&line).unwrap_err();
-    assert!(err.contains("unsupported journal version"), "{err}");
+    assert!(
+        err.contains("unsupported_journal_version: unsupported journal version: 2"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -207,6 +213,30 @@ fn malformed_record_line_is_refused() {
         ndjson_of(header(), &AuditLog::new()).trim()
     );
     let err = replay_journal_json(&ndjson).unwrap_err();
-    assert!(!err.is_empty());
+    assert!(err.contains("invalid_record:"), "{err}");
     assert!(journal_header_json(&ndjson).is_err());
+}
+
+#[test]
+fn malformed_header_json_is_not_a_record_failure() {
+    let err = replay_journal_json("not json\n").unwrap_err();
+    assert!(err.contains("invalid_header_json:"), "{err}");
+}
+
+#[test]
+fn header_value_failure_is_not_a_record_failure() {
+    let mut value = serde_json::to_value(header()).unwrap();
+    value.as_object_mut().unwrap().remove("seed");
+    value
+        .as_object_mut()
+        .unwrap()
+        .insert("type".to_string(), serde_json::json!("header"));
+    let line = format!("{}\n", value);
+    eprintln!("Test input line: {}", line);
+    let err = replay_journal_json(&line).unwrap_err();
+    eprintln!("Got error: {}", err);
+    assert!(
+        err.contains("invalid_header:"),
+        "expected invalid_header: got {err}"
+    );
 }

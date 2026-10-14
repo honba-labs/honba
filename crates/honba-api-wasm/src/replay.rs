@@ -32,9 +32,102 @@ use honba_engine::{AuditKind, AuditLog, JournalHeader, JournalV1, ReplayState};
 use honba_messages::{OrderSide, TradingState};
 use serde_json::{json, Value};
 
+/// Why a journal request was refused: a stable `reason` in a `reason: message` pair
+/// (ADR 0012 rule 4).
+///
+/// Malformed header JSON classifies as [`ReplayError::InvalidHeaderJson`]; a header that parses
+/// but carries wrong field values classifies as [`ReplayError::InvalidHeader`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReplayError {
+    /// The stream has no non-empty line at all.
+    EmptyJournal,
+    /// The first line fails header JSON parsing.
+    InvalidHeaderJson,
+    /// The first line is not a journal v1 header.
+    MissingHeader,
+    /// The header fails `JournalHeader` deserialization.
+    InvalidHeader,
+    /// `journal_version` is not 1.
+    UnsupportedJournalVersion,
+    /// A later line fails record JSON parsing or record deserialization.
+    InvalidRecord,
+    /// The header fails JSON serialization for the answer.
+    HeaderSerialize,
+}
+
+impl ReplayError {
+    /// A stable machine-readable reason string.
+    #[must_use]
+    pub const fn reason(self) -> &'static str {
+        match self {
+            Self::EmptyJournal => "empty_journal",
+            Self::InvalidHeaderJson => "invalid_header_json",
+            Self::MissingHeader => "missing_header",
+            Self::InvalidHeader => "invalid_header",
+            Self::UnsupportedJournalVersion => "unsupported_journal_version",
+            Self::InvalidRecord => "invalid_record",
+            Self::HeaderSerialize => "header_serialize",
+        }
+    }
+}
+
+impl std::fmt::Display for ReplayError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: journal rejected", self.reason())
+    }
+}
+
 /// Parses an in-memory NDJSON journal without touching the filesystem.
-fn parse_journal(journal_ndjson: &str) -> Result<JournalV1, String> {
-    JournalV1::read_ndjson(BufReader::new(journal_ndjson.as_bytes())).map_err(|e| e.to_string())
+///
+/// Every refusal is `(reason, message)`: the stable `reason` string comes from
+/// `ReplayError::reason`, the message is the reader's original diagnostic, separated by
+/// `": "` so the [`crate`] boundary can split them apart again.
+/// Classifies one `read_ndjson` failure. The reader carries no phase, so header failures are
+/// told apart by their engine message: `"missing journal v1 header"` is a missing header,
+/// `"unsupported journal version: N"` a version refusal, and any header JSON or value failure
+/// lands as the malformed-header or bad-header reason respectively; record failures carry the
+/// record text.
+fn classify(error: &std::io::Error, header_line: Option<&str>, record_lines: usize) -> ReplayError {
+    let message = error.to_string();
+    match error.kind() {
+        std::io::ErrorKind::UnexpectedEof => ReplayError::EmptyJournal,
+        std::io::ErrorKind::InvalidData if message == "missing journal v1 header" => {
+            ReplayError::MissingHeader
+        }
+        std::io::ErrorKind::InvalidData if message.starts_with("unsupported journal version:") => {
+            ReplayError::UnsupportedJournalVersion
+        }
+        // A header-value failure names the field; anything else from the header line is
+        // malformed header JSON.
+        std::io::ErrorKind::InvalidData if record_lines == 0 && header_line.is_some() => {
+            if message.contains("missing field")
+                || message.contains("invalid type")
+                || message.contains("invalid value")
+            {
+                ReplayError::InvalidHeader
+            } else {
+                ReplayError::InvalidHeaderJson
+            }
+        }
+        _ => ReplayError::InvalidRecord,
+    }
+}
+
+fn parse_journal(journal_ndjson: &str) -> Result<JournalV1, (ReplayError, String)> {
+    let mut lines = journal_ndjson
+        .lines()
+        .filter(|line| !line.trim().is_empty());
+    let header_line = lines.next().map(str::to_string);
+    let record_lines = lines.count();
+    JournalV1::read_ndjson(BufReader::new(journal_ndjson.as_bytes())).map_err(|error| {
+        let message = error.to_string();
+        let reason = classify(&error, header_line.as_deref(), record_lines);
+        (reason, message)
+    })
+}
+
+fn pair(error: (ReplayError, String)) -> String {
+    format!("{}: {}", error.0.reason(), error.1)
 }
 
 /// Renders a finite `f64` as a JSON number, and anything else as `null` (never `NaN`/infinity).
@@ -61,7 +154,8 @@ fn trading_state_str(state: TradingState) -> &'static str {
 }
 
 fn header_value(header: &JournalHeader) -> Result<Value, String> {
-    serde_json::to_value(header).map_err(|e| e.to_string())
+    serde_json::to_value(header)
+        .map_err(|error| pair((ReplayError::HeaderSerialize, error.to_string())))
 }
 
 /// The final rejection reason per order id, as recorded by the replayed [`ReplayState`].
@@ -89,21 +183,22 @@ fn rejection_reasons(state: &ReplayState, log: &AuditLog) -> BTreeMap<String, St
 ///
 /// # Errors
 ///
-/// A message from the reader: an empty stream, a missing or malformed header, or a header for an
-/// unsupported journal version.
+/// A `reason: message` pair for an empty stream, a missing or malformed header, an unsupported
+/// journal version, or a header that fails serialization.
 pub fn journal_header_json(journal_ndjson: &str) -> Result<String, String> {
-    let journal = parse_journal(journal_ndjson)?;
-    serde_json::to_string(&journal.header).map_err(|e| e.to_string())
+    let journal = parse_journal(journal_ndjson).map_err(pair)?;
+    serde_json::to_string(&journal.header)
+        .map_err(|error| pair((ReplayError::HeaderSerialize, error.to_string())))
 }
 
 /// Replays the journal and returns the compact summary JSON described in the module docs.
 ///
 /// # Errors
 ///
-/// A message from the reader for an empty stream, a missing or malformed header, a malformed
-/// record line, or an unsupported journal version.
+/// A `reason: message` pair for an empty stream, a missing or malformed header, a malformed
+/// record line, an unsupported journal version, or a header that fails serialization.
 pub fn replay_journal_json(journal_ndjson: &str) -> Result<String, String> {
-    let journal = parse_journal(journal_ndjson)?;
+    let journal = parse_journal(journal_ndjson).map_err(pair)?;
     let state = ReplayState::from_log(&journal.log);
 
     let positions: Vec<Value> = state
@@ -163,8 +258,9 @@ pub fn replay_journal_json(journal_ndjson: &str) -> Result<String, String> {
 ///
 /// # Errors
 ///
-/// As [`journal_header_json`], plus a malformed record line.
+/// A `reason: message` pair for an empty stream, a missing or malformed header, a malformed
+/// record line, or an unsupported journal version.
 pub fn journal_record_count(journal_ndjson: &str) -> Result<usize, String> {
-    let journal = parse_journal(journal_ndjson)?;
+    let journal = parse_journal(journal_ndjson).map_err(pair)?;
     Ok(journal.log.len())
 }

@@ -29,7 +29,8 @@ use honba_indicators::screener::{
     evaluate_group, evaluate_predicate, group_metric_keys, latest_metrics, ScreenerError,
 };
 use honba_messages::{
-    Bar, BarAggregation, BarSpecification, BarType, Exchange, InstrumentId, PriceType, UnixNanos,
+    Bar, BarAggregation, BarSpecification, BarType, ErrorCode, Exchange, InstrumentId, PriceType,
+    UnixNanos,
 };
 use serde_json::{json, Value};
 
@@ -37,8 +38,10 @@ use serde_json::{json, Value};
 const DAY_NANOS: u64 = 86_400_000_000_000;
 
 /// Why a screener request over column-oriented arrays was refused.
+///
+/// [`reason`](Self::reason) is the stable machine-readable half of the refusal.
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum WasmScreenerError {
+pub enum WasmScreenerError {
     /// A predicate or group JSON document is malformed (unknown fields, bad types, ...).
     InvalidJson {
         /// Which document failed to parse: `"predicate"` or `"group"`.
@@ -78,6 +81,26 @@ enum WasmScreenerError {
     Screener(ScreenerError),
 }
 
+impl WasmScreenerError {
+    /// A stable machine-readable reason in a `reason: message` pair (ADR 0012 rule 4).
+    ///
+    /// Caller-facing input failures (malformed predicate or group JSON, unequal series lengths,
+    /// non-finite input, an inconsistent OHLC row) all reuse the REST
+    /// [`ErrorCode::ValidationInvalidRequest`] code, matching `POST /screener/scan`; evaluator
+    /// failures reuse the evaluator's own reason (`unsupported_metric`, `invalid_operand`,
+    /// `invalid_filter`).
+    #[must_use]
+    pub fn reason(&self) -> &'static str {
+        match self {
+            Self::InvalidJson { .. }
+            | Self::LengthMismatch { .. }
+            | Self::NonFiniteInput { .. }
+            | Self::InvalidBar { .. } => ErrorCode::ValidationInvalidRequest.as_str(),
+            Self::Screener(error) => error.reason(),
+        }
+    }
+}
+
 impl fmt::Display for WasmScreenerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -108,6 +131,13 @@ impl From<ScreenerError> for WasmScreenerError {
     fn from(e: ScreenerError) -> Self {
         Self::Screener(e)
     }
+}
+
+/// Renders an error as a `reason: message` pair (ADR 0012 rule 4) for the `Result<_, String>`
+/// adaptation fns below.
+fn error_pair(error: impl Into<WasmScreenerError>) -> String {
+    let error = error.into();
+    format!("{}: {error}", error.reason())
 }
 
 /// The stable identity of the synthetic bars: instrument `X` on `NSE`, one-day `Last` bars.
@@ -230,8 +260,9 @@ fn scan_json(result: bool, metrics: BTreeMap<String, Option<f64>>) -> String {
 ///
 /// # Errors
 ///
-/// A message for malformed predicate JSON, unequal lengths, non-finite input, an inconsistent
-/// OHLC row, or an [`ScreenerError`] (unknown/unsupported metric, bad operand, bad filter tree).
+/// A `reason: message` pair for malformed predicate JSON, unequal lengths, non-finite input, an
+/// inconsistent OHLC row, or an [`ScreenerError`] (unknown/unsupported metric, bad operand, bad
+/// filter tree). The `reason` is the stable [`WasmScreenerError::reason`] string.
 pub fn evaluate_predicate_json(
     predicate_json: &str,
     open: &[f64],
@@ -240,9 +271,9 @@ pub fn evaluate_predicate_json(
     close: &[f64],
     volume: &[f64],
 ) -> Result<bool, String> {
-    let pred = parse_predicate(predicate_json).map_err(|e| e.to_string())?;
-    let bars = bars_from_arrays(open, high, low, close, volume).map_err(|e| e.to_string())?;
-    evaluate_predicate(&pred, &bars).map_err(|e| e.to_string())
+    let pred = parse_predicate(predicate_json).map_err(error_pair)?;
+    let bars = bars_from_arrays(open, high, low, close, volume).map_err(error_pair)?;
+    evaluate_predicate(&pred, &bars).map_err(error_pair)
 }
 
 /// Evaluates one filter group JSON document (AND/OR, possibly nested) against the input arrays.
@@ -258,9 +289,9 @@ pub fn evaluate_group_json(
     close: &[f64],
     volume: &[f64],
 ) -> Result<bool, String> {
-    let group = parse_group(group_json).map_err(|e| e.to_string())?;
-    let bars = bars_from_arrays(open, high, low, close, volume).map_err(|e| e.to_string())?;
-    evaluate_group(&group, &bars).map_err(|e| e.to_string())
+    let group = parse_group(group_json).map_err(error_pair)?;
+    let bars = bars_from_arrays(open, high, low, close, volume).map_err(error_pair)?;
+    evaluate_group(&group, &bars).map_err(error_pair)
 }
 
 /// Evaluates a predicate and reports both its `result` and the latest `metrics` it reads.
@@ -280,10 +311,10 @@ pub fn scan_predicate_json(
     close: &[f64],
     volume: &[f64],
 ) -> Result<String, String> {
-    let pred = parse_predicate(predicate_json).map_err(|e| e.to_string())?;
-    let bars = bars_from_arrays(open, high, low, close, volume).map_err(|e| e.to_string())?;
-    let result = evaluate_predicate(&pred, &bars).map_err(|e| e.to_string())?;
-    let metrics = latest_metrics(&predicate_keys(&pred), &bars).map_err(|e| e.to_string())?;
+    let pred = parse_predicate(predicate_json).map_err(error_pair)?;
+    let bars = bars_from_arrays(open, high, low, close, volume).map_err(error_pair)?;
+    let result = evaluate_predicate(&pred, &bars).map_err(error_pair)?;
+    let metrics = latest_metrics(&predicate_keys(&pred), &bars).map_err(error_pair)?;
     Ok(scan_json(result, metrics))
 }
 
@@ -303,10 +334,10 @@ pub fn scan_group_json(
     close: &[f64],
     volume: &[f64],
 ) -> Result<String, String> {
-    let group = parse_group(group_json).map_err(|e| e.to_string())?;
-    let bars = bars_from_arrays(open, high, low, close, volume).map_err(|e| e.to_string())?;
-    let result = evaluate_group(&group, &bars).map_err(|e| e.to_string())?;
-    let keys = group_metric_keys(&group).map_err(|e| e.to_string())?;
-    let metrics = latest_metrics(&keys, &bars).map_err(|e| e.to_string())?;
+    let group = parse_group(group_json).map_err(error_pair)?;
+    let bars = bars_from_arrays(open, high, low, close, volume).map_err(error_pair)?;
+    let result = evaluate_group(&group, &bars).map_err(error_pair)?;
+    let keys = group_metric_keys(&group).map_err(error_pair)?;
+    let metrics = latest_metrics(&keys, &bars).map_err(error_pair)?;
     Ok(scan_json(result, metrics))
 }

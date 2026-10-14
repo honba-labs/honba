@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Stable error reasons on the WASM compute surface (§7 gap (d))
+
+- `crates/honba-api-wasm`: every refusal is now a `reason: message` pair (ADR 0012 rule 4), so a
+  JS caller can match on a stable reason instead of parsing message text. The input-validation
+  reasons reuse the REST [`ErrorCode`](crates/honba-messages/src/errors.rs)
+  (`validation_invalid_request` for malformed JSON, unequal series lengths, non-finite input and
+  inconsistent OHLC rows); the evaluator reasons (`unsupported_metric`, `invalid_operand`,
+  `invalid_filter`) reach the surface unchanged. New typed errors: `IndicatorError::reason`
+  (`unknown_indicator`, `invalid_params`, `non_finite_input`, `non_finite_output`,
+  `inverted_range`, `length_mismatch`), `WasmScreenerError::reason` (input validation reuses the
+  REST code, screener failures reuse the evaluator's reason), and `ReplayError::reason`
+  (`empty_journal`, `invalid_header_json`, `missing_header`, `invalid_header`,
+  `unsupported_journal_version`, `invalid_record`, `header_serialize`). The render error
+  (`RenderError`) stays out of scope: the render contract is static data, so a violation is a
+  programming error, not a caller failure (a catalog test pins it).
+- Tests: unit `crates/honba-api-wasm/src/tests/wasm_error_codes.rs` (reason tables, code
+  identity, distinctness, machine-readability); the existing message assertions in
+  `tests/{screener,replay}.rs` now pin the `reason: message` form. Real-build conformance
+  (`make test-wasm`: 28 indicator + 10 OHLC vectors, 65 predicate + 7 group vectors, replay
+  fixture) is unchanged.
+
 ### Determinism guard for a run across worker threads (extends E10-S6)
 
 - `crates/honba-async/tests/shell.rs` gains

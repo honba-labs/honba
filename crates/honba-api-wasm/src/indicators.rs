@@ -40,6 +40,29 @@ pub enum IndicatorError {
     },
 }
 
+/// Renders an indicator failure as a `reason: message` pair (ADR 0012 rule 4) for the
+/// wasm boundary, which can only throw the message string.
+pub fn error_pair(error: &IndicatorError) -> wasm_bindgen::JsError {
+    wasm_bindgen::JsError::new(&format!("{}: {error}", error.reason()))
+}
+
+impl IndicatorError {
+    /// A stable machine-readable reason in a `reason: message` pair (ADR 0012 rule 4):
+    /// `unknown_indicator`, `invalid_params`, `non_finite_input`, `non_finite_output`,
+    /// `inverted_range` or `length_mismatch`.
+    #[must_use]
+    pub const fn reason(&self) -> &'static str {
+        match self {
+            Self::UnknownIndicator(_) => "unknown_indicator",
+            Self::InvalidParams(_) => "invalid_params",
+            Self::NonFiniteInput(_) => "non_finite_input",
+            Self::NonFiniteOutput(_) => "non_finite_output",
+            Self::InvertedRange(_) => "inverted_range",
+            Self::LengthMismatch { .. } => "length_mismatch",
+        }
+    }
+}
+
 impl fmt::Display for IndicatorError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

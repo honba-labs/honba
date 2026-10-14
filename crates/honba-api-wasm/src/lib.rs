@@ -20,8 +20,9 @@ pub mod screener;
 /// Full indicator series over `closes`, same length as the input, `NaN` during warm-up.
 ///
 /// `params_json` is a JSON object such as `{"period":14}`. Throws a JavaScript `Error` (a `JsError`
-/// carrying the message) on an unknown indicator, bad params, non-finite input, or finite input
-/// whose result overflows `f64` (e.g. an SMA of values near `1e308`); it never returns infinity.
+/// carrying a `reason: message` pair) on an unknown indicator, bad params, non-finite input, or
+/// finite input whose result overflows `f64` (e.g. an SMA of values near `1e308`); it never
+/// returns infinity. The `reason` is the stable [`IndicatorError::reason`] string.
 #[wasm_bindgen]
 pub fn indicator_series(
     name: &str,
@@ -29,17 +30,18 @@ pub fn indicator_series(
     closes: &[f64],
 ) -> Result<Vec<f64>, JsError> {
     indicators::indicator_series(name, params_json, closes)
-        .map_err(|e| JsError::new(&e.to_string()))
+        .map_err(|error| indicators::error_pair(&error))
 }
 
 /// Full OHLC-input indicator series (currently `atr`) over equal-length `high`, `low` and
 /// `close` arrays, same length as the input, `NaN` during warm-up (`period - 1` values).
 ///
 /// Additive companion to [`indicator_series`]: `params_json` is a JSON object such as
-/// `{"period":14}`. Throws a JavaScript `Error` on an unknown (or close-only) indicator, bad
-/// params (period must be an integer in `1..=1000000`), unequal array lengths, non-finite input,
-/// or finite input whose result overflows `f64`; it never returns infinity. Empty arrays give an
-/// empty result.
+/// `{"period":14}`. Throws a JavaScript `Error` (a `JsError` carrying a `reason: message` pair)
+/// on an unknown (or close-only) indicator, bad params (period must be an integer in
+/// `1..=1000000`), unequal array lengths, non-finite input, or finite input whose result
+/// overflows `f64`; it never returns infinity. Empty arrays give an empty result. The `reason` is
+/// the stable [`IndicatorError::reason`] string.
 #[wasm_bindgen]
 pub fn ohlc_indicator_series(
     name: &str,
@@ -49,7 +51,7 @@ pub fn ohlc_indicator_series(
     close: &[f64],
 ) -> Result<Vec<f64>, JsError> {
     indicators::ohlc_indicator_series(name, params_json, high, low, close)
-        .map_err(|e| JsError::new(&e.to_string()))
+        .map_err(|error| indicators::error_pair(&error))
 }
 
 /// JSON catalog of the available indicators: names, params, outputs and warm-up length.

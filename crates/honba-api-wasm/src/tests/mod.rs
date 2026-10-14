@@ -5,3 +5,4 @@ mod indicators;
 mod ohlc;
 mod replay;
 mod screener;
+mod wasm_error_codes;
