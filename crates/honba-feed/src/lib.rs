@@ -11,6 +11,7 @@ pub mod export;
 pub mod import;
 /// Dated instrument snapshots (E1-S3).
 pub mod instruments;
+pub mod live_quotes;
 pub mod reader;
 
 pub use dataset::{
@@ -22,6 +23,7 @@ pub use export::{
 };
 pub use import::parquet_source::{ParquetBarSource, ParquetError};
 pub use instruments::{snapshot_schema, CatalogError, CatalogInstrumentMaster};
+pub use live_quotes::LiveQuoteStore;
 pub use reader::{DatasetReader, ReaderError};
 
 #[cfg(test)]

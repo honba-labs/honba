@@ -135,3 +135,38 @@ async fn an_advance_error_is_counted_and_does_not_kill_the_pump() {
     assert_eq!(report.errors, 1);
     assert_eq!(order_status(&st, "o1").await, "filled");
 }
+
+#[tokio::test]
+async fn pumped_bar_refreshes_the_quote_the_risk_gate_reads() {
+    let st = state();
+    let before = st.quotes.read_quote(&iid(), None).await.unwrap().unwrap();
+    assert_eq!(before.ts_event(), UnixNanos::from_u64(1));
+
+    let (tx, rx) = tokio::sync::mpsc::channel(8);
+    let pump = st.spawn_bar_pump(rx);
+    tx.send(bar(5_000, 123.5)).await.unwrap();
+    drop(tx);
+    pump.await.unwrap();
+
+    // `st.quotes` is the port `risk_request` and `reference_price` read.
+    let after = st.quotes.read_quote(&iid(), None).await.unwrap().unwrap();
+    assert_eq!(after.ts_event(), UnixNanos::from_u64(5_000));
+    assert_eq!(after.bid_price(), 123.5);
+    assert!(st.live_quotes().is_some());
+}
+
+#[tokio::test]
+async fn get_quotes_returns_the_pumped_bar_close() {
+    let st = state();
+    let (tx, rx) = tokio::sync::mpsc::channel(8);
+    let pump = st.spawn_bar_pump(rx);
+    tx.send(bar(5_000, 123.5)).await.unwrap();
+    drop(tx);
+    pump.await.unwrap();
+
+    let (s, v) = call(&st, Method::GET, "/quotes?symbols=X", None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let text = v.to_string();
+    assert!(text.contains("123.5"), "{text}");
+    assert!(text.contains("5000"), "{text}");
+}

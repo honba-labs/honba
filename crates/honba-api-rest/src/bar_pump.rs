@@ -38,6 +38,9 @@ impl AppState {
         let mut report = BarPumpReport::default();
         while let Some(bar) = bars.recv().await {
             report.bars += 1;
+            if let Some(live) = self.live_quotes() {
+                live.put_bar(&bar);
+            }
             if let Err(e) = self.advance_market(std::slice::from_ref(&bar)) {
                 report.errors += 1;
                 tracing::warn!(ts_event = ?bar.ts_event(), error = %e.message, "bar pump: advance_market failed; bar skipped");

@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 
 use honba_api::StrategyCatalog;
 use honba_entities::Currency;
-use honba_feed::{DatasetReader, ReaderError};
+use honba_feed::{DatasetReader, LiveQuoteStore, ReaderError};
 use honba_messages::{ErrorDetail, TradingState};
 use honba_ports::{BarReader, DepthReader, InstrumentMaster, QuoteReader};
 
@@ -57,6 +57,8 @@ pub struct AppState {
     pub orders: OrderLedger,
     /// The embedded `NextOpenSim` approved orders are submitted to (ADR 0016).
     pub(crate) exec: crate::exec::ExecGateway,
+    /// The writable store behind `quotes`, when the state was built by `from_reader`.
+    live: Option<Arc<LiveQuoteStore>>,
 }
 
 impl AppState {
@@ -79,7 +81,16 @@ impl AppState {
             approval_queue: None,
             orders: OrderLedger::default(),
             exec: crate::exec::ExecGateway::default_sim(),
+            live: None,
         }
+    }
+
+    /// The writable live-quote store `quotes` reads, if this state has one.
+    ///
+    /// `from_reader` and `from_parquet_dir` build it; `AppState::new` with caller-supplied
+    /// ports has none. The bar pump writes each bar here before advancing the market.
+    pub fn live_quotes(&self) -> Option<&Arc<LiveQuoteStore>> {
+        self.live.as_ref()
     }
 
     /// Enables the approval queue for order placements (E5-S4).
@@ -163,13 +174,17 @@ impl AppState {
         self
     }
 
-    /// Creates state serving every port from one [`DatasetReader`].
+    /// Creates state serving every port from one [`DatasetReader`], except `quotes`, which is
+    /// a [`LiveQuoteStore`] over it so a live feed can refresh the latest quote.
     ///
     /// This is the constructor for tests: build a reader over an in-memory
     /// `Dataset` and no file or network is touched.
     pub fn from_reader(reader: DatasetReader) -> Self {
         let reader = Arc::new(reader);
-        Self::new(reader.clone(), reader.clone(), reader.clone(), reader)
+        let live = Arc::new(LiveQuoteStore::new(reader.clone()));
+        let mut state = Self::new(reader.clone(), reader.clone(), live.clone(), reader);
+        state.live = Some(live);
+        state
     }
 
     /// Creates state serving the `SYMBOL.EXCHANGE.parquet` files in `dir`.
