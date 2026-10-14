@@ -12,6 +12,8 @@ use serde_json::Value;
 
 // Hand-computed spot check (atr_1_single): one bar, period 1, TR = high - low = 2.5 - 1.5 = 1.
 const FIXTURE: &str = include_str!("../../../schema/conformance/ohlc_series.json");
+// Hand-computed Williams %R / Stochastic vectors (no Python counterpart).
+const OSC_FIXTURE: &str = include_str!("../../../schema/conformance/ohlc_oscillator_series.json");
 
 fn floats(v: &Value) -> Vec<f64> {
     v.as_array()
@@ -33,12 +35,21 @@ fn matches(actual: f64, expected: f64, rel: f64) -> bool {
 
 #[test]
 fn every_vector_matches_the_pure_module() {
-    let fx: Value = serde_json::from_str(FIXTURE).unwrap();
+    run_fixture(FIXTURE, 10);
+}
+
+#[test]
+fn oscillator_vectors_match_the_pure_module() {
+    run_fixture(OSC_FIXTURE, 6);
+}
+
+fn run_fixture(text: &str, min_cases: usize) {
+    let fx: Value = serde_json::from_str(text).unwrap();
     assert_eq!(fx["type"], "OhlcSeries");
     let rel = fx["tolerance"]["relative"].as_f64().unwrap();
     assert_eq!(rel, 1e-12);
     let cases = fx["cases"].as_array().unwrap();
-    assert!(cases.len() >= 10, "fixture lost cases");
+    assert!(cases.len() >= min_cases, "fixture lost cases");
     for case in cases {
         let name = case["name"].as_str().unwrap();
         let bars = &fx["inputs"][case["input"].as_str().unwrap()];

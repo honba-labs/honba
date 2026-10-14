@@ -9,9 +9,10 @@ use serde_json::Value;
 
 fn outputs_of(name: &str) -> Vec<&'static str> {
     match name {
-        "sma" | "ema" | "rsi" | "atr" => vec!["value"],
+        "sma" | "ema" | "rsi" | "atr" | "williams_r" => vec!["value"],
         "macd" => vec!["macd", "signal", "histogram"],
         "bollinger" => vec!["middle", "upper", "lower"],
+        "stochastic" => vec!["k", "d"],
         other => panic!("unknown catalog indicator {other}"),
     }
 }

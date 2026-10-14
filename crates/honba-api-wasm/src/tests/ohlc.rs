@@ -134,3 +134,86 @@ fn catalog_lists_atr_as_an_ohlc_indicator() {
     assert_eq!(atr["params"][0]["name"], "period");
     assert_eq!(atr["warmup"], "period - 1");
 }
+
+const OH: [f64; 5] = [10.0, 12.0, 11.0, 13.0, 12.0];
+const OL: [f64; 5] = [8.0, 9.0, 7.0, 10.0, 9.0];
+const OC: [f64; 5] = [9.0, 11.0, 8.0, 12.0, 10.0];
+
+#[test]
+fn williams_r_is_minus_100_times_distance_from_high_over_range() {
+    let out = ohlc_indicator_series("williams_r", r#"{"period":3}"#, &OH, &OL, &OC).unwrap();
+    assert_eq!(nan_mask(&out), [true, true, false, false, false]);
+    assert_eq!(out[2], -80.0); // HH 12, LL 7, close 8
+    assert_eq!(out[4], -50.0); // HH 13, LL 7, close 10
+}
+
+#[test]
+fn stochastic_k_and_d_outputs() {
+    let k = ohlc_indicator_series("stochastic", r#"{"period":3}"#, &OH, &OL, &OC).unwrap();
+    assert_eq!(nan_mask(&k), [true, true, false, false, false]);
+    assert_eq!(k[2], 20.0);
+    assert_eq!(k[4], 50.0);
+    let p = r#"{"period":3,"d_period":2,"output":"d"}"#;
+    let d = ohlc_indicator_series("stochastic", p, &OH, &OL, &OC).unwrap();
+    assert_eq!(nan_mask(&d), [true, true, true, false, false]);
+    assert!((d[3] - (20.0 + 250.0 / 3.0) / 2.0).abs() < 1e-12);
+}
+
+#[test]
+fn oscillator_params_are_validated() {
+    for (name, params) in [
+        ("williams_r", r#"{"period":0}"#),
+        ("williams_r", r#"{}"#),
+        ("williams_r", r#"{"period":2,"bogus":1}"#),
+        ("stochastic", r#"{"period":0}"#),
+        ("stochastic", r#"{"period":3,"d_period":0}"#),
+        ("stochastic", r#"{"period":3,"output":"nope"}"#),
+        ("stochastic", r#"{"period":1000001}"#),
+    ] {
+        assert!(
+            matches!(
+                ohlc_indicator_series(name, params, &OH, &OL, &OC),
+                Err(IndicatorError::InvalidParams(_))
+            ),
+            "{name} {params}"
+        );
+    }
+}
+
+#[test]
+fn oscillators_reject_inverted_range_and_unequal_lengths() {
+    for name in ["williams_r", "stochastic"] {
+        assert_eq!(
+            ohlc_indicator_series(name, r#"{"period":2}"#, &[1.0], &[2.0], &[1.5]).unwrap_err(),
+            IndicatorError::InvertedRange(0)
+        );
+        assert!(matches!(
+            ohlc_indicator_series(name, r#"{"period":2}"#, &[2.0, 3.0], &[1.0], &[1.5]),
+            Err(IndicatorError::LengthMismatch { .. })
+        ));
+    }
+}
+
+#[test]
+fn catalog_lists_oscillators_as_ohlc_indicators() {
+    let v: serde_json::Value = serde_json::from_str(&list_indicators_json()).unwrap();
+    let find = |n: &str| {
+        v["indicators"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|i| i["name"] == n)
+            .unwrap_or_else(|| panic!("{n} in catalog"))
+            .clone()
+    };
+    let w = find("williams_r");
+    assert_eq!(w["input"], "ohlc");
+    assert_eq!(w["export"], "ohlc_indicator_series");
+    assert_eq!(w["outputs"], serde_json::json!(["value"]));
+    assert_eq!(w["warmup"], "period - 1");
+    let s = find("stochastic");
+    assert_eq!(s["input"], "ohlc");
+    assert_eq!(s["export"], "ohlc_indicator_series");
+    assert_eq!(s["outputs"], serde_json::json!(["k", "d"]));
+    assert_eq!(s["params"][0]["name"], "period");
+}

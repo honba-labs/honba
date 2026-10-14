@@ -3,12 +3,13 @@
 use std::collections::BTreeSet;
 
 use crate::render::{self, ColorRole, Pane, Plot, PlotKind, Presentation, RenderError, Zone};
-use crate::{Atr, BollingerBands, Ema, Indicator, Macd, Rsi, Sma};
+use crate::{Atr, BollingerBands, Ema, Indicator, Macd, Rsi, Sma, Stochastic, WilliamsR};
 
 /// The declared outputs of each catalog indicator (mirrors the wasm catalog).
 fn outputs_of(name: &str) -> Vec<&'static str> {
     match name {
-        "sma" | "ema" | "rsi" | "atr" => vec!["value"],
+        "sma" | "ema" | "rsi" | "atr" | "williams_r" => vec!["value"],
+        "stochastic" => vec!["k", "d"],
         "macd" => vec!["macd", "signal", "histogram"],
         "bollinger" => vec!["middle", "upper", "lower"],
         other => panic!("unknown catalog indicator {other}"),
@@ -51,6 +52,23 @@ fn series_of(name: &str, inputs: &[f64]) -> Vec<f64> {
             inputs
                 .iter()
                 .map(|&x| nan(ind.update_hlc(x, x, x)))
+                .collect()
+        }
+        "williams_r" => {
+            let mut ind = WilliamsR::new(14);
+            inputs
+                .iter()
+                .map(|&x| nan(ind.update_hlc(x + 1.0, x - 1.0, x)))
+                .collect()
+        }
+        "stochastic" => {
+            let mut ind = Stochastic::new(14, 3);
+            inputs
+                .iter()
+                .map(|&x| {
+                    ind.update_hlc(x + 1.0, x - 1.0, x)
+                        .map_or(f64::NAN, |v| v.k)
+                })
                 .collect()
         }
         other => panic!("unknown catalog indicator {other}"),

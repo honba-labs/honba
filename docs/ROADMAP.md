@@ -145,7 +145,7 @@ E10-S1..S8, E11-S1..S8). E6 batches 1-2, E7 and E8 are tracked separately below.
 | E1-S3 instrument master snapshots | `crates/honba-ports/src/master.rs` `DatedInstrument`, provided-default `snapshot(as_of)`/`resolve_as_of`; `crates/honba-feed/src/instruments.rs` `CatalogInstrumentMaster` over `{root}/instruments/YYYY-MM-DD.parquet`; tests `resolve_as_of_old_symbol`, `backtest_resolves_expired_contract` |
 | E3-S3 cost schedule in fills | `honba-market::DatedCostScheduleSource`, `edge_after_costs`, `FeeBreakdown::total_bps`; `honba-sim::cost::ScheduleFillCost`, `NextOpenSim::with_schedule`, `BarFillEngine::with_schedule`; tests `charges_effective_dated`, `india_costs_in_backtest_match_python_costmodel` (golden) |
 | E4-S5 sweep fitness & REST | `honba-sweep` `CalmarFitness`, `SortinoFitness`, `OmegaFitness`, `fitness_ranking_stable`; `POST /sweeps`, `GET /sweeps/{id}`, `GET /sweeps/{id}/journal` (422 per-trial); `crates/honba-api-rest/tests/rest_sweep.rs` |
-| E11-S5 part 1 | `crates/honba-api-wasm`: `indicator_series`, `ohlc_indicator_series` (ATR), conformance vectors (d1c9db3, e9fd98e) |
+| E11-S5 part 1 | `crates/honba-api-wasm`: `indicator_series`, `ohlc_indicator_series` (ATR, Williams %R, Stochastic), conformance vectors (d1c9db3, e9fd98e) |
 | E6 batches 1-2 | commits 6372528, 510e0d4, efca4bd, 7c9a325, 6a91432 |
 | Backtest foundation (Python) | `python/src/honba/session.py` `BacktestSession`/`BacktestResult`, `backtest/simulated.py` `NextOpenExecution`, date-aware India settlement (9cc171e), single-round costs (d38fe82) |
 | E5-S5 AI strategy verifier | ADR 0022; `honba.ai.verification`: static AST scan (import allowlist, forbidden names/dunders), rlimit sandbox with audit hook, deterministic smoke, look-ahead truncation property; 45 unit + 37 integration tests; red-team corpus |
@@ -532,5 +532,5 @@ Checked about 25 verdicts against code, git log and ls/grep (read-only). Counts:
 | ADR 0009 | "Approved" | File says Status: Proposed | Open decision D12 |
 | E3-S3 | PARTIAL, "cost model wired to fills" | Rust `CostSchedule` unused by `honba-sim`; only Python `fill_costs_from_model` path | PARTIAL (Python only) |
 
-Verdicts confirmed by the spot-check: E3-S1 (L1 only; sim stubs), E11-S5 (indicators and ATR only; screener evaluator not exported to WASM),
+Verdicts confirmed by the spot-check: E3-S1 (L1 only; sim stubs), E11-S5 (indicators, ATR, Williams %R and Stochastic only; screener evaluator not exported to WASM),
 E5-S1 (DONE) (11 tool schemas, MCP server with CLI `honba mcp serve`); E1-S1, E0-S7, E0-S1..S3, E11-S1/S2, E10-S1, E9 (all not started), E5-S4 (DONE), E5-S5/S6/S7.

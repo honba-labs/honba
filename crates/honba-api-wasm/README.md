@@ -32,12 +32,14 @@ follows the same rules as `indicator_series` (params JSON validated first with u
 rejected, finite input only, `NaN` warm-up kept, a thrown `Error` instead of infinity, empty input
 gives empty output) plus: the three arrays must have equal length, otherwise it throws
 (`series lengths differ: high=..`). A close-only name such as `sma` is an unknown indicator here, and
-`atr` is unknown to `indicator_series`; the catalog marks it with `"input":"ohlc"` and
+`atr`, `williams_r` and `stochastic` are unknown to `indicator_series`; the catalog marks it with `"input":"ohlc"` and
 `"export":"ohlc_indicator_series"`.
 
 | name | params | warm-up `NaN`s |
 |---|---|---|
 | `atr` (Wilder) | `period` (required, integer in `1..=1000000`) | `period - 1` |
+| `williams_r` | `period` (required) | `period - 1` |
+| `stochastic` | `period` (required), `d_period` (default 3), `output` (`k` default, or `d`) | `period - 1` for `k`; `period + d_period - 2` for `d` |
 
 ATR uses the first bar's `high - low` as its first true range, then `max(high - low,
 |high - prev_close|, |low - prev_close|)`; the first value is the mean of the first `period` true

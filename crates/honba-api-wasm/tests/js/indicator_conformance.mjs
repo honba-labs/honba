@@ -30,7 +30,7 @@ for (const c of fx.cases) {
 }
 const catalog = JSON.parse(wasm.list_indicators());
 const names = catalog.indicators.map((i) => i.name);
-if (names.join() !== "sma,ema,rsi,macd,bollinger,atr") { failures++; console.error("FAIL catalog", names); }
+if (names.join() !== "sma,ema,rsi,macd,bollinger,atr,williams_r,stochastic") { failures++; console.error("FAIL catalog", names); }
 // E6-S5: the chart consumes each indicator's render contract through the catalog.
 for (const i of catalog.indicators) {
   const p = i.presentation;

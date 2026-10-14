@@ -17,7 +17,16 @@ use std::collections::BTreeSet;
 use serde::Serialize;
 
 /// The indicators the WASM surface computes and therefore declares a render contract for.
-pub const CATALOG: [&str; 6] = ["sma", "ema", "rsi", "macd", "bollinger", "atr"];
+pub const CATALOG: [&str; 8] = [
+    "sma",
+    "ema",
+    "rsi",
+    "macd",
+    "bollinger",
+    "atr",
+    "williams_r",
+    "stochastic",
+];
 
 /// The catalog indicator names, in the order the chart should list them.
 pub fn catalog_names() -> &'static [&'static str] {
@@ -276,6 +285,25 @@ pub fn presentation(name: &str) -> Result<Presentation, RenderError> {
             Pane::Separate,
             vec![line("value", ColorRole::Secondary, "ATR")],
             vec![],
+        ),
+        "williams_r" => (
+            Pane::Separate,
+            vec![line("value", ColorRole::Secondary, "Williams %R")],
+            vec![
+                zone(-100.0, -80.0, ColorRole::Bullish, "Oversold"),
+                zone(-20.0, 0.0, ColorRole::Bearish, "Overbought"),
+            ],
+        ),
+        "stochastic" => (
+            Pane::Separate,
+            vec![
+                line("k", ColorRole::Primary, "%K"),
+                line("d", ColorRole::Secondary, "%D"),
+            ],
+            vec![
+                zone(0.0, 20.0, ColorRole::Bullish, "Oversold"),
+                zone(80.0, 100.0, ColorRole::Bearish, "Overbought"),
+            ],
         ),
         other => return Err(RenderError::UnknownIndicator(other.to_string())),
     };

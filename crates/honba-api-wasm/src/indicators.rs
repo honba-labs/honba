@@ -9,7 +9,9 @@
 
 use std::fmt;
 
-use honba_indicators::{Atr, BollingerBands, Ema, Indicator, Macd, Rsi, Sma};
+use honba_indicators::{
+    Atr, BollingerBands, Ema, Indicator, Macd, Rsi, Sma, Stochastic, WilliamsR,
+};
 use serde::Deserialize;
 use serde_json::json;
 
@@ -91,6 +93,16 @@ struct PeriodParams {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct StochasticParams {
+    period: usize,
+    #[serde(default = "default_d_period")]
+    d_period: usize,
+    #[serde(default = "default_k_output")]
+    output: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct BollingerParams {
     period: usize,
     #[serde(default = "default_k")]
@@ -117,6 +129,12 @@ fn default_k() -> f64 {
 }
 fn default_middle() -> String {
     "middle".into()
+}
+fn default_d_period() -> usize {
+    3
+}
+fn default_k_output() -> String {
+    "k".into()
 }
 fn default_fast() -> usize {
     12
@@ -264,7 +282,7 @@ pub fn indicator_series(
 }
 
 /// Computes the full series of OHLC-input indicator `name` over equal-length `high`, `low` and
-/// `close` series (currently `atr`: Wilder, `period` required).
+/// `close` series (`atr`: Wilder; `williams_r`; `stochastic` with `output` `k`/`d`; `period` required).
 ///
 /// Same conventions as [`indicator_series`]: params are validated first (unknown fields rejected,
 /// `period` in `1..=MAX_PERIOD`), then lengths, then finiteness; the output has the input's
@@ -282,8 +300,29 @@ pub fn ohlc_indicator_series(
     low: &[f64],
     close: &[f64],
 ) -> Result<Vec<f64>, IndicatorError> {
-    let n = match name {
-        "atr" => period("period", parse::<PeriodParams>(params_json)?.period)?,
+    enum Kind {
+        Atr(usize),
+        WilliamsR(usize),
+        Stochastic(usize, usize, usize),
+    }
+    let kind = match name {
+        "atr" => Kind::Atr(period(
+            "period",
+            parse::<PeriodParams>(params_json)?.period,
+        )?),
+        "williams_r" => Kind::WilliamsR(period(
+            "period",
+            parse::<PeriodParams>(params_json)?.period,
+        )?),
+        "stochastic" => {
+            let p: StochasticParams = parse(params_json)?;
+            let out = pick(&p.output, &["k", "d"])?;
+            Kind::Stochastic(
+                period("period", p.period)?,
+                period("d_period", p.d_period)?,
+                out,
+            )
+        }
         other => return Err(IndicatorError::UnknownIndicator(other.to_string())),
     };
     if high.len() != low.len() || high.len() != close.len() {
@@ -301,13 +340,32 @@ pub fn ohlc_indicator_series(
     if let Some(i) = high.iter().zip(low).position(|(h, l)| h < l) {
         return Err(IndicatorError::InvertedRange(i));
     }
-    let mut atr = Atr::new(n);
-    let out: Vec<f64> = high
+    let bars = high
         .iter()
         .zip(low)
         .zip(close)
-        .map(|((&h, &l), &c)| atr.update_hlc(h, l, c).unwrap_or(f64::NAN))
-        .collect();
+        .map(|((&h, &l), &c)| (h, l, c));
+    let out: Vec<f64> = match kind {
+        Kind::Atr(n) => {
+            let mut ind = Atr::new(n);
+            bars.map(|(h, l, c)| ind.update_hlc(h, l, c).unwrap_or(f64::NAN))
+                .collect()
+        }
+        Kind::WilliamsR(n) => {
+            let mut ind = WilliamsR::new(n);
+            bars.map(|(h, l, c)| ind.update_hlc(h, l, c).unwrap_or(f64::NAN))
+                .collect()
+        }
+        Kind::Stochastic(n, d, out) => {
+            let mut ind = Stochastic::new(n, d);
+            bars.map(|(h, l, c)| {
+                ind.update_hlc(h, l, c)
+                    .and_then(|v| if out == 0 { Some(v.k) } else { v.d })
+                    .unwrap_or(f64::NAN)
+            })
+            .collect()
+        }
+    };
     check_output(&out)?;
     Ok(out)
 }
@@ -361,6 +419,13 @@ pub fn list_indicators_json() -> String {
             {"name": "atr", "input": "ohlc", "export": "ohlc_indicator_series",
              "params": [period], "outputs": ["value"], "warmup": "period - 1",
              "presentation": pres("atr")},
+            {"name": "williams_r", "input": "ohlc", "export": "ohlc_indicator_series",
+             "params": [period], "outputs": ["value"], "warmup": "period - 1",
+             "presentation": pres("williams_r")},
+            {"name": "stochastic", "input": "ohlc", "export": "ohlc_indicator_series",
+             "params": [period, int("d_period", 3), output(&["k", "d"])],
+             "outputs": ["k", "d"], "warmup": "period - 1 (k); period + d_period - 2 (d)",
+             "presentation": pres("stochastic")},
         ],
     })
     .to_string()
