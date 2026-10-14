@@ -3,24 +3,25 @@
 //!
 //! The handler builds a [`RiskRequest`] from the request body plus the ports the
 //! composition root already wires: rules come from the `null` profile over the
-//! `InstrumentMaster` set, positions are zero (the write ledger of E11-S7 stays
-//! 501 until its store exists), `trading_state` is the app's operator-set
-//! [`AppState::trading_state`] (default `Active`; the route that changes it stays
-//! 501 with E11-S8), `reference_price` comes from `QuoteReader` (the close of the
-//! latest bar, via mid when a book exists; the limit price when no quote exists),
-//! and `ts = 0`. Known limits: with no sim clock composed yet the rate rule cannot
-//! be exercised and orders carry no timestamp.
+//! `InstrumentMaster` set, `position` is the signed position the write ledger
+//! implies for the instrument ([`OrderLedger::position`]), `trading_state` is the
+//! app's operator-set [`AppState::trading_state`] (default `Active`; no registered
+//! route changes it, it is set in process via `AppState::with_trading_state`),
+//! `reference_price` comes from `QuoteReader` (the close of the latest bar, via
+//! mid when a book exists; the limit price when no quote exists), and `ts` /
+//! `last_feed_ts` are the latest quote's `ts_event` (no wall clock; both 0 / `None`
+//! when no quote exists). Known limits: the ledger holds submitted orders only (no
+//! venue fills), and order rows themselves still carry a zero timestamp.
 //!
 //! When the approval queue is enabled (E5-S4), placements are held in the queue
 //! until approved by an operator. Cancel and modify bypass the queue.
 //! A refusal from the risk stage is the 422 of ADR 0018 decision 5 and never
-//! reaches the gateway. The decision 6 audit record and the `order_id`
-//! idempotency key of ADR 0019 decision 3 both arrive with the E11-S7 write
-//! ledger; here the id is a fixed placeholder and nothing is audited.
+//! reaches the gateway. Approved placements land in the [`OrderLedger`] keyed by
+//! the ADR 0019 decision 3 idempotency key; the decision 6 audit record is not
+//! written yet.
 //! `DELETE /orders/{id}` and `POST /positions/close` cannot add exposure, so
-//! they are never risk-checked and are allowed in every state; at this seam
-//! both acknowledge without a store, and close does not yet generate the
-//! reduce-only orders the ledger will submit.
+//! they are never risk-checked and are allowed in every state; close does not yet
+//! generate the reduce-only orders a position close implies.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
@@ -74,6 +75,39 @@ impl OrderLedger {
         guard.get(order_id).cloned()
     }
 
+    /// Signed position of `instrument_id` implied by the ledger: buys positive, sells
+    /// negative, summed over rows that still count as exposure (`Submitted`, `Accepted`,
+    /// `PartiallyFilled`, `Filled`). Cancelled, rejected, expired and not-yet-submitted
+    /// rows are excluded.
+    ///
+    /// `Order` carries no filled quantity and no venue fills reach this ledger yet, so a
+    /// working or partly filled row counts at its full quantity: a conservative upper
+    /// bound on exposure, which is the safe side for risk rules.
+    pub fn position(&self, instrument_id: &InstrumentId) -> f64 {
+        let guard = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        guard
+            .values()
+            .filter(|o| o.instrument_id() == instrument_id)
+            .filter(|o| {
+                matches!(
+                    o.status(),
+                    OrderStatus::Submitted
+                        | OrderStatus::Accepted
+                        | OrderStatus::PartiallyFilled
+                        | OrderStatus::Filled
+                )
+            })
+            .map(|o| match o.side() {
+                OrderSide::Buy => o.quantity(),
+                OrderSide::Sell => -o.quantity(),
+                _ => 0.0,
+            })
+            .sum()
+    }
+
     /// Every row, oldest insertion first.
     pub fn list(&self) -> Vec<Order> {
         let guard = self
@@ -116,6 +150,42 @@ impl OrderLedger {
         } else {
             Some(false)
         }
+    }
+}
+
+/// Builds the order-gate [`RiskRequest`].
+///
+/// * `position`: the signed ledger position of the instrument ([`OrderLedger::position`]).
+/// * `ts` / `last_feed_ts`: this crate has no clock (and domain code must not read the
+///   wall clock), so event time is the `ts_event` of the instrument's latest quote from
+///   the `QuoteReader`. With a quote both are that value (feed age 0); with none, `ts`
+///   is 0 and `last_feed_ts` is `None` (a staleness rule, if configured, then refuses).
+async fn risk_request(
+    state: &AppState,
+    order_id: OrderId,
+    instrument_id: &InstrumentId,
+    side: OrderSide,
+    quantity: f64,
+    price: Option<f64>,
+    reference_price: Option<f64>,
+) -> RiskRequest {
+    let feed_ts = match state.quotes.read_quote(instrument_id, None).await {
+        Ok(Some(quote)) => Some(quote.ts_event()),
+        _ => None,
+    };
+    RiskRequest {
+        order_id,
+        instrument_id: instrument_id.clone(),
+        side,
+        quantity,
+        price,
+        trigger_price: None,
+        reference_price,
+        adv: None,
+        position: state.orders.position(instrument_id),
+        trading_state: state.trading_state,
+        ts: feed_ts.unwrap_or_else(|| UnixNanos::new(0)),
+        last_feed_ts: feed_ts,
     }
 }
 
@@ -266,20 +336,16 @@ pub(crate) async fn post_orders(
     }
 
     // No approval queue: proceed directly to risk stage
-    let request = RiskRequest {
-        order_id: ledger_id.clone(),
-        instrument_id: instrument_id.clone(),
+    let request = risk_request(
+        &state,
+        ledger_id.clone(),
+        &instrument_id,
         side,
         quantity,
         price,
-        trigger_price: None,
         reference_price,
-        adv: None,
-        position: 0.0,
-        trading_state: state.trading_state,
-        ts: UnixNanos::new(0),
-        last_feed_ts: None,
-    };
+    )
+    .await;
     match stage.check(&request) {
         RiskDecision::Approved => {
             let order = Order::new(
@@ -428,20 +494,16 @@ async fn post_orders_direct(
             );
         }
     };
-    let request = RiskRequest {
-        order_id: order_id.clone(),
-        instrument_id: instrument_id.clone(),
+    let request = risk_request(
+        &state,
+        order_id.clone(),
+        &instrument_id,
         side,
         quantity,
         price,
-        trigger_price: None,
         reference_price,
-        adv: None,
-        position: 0.0,
-        trading_state: state.trading_state,
-        ts: UnixNanos::new(0),
-        last_feed_ts: None,
-    };
+    )
+    .await;
     match stage.check(&request) {
         RiskDecision::Approved => {
             let order = Order::new(

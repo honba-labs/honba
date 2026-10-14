@@ -43,8 +43,9 @@ pub struct AppState {
     pub account_currency: Currency,
     /// The operator trading state the write routes evaluate against (ADR 0018 decision 7).
     ///
-    /// Set in process by the composition root; the operator route that changes it stays 501
-    /// until E11-S8. `Halted` refuses placements while cancel and close still pass.
+    /// Set in process by the composition root ([`AppState::with_trading_state`]); no
+    /// registered route changes it at runtime. `Halted` refuses placements while cancel and
+    /// close still pass.
     pub trading_state: TradingState,
     /// Approval queue for order placements (E5-S4).
     ///

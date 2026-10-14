@@ -359,3 +359,72 @@ async fn approval_queue_full_returns_429() {
         json!("approval_queue_full")
     );
 }
+
+/// Seeds the write ledger with one working buy of 25 on `X.NSE`, then runs the
+/// app in the reduce-only state.
+fn reducing_state_with_long_25() -> AppState {
+    let state = state();
+    state.orders.record(
+        honba_messages::Order::new(
+            honba_messages::OrderId::new("seed-1"),
+            instrument_id(),
+            honba_messages::OrderSide::Buy,
+            honba_messages::OrderType::Market,
+            25.0,
+            None,
+            honba_messages::TimeInForce::Day,
+            UnixNanos::new(0),
+            UnixNanos::new(0),
+        )
+        .with_status(honba_messages::OrderStatus::Submitted),
+    );
+    state.with_trading_state(TradingState::Reducing)
+}
+
+#[tokio::test]
+async fn position_from_ledger_drives_reduce_only() {
+    // The ledger shows a long 25: a sell of 25 reduces it and passes ...
+    let app = api_router_with(reducing_state_with_long_25());
+    let (status, body) = call(
+        app.clone(),
+        Method::POST,
+        "/orders",
+        Some(order("X", "NSE", "sell", 25.0, None)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+
+    // ... a buy would add exposure and is refused with the derived position ...
+    let (status, body) = call(
+        api_router_with(reducing_state_with_long_25()),
+        Method::POST,
+        "/orders",
+        Some(order("X", "NSE", "buy", 25.0, None)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(body["error"]["code"], json!("risk_reduce_only_violation"));
+
+    // ... and a sell larger than the position would flip it, so it is refused.
+    let (status, _) = call(
+        api_router_with(reducing_state_with_long_25()),
+        Method::POST,
+        "/orders",
+        Some(order("X", "NSE", "sell", 50.0, None)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn flat_ledger_refuses_everything_when_reducing() {
+    let app = api_router_with(state().with_trading_state(TradingState::Reducing));
+    let (status, _) = call(
+        app,
+        Method::POST,
+        "/orders",
+        Some(order("X", "NSE", "sell", 25.0, None)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
