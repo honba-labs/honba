@@ -340,7 +340,7 @@ The stage sits in front of the code that calls `ExecutionEngine::submit` — the
   handler reports one, or when two handlers do. Test: `double_stage_rejected_at_build`. Assemblers
   put the stage on the runner when a runner is the submitter, on the engine otherwise.
 - **REST write routes (E11-S7):** `POST /orders` runs approval queue (E5-S4, when configured) ->
-  risk stage -> execution gateway (simulator only until E3-S7). With no `Engine`, the handler builds
+  risk stage -> execution gateway (`ExecutionVenue`, E3-S7: pluggable via `AppState::with_execution_gateway`, `NextOpenSim` by default; no real venue wired yet). With no `Engine`, the handler builds
   the `RiskRequest` from: rules via `InstrumentMaster` + the registered profile (decision 1);
   `position` and working exposure from the simulator gateway's ledger and order store that E11-S7
   wires into `AppState` (write routes stay 501 until it exists); `trading_state` from the app's

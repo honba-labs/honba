@@ -1,5 +1,5 @@
 //! The `POST /orders` risk gate (ADR 0018 decision 7): approval queue (E5-S4) ->
-//! risk stage -> execution gateway (the embedded `NextOpenSim`; no venue until E3-S7).
+//! risk stage -> execution gateway (an [`crate::ExecutionVenue`]: the embedded `NextOpenSim` by default; no real venue wired yet, E3-S7).
 //!
 //! The handler builds a [`RiskRequest`] from the request body plus the ports the
 //! composition root already wires: rules come from the `null` profile over the
@@ -461,7 +461,9 @@ pub(crate) async fn delete_order(
     Path(id): Path<String>,
 ) -> Response {
     if state.orders.cancel(id.as_str()) == Some(true) {
-        state.exec.cancel(id.as_str(), UnixNanos::new(0));
+        state
+            .exec
+            .cancel(&state.orders, id.as_str(), UnixNanos::new(0));
     }
     success(serde_json::json!({"status": "cancelled"}))
 }

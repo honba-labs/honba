@@ -92,8 +92,16 @@ impl AppState {
     }
 
     /// Replaces the embedded execution simulator (cash, costs, slippage, seed).
-    pub fn with_execution_sim(mut self, sim: honba_sim::NextOpenSim) -> Self {
-        self.exec = crate::exec::ExecGateway::new(sim);
+    pub fn with_execution_sim(self, sim: honba_sim::NextOpenSim) -> Self {
+        self.with_execution_gateway(sim)
+    }
+
+    /// Plugs in the execution venue every order route submits to and cancels on (E3-S7).
+    ///
+    /// The default is a `NextOpenSim`. Events the venue reports (fills, rejects, cancels) update
+    /// the order ledger through the same mapping as the simulator's; see [`ExecutionVenue`].
+    pub fn with_execution_gateway(mut self, gateway: impl crate::ExecutionVenue) -> Self {
+        self.exec = crate::exec::ExecGateway::new(gateway);
         self
     }
 

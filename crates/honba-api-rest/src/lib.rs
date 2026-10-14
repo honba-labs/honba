@@ -53,6 +53,7 @@ pub use auth::{
     ROUTE_SCOPES,
 };
 pub use dispatch::{build_target, dispatch, dispatch_stream, DispatchError};
+pub use exec::ExecutionVenue;
 pub use executor::BacktestExecutor;
 pub use honba_api::JournalWriter;
 pub use journal::NdjsonJournal;

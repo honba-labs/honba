@@ -1,21 +1,29 @@
-//! The execution gateway behind the order routes: an embedded [`NextOpenSim`] (ADR 0016).
+//! The execution gateway behind the order routes (ADR 0016, E3-S7).
 //!
-//! A risk-approved order is recorded in the [`OrderLedger`] as `Submitted` and handed to the
-//! simulator. The simulator fills market orders at the open of the instrument's first bar in a
-//! later session, so a fill needs the market to advance: the composition root (or a test) pushes
-//! bars with [`AppState::advance_market`], and each simulator event updates the matching ledger
-//! row (`Filled`, `PartiallyFilled`, `Rejected`, `Cancelled`). Event time is the bar's
-//! `ts_event`; nothing here reads the wall clock, and the simulator is seeded, so a replay of
-//! the same orders and bars books the same fills.
+//! A risk-approved order is recorded in the [`OrderLedger`] as `Submitted` and handed to an
+//! [`ExecutionVenue`]. The default venue is the embedded [`NextOpenSim`], which fills market
+//! orders at the open of the instrument's first bar in a later session, so a fill needs the
+//! market to advance: the composition root (or a test) pushes bars with
+//! [`AppState::advance_market`]. Whatever the venue, each [`ExecutionEvent`] it drains updates
+//! the matching ledger row (`Filled`, `PartiallyFilled`, `Rejected`, `Cancelled`) through one
+//! mapping, and terminal rows never change. Event time is the venue's own; nothing here reads
+//! the wall clock, and the simulator is seeded, so a replay books the same fills.
 //!
-//! Scope: market orders only. A limit order is refused by the simulator
+//! Why a crate-local trait and not `honba_ports::ExecutionGateway`: the ports trait is async,
+//! takes `&mut self` and only reports fills (`next_fill`), so it cannot carry the rejections and
+//! cancels the ledger needs, and the sync handlers here hold a std mutex across the call. The
+//! sync `honba_engine::ExecutionEngine` already speaks `ExecutionEvent` and `NextOpenSim`
+//! implements it, so [`ExecutionVenue`] only extends it with the market hook. A venue backed
+//! by the async port is bridged by implementing `ExecutionEngine` over it (not done yet).
+//!
+//! Scope: the default simulator handles market orders only. A limit order is refused by it
 //! (`unsupported_order_type`) and its ledger row becomes `Rejected`; the reason is logged
 //! because `Order` carries no reason field. The simulator is long-only, so a sell with no
-//! simulated position is `Rejected` (`no_position`). No venue gateway exists (E3-S7).
+//! simulated position is `Rejected` (`no_position`). No real venue gateway is wired (E3-S7).
 
 use std::sync::{Arc, Mutex};
 
-use honba_engine::ExecutionEngine;
+use honba_engine::{ExecutionEngine, Result as EngineResult};
 use honba_entities::{Currency, ExecutionEvent, Money};
 use honba_messages::{Bar, ErrorCode, ErrorDetail, Order, OrderStatus};
 use honba_sim::NextOpenSim;
@@ -25,16 +33,34 @@ use crate::OrderLedger;
 /// Starting cash of the default simulator, in minor units (10 billion INR in paise).
 const DEFAULT_CASH_MINOR: i64 = 1_000_000_000_000;
 
-/// Shared handle on the embedded simulator.
+/// A venue the order routes can submit to and cancel on: an [`ExecutionEngine`] that may also
+/// react to market bars.
+///
+/// `on_bar` defaults to a no-op, for a venue driven by its own feed; such a venue's events are
+/// drained on every [`AppState::advance_market`] call (with or without bars).
+pub trait ExecutionVenue: ExecutionEngine + 'static {
+    /// Feeds one market bar (ascending event time). An out-of-order bar is an error.
+    fn on_bar(&mut self, _bar: &Bar) -> EngineResult<()> {
+        Ok(())
+    }
+}
+
+impl ExecutionVenue for NextOpenSim {
+    fn on_bar(&mut self, bar: &Bar) -> EngineResult<()> {
+        NextOpenSim::on_bar(self, bar)
+    }
+}
+
+/// Shared handle on the execution venue.
 #[derive(Clone)]
 pub(crate) struct ExecGateway {
-    sim: Arc<Mutex<NextOpenSim>>,
+    sim: Arc<Mutex<Box<dyn ExecutionVenue>>>,
 }
 
 impl ExecGateway {
-    pub(crate) fn new(sim: NextOpenSim) -> Self {
+    pub(crate) fn new(venue: impl ExecutionVenue) -> Self {
         Self {
-            sim: Arc::new(Mutex::new(sim)),
+            sim: Arc::new(Mutex::new(Box::new(venue))),
         }
     }
 
@@ -51,11 +77,11 @@ impl ExecGateway {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Err(e) = sim.submit(order.clone()) {
-            tracing::warn!(order = %order.order_id(), error = %e, "simulator refused submit");
+            tracing::warn!(order = %order.order_id(), error = %e, "venue refused submit");
             ledger.set_status(order.order_id().as_str(), OrderStatus::Rejected);
             return;
         }
-        apply(&mut sim, ledger);
+        apply(sim.as_mut(), ledger);
     }
 
     /// Feeds `bars` (ascending event time) to the simulator and applies its events.
@@ -71,23 +97,29 @@ impl ExecGateway {
                 break;
             }
         }
-        apply(&mut sim, ledger);
+        apply(sim.as_mut(), ledger);
         result
     }
 
-    /// Withdraws a working order from the simulator (the ledger row is cancelled by the caller).
-    pub(crate) fn cancel(&self, order_id: &str, ts: honba_messages::UnixNanos) {
+    /// Withdraws a working order from the venue (the ledger row is cancelled by the caller; any
+    /// event the venue reports meanwhile goes through the ledger's terminal-row rule).
+    pub(crate) fn cancel(
+        &self,
+        ledger: &OrderLedger,
+        order_id: &str,
+        ts: honba_messages::UnixNanos,
+    ) {
         let mut sim = self
             .sim
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let _ = sim.cancel(order_id, ts);
-        let _ = sim.drain_events();
+        apply(sim.as_mut(), ledger);
     }
 }
 
-/// Drains the simulator's events into ledger status changes.
-fn apply(sim: &mut NextOpenSim, ledger: &OrderLedger) {
+/// Drains the venue's events into ledger status changes.
+fn apply(sim: &mut dyn ExecutionVenue, ledger: &OrderLedger) {
     let events = sim.drain_events().unwrap_or_default();
     for event in events {
         match event {
@@ -104,7 +136,7 @@ fn apply(sim: &mut NextOpenSim, ledger: &OrderLedger) {
             ExecutionEvent::Rejected {
                 order_id, reason, ..
             } => {
-                tracing::info!(order = %order_id, %reason, "simulator rejected order");
+                tracing::info!(order = %order_id, %reason, "venue rejected order");
                 // The remainder of a partial fill is also reported as a rejection; the
                 // filled part stays exposure, so the row keeps `PartiallyFilled`.
                 if ledger
