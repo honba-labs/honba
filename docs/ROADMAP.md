@@ -66,10 +66,10 @@ E10-S1..S8, E11-S1..S8). E6 batches 1-2, E7 and E8 are tracked separately below.
 | E6 Indicators | 1 | 0 | 0 | Batches 1-4 (O(1) rolling, plain sums) and the render contract (S5) done |
 | E7 Scale and ops | 0 | 0 | 5 | Pull-based; E7-S4 is superseded by `honba-sweep` (E10-S5); tracked separately from the 74 |
 | E8 Multi-leg | 0 | 0 | 4 | Optional; not scheduled (open decision D13); tracked separately from the 74 |
-| E9 Frontend and AlgoDesigner | 1 | 0 | 7 | Generated typed client + types (S8), test/lint/typecheck scripts shipped; S1..S7 app work greenfield |
+| E9 Frontend and AlgoDesigner | 8 | 0 | 0 | Complete: StrategyGraph v1 + node catalogue, graph<->code, designer verify/run, AI assistant hook, ops console, result views, generated client + types (commit `4e15416`, frontend `7050c49`, ADR 0029, D16) |
 | E10 Async core | 8 | 0 | 0 | Complete: ports, shell, engine output, Arc dataset, sweep, determinism test, runtime bridge (ADR 0015) and the bhavcopy Rust connector (E10-S8) |
 | E11 Versioned API | 8 | 0 | 0 | Complete: read API, SDK, WASM, SSE streaming, write endpoints, auth, and the generated typed client (E11-S6) |
-| **Total (74)** | **66** | **0** | **8** | |
+| **Total (74)** | **73** | **0** | **1** | |
 
 ### 1.1 What is shipped (evidence)
 
@@ -194,7 +194,7 @@ thin; no live feed or broker exists in Rust.
 | Trust envelope for untrusted broker text | ADOPT | Nothing built; do with MCP server | E5-S2 |
 | Approval queue for placements | ADOPT | Gated on risk stage; cancel/modify bypass | E5-S4 |
 | Market-data normaliser and silent-feed watchdog | DEFER | No feed exists; ports only | E1-S6 |
-| Visual flow builder with code twin (clean-room) | DEFER | Frontend greenfield; needs E4-S3 runner and E5-S5 verifier first | E9-S1..S4 |
+| Visual flow builder with code twin (clean-room) | DONE | Shipped (ADR 0029, commit `4e15416` + frontend `7050c49`); graph editor model, codegen, recogniser, verify/run, assistant hook, ops console, result views | E9-S1..S7 |
 | 36-broker breadth, Flask/ZeroMQ, key in body, global analyzer flag | DROP | Unchanged | none |
 
 ### 3.2 Nautilus (LGPL, ideas only)
@@ -237,7 +237,7 @@ thin; no live feed or broker exists in Rust.
 | Per-source circuit breaker, rate limiter | DEFER | No remote sources yet; Python adapters own it when built | E1-S5 |
 | AST/allowlist/subprocess verification of AI code | ADOPT | `ai/verification/` is empty; blocks any AI authoring path | E5-S5 |
 | Indicator render contract | KEEP | Built (E6-S5): `honba_indicators::render` descriptor embedded in the WASM catalog; consumed by WASM browsers, MCP and alerts | E6-S5 |
-| Ops console, per-run mode | DEFER | Needs risk, streaming, run lifecycle | E9-S6 |
+| Ops console, per-run mode | DONE | Shipped with E9 (frontend ops panel + core helpers, `7050c49`) | E9-S6 |
 | Celery/Redis/Kafka, billing, multi-tenant SaaS, crypto breadth, Vue | DROP | Unchanged | none |
 
 ### 3.5 Jesse
@@ -287,13 +287,14 @@ Done work is removed. Sizes: S (<=1 day), M (2-4 days), L (split before start). 
 R6 and R7 can run in parallel with R4 once R2 exits. R5 needs R1 for write tools and R2 for runs.
 
 **Milestone status (2026-10-14):** R1 (Safe writes), R2 (Runs), R3 (Live-shaped runtime), R4 (Trustworthy research) and R5 (Agent surfaces) are **complete** (E5-S6 webhook ingestion and E5-S9 report builder shipped). R6 (Live-ready) is complete except the L2 simulator
-(E3-S1b/S1d, deferred by ADR 0025/D14); E10-S8 shipped the bhavcopy Rust connector. R7 (Frontend) has only the local TS drift
-check open on the `honba` side (`make check-schema-ts`/`check-client`; the typed client itself shipped as E9-S8/E11-S6); the app work is in `honba-frontend`. R8 (Optional) stays unscheduled.
+(E3-S1b/S1d, deferred by ADR 0025/D14); E10-S8 shipped the bhavcopy Rust connector. R7 (Frontend) is **complete**
+(E9-S1..S7 shipped: core graph/code/verify/assistant in `4e15416`, React Flow canvas and views in frontend `7050c49`).
+R8 (Optional) stays unscheduled.
 
 **Critical path:** E2-S2 -> E11-S7 (write endpoints) and E5-S4 (all DONE); ADR-Run -> E4-S3 -> `POST /backtests` -> E4-S5 -> E11-S4 -> E9-S7
 (all DONE in `honba`, E9-S7 in `honba-frontend`); E3-S1a (next-open Rust) -> E3-S2 -> E3-S7 (all DONE; E3-S1b is deferred by ADR 0025);
 E10-S7 (done) gates Python callers of any async Rust API; E2-S6(a) -> E2-S6(b..d) -> E2-S7 -> E3-S7 (all DONE). What remains is off the
-old critical path: L2 matching (E3-S1b/S1d), the pull-based E7 and optional E8 epics, and the E9 app work (S1..S7) in `honba-frontend`.
+old critical path: L2 matching (E3-S1b/S1d) and the pull-based E7 and optional E8 epics.
 
 ### E1 Instruments and adapters
 
@@ -376,7 +377,7 @@ old critical path: L2 matching (E3-S1b/S1d), the pull-based E7 and optional E8 e
 | E7-S2/S3/S5 | Indexed state, cache persistence, recorder tap | M | pull-based | n/a | honba |
 | E8-S1..S4 | Multi-leg; not scheduled | | D13 | n/a | honba |
 | E9-S8 (DONE) | Generated TS client from OpenAPI. `honba-codegen` renders `client.ts` (`HonbaClient` + `request<T>` + `apiUrl` + SSE helper) from the same `ENDPOINTS` registry as OpenAPI (`Artifact::Client`, `make client`, `make check-client`); the frontend pins it with `client.test.ts` and now has `lint`/`typecheck`/`test` scripts, and `domain.ts` was refreshed (`honba-frontend ee2e1cb`, honba `60373f0`) | S | E11-S6 | `client_types_compile` / contract test against `honba serve` | honba + honba-frontend |
-| E9-S1..S7 | StrategyGraph editor, graph to code, code to graph, verify/run, AI assistant, ops console, result views | M each | E0-S8, E4-S3, E5-S5, E11-S4 | per old roadmap section E9 | honba-frontend |
+| E9-S1..S7 (DONE) | StrategyGraph editor, graph to code, code to graph, verify/run, AI assistant, ops console, result views. Core: `strategies/graph.py`, `graph_codegen.py`, `graph_recognize.py`, `designer.py`, `ai/designer_assistant.py` + manifest `graph_hash`/`sidecar` (commit `4e15416`); frontend: React Flow canvas, code/verify/run/assistant/ops/results panels (`7050c49`); ADR 0029, D16 | M each | E0-S8, E4-S3, E5-S5, E11-S4 | core `test_strategy_graph`/`test_graph_codegen`/`test_graph_recognize`/`test_designer`/`test_designer_assistant` + `test_designer_verify_run`; frontend `graph.test.ts`/`flows.test.ts`/`ops.test.ts` (23 vitest) | honba + honba-frontend |
 
 ### E10 Async core (complete; E10-S7 done)
 
@@ -416,14 +417,14 @@ old critical path: L2 matching (E3-S1b/S1d), the pull-based E7 and optional E8 e
 | D13 | Is arbitrage a product goal (E8)? | E8 | Unscheduled unless yes |
 | D14 | Tick/depth data source for L2 (bars only today; `/depth` empty) — **decided (ADR 0025)**: stay L1; E3-S1b/S1d deferred | E3-S1b | Decide before L2; else stay L1 |
 | D15 | Root CLAUDE.md wording for the pack pattern; clean-room log for OpenAlgo/QuantDinger-inspired work; `honba-python` split re-evaluation (needs `honba-py` on crates.io) | housekeeping | Owner approval |
-| D16 | `StrategyGraph` stored form: Python file plus sidecar graph | E9 | Per old roadmap item 18 |
+| D16 | `StrategyGraph` stored form — **decided (ADR 0029)**: Python file + optional `.strategy.json` sidecar; `graph_hash` + `source_hash` on the manifest | E9 | Shipped |
 | D17 | NSE settlement default and intraday cycle (counts bars, not sessions) in simulators — **decided (ADR 0016)**; shipped (E3-S1a) | E3-S1a | Settle in the port ADR |
 
 Already decided: pyo3 single cdylib (ADR 0014 decision, `honba-py`), Strategy ABC with shim (ADR 0008), schema from Rust (ADR 0014),
 integer money (0011), versioning and nanosecond strings (0012), REST read ports (0013), explicit runtime (0015, implemented in E10-S7), next-open Rust port (0016, all three chunks done, D17),
 run lifecycle and `run_id` (0017, D1), risk stage (0018, D4), `OrderState` FSM and client order ids (0019, D5/D2), journal schema v1 and result cache (0020, D3),
 SSE streaming (0021, D6), AI strategy verifier (0022, D7), minimal auth (0023, D11), overfitting gates / streaming datasets / session MTF (0024, D8),
-tick/depth scope (0025, D14), bhavcopy connector + D10 default (0028). Still open: D13 (arbitrage), D15 (housekeeping), D16 (`StrategyGraph` form).
+tick/depth scope (0025, D14), bhavcopy connector + D10 default (0028), StrategyGraph + AlgoDesigner (0029, D16). Still open: D13 (arbitrage), D15 (housekeeping).
 
 ---
 

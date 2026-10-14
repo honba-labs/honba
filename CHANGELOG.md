@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### StrategyGraph v1 and the AlgoDesigner (E9-S1..S5 core + D16, ADR 0029)
+
+- `python/src/honba/strategies/graph.py`: versioned `StrategyGraph` JSON v1 with a node
+  catalogue derived from the registered indicators; validation returns `honba verify` error
+  codes; canonical JSON + `graph_hash`. `graph_codegen.py`: deterministic graph->code codegen
+  (builder block + `on_bar`, one-line params, node labels in `reason=`).
+  `graph_recognize.py`: AST code->graph recogniser with unsupported-span line ranges and a
+  code-only fallback — never lossy; `graph->code->graph` holds over the whole catalogue.
+  `strategies/designer.py`: `verify_graph`/`verify_and_run`, publish checklist, version
+  diff/restore, ops/result pure helpers. `StrategyManifest` gains Python-only
+  `graph_hash`/`sidecar` (stripped from the Rust shape); `verify_strategy_source` verifies a
+  `.py` plus optional `.strategy.json` with a bundle `source_hash`. `ai/designer_assistant.py`:
+  proposals route to `discussion`/`candidate`/`validation_error` through the E5-S5 verifier and
+  E5-S7 typed decisions.
+- Tests: unit `test_strategy_graph`/`test_graph_codegen`/`test_graph_recognize`/`test_designer`/
+  `test_designer_assistant` (incl. identical-error-codes vs `verify_manifest` and catalogue
+  identity); integration `test_designer_verify_run` (106 passed with its five unit files).
+- Frontend `7050c49` ships the matching canvas/panels (S6/S7 views included).
+
 ### Generated typed TypeScript client (E11-S6 / E9-S8)
 
 - `honba-codegen` gained a `client` artifact (`crates/honba-codegen/src/client.rs`): renders a typed
