@@ -273,7 +273,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 | E1-S3 (DONE) | `InstrumentMaster` impl over Parquet catalog: `snapshot(as_of)`, effective-dated lot/tick/freeze | M | E1-S2 | `resolve_as_of_old_symbol` / `backtest_resolves_expired_contract` | honba |
 | E1-S4 | Product/price-type/TIF table mapping per adapter | S | first real adapter | `mapping_round_trip_property` / `adapter_rejects_unsupported_combo` | honba-adapters |
 | E1-S5 | `SessionProvider`, rate limiter, secret store impl (Python side) | M | E1-S1b | `token_expiry_fake_clock`, `bucket_refill` / `limits_hold_across_workers`, `no_secret_in_logs` | honba (+adapters) |
-| E1-S6 | Feed connector contract: reconnect, backoff, gap markers, watchdog, Terminal/Unrecoverable | M | E10-S1, E2-S3 | `backoff_schedule`, `terminal_error_stops` / `simulated_feed_drop_emits_gap_marker` | honba |
+| E1-S6 (DONE) | Feed connector contract: reconnect, backoff, gap markers, watchdog, Terminal/Unrecoverable | M | E10-S1, E2-S3 | `backoff_schedule`, `terminal_error_stops` / `simulated_feed_drop_emits_gap_marker`, `feed_into_engine_run` (commit `bc3b20b`) | honba |
 
 ### E2 Safe engine
 

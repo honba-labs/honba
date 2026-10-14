@@ -255,8 +255,12 @@
 - Tests: unit `backoff_schedule` (exact seeded schedule), `watchdog_emits_gap_after_silence` (fake
   clock), plus integration `simulated_feed_drop_emits_gap_marker`, `terminal_error_stops` (no
   retry after `Terminal`) and `retriable_error_backs_off_and_reconnects` over a `SimulatedConnector`.
-- Deferred: the per-broker connector implementation and its auth/TOTP wiring (honba-adapters), and
-  the roadmap status flip for E1-S6.
+- Integration `feed_into_engine_run` (`crates/honba-feed/tests/feed_into_engine_run.rs`) drives a
+  real `Engine` from a `MarketDataConnector`: every data event is injected as a kernel `Message`
+  and dispatched in order, a `GapMarker` surfaces in-band without breaking the run, and a
+  `PortError::Terminal` stops the loop for good.
+- Deferred: the per-broker connector implementation and its auth/TOTP wiring (honba-adapters). E1-S6
+  is marked done in the roadmap (commit `bc3b20b`).
 
 ### Session, rate limit and secret store (E1-S5)
 
