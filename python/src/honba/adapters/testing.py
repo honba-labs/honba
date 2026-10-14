@@ -115,7 +115,8 @@ def _load_instruments_from_store() -> tuple[Instrument, ...]:
                             )
                             seen.add(iid)
                     return tuple(insts)
-    except (OSError, RuntimeError, ValueError, KeyError):
+    except (OSError, RuntimeError, ValueError, KeyError, ImportError):
+        # ``duckdb`` is an optional extra: the store may exist while the driver is absent.
         pass
     return _INSTRUMENTS
 
