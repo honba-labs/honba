@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Determinism guard for backtest runs (extends E10-S6)
+
+- `crates/honba-api-rest/tests/runs_determinism.rs` gains
+  `determinism_under_threads_{one,four,sixteen}_workers`: the same seeded backtest
+  (`BacktestExecutor` over the fixture bars, written to `events.ndjson`) is driven from a
+  multi-thread tokio runtime with 1, 4 and 16 `worker_threads` and must be byte-identical to the
+  single-threaded run. This is the `honba-sweep` `determinism_under_threads_*` shape applied to a
+  run; the existing `determinism_under_workers` still covers the run service's worker pool.
+
 ### StrategyGraph v1 and the AlgoDesigner (E9-S1..S5 core + D16, ADR 0029)
 
 - `python/src/honba/strategies/graph.py`: versioned `StrategyGraph` JSON v1 with a node
