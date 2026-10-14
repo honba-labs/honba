@@ -59,6 +59,10 @@ pub struct AppState {
     pub(crate) exec: crate::exec::ExecGateway,
     /// The writable store behind `quotes`, when the state was built by `from_reader`.
     live: Option<Arc<LiveQuoteStore>>,
+    /// The sending side of the bar ingest channel behind `POST /bars`; `None` until
+    /// [`AppState::start_bar_ingest`] (or [`AppState::attach_bar_ingest`]) and again after
+    /// [`AppState::stop_bar_ingest`]. Shared by every clone of the state.
+    pub(crate) bar_ingest: Arc<Mutex<Option<tokio::sync::mpsc::Sender<honba_messages::Bar>>>>,
 }
 
 impl AppState {
@@ -82,6 +86,7 @@ impl AppState {
             orders: OrderLedger::default(),
             exec: crate::exec::ExecGateway::default_sim(),
             live: None,
+            bar_ingest: Arc::default(),
         }
     }
 

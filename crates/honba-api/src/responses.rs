@@ -235,3 +235,10 @@ pub enum StreamFrame {
         message: Message,
     },
 }
+
+/// `POST /bars` response: how many bars were handed to the bar pump.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct BarsIngestResponse {
+    /// Bars queued for the pump; the whole batch, or the request failed.
+    pub accepted: u64,
+}

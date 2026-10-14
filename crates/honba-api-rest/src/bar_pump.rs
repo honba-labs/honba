@@ -7,7 +7,9 @@
 //! aborts the task). An `advance_market` error (an out-of-order bar) is logged and counted,
 //! and the pump keeps going.
 
-use tokio::sync::mpsc::Receiver;
+use std::sync::PoisonError;
+
+use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::task::JoinHandle;
 
 use honba_messages::Bar;
@@ -31,6 +33,46 @@ impl AppState {
     pub fn spawn_bar_pump(&self, bars: Receiver<Bar>) -> JoinHandle<BarPumpReport> {
         let state = self.clone();
         tokio::spawn(async move { state.run_bar_pump(bars).await })
+    }
+
+    /// Starts the live bar ingest behind `POST /bars`: a bounded channel of `capacity` bars (at
+    /// least 1) whose sender the state keeps and whose receiver a [`spawn_bar_pump`] task drains.
+    ///
+    /// Must be called inside a tokio runtime. Starting again replaces the sender, which ends the
+    /// previous pump. Call [`AppState::stop_bar_ingest`] to shut down: it drops the sender, the
+    /// pump drains what is queued and then returns its [`BarPumpReport`].
+    ///
+    /// [`spawn_bar_pump`]: AppState::spawn_bar_pump
+    pub fn start_bar_ingest(&self, capacity: usize) -> JoinHandle<BarPumpReport> {
+        let (tx, rx) = mpsc::channel(capacity.max(1));
+        self.attach_bar_ingest(tx);
+        self.spawn_bar_pump(rx)
+    }
+
+    /// Makes `POST /bars` send into `sender`; whoever owns the receiver drains it (usually
+    /// [`AppState::spawn_bar_pump`]). [`AppState::start_bar_ingest`] is this plus the pump.
+    pub fn attach_bar_ingest(&self, sender: Sender<Bar>) {
+        *self
+            .bar_ingest
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = Some(sender);
+    }
+
+    /// Detaches the ingest sender so `POST /bars` answers `bar_ingest_disabled` again. The pump
+    /// ends once every other sender clone (an in-flight request) is gone and the queue is drained.
+    pub fn stop_bar_ingest(&self) {
+        self.bar_ingest
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take();
+    }
+
+    /// A clone of the ingest sender, if ingest is on.
+    pub(crate) fn bar_ingest_sender(&self) -> Option<Sender<Bar>> {
+        self.bar_ingest
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
     }
 
     /// Runs the bar pump on the current task until `bars` closes.

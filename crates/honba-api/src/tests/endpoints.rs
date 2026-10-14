@@ -57,10 +57,11 @@ fn an_unterminated_placeholder_does_not_loop_forever() {
 }
 
 #[test]
-fn write_endpoints_are_exactly_the_order_and_position_routes() {
+fn write_endpoints_are_exactly_the_order_position_and_bar_ingest_routes() {
     assert_eq!(
         write_endpoints(),
         vec![
+            "POST /bars",
             "POST /orders",
             "DELETE /orders/{id}",
             "POST /positions/close",

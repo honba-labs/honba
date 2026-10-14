@@ -35,6 +35,7 @@ mod bar_pump;
 mod dispatch;
 mod exec;
 mod executor;
+mod ingest;
 mod journal;
 mod market;
 mod orders;
@@ -167,6 +168,7 @@ pub fn api_router_with_config(state: AppState, config: &ApiConfig) -> Router {
         .route("/quotes", get(market::get_quotes))
         .route("/bars/:id", get(market::get_bars))
         .route("/depth/:id", get(market::get_depth))
+        .route("/bars", post(ingest::post_bars))
         .route("/strategies", post(post_strategies).get(get_strategies))
         .route("/strategies/verify", post(post_verify_strategy))
         .route("/backtests", post(runs::post_backtests))

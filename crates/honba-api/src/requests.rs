@@ -210,3 +210,17 @@ pub struct OrdersRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub client_order_id: Option<String>,
 }
+
+/// `POST /bars` request body: a batch of bars for the live bar pump (E3-S7 follow-up).
+///
+/// Each bar is validated on deserialization (finite prices, `low <= open, close <= high`,
+/// `volume >= 0`), so one bad bar rejects the whole batch. The batch size is bounded by
+/// [`crate::MAX_INGEST_BARS`]. Bars must ascend by `ts_event`; ordering is enforced downstream
+/// by the simulator, where an out-of-order bar is counted and skipped rather than failing the
+/// request.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct BarsIngestRequest {
+    /// The bars to feed, oldest first.
+    pub bars: Vec<honba_messages::Bar>,
+}

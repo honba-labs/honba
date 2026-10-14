@@ -169,6 +169,7 @@ pub fn request_type_names() -> &'static [&'static str] {
         "BacktestEventsQuery",
         "OrdersRequest",
         "OrdersQuery",
+        "BarsIngestRequest",
     ]
 }
 
@@ -184,6 +185,7 @@ pub fn register_requests(set: &mut SchemaSet) {
     set.add_type::<honba_api::SweepRequest>("SweepRequest");
     set.add_type::<honba_api::OrdersRequest>("OrdersRequest");
     set.add_type::<honba_api::OrdersQuery>("OrdersQuery");
+    set.add_type::<honba_api::BarsIngestRequest>("BarsIngestRequest");
     set.add_type::<honba_api::BacktestEventsQuery>("BacktestEventsQuery");
 }
 
@@ -204,6 +206,7 @@ pub fn register_responses(set: &mut SchemaSet) {
     set.add_type::<honba_api::StreamFrame>("StreamFrame");
     set.add_type::<honba_api::OrdersResponse>("OrdersResponse");
     set.add_type::<honba_api::PositionsResponse>("PositionsResponse");
+    set.add_type::<honba_api::BarsIngestResponse>("BarsIngestResponse");
     set.add_type::<honba_api::TradesResponse>("TradesResponse");
 }
 

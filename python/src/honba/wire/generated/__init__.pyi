@@ -79,6 +79,12 @@ class BarType:
     instrument_id: InstrumentId
     spec: BarSpecification
 
+class BarsIngestRequest:
+    bars: list[Bar]
+
+class BarsIngestResponse:
+    accepted: int
+
 BarsQuery = TypedDict("BarsQuery", {"from": NotRequired[str | None], "tf": NotRequired[str | None], "to": NotRequired[str | None]})
 
 class BarsResponse:

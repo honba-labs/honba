@@ -2,6 +2,7 @@
 
 mod cache;
 mod endpoints;
+mod ingest;
 mod market;
 mod run_id;
 mod run_ports;

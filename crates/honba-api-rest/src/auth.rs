@@ -188,6 +188,7 @@ pub const ROUTE_SCOPES: &[(&str, &str, RouteScope)] = &[
     ("GET", "/quotes", RouteScope::Required("read:market")),
     ("GET", "/bars/{id}", RouteScope::Required("read:market")),
     ("GET", "/depth/{id}", RouteScope::Required("read:market")),
+    ("POST", "/bars", RouteScope::Required("write:orders")),
     ("GET", "/screener/scan", RouteScope::Required("read:market")),
     ("GET", "/strategies", RouteScope::Required("research")),
     ("POST", "/strategies", RouteScope::Required("research")),

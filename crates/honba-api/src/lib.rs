@@ -15,6 +15,7 @@
 
 pub mod cache;
 pub mod capabilities;
+pub mod ingest;
 pub mod market;
 pub mod requests;
 pub mod responses;
@@ -32,20 +33,22 @@ pub use honba_messages::{
     write_endpoints, Access, ApiResponse, ApiVersion, Endpoint, ErrorCategory, ErrorCode,
     ErrorDetail, HttpMethod, ParamLocation, ResponseEnvelope, API_VERSION, ENDPOINTS, WRITE_PATHS,
 };
+pub use ingest::{check_ingest_batch, MAX_INGEST_BARS};
 pub use market::{
     instrument_json, parse_instrument_id, parse_timeframe, ResolvedBarsQuery, ResolvedQuotesQuery,
     DEFAULT_DEPTH_LEVELS, DEFAULT_TIMEFRAME, MAX_DEPTH_LEVELS,
 };
 pub use requests::{
-    BacktestEventsQuery, BacktestRequest, BarsQuery, DepthQuery, InstrumentsQuery, OrdersQuery,
-    OrdersRequest, QuotesQuery, ScreenerQuery, StrategiesRequest, SweepRequest,
+    BacktestEventsQuery, BacktestRequest, BarsIngestRequest, BarsQuery, DepthQuery,
+    InstrumentsQuery, OrdersQuery, OrdersRequest, QuotesQuery, ScreenerQuery, StrategiesRequest,
+    SweepRequest,
 };
 pub use responses::{
-    BacktestMetrics, BacktestResponse, BacktestStatus, BarsResponse, CapabilitiesResponse,
-    CompiledStrategy, DepthLevel, DepthResponse, InstrumentsResponse, OrdersResponse,
-    PositionsResponse, QuotesResponse, RunStatus, ScreenerResponse, ScreenerResultRow,
-    StrategiesResponse, StreamFrame, SweepReportResponse, SweepResponse, SweepStatus,
-    TradesResponse,
+    BacktestMetrics, BacktestResponse, BacktestStatus, BarsIngestResponse, BarsResponse,
+    CapabilitiesResponse, CompiledStrategy, DepthLevel, DepthResponse, InstrumentsResponse,
+    OrdersResponse, PositionsResponse, QuotesResponse, RunStatus, ScreenerResponse,
+    ScreenerResultRow, StrategiesResponse, StreamFrame, SweepReportResponse, SweepResponse,
+    SweepStatus, TradesResponse,
 };
 pub use run_id::{RunId, RunIdError, RunIdGenerator};
 pub use run_ports::{JournalWriter, RunExecutor, RunJob, RunOutcome};

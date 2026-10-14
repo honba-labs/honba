@@ -456,6 +456,38 @@
         ],
         "type": "object"
       },
+      "BarsIngestRequest": {
+        "additionalProperties": false,
+        "description": "`POST /bars` request body: a batch of bars for the live bar pump (E3-S7 follow-up).\n\nEach bar is validated on deserialization (finite prices, `low <= open, close <= high`, `volume >= 0`), so one bad bar rejects the whole batch. The batch size is bounded by [`crate::MAX_INGEST_BARS`]. Bars must ascend by `ts_event`; ordering is enforced downstream by the simulator, where an out-of-order bar is counted and skipped rather than failing the request.",
+        "properties": {
+          "bars": {
+            "description": "The bars to feed, oldest first.",
+            "items": {
+              "$ref": "#/components/schemas/Bar"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "bars"
+        ],
+        "type": "object"
+      },
+      "BarsIngestResponse": {
+        "description": "`POST /bars` response: how many bars were handed to the bar pump.",
+        "properties": {
+          "accepted": {
+            "description": "Bars queued for the pump; the whole batch, or the request failed.",
+            "format": "uint64",
+            "minimum": 0.0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accepted"
+        ],
+        "type": "object"
+      },
       "BarsQuery": {
         "additionalProperties": false,
         "description": "Bars query parameters.",
@@ -4634,6 +4666,48 @@
           "runs"
         ],
         "x-honba-access": "read_only"
+      }
+    },
+    "/bars": {
+      "post": {
+        "operationId": "post_bars",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BarsIngestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BarsIngestResponse"
+                }
+              }
+            },
+            "description": "Success. Always enveloped; see ResponseEnvelope."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseEnvelope"
+                }
+              }
+            },
+            "description": "Failure. Carries the envelope's `error` with a stable ErrorCode."
+          }
+        },
+        "summary": "POST bars",
+        "tags": [
+          "bars"
+        ],
+        "x-honba-access": "write"
       }
     },
     "/bars/{id}": {

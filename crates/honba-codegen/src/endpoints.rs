@@ -31,6 +31,7 @@ pub(crate) fn response_type_for(method: &str, path: &str) -> Option<&'static str
         ("GET", "/quotes") => "QuotesResponse",
         ("GET", "/bars/{id}") => "BarsResponse",
         ("GET", "/depth/{id}") => "DepthResponse",
+        ("POST", "/bars") => "BarsIngestResponse",
         ("POST", "/strategies") => "CompiledStrategy",
         ("GET", "/strategies") => "StrategiesResponse",
         ("POST", "/strategies/verify") => "StrategyIr",
@@ -53,6 +54,7 @@ pub(crate) fn response_type_for(method: &str, path: &str) -> Option<&'static str
 /// The request body type for each endpoint that takes one.
 pub(crate) fn request_type_for(method: &str, path: &str) -> Option<&'static str> {
     Some(match (method, path) {
+        ("POST", "/bars") => "BarsIngestRequest",
         ("POST", "/strategies") => "StrategiesRequest",
         ("POST", "/strategies/verify") => "StrategyManifest",
         ("POST", "/backtests") => "BacktestRequest",
