@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Report builder with a fact snapshot and quality gate (E5-S9, ADR 0027)
+
+- `honba.ai.report`: an immutable snapshot of run facts (`FactSnapshot`) and a deterministic
+  quality gate over an LLM narrative. `build_snapshot` shapes a `BacktestResult` / mapping / attrs
+  object into a frozen `FactSnapshot` (metrics copied behind a `MappingProxyType`, journal ids and
+  assumptions as tuples). `allowed_numbers()` is the normalised vocabulary a narrative may cite —
+  decimal, comma-grouped, `×100` percent and `÷100` forms of every metric and every numeric token in
+  `run_id` / `journal_ids` / `assumptions`. `quality_gate` extracts every numeric token from the
+  narrative (currency symbols, thousands commas, scientific notation, trailing `%`) and rejects any
+  number not in the allowed set, reporting the violation with context. `build_report` runs the
+  narrator with the snapshot as its **only** argument, wraps the text as untrusted
+  (`honba.ai.trust.wrap_untrusted`), runs the gate, and returns a `Report` whose
+  `as_markdown()` renders the snapshot facts as a sorted table and the narrative inside the trust
+  envelope delimiters. Deterministic: same snapshot and narrator give a byte-identical report.
+- Tests: unit `python/tests/unit/test_report_builder.py` (`test_snapshot_is_immutable`,
+  `test_narrator_receives_only_the_snapshot`, `test_quality_gate_allows_snapshot_numbers`,
+  `test_narrative_number_outside_snapshot_rejected`,
+  `test_percentage_and_currency_forms_are_matched`); integration
+  `python/tests/integration/test_report_snapshot.py` (`test_report_uses_only_snapshot_facts`,
+  `test_llm_narrative_is_wrapped_untrusted`).
+
 ### Webhook order ingestion (E5-S6, ADR 0026)
 
 - `honba.api.webhooks`: an ordered, fail-closed pipeline (`WebhookIngestor`) that turns an inbound

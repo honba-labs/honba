@@ -62,14 +62,14 @@ E10-S1..S8, E11-S1..S8). E6 batches 1-2, E7 and E8 are tracked separately below.
 | E2 Safe engine | 10 | 0 | 1 | Risk stage, order FSM, reconciliation, cache, staleness breaker, durable ledger and kill switch all shipped; E2-S8 dropped |
 | E3 Execution realism | 7 | 0 | 0 | Bar-fill (L1), Rust/Python next-open, cost-schedule fills, fill/latency, margin/MIS, target-position, lot/freeze, sandbox shipped; L2 (E3-S1b/S1d) deferred (ADR 0025) |
 | E4 Research pipeline | 8 | 0 | 0 | Complete: journal v1, cache, hyperparameters, CLI/REST runner, look-ahead, sweep fitness, overfitting gates, streaming datasets, MTF aggregation |
-| E5 Agent and API | 8 | 0 | 1 | Verifier, MCP server, scopes, approval queue, typed decisions, webhook ingestion (S6), GBNF+LLM, synthetic+QLoRA+RLVR shipped; report builder (S9) deferred |
+| E5 Agent and API | 9 | 0 | 0 | Complete: verifier, MCP server, scopes, approval queue, typed decisions, webhook ingestion (S6), report builder (S9), GBNF+LLM, synthetic+QLoRA+RLVR — no deferred stories |
 | E6 Indicators | 1 | 0 | 0 | Batches 1-4 (O(1) rolling, plain sums) and the render contract (S5) done |
 | E7 Scale and ops | 0 | 0 | 5 | Pull-based; E7-S4 is superseded by `honba-sweep` (E10-S5); tracked separately from the 74 |
 | E8 Multi-leg | 0 | 0 | 4 | Optional; not scheduled (open decision D13); tracked separately from the 74 |
 | E9 Frontend and AlgoDesigner | 0 | 1 | 7 | Greenfield; generated TS types only |
 | E10 Async core | 7 | 0 | 1 | Ports, shell, engine output, Arc dataset, sweep, determinism test and Python runtime bridge (ADR 0015) shipped; Rust connectors (E10-S8) open |
 | E11 Versioned API | 7 | 0 | 1 | Read API, SDK, WASM, SSE streaming, write endpoints and auth shipped; only the CI TS drift check (E11-S6) open |
-| **Total (74)** | **62** | **1** | **11** | |
+| **Total (74)** | **63** | **1** | **10** | |
 
 ### 1.1 What is shipped (evidence)
 
@@ -123,6 +123,7 @@ E10-S1..S8, E11-S1..S8). E6 batches 1-2, E7 and E8 are tracked separately below.
 | E3-S2/S4/S5/S6/S7 (DONE) | Seeded `FillModel`/`LatencyModel` (`seeded_slippage_reproducible`, `same_seed_byte_identical_fills`, `crates/honba-sim/tests/fill_latency_models.rs`); margin model + MIS square-off (`mis_run_flat_by_close`, `crates/honba-sim/tests/mis_square_off.rs`); target-position smart order (`target_delta_computed`, `target_position_run`); lot/freeze splitter (`slice_above_freeze`, `order_sliced_in_sim`); `SandboxAdapter` (`virtual_funds_isolated`, `sandbox_vs_backtest_same_fills`) (commits `695a549`, `1ffa180`, `599fb22`, `6f8d509`, `71de25f`) | honba |
 | E1-S4/S5 (DONE) | Canonical `Product` enum + per-adapter mapping tables (`9a7731a`); session provider, shared token-bucket rate limiter and encrypted secret store (`0df5b75`, `40ae1ec`) | honba (+adapters) |
 | E5-S6 webhook ingestion (DONE) | ADR 0026; `python/src/honba/api/webhooks.py` (`WebhookIngestor`, `WebhookConfig`, `TtlCache`, ordered stages); tests `python/tests/unit/test_webhooks.py`, `python/tests/integration/test_webhook_ingest.py` | honba |
+| E5-S9 report builder with a fact snapshot and quality gate (DONE) | ADR 0027; `python/src/honba/ai/report.py` (`FactSnapshot`, `build_snapshot`, `QualityViolation`/`QualityReport`, `quality_gate`, `Report`/`build_report`/`as_markdown()`); quality gate rejects any number not in the snapshot; narrative is the only input wrapped as untrusted (`honba.ai.trust`); tests `python/tests/unit/test_report_builder.py`, `python/tests/integration/test_report_snapshot.py` | honba |
 | E5-S10/S11 (DONE) | GBNF grammar and local llama-cpp GGUF runner (`c9579d2`) — `python/tests/unit/test_ai_gbnf.py::test_grammar_masks_invalid_tokens`, `python/tests/integration/test_ai_local_llm.py::test_ask_runs_offline_zero_syntax_errors`; synthetic financial dataset + QLoRA SFT + GRPO compiler reward (`827627f`) — `python/tests/unit/test_ai_alignment.py::test_benchmark_screener_accuracy_gt_90pct`, `::test_rlvr_rewards_compiler_pass` | honba |
 | E11-S3 rest (DONE) | `NOT_IMPLEMENTED_ENDPOINTS` is empty (`crates/honba-api-rest/src/lib.rs`); no route returns 501. `POST/GET /backtests`, journal routes and `honba serve` run flags (commit `7298373`); sweeps (E4-S5); orders write ledger (E11-S7, commit `91ab361`); read routes, screener and strategies as before | honba |
 | Trailing stop (wire + sim) | `OrderType::TrailingStop` with `trail_amount`/`trail_percent`, opt-in via `AdapterCapabilities.order_types` (`6e01d81`); full Rust/wire/simulator support — `BarFillSim` trails (high/low-water mark), `NextOpenSim` rejects it explicitly (`4e2fbb4`, `2568dab`, `381bbc4`) | honba (+adapters) |
@@ -283,8 +284,7 @@ Done work is removed. Sizes: S (<=1 day), M (2-4 days), L (split before start). 
 
 R6 and R7 can run in parallel with R4 once R2 exits. R5 needs R1 for write tools and R2 for runs.
 
-**Milestone status (2026-10-14):** R1 (Safe writes), R2 (Runs), R3 (Live-shaped runtime), R4 (Trustworthy research) and R5 (Agent surfaces,
-except the deferred E5-S9 report builder; E5-S6 webhook ingestion shipped) are **complete**. R6 (Live-ready) is complete except the L2 simulator
+**Milestone status (2026-10-14):** R1 (Safe writes), R2 (Runs), R3 (Live-shaped runtime), R4 (Trustworthy research) and R5 (Agent surfaces) are **complete** (E5-S6 webhook ingestion and E5-S9 report builder shipped). R6 (Live-ready) is complete except the L2 simulator
 (E3-S1b/S1d, deferred by ADR 0025/D14) and the Rust-native connectors (E10-S8). R7 (Frontend) has only the local TS drift check
 (E11-S6) open on the `honba` side; the app work is in `honba-frontend`. R8 (Optional) stays unscheduled.
 
@@ -362,7 +362,7 @@ E5-S6/E5-S9.
 | E5-S10 (DONE) | Local in-process LLM runtime (llama-cpp / GGUF runner) and EBNF->GBNF grammar constraint for zero-syntax-hallucination screening (Design.md §13) (commit `c9579d2`) | M | E5-S1, ADR 0009 | `grammar_masks_invalid_tokens` (`python/tests/unit/test_ai_gbnf.py`) / `ask_runs_offline_zero_syntax_errors` (`python/tests/integration/test_ai_local_llm.py`) | honba |
 | E5-S11 (DONE) | Financial domain alignment for tiny models (1B-3B): synthetic financial dataset (3k Indian market NL queries), QLoRA SFT, and compiler-reward RLVR (GRPO via parser & screener evaluator) (commit `827627f`) | M | E5-S10 | `benchmark_screener_accuracy_gt_90pct` / `rlvr_rewards_compiler_pass` (`python/tests/unit/test_ai_alignment.py`) | honba |
 | E5-S6 (DONE) | Webhook order ingestion: ordered fail-closed pipeline (kill switch, IP allowlist, size cap, hashed token, parse, live gate, idempotency, cool-off, risk, journal); opaque auth failures so the endpoint is not a token oracle; orders pass the risk stage and are journaled; ADR 0026 | M | E2-S2, E11-S8, E5-S3 | `stage_order_blocks_before_parse`, `unknown_and_malformed_tokens_are_indistinguishable`, `idempotent_replay_returns_cached_response`, `idempotency_caches_the_refusal_not_a_premature_accept` / `webhook_order_passes_risk_and_journals`, `webhook_risk_refusal_is_audited` (`python/tests/unit/test_webhooks.py`, `python/tests/integration/test_webhook_ingest.py`) | honba |
-| E5-S9 | Report builder with a fact snapshot and quality gate: an immutable snapshot of run facts (metrics, journal ids, assumptions) is the only input to the LLM narrative; a quality check rejects any number in the narrative not in the snapshot | M | E4-S1, E5-S7 | `narrative_number_outside_snapshot_rejected` / `report_uses_only_snapshot_facts` | honba |
+| E5-S9 (DONE) | Report builder with a fact snapshot and quality gate: an immutable snapshot of run facts (metrics, journal ids, assumptions) is the only input to the LLM narrative; a quality check rejects any number in the narrative not in the snapshot; narrative is wrapped as untrusted (ADR 0027) | M | E4-S1, E5-S7 | `narrative_number_outside_snapshot_rejected`, `quality_gate_allows_snapshot_numbers`, `percentage_and_currency_forms_are_matched` / `report_uses_only_snapshot_facts`, `llm_narrative_is_wrapped_untrusted` (`python/tests/unit/test_report_builder.py`, `python/tests/integration/test_report_snapshot.py`) | honba |
 
 ### E6, E7, E8, E9
 
