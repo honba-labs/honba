@@ -35,3 +35,6 @@ IN PROGRESS: Rust/wire parity for trailing stop, chunk A (agent ac08e661aa561765
 NEXT, chunk B: simulator/paper/backtest actually trail the stop (SELL protects long: high-water mark; BUY protects short: low-water mark; trigger fills as market), then let adapters opt in (check each broker's native trailing/super-order support before listing the type). No broker lists TRAILING_STOP today.
 Known gaps: no automatic OCO cancel for Entry stop/take-profit (busy() blocks should_exit while they rest); honba-frontend TS enums need the new order type after codegen; Alpha 30 point-in-time history is inception-dated only.
 Env rules: cargo with CARGO_TARGET_DIR=honba/target, never /tmp; pytest `--basetemp=$HOME/.cache/pytest-honba` then delete; one sonnet subagent at a time (never opus); commit by explicit path, no trailers; nothing pushed.
+
+## 2026-10-14
+Core items 1,3,4 audited: done except order->sim routing (design call). Fixed: wasm WilliamsR/Stoch 8fc645b, risk inputs cbf525a, close 0c1bc3a.
