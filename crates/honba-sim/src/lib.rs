@@ -7,6 +7,7 @@
 pub mod bar_fill;
 pub mod cost;
 pub mod fill_model;
+pub mod l2;
 pub mod latency;
 pub mod lot;
 pub mod margin;
@@ -19,6 +20,7 @@ pub mod target;
 pub use bar_fill::{BarFillEngine, FillCosts, FillCostsError};
 pub use cost::ScheduleFillCost;
 pub use fill_model::{FillModel, NoSlippage, SlippageKind, SlippageModel};
+pub use l2::{L2Book, L2Sim};
 pub use latency::{depth_survival_discount, LatencyModel, NoLatency, SeededLatency};
 pub use lot::{lot_aligned_size, split_order};
 pub use margin::{

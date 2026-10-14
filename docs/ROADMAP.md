@@ -300,14 +300,14 @@ Done work is removed. Sizes: S (<=1 day), M (2-4 days), L (split before start). 
 R6 and R7 can run in parallel with R4 once R2 exits. R5 needs R1 for write tools and R2 for runs.
 
 **Milestone status (2026-10-14):** R1 (Safe writes), R2 (Runs), R3 (Live-shaped runtime), R4 (Trustworthy research) and R5 (Agent surfaces) are **complete** (E5-S6 webhook ingestion and E5-S9 report builder shipped). R6 (Live-ready) is complete except the L2 simulator
-(E3-S1b/S1d, **ADR 0030 defines the stream/book/vectors; scheduling decision pending**); E10-S8 shipped the bhavcopy Rust connector. R7 (Frontend) is **complete**
+(E3-S1b/S1d, **ADR 0030 (accepted) defines the stream/book/vectors; scheduled**); E10-S8 shipped the bhavcopy Rust connector. R7 (Frontend) is **complete**
 (E9-S1..S7 shipped: core graph/code/verify/assistant in `4e15416`, React Flow canvas and views in frontend `7050c49`).
 R8 (Optional) stays unscheduled.
 
 **Critical path:** E2-S2 -> E11-S7 (write endpoints) and E5-S4 (all DONE); ADR-Run -> E4-S3 -> `POST /backtests` -> E4-S5 -> E11-S4 -> E9-S7
 (all DONE in `honba`, E9-S7 in `honba-frontend`); E3-S1a (next-open Rust) -> E3-S2 -> E3-S7 (all DONE; **E3-S1b/S1d now schedulable per ADR 0030**);
 E10-S7 (done) gates Python callers of any async Rust API; E2-S6(a) -> E2-S6(b..d) -> E2-S7 -> E3-S7 (all DONE). What remains is off the
-old critical path: **E3-S1b-1/2/3, E3-S1d (ADR 0030 blocks scheduling)** and the pull-based E7 and optional E8 epics.
+old critical path: **E3-S1b-1/2/3, E3-S1d (scheduled per ADR 0030)** and the pull-based E7 and optional E8 epics.
 
 ### E1 Instruments and adapters
 
@@ -340,7 +340,7 @@ old critical path: **E3-S1b-1/2/3, E3-S1d (ADR 0030 blocks scheduling)** and the
 | ID | Scope | Size | Deps | Acceptance | Owner |
 |---|---|---|---|---|---|
 | E3-S1a (DONE) | Rust port of the next-open simulator behind `ExecutionEngine`, Python `NextOpenExecution` API unchanged. **All chunks shipped** (ADR 0016): chunk 1 port, chunk 2 settlement + costs + `SessionOpen`, chunk 3a PyO3 binding, chunk 3b Python delegation (native backend with a pure-Python fallback). Note: the Python reference never fills limit or stop orders (they are rejected `unsupported_order_type`), so "harden L1 stop/limit" needs a product decision before it can be scheduled | L -> split (port, order types, partial by volume) | ADR D1 | `crates/honba-sim/tests/next_open_conformance.rs::next_open_vectors_match_the_python_reference` (Rust), `crates/honba-py/tests/next_open_native.rs::every_chunk_one_and_two_vector_matches_the_python_reference` (`honba._honba` core), `python/tests/integration/test_next_open_sim_conformance.py::test_next_open_vector_matches_the_python_reference` (Python + native backends) replay `schema/conformance/next_open_sim.json` and assert equal | honba |
-| E3-S1b-1 | L2 matching core: top-of-book book, marketable walks, resting limits trade-through, stops from TradeTick, IOC/FOK/day, L2 cancel timing (ADR 0019) | M | E2-S6, E3-S2, ADR 0030 | `limit_fills_on_trade_through` / L1 vs L2 conformance on same stream | honba |
+| E3-S1b-1 (DONE) | L2 matching core (`crates/honba-sim/src/l2/`, `L2Sim`; unit tests `crates/honba-sim/src/tests/l2.rs`): top-of-book book, marketable walks, resting limits trade-through, stops from TradeTick, IOC/FOK/day, L2 cancel timing (ADR 0019) | M | E2-S6, E3-S2, ADR 0030 | `limit_fills_on_trade_through` / L1 vs L2 conformance on same stream | honba |
 | E3-S1b-2 | Python parity: `make_simulator(fill="l2")`, native binding via `honba._honba`, fallback reference | M | E3-S1b-1 | parity on `l2_sim.json` vectors | honba |
 | E3-S1b-3 | Conformance vectors: `l2_sim.json`, `gen_l2_vectors.py`, replay (Rust + Python) | M | E3-S1b-1 | `l2_sim.json` replayed byte-identically | honba |
 | E3-S1d | Differential oracle: naive reference matcher vs optimised sim on seeded streams | M | E3-S1b-3 | `oracle_agrees_seeded_streams` | honba |

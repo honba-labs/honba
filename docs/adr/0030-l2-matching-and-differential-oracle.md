@@ -1,6 +1,6 @@
 # ADR 0030: L2 Quote/Tick Matching and Differential Oracle
 
-Date: 2026-10-14. Status: **proposed**. Roadmap stories: E3-S1b, E3-S1d. Supersedes ADR 0025 decisions 1–3 for scheduling purposes; ADR 0025 decisions 4–5 remain in force.
+Date: 2026-10-14. Status: **accepted** (2026-10-14). Roadmap stories: E3-S1b, E3-S1d. Supersedes ADR 0025 decisions 1–3 for scheduling purposes; ADR 0025 decisions 4–5 remain in force.
 
 ## Context
 
@@ -94,3 +94,4 @@ All work is opt-in; the default simulator and research pipeline remain L1 (ADR 0
 ## Decision log
 
 - 2026-10-14: proposed.
+- 2026-10-14: accepted; E3-S1b/S1d scheduling authorized. E3-S1b-1 implemented `L2Sim` (`honba-sim/src/l2/`); `depth_survival_discount` left unwired (matching is instantaneous at event time, no in-flight interval to discount), still an open item for v2.
