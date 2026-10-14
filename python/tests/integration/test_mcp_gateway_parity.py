@@ -110,7 +110,8 @@ def test_mcp_error_carries_the_rest_code(client: Client) -> None:
     assert getattr(rest_err.value, "code", None) == err.value.code
 
 
-def test_mcp_result_marks_broker_text_untrusted(client: Client) -> None:
+def test_mcp_tool_output_marked(client: Client) -> None:
+    """E5-S2: free text in an MCP tool's output is wrapped and marked untrusted."""
     gateway = McpGateway(client)
 
     result = gateway.call_tool("get_instruments", {"query": {"symbol": "TCS"}})
@@ -118,5 +119,7 @@ def test_mcp_result_marks_broker_text_untrusted(client: Client) -> None:
     wrapped = json.loads(result.content)["instruments"][0]["id"]["symbol"]
     assert wrapped["untrusted"] is True
     assert wrapped["content"] == "TCS"
+    assert wrapped["origin"] == "mcp:get_instruments:symbol"
+    assert wrapped["content_hash"]
     # The raw payload is unchanged, so the result still equals the REST response.
     assert result.data["instruments"][0]["id"]["symbol"] == "TCS"

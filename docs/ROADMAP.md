@@ -15,6 +15,10 @@ E5-S10, E5-S11 added (2026-10-11): In-process Llama runtime (GBNF constraints) a
 E5-S10/S11 done (2026-10-12): GBNF→LLM grammar, local llama-cpp runner, synthetic dataset, QLoRA scaffold, GRPO compiler reward (`c9579d2`, `827627f`).
 E5-S3 done (2026-10-13): canonical route→scope map (`honba_api_rest::ROUTE_SCOPES`) with the drift guard
 (`scope_for_every_endpoint`, `drift_test_fails_on_new_route`) and a Python mirror in `honba.api.auth`.
+E5-S2 done (2026-10-13): trust envelope (`honba.ai.trust.wrap_untrusted` / `render_for_llm` /
+`extract_from_llm_rendered`) wraps broker/LLM/instrument text with an origin, content hash and
+`untrusted=True`; the MCP gateway marks free-text result fields
+(`wraps_untrusted_text` / `mcp_tool_output_marked`, commit `d6eb37c`).
 E4-S6, E4-S7, E4-S8 done (2026-10-11): Overfitting validation gates (DSR, PBO, CSCV, holdout, MC, cost-stress), chunked streaming datasets, and session MTF aggregation (ADR 0024, commit e7da809).
 E1-S2 done (2026-10-11): F&O instruments & grammar (india::fno), OptionType, right-to-left resolution, acceptance suite, Python bindings and stubs.
 E6 batch 4, E1-S3, E3-S3 done (2026-10-12): plain-sum indicators O(1) (`00c75af`, `6f23282`); InstrumentMaster dated snapshots over a Parquet
@@ -316,7 +320,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 | ID | Scope | Size | Deps | Acceptance | Owner |
 |---|---|---|---|---|---|
 | E5-S5 (DONE) | AI strategy verifier: AST, import allowlist, subprocess with rlimits, no network, deterministic smoke, look-ahead check, red-team tests; ADR D7 | M | E4-S4, ADR | `ast_rejects_forbidden_import` / `generated_strategy_passes_same_suite_as_handwritten` | honba |
-| E5-S2 | Trust envelope: broker/LLM/instrument text wrapped and marked untrusted | S | none | `wraps_untrusted_text` / `mcp_tool_output_marked` | honba |
+| E5-S2 (DONE) | Trust envelope: broker/LLM/instrument text wrapped and marked untrusted | S | none | `wraps_untrusted_text` / `mcp_tool_output_marked` | honba |
 | E5-S1 (DONE) | Thin Python MCP server over generated `mcp_tools.json` (11 tools: backtest, sweep, verify_strategy, compile_strategy, list_strategies, screen, get_instruments, get_bars, get_backtest, get_backtest_journal, get_sweep); toolset filter; read-only kill switch | M | E5-S2 | `toolset_filter` / `mcp_call_matches_rest_response` | honba |
 | E5-S3 (DONE) | Scope map (read:market, read:account, write:orders, research) with CI drift test; audit by token id | S | E5-S1, E11-S8 min | `scope_for_every_endpoint` / `drift_test_fails_on_new_route` | honba |
 | E5-S4 (DONE) | Approval queue for placements; cancel/modify bypass | M | E2-S2, E5-S3 | `placement_held`, `cancel_bypasses` / `approve_flows_through_risk_to_sim` | honba |
