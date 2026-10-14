@@ -37,4 +37,4 @@ Known gaps: no automatic OCO cancel for Entry stop/take-profit (busy() blocks sh
 Env rules: cargo with CARGO_TARGET_DIR=honba/target, never /tmp; pytest `--basetemp=$HOME/.cache/pytest-honba` then delete; one sonnet subagent at a time (never opus); commit by explicit path, no trailers; nothing pushed.
 
 ## 2026-10-14
-Core items 1,3,4 audited: done except order->sim routing (design call). Fixed: wasm WilliamsR/Stoch 8fc645b, risk inputs cbf525a, close 0c1bc3a.
+E3-S7 done to 436aac6/9b37cf5. NEXT: LiveQuoteStore (honba-feed) -> POST /bars ingest + serve wiring -> yfinance driver. Dhan feed unwired.
