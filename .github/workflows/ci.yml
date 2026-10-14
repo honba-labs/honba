@@ -170,8 +170,7 @@ jobs:
       - run: make test-wasm
 
   # Regenerates schema/domain, schema/openapi, schema/mcp and the .pyi stubs with the Rust
-  # generator and fails on any modified or untracked file. The frontend TypeScript check
-  # (make check-schema-ts) needs the sibling honba-frontend repo: local only.
+  # generator and fails on any modified or untracked file.
   codegen-drift:
     needs: [fmt, layering]
     runs-on: ubuntu-latest
@@ -182,6 +181,32 @@ jobs:
         with:
           shared-key: test
       - run: make check-codegen-ci
+
+  # Regenerates the frontend TypeScript (domain.ts) and typed client (client.ts) with the same
+  # Rust generator and fails on any difference from the sibling honba-frontend repo. That repo is
+  # checked out beside this one so the generator writes the paths a developer's
+  # `make check-schema-ts` / `make check-client` use (FRONTEND_TS_DIR = ../honba-frontend/...).
+  codegen-drift-frontend:
+    needs: [fmt, layering]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: honba
+      # Needs read access to honba-frontend: the default token works for a public repo; set the
+      # HONBA_FRONTEND_TOKEN secret (a PAT with contents:read) if it is private.
+      - uses: actions/checkout@v4
+        with:
+          repository: honba-labs/honba-frontend
+          path: honba-frontend
+          token: ${{ secrets.HONBA_FRONTEND_TOKEN || github.token }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: honba
+      - name: TypeScript and typed client drift
+        working-directory: honba
+        run: make check-schema-ts check-client
 
   python:
     needs: [changes, ruff, layering]
@@ -226,7 +251,7 @@ jobs:
   # as success; failed or cancelled ones do not.
   ci-ok:
     if: always()
-    needs: [fmt, layering, secrets-scan, clippy, ruff, rust-test, docs, wasm, codegen-drift, python]
+    needs: [fmt, layering, secrets-scan, clippy, ruff, rust-test, docs, wasm, codegen-drift, codegen-drift-frontend, python]
     runs-on: ubuntu-latest
     steps:
       - name: all required jobs passed or were skipped

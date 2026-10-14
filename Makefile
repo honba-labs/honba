@@ -100,6 +100,7 @@ codegen: schema client openapi pyi mcp
 check-codegen: check-schema check-schema-ts check-client check-openapi check-pyi check-mcp
 	@echo "all codegen drift checks passed"
 
-# Every drift check that needs only this repo (what CI runs).
+# Every drift check that needs only this repo. CI also runs the cross-repo TypeScript checks in
+# its own job (codegen-drift-frontend), which checks out honba-frontend beside this repo.
 check-codegen-ci: check-schema check-openapi check-pyi check-mcp
-	@echo "codegen drift checks passed (TypeScript: run make check-schema-ts / check-client locally)"
+	@echo "codegen drift checks passed (TypeScript: checked by codegen-drift-frontend in CI; locally run make check-schema-ts / check-client)"

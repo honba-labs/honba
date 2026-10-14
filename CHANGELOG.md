@@ -11,6 +11,13 @@
   single-threaded run. This is the `honba-sweep` `determinism_under_threads_*` shape applied to a
   run; the existing `determinism_under_workers` still covers the run service's worker pool.
 
+### Blocking TypeScript codegen drift check in CI (E9-S8 / E11-S6)
+
+- `.github/workflows/ci.yml`: the new `codegen-drift-frontend` job checks out
+  `honba-labs/honba-frontend` beside this repo and runs `make check-schema-ts check-client`, so
+  generated `domain.ts` and `client.ts` drift fails CI instead of being a local-only check. It is
+  part of `ci-ok`; `make check-codegen-ci` stays repo-only.
+
 ### StrategyGraph v1 and the AlgoDesigner (E9-S1..S5 core + D16, ADR 0029)
 
 - `python/src/honba/strategies/graph.py`: versioned `StrategyGraph` JSON v1 with a node
