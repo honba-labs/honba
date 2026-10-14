@@ -221,7 +221,14 @@ def param_range_to_schema(
 
 
 class StrategyManifest(_Strict):
-    """A verified, hashable description of a strategy, ready to be run."""
+    """A verified, hashable description of a strategy, ready to run.
+
+    ``graph_hash`` and ``sidecar`` are **Python-only** provenance fields (ADR 0029, D16): the
+    digest of the canonical ``StrategyGraph`` JSON a generated strategy came from, and the
+    optional ``.strategy.json`` path beside it. They are deliberately **absent from the Rust
+    serde shape** (``manifest.rs`` is untouched and rejects unknown fields), so
+    :meth:`to_json_dict` strips them; only the Python control plane reads them.
+    """
 
     api_version: str
     name: str
@@ -232,6 +239,9 @@ class StrategyManifest(_Strict):
     warmup_bars: WarmupBars
     schedules: dict[str, str] = Field(default_factory=dict)
     parameters: dict[str, ParameterSpec] = Field(default_factory=dict)
+    # Python-only (stripped from the Rust JSON shape by ``to_json_dict``).
+    graph_hash: str | None = None
+    sidecar: str | None = None
 
     @classmethod
     def build(
@@ -245,6 +255,8 @@ class StrategyManifest(_Strict):
         warmup_bars: int = 0,
         schedules: dict[str, str] | None = None,
         parameters: dict[str, ParameterSpec] | None = None,
+        graph_hash: str | None = None,
+        sidecar: str | None = None,
     ) -> StrategyManifest:
         """Start a manifest stamped with the current contract version (Rust ``new`` + ``with_*``)."""
         return cls(
@@ -257,6 +269,8 @@ class StrategyManifest(_Strict):
             warmup_bars=warmup_bars,
             schedules=dict(schedules or {}),
             parameters=dict(parameters or {}),
+            graph_hash=graph_hash,
+            sidecar=sidecar,
         )
 
     @classmethod
@@ -269,6 +283,8 @@ class StrategyManifest(_Strict):
         *,
         subscriptions: Subscriptions | None = None,
         schedules: dict[str, str] | None = None,
+        graph_hash: str | None = None,
+        sidecar: str | None = None,
     ) -> StrategyManifest:
         """Create a manifest directly from a Strategy class, extracting its name, warmup, and hyperparameters."""
         hparams = strategy_cls.hyperparameters()
@@ -282,6 +298,8 @@ class StrategyManifest(_Strict):
             warmup_bars=strategy_cls.warmup_bars,
             schedules=schedules,
             parameters=param_specs,
+            graph_hash=graph_hash,
+            sidecar=sidecar,
         )
 
     def instruments(self) -> list[InstrumentId]:
@@ -325,8 +343,15 @@ class StrategyManifest(_Strict):
                     )
 
     def to_json_dict(self) -> dict[str, Any]:
-        """The Rust serde shape (``universe`` externally tagged, empty ``schedules`` omitted)."""
-        out = self.model_dump(mode="json", exclude={"universe", "schedules", "parameters"})
+        """The Rust serde shape (``universe`` externally tagged, empty ``schedules`` omitted).
+
+        ``graph_hash`` / ``sidecar`` are Python-only and stripped here: the Rust
+        ``StrategyManifest`` rejects unknown fields, so they must never reach
+        ``honba verify`` or the REST ``/strategies`` body.
+        """
+        out = self.model_dump(
+            mode="json", exclude={"universe", "schedules", "parameters", "graph_hash", "sidecar"}
+        )
         out["universe"] = self.universe.to_json()
         if self.schedules:
             out["schedules"] = dict(self.schedules)

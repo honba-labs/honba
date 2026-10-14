@@ -7,6 +7,13 @@ from honba.ai.decision import (
     apply_llm_decision,
     validate_llm_decision,
 )
+from honba.ai.designer_assistant import (
+    ASSISTANT_KINDS,
+    Assistant,
+    AssistantProposal,
+    AssistantResult,
+    route_proposal,
+)
 from honba.ai.gbnf import build_grammar, ebnf_to_gbnf
 from honba.ai.local_llm import LocalLlm
 from honba.ai.report import (
@@ -26,6 +33,10 @@ from honba.ai.trust import (
 )
 
 __all__ = [
+    "ASSISTANT_KINDS",
+    "Assistant",
+    "AssistantProposal",
+    "AssistantResult",
     "DecisionKind",
     "FactSnapshot",
     "GRPOReward",
@@ -45,6 +56,7 @@ __all__ = [
     "extract_from_llm_rendered",
     "quality_gate",
     "render_for_llm",
+    "route_proposal",
     "validate_llm_decision",
     "wrap_untrusted",
 ]

@@ -66,10 +66,10 @@ E10-S1..S8, E11-S1..S8). E6 batches 1-2, E7 and E8 are tracked separately below.
 | E6 Indicators | 1 | 0 | 0 | Batches 1-4 (O(1) rolling, plain sums) and the render contract (S5) done |
 | E7 Scale and ops | 0 | 0 | 5 | Pull-based; E7-S4 is superseded by `honba-sweep` (E10-S5); tracked separately from the 74 |
 | E8 Multi-leg | 0 | 0 | 4 | Optional; not scheduled (open decision D13); tracked separately from the 74 |
-| E9 Frontend and AlgoDesigner | 0 | 1 | 7 | Greenfield; generated TS types only |
-| E10 Async core | 7 | 0 | 1 | Ports, shell, engine output, Arc dataset, sweep, determinism test and Python runtime bridge (ADR 0015) shipped; Rust connectors (E10-S8) open |
-| E11 Versioned API | 7 | 0 | 1 | Read API, SDK, WASM, SSE streaming, write endpoints and auth shipped; only the CI TS drift check (E11-S6) open |
-| **Total (74)** | **63** | **1** | **10** | |
+| E9 Frontend and AlgoDesigner | 1 | 0 | 7 | Generated typed client + types (S8), test/lint/typecheck scripts shipped; S1..S7 app work greenfield |
+| E10 Async core | 8 | 0 | 0 | Complete: ports, shell, engine output, Arc dataset, sweep, determinism test, runtime bridge (ADR 0015) and the bhavcopy Rust connector (E10-S8) |
+| E11 Versioned API | 8 | 0 | 0 | Complete: read API, SDK, WASM, SSE streaming, write endpoints, auth, and the generated typed client (E11-S6) |
+| **Total (74)** | **66** | **0** | **8** | |
 
 ### 1.1 What is shipped (evidence)
 
@@ -104,7 +104,9 @@ E10-S1..S8, E11-S1..S8). E6 batches 1-2, E7 and E8 are tracked separately below.
 | E10-S6 determinism under threads | `crates/honba-sweep/tests/sweep.rs` `determinism_under_threads_{one,four,sixteen}_worker(s)` compare journal and ranking across thread counts |
 | E11-S1 envelope and registry | `crates/honba-api`, `crates/honba-messages/src/endpoints.rs` (22 routes, `WRITE_PATHS`), `GET /capabilities` (cf1366e) |
 | E11-S2 timestamps as strings | ADR 0012 rule 4, commits 4006ff1, 9530251 |
-| E11-S3 REST read API | ADR 0013; `instruments`, `quotes` (derived from bars), `bars` (cap 100k rows), `depth` (none), `strategies`, `screener/scan`; `honba serve`; error envelope for unknown routes (e24b806); `POST/GET /backtests`, `GET /backtests/{id}/journal`, `GET /journals/{id}` (ADR 0017, q2c; sweeps and trading routes still 501); `honba serve --journals-dir` |
+| E10-S8 NSE bhavcopy Rust connector (DONE) | `honba-feed::bhavcopy::BhavcopyConnector` (D10 default, ADR 0028): parses the three NSE CSV shapes to 1-day bars at 09:15 IST, filters to the subscriber's instruments, drives an engine run; tests `bhavcopy_connector_parses_fixture`, `bar_ts_is_ist_open_independent_of_local_tz` / `bhavcopy_feed_into_engine_run` (commit `3b230b9`) | honba |
+| E9-S8 / E11-S6 generated typed TS client (DONE) | `honba-codegen` renders `client.ts` (`HonbaClient`, `request<T>`, SSE helper) from the registry (`Artifact::Client`, `make client`/`make check-client`); frontend pins it with `client.test.ts` and ships lint/typecheck/test scripts; `domain.ts` refreshed (frontend `ee2e1cb`, honba `60373f0`) | honba + honba-frontend |
+| E11-S3 REST read API | ADR 0013; `instruments`, `quotes` (derived from bars), `bars` (cap 100k rows), `depth` (none), `strategies`, `screener/scan`; `honba serve`; error envelope for unknown routes (e24b806); `POST/GET /backtests`, `GET /backtests/{id}/journal`, `GET /journals/{id}` (ADR 0017, q2c; sweeps and trading routes built, `NOT_IMPLEMENTED_ENDPOINTS` empty); `honba serve --journals-dir` |
 | Python SDK | `honba.client` (`HttpTransport`, `InprocTransport` via `honba._honba.api_request`), parity tests `python/tests/integration/test_client_parity.py` |
 | E4-S1 journal schema v1 and result cache | ADR 0020, `JournalHeader`/`JournalV1` NDJSON roundtrip (`honba-engine`), `CacheKey`/`ResultCache` (`honba-api`), `BacktestExecutor` caching with unit tests `journal_schema_roundtrip`, `cache_key_changes_with_costs` and integration test `rerun_hits_cache` |
 | E4-S4 look-ahead truncation property | `crates/honba-strategy/src/tests/look_ahead.rs` `truncation_property` and `truncation_property_detects_a_peeking_strategy`; Python `test_prefilter_vs_event_driven_fixture.py` |
@@ -285,20 +287,19 @@ Done work is removed. Sizes: S (<=1 day), M (2-4 days), L (split before start). 
 R6 and R7 can run in parallel with R4 once R2 exits. R5 needs R1 for write tools and R2 for runs.
 
 **Milestone status (2026-10-14):** R1 (Safe writes), R2 (Runs), R3 (Live-shaped runtime), R4 (Trustworthy research) and R5 (Agent surfaces) are **complete** (E5-S6 webhook ingestion and E5-S9 report builder shipped). R6 (Live-ready) is complete except the L2 simulator
-(E3-S1b/S1d, deferred by ADR 0025/D14) and the Rust-native connectors (E10-S8). R7 (Frontend) has only the local TS drift check
-(E11-S6) open on the `honba` side; the app work is in `honba-frontend`. R8 (Optional) stays unscheduled.
+(E3-S1b/S1d, deferred by ADR 0025/D14); E10-S8 shipped the bhavcopy Rust connector. R7 (Frontend) has only the local TS drift
+check open on the `honba` side (`make check-schema-ts`/`check-client`; the typed client itself shipped as E9-S8/E11-S6); the app work is in `honba-frontend`. R8 (Optional) stays unscheduled.
 
 **Critical path:** E2-S2 -> E11-S7 (write endpoints) and E5-S4 (all DONE); ADR-Run -> E4-S3 -> `POST /backtests` -> E4-S5 -> E11-S4 -> E9-S7
 (all DONE in `honba`, E9-S7 in `honba-frontend`); E3-S1a (next-open Rust) -> E3-S2 -> E3-S7 (all DONE; E3-S1b is deferred by ADR 0025);
 E10-S7 (done) gates Python callers of any async Rust API; E2-S6(a) -> E2-S6(b..d) -> E2-S7 -> E3-S7 (all DONE). What remains is off the
-old critical path: L2 matching (E3-S1b/S1d), Rust connectors (E10-S8), the pull-based E7 and optional E8 epics, E11-S6, and the deferred
-E5-S6/E5-S9.
+old critical path: L2 matching (E3-S1b/S1d), the pull-based E7 and optional E8 epics, and the E9 app work (S1..S7) in `honba-frontend`.
 
 ### E1 Instruments and adapters
 
 | ID | Scope | Size | Deps | Acceptance (unit / integration) | Owner |
 |---|---|---|---|---|---|
-| E1-S1b | Second adapter passes the contract suite on recorded fixtures; migration note per adapter | M | E1-S1 | `test_contract_suite[dhan]` / `test_adapter_wiring_recorded_fixture` | honba-adapters (ask first) |
+| E1-S1b (DONE) | Second adapter passes the contract suite on recorded fixtures; migration note per adapter. dhan + zerodha certified (`honba-adapters` `ea61c47`, `test_contract_suite[dhan]`, `test_contract_suite[zerodha]`, `test_adapter_wiring_recorded_fixture`, `MIGRATION.md`); the six remaining adapters are scaffold-only future work | M | E1-S1 | `test_contract_suite[dhan]` / `test_adapter_wiring_recorded_fixture` | honba-adapters |
 | E1-S2 (DONE) | `Instrument` gains optional expiry, strike, option type, underlying; `india::fno` grammar parse/format (equity, futures, options, index) | M | E0-S7 | `symbol_round_trip_property`, `ce_suffix_ambiguity`, `weekly_vs_monthly` / `catalog_resolves_fno_symbol` through market registry; Python binding + stub | honba |
 | E1-S3 (DONE) | `InstrumentMaster` impl over Parquet catalog: `snapshot(as_of)`, effective-dated lot/tick/freeze | M | E1-S2 | `resolve_as_of_old_symbol` / `backtest_resolves_expired_contract` | honba |
 | E1-S4 (DONE) | Product/price-type/TIF table mapping per adapter. Canonical `Product` enum + per-adapter JSON mappings in `honba-messages` (commit `9a7731a`) | S | first real adapter | `mapping_round_trip_property` / `adapter_rejects_unsupported_combo` | honba (+adapters) |
@@ -374,23 +375,23 @@ E5-S6/E5-S9.
 | E7-S1 | Docs from schemas | S | continuous | docs build | honba-docs |
 | E7-S2/S3/S5 | Indexed state, cache persistence, recorder tap | M | pull-based | n/a | honba |
 | E8-S1..S4 | Multi-leg; not scheduled | | D13 | n/a | honba |
-| E9-S8 | Generated TS client from OpenAPI (types already generated) | S | E11-S6 | `client_types_compile` / contract test against `honba serve` | honba-frontend (approved) |
+| E9-S8 (DONE) | Generated TS client from OpenAPI. `honba-codegen` renders `client.ts` (`HonbaClient` + `request<T>` + `apiUrl` + SSE helper) from the same `ENDPOINTS` registry as OpenAPI (`Artifact::Client`, `make client`, `make check-client`); the frontend pins it with `client.test.ts` and now has `lint`/`typecheck`/`test` scripts, and `domain.ts` was refreshed (`honba-frontend ee2e1cb`, honba `60373f0`) | S | E11-S6 | `client_types_compile` / contract test against `honba serve` | honba + honba-frontend |
 | E9-S1..S7 | StrategyGraph editor, graph to code, code to graph, verify/run, AI assistant, ops console, result views | M each | E0-S8, E4-S3, E5-S5, E11-S4 | per old roadmap section E9 | honba-frontend |
 
-### E10 Async core (remaining: E10-S8; E10-S7 done)
+### E10 Async core (complete; E10-S7 done)
 
 | ID | Scope | Size | Deps | Acceptance | Owner |
 |---|---|---|---|---|---|
-| E10-S8 | Rust-native connectors (NSE bhavcopy first, broker REST later) as `honba-ports` impls; decide Python-adapter bridge (D10) | L -> split | E10-S1, D10 | `bhavcopy_connector_parses_fixture` / `feed_into_engine_run` | honba |
+| E10-S8 (DONE) | Rust-native NSE bhavcopy connector as a `honba-ports` `MarketDataConnector` impl in `honba-feed::bhavcopy`. Parses the three NSE CSV shapes to 1-day bars at 09:15 IST, filters to the subscriber's instruments, and drives an engine run. D10 decided as a default (ADR 0028): Rust owns market-data connectors, Python adapters keep broker execution; the full bridge stays open | L -> split | E10-S1, D10 | `bhavcopy_connector_parses_fixture` / `bhavcopy_feed_into_engine_run` (`crates/honba-feed/src/tests/bhavcopy.rs`, `crates/honba-feed/tests/bhavcopy_feed_into_engine.rs`, commit `3b230b9`) | honba |
 
-### E11 Versioned API (remaining: E11-S6)
+### E11 Versioned API (complete)
 
 | ID | Scope | Size | Deps | Acceptance | Owner |
 |---|---|---|---|---|---|
 | E11-S3 rest (DONE) | Backtests, sweeps, journals, orders routes built in order of R2; `NOT_IMPLEMENTED_ENDPOINTS` is now empty, so no route returns 501. Backtests and journals built by ADR 0017 q2c (`7298373`), sweeps (E4-S5), orders write ledger (E11-S7, `91ab361`, `GET /orders`); ADR 0013 limits (no real bid/ask, no pagination) stand | M each | E4-S3, E4-S5 | route unit tests / `test_client_parity` extended | honba |
 | E11-S4 | SSE for run progress and journals (resume-from-sequence), WS for events later; schema for streamed events | M | ADR D6, E4-S3 | `resume_from_seq`, `event_schema` / `sse_backtest_progress_inproc_and_http` | honba | **DONE** (ADR 0021, commits 523bca5) |
 | E11-S5 rest **(DONE)** | WASM: screener eval + backtest replay (screener eval had existed in `honba-indicators`, replay over `JournalV1`; both exported via `honba-api-wasm`; wasm-pack exercised via `make test-wasm`) | M | E4-S3 | conformance vectors `screener_scan.json` + journal replay / browser-free node run | honba |
-| E11-S6 | Frontend client from OpenAPI, TS drift check in CI (currently local only) | S | none | `ts_matches_openapi` / frontend build | honba + honba-frontend |
+| E11-S6 (DONE) | Frontend typed client from the OpenAPI/export registry (`Artifact::Client`, `HonbaClient`, `make client`/`make check-client`, frontend `ee2e1cb`, honba `60373f0`) | S | none | `ts_matches_openapi` / frontend build | honba + honba-frontend |
 | E11-S7 (DONE) | Write endpoints behind risk and approval queue | M | E2-S2, E5-S4 | `order_refused_by_risk` / `post_order_flows_to_sim_only` / approval queue tests | honba |
 | E11-S8 (DONE) | Auth, scopes, secrets, audit (minimum viable before non-loopback `serve`) | L | ADR D11 | `token_scope_enforced` / `write_needs_second_factor` | honba |
 
@@ -409,7 +410,7 @@ E5-S6/E5-S9.
 | D7 | Verifier sandbox strength: subprocess rlimits vs container — **decided (ADR 0022)**: subprocess with rlimits/audit hook; revisit for hosted | E5-S5 | Subprocess; revisit for hosted |
 | D8 | Holdout policy: fixed ranges, who resets consumption — **decided (ADR 0024)**; gates shipped (E4-S6) | E4-S6 | ADR with E4-S6 |
 | D9 | Sampler: Rust seeded sampler vs Optuna extra; pinned version — **decided**: Rust seeded sampler shipped (E4-S5); Optuna stays an optional extra | E4-S5 | Rust sampler; Optuna optional |
-| D10 | Python adapters (ADR 0010) vs Rust `ExecutionGateway`/`MarketDataFeed` ports: who bridges, which side owns the loop — **still open** | E10-S8, E3-S7 | ADR before E10-S8 |
+| D10 | Python adapters (ADR 0010) vs Rust `ExecutionGateway`/`MarketDataFeed` ports: who bridges, which side owns the loop — **decided as a default (ADR 0028)**: Rust owns market-data connectors (bhavcopy first), Python adapters keep broker execution; the full bridge stays open | E10-S8, E3-S7 | ADR before E10-S8 |
 | D11 | Minimal auth before non-loopback serve — **decided (ADR 0023)**; shipped (E11-S8) | E11-S8, E5-S3 | Bearer token plus scope map |
 | D12 | ADR 0009 (agentic MCP and local LLM) reconciliation: accept local in-process Llama runtime and the layered alignment strategy (GBNF -> SFT -> RLVR) per Design.md §13 — **decided 2026-10-12**; E5-S10/S11 shipped | E5, E5-S10, E5-S11 | Accept with GBNF + RLVR |
 | D13 | Is arbitrage a product goal (E8)? | E8 | Unscheduled unless yes |
@@ -422,7 +423,7 @@ Already decided: pyo3 single cdylib (ADR 0014 decision, `honba-py`), Strategy AB
 integer money (0011), versioning and nanosecond strings (0012), REST read ports (0013), explicit runtime (0015, implemented in E10-S7), next-open Rust port (0016, all three chunks done, D17),
 run lifecycle and `run_id` (0017, D1), risk stage (0018, D4), `OrderState` FSM and client order ids (0019, D5/D2), journal schema v1 and result cache (0020, D3),
 SSE streaming (0021, D6), AI strategy verifier (0022, D7), minimal auth (0023, D11), overfitting gates / streaming datasets / session MTF (0024, D8),
-tick/depth scope (0025, D14). Still open: D10 (Python adapters vs Rust ports), D13 (arbitrage), D15 (housekeeping), D16 (`StrategyGraph` form).
+tick/depth scope (0025, D14), bhavcopy connector + D10 default (0028). Still open: D13 (arbitrage), D15 (housekeeping), D16 (`StrategyGraph` form).
 
 ---
 
@@ -430,10 +431,10 @@ tick/depth scope (0025, D14). Still open: D10 (Python adapters vs Rust ports), D
 
 | Repo | Impact and action | Triggered by |
 |---|---|---|
-| `honba-adapters` | 8 adapters + shared still unmigrated to the E1-S1 contract (migration note owed); will need FSM events (E2-S6), reconcile reports (E2-S7), session/rate-limit (E1-S5). Ask before touching | E1-S1b, E2-S6, D10 |
+| `honba-adapters` | dhan + zerodha certified (E1-S1b, `MIGRATION.md`); six adapters scaffold-only (future). Will need FSM events (E2-S6), reconcile reports (E2-S7), session/rate-limit (E1-S5) when they land | E1-S1b, E2-S6, D10 |
 | `honba-strategies` | Catalog passes `verify` and the loader; add `hyperparameters()` (E4-S2); `backtest_result.json` are placeholders with no regen script; alpha strategies excluded from the next-open replay test; 72 pre-existing ruff errors; `ai_generated/` must route through E5-S5 | E4-S2, E4-S3, E5-S5 |
 | `honba-examples` | **Another agent owns it: ask first, new files only below.** Existing follow-ups (use core `NextOpenExecution`/loader, `*_minor` names, settlement default T+1) are theirs, not part of this roadmap | R2, R4, R5 |
-| `honba-frontend` | No consumers of generated types, no test runner or lint; needs generated client (E11-S6), SSE consumer (E11-S4), WASM loader (E11-S5), then E9. TS drift check is local only | E11-S6, E9 |
+| `honba-frontend` | Generated client + types (E9-S8/E11-S6) and test/lint/typecheck scripts shipped (`ee2e1cb`); still needs SSE consumer (E11-S4) and WASM loader (E11-S5), then E9. TS drift check is local only (`make check-schema-ts`/`check-client`) | E11-S6, E9 |
 | `honba-docs` | `docs/architecture/money.md` never built (`make build`); missing pages: reject/cancel contract, quotes/depth/serve, WASM, SDK; strategy pages still describe APIs that never existed (`on_stop` intents) | every story; docs ticket per story |
 
 ### 6.1 honba-examples E4/E5 demonstrations (new example files only; do not edit existing)
