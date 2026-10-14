@@ -316,3 +316,72 @@ fn trading_state_gates_post_orders() {
     );
     stop(child);
 }
+
+fn bar_body(ts: u64, close: f64) -> String {
+    use honba_messages::{
+        Bar, BarAggregation, BarSpecification, BarType, Exchange, InstrumentId, PriceType,
+        UnixNanos,
+    };
+    let id = InstrumentId::new("TCS", Exchange::new("NSE"));
+    let bar_type = BarType::new(
+        id,
+        BarSpecification::new(1, BarAggregation::Minute, PriceType::Last),
+    );
+    let t = UnixNanos::from_u64(ts);
+    let bar = Bar::new(bar_type, close, close, close, close, 10.0, t, t);
+    serde_json::json!({ "bars": [bar] }).to_string()
+}
+
+#[test]
+fn bar_ingest_flag_turns_on_post_bars_and_the_quote_follows() {
+    let dir = data_dir("bar-ingest");
+    let d = dir.to_str().unwrap();
+
+    // Off by default: the route exists but says why it cannot take bars.
+    let (child, addr) = start(&["--data-dir", d, "--addr", "127.0.0.1:0"]);
+    let (status, body) = post(addr, "/bars", &bar_body(180_000_000_000, 77.0));
+    assert_eq!(status, 503, "{body}");
+    assert_eq!(
+        body["error"]["context"]["reason"],
+        Value::from("bar_ingest_disabled")
+    );
+    stop(child);
+
+    let (mut child, addr) = start(&[
+        "--data-dir",
+        d,
+        "--addr",
+        "127.0.0.1:0",
+        "--bar-ingest",
+        "--bar-ingest-capacity",
+        "16",
+    ]);
+    let (status, body) = post(addr, "/bars", &bar_body(180_000_000_000, 77.0));
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["data"]["accepted"], Value::from(1));
+    // The pump applies the bar asynchronously; the quote follows within a moment.
+    let mut bid = Value::Null;
+    for _ in 0..100 {
+        bid = get(addr, "/quotes?symbols=TCS").1["data"]["quotes"][0]["bid_price"].clone();
+        if bid == 77.0 {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    assert_eq!(bid, 77.0);
+
+    // Shutdown drops the sender and waits for the pump, then reports on stderr.
+    Command::new("kill")
+        .args(["-INT", &child.id().to_string()])
+        .status()
+        .unwrap();
+    assert!(child.wait().unwrap().success());
+    let mut err = String::new();
+    child
+        .stderr
+        .take()
+        .unwrap()
+        .read_to_string(&mut err)
+        .unwrap();
+    assert!(err.contains("bar ingest: 1 bars, 0 errors"), "{err}");
+}

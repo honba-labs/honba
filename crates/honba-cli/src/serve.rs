@@ -5,6 +5,10 @@
 //! listens), then `honba-api-rest` serves it until ctrl-c. The first stdout line
 //! is `listening on http://<addr>` with the address actually bound, so
 //! `--addr 127.0.0.1:0` is usable by scripts and tests. Handlers read no clock.
+//!
+//! With `--bar-ingest`, `POST /bars` feeds a bounded queue drained by the bar pump (fills and
+//! quotes follow). Shutdown drops the sender, waits for the pump to drain, and reports its
+//! counts on stderr.
 
 use anyhow::{Context, Result};
 use std::io::Write;
@@ -75,6 +79,18 @@ pub(crate) struct AuthArgs {
     pub audit_log_file: Option<PathBuf>,
 }
 
+/// The live bar feed behind `POST /bars` (E3-S7 follow-up). Off by default: with it off the
+/// route answers 503 `bar_ingest_disabled`.
+#[derive(clap::Args, Debug, Clone, PartialEq, Eq)]
+pub(crate) struct IngestArgs {
+    /// Accept bars on POST /bars and feed them to the simulated market (fills, quotes)
+    #[arg(long)]
+    pub bar_ingest: bool,
+    /// Bars the ingest queue holds before POST /bars answers 429
+    #[arg(long, default_value_t = 1_024, value_parser = clap::value_parser!(u64).range(1..))]
+    pub bar_ingest_capacity: u64,
+}
+
 impl RunsArgs {
     /// The run-service tunables these flags spell.
     pub(crate) fn service_config(&self) -> RunServiceConfig {
@@ -104,6 +120,7 @@ pub fn run(
     trading_state: TradingState,
     runs: &RunsArgs,
     auth: &AuthArgs,
+    ingest: &IngestArgs,
 ) -> Result<()> {
     let mut config = ApiConfig::default()
         .with_cors_origins(cors_origins)
@@ -140,11 +157,27 @@ pub fn run(
                 eprintln!("{warning}");
             }
         }
+        // Started inside the runtime, before the first request can arrive.
+        let pump = ingest
+            .bar_ingest
+            .then(|| state.start_bar_ingest(clamp_usize(ingest.bar_ingest_capacity)));
         println!("listening on http://{}", listener.local_addr()?);
         std::io::stdout().flush()?;
-        honba_api_rest::serve_with_config(listener, state.clone(), &config, stop_signal())
-            .await
-            .context("serving")
+        let served =
+            honba_api_rest::serve_with_config(listener, state.clone(), &config, stop_signal())
+                .await
+                .context("serving");
+        // Drop the sender so the pump drains what is queued and ends, then report.
+        state.stop_bar_ingest();
+        if let Some(pump) = pump {
+            match pump.await {
+                Ok(report) => {
+                    eprintln!("bar ingest: {} bars, {} errors", report.bars, report.errors)
+                }
+                Err(e) => eprintln!("bar ingest: pump task failed: {e}"),
+            }
+        }
+        served
     });
     // Graceful run shutdown (ADR 0017 decision 5): cancel pending runs, wait the grace
     // period for running ones, cancel the rest. Blocking, so after the runtime stopped.

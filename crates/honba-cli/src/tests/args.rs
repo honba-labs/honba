@@ -225,3 +225,32 @@ fn serve_trading_state_accepts_the_wire_spellings() {
 fn serve_rejects_an_unknown_trading_state() {
     assert!(parse(&["serve", "--data-dir", "d", "--trading-state", "paused"]).is_err());
 }
+
+#[test]
+fn serve_bar_ingest_is_off_by_default_and_opt_in() {
+    match parse(&["serve", "--data-dir", "d"]).unwrap().command {
+        Commands::Serve { ingest, .. } => {
+            assert!(!ingest.bar_ingest);
+            assert_eq!(ingest.bar_ingest_capacity, 1_024);
+        }
+        _ => panic!("expected serve"),
+    }
+    match parse(&[
+        "serve",
+        "--data-dir",
+        "d",
+        "--bar-ingest",
+        "--bar-ingest-capacity",
+        "8",
+    ])
+    .unwrap()
+    .command
+    {
+        Commands::Serve { ingest, .. } => {
+            assert!(ingest.bar_ingest);
+            assert_eq!(ingest.bar_ingest_capacity, 8);
+        }
+        _ => panic!("expected serve"),
+    }
+    assert!(parse(&["serve", "--data-dir", "d", "--bar-ingest-capacity", "0"]).is_err());
+}
