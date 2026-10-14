@@ -443,3 +443,121 @@ fn stale_feed_scenario() {
     // O-2 was approved and reached the venue
     assert_eq!(venue.working_orders(), vec!["O-2".to_string()]);
 }
+
+// ---- Market-order price collar fed from the quote stream (ADR 0018 addendum) ----
+
+fn market(id: &str, side: OrderSide, t: u64) -> Order {
+    Order::new(
+        OrderId::new(id),
+        x(),
+        side,
+        OrderType::Market,
+        1.0,
+        None,
+        TimeInForce::Day,
+        ts(t),
+        ts(t),
+    )
+}
+
+fn trade_at(px: f64, t: u64) -> Message {
+    Message::new(
+        Event::Trade(honba_messages::TradeTick::new(
+            x(),
+            px,
+            1.0,
+            honba_messages::AggressorSide::Buyer,
+            honba_messages::TradeId::new("T"),
+            ts(t),
+            ts(t),
+        )),
+        ts(t),
+    )
+}
+
+fn quote_at(bid: f64, ask: f64, t: u64) -> Message {
+    Message::new(
+        Event::Quote(QuoteTick::new(x(), bid, ask, 1.0, 1.0, ts(t), ts(t))),
+        ts(t),
+    )
+}
+
+/// Reference 100 (trade), then quote bid/ask; the strategy fires at the quote's ts.
+fn collar_run(collar_bps: Option<u32>, bid: f64, ask: f64, side: OrderSide) -> Vec<AuditKind> {
+    let limits = RiskLimits {
+        price_collar_bps: collar_bps,
+        ..RiskLimits::default()
+    };
+    let venue = ScriptedExecution::new(100.0).with("O-1", Behavior::Hold);
+    let strategy = Strategy::new(vec![(2, vec![market("O-1", side, 2)])]);
+    let mut engine = Engine::new().with_risk(stage(limits, true));
+    engine.set_execution(Box::new(venue));
+    engine.add_handler(strategy);
+    engine.start().unwrap();
+    engine.inject(trade_at(100.0, 1));
+    engine.inject(quote_at(bid, ask, 2));
+    engine.finish().unwrap();
+    kinds(&engine)
+}
+
+#[test]
+fn collar_refuses_market_buy_when_ask_is_outside_and_sell_when_bid_is_outside() {
+    let buy = collar_run(Some(100), 100.0, 103.0, OrderSide::Buy);
+    assert_eq!(
+        buy,
+        vec![
+            AuditKind::RiskRefused {
+                order_id: "O-1".to_string(),
+                refusal: RiskRefusal::PriceCollar {
+                    side: OrderSide::Buy,
+                    expected_price: 103.0,
+                    reference_price: 100.0,
+                    deviation_bps: 300.0,
+                    collar_bps: 100,
+                },
+            },
+            rejected("O-1", "risk_price_collar"),
+        ]
+    );
+    let sell = collar_run(Some(100), 97.0, 100.0, OrderSide::Sell);
+    assert!(matches!(
+        &sell[0],
+        AuditKind::RiskRefused {
+            refusal: RiskRefusal::PriceCollar { expected_price, .. },
+            ..
+        } if *expected_price == 97.0
+    ));
+}
+
+#[test]
+fn collar_uses_the_touch_on_the_orders_side() {
+    // Ask is wild but a sell crosses the bid, which is inside the collar.
+    let kinds = collar_run(Some(100), 100.5, 150.0, OrderSide::Sell);
+    assert!(
+        !kinds
+            .iter()
+            .any(|k| matches!(k, AuditKind::RiskRefused { .. })),
+        "{kinds:?}"
+    );
+}
+
+#[test]
+fn collar_passes_inside_and_is_inert_when_unset() {
+    for bps in [Some(100), None] {
+        let ask = if bps.is_some() { 100.5 } else { 150.0 };
+        let kinds = collar_run(bps, 100.0, ask, OrderSide::Buy);
+        assert!(
+            !kinds
+                .iter()
+                .any(|k| matches!(k, AuditKind::RiskRefused { .. })),
+            "{bps:?}: {kinds:?}"
+        );
+    }
+}
+
+#[test]
+fn collar_is_deterministic_across_runs() {
+    let a = collar_run(Some(100), 100.0, 103.0, OrderSide::Buy);
+    let b = collar_run(Some(100), 100.0, 103.0, OrderSide::Buy);
+    assert_eq!(a, b);
+}

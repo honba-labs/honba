@@ -334,3 +334,55 @@ fn live_run_without_limits_refused() {
     let r = runner(vec![], &venue).with_risk(stage(full, true));
     assert!(assemble_live(r).is_ok());
 }
+
+// ---- Market-order price collar fed from the quote stream (ADR 0018 addendum) ----
+
+fn collar_limits(bps: Option<u32>) -> RiskLimits {
+    RiskLimits {
+        price_collar_bps: bps,
+        ..RiskLimits::default()
+    }
+}
+
+/// Quote (bid, ask) at ts 1, then the strategy trades on the bar at ts 2 (close 10).
+fn collar_hosted(bps: Option<u32>, bid: f64, ask: f64, order: OrderIntent) -> Hosted {
+    let venue = ScriptedExecution::new(10.0).with("s-0", Behavior::Hold);
+    let hosted = Hosted::new(
+        runner(vec![(2, vec![order])], &venue).with_risk(stage(collar_limits(bps), true)),
+    );
+    let mut engine = Engine::new();
+    engine.add_handler(hosted.clone());
+    let mut feed = VecFeed::new(vec![
+        VecFeed::quote("X", bid, ask, 1),
+        VecFeed::bar("X", 10.0, 2),
+    ]);
+    engine.run(&mut feed).unwrap();
+    hosted
+}
+
+#[test]
+fn collar_refuses_market_orders_outside_the_touch_collar() {
+    let buy_h = collar_hosted(Some(100), 10.0, 11.0, buy(1.0));
+    assert!(matches!(
+        &kinds(&buy_h)[0],
+        AuditKind::RiskRefused {
+            refusal: RiskRefusal::PriceCollar { expected_price, reference_price, .. },
+            ..
+        } if *expected_price == 11.0 && *reference_price == 10.0
+    ));
+    assert_eq!(reasons(&buy_h), vec!["risk_price_collar"]);
+
+    let sell_h = collar_hosted(Some(100), 9.0, 10.0, sell(1.0));
+    assert_eq!(reasons(&sell_h), vec!["risk_price_collar"]);
+}
+
+#[test]
+fn collar_passes_inside_and_is_inert_when_unset() {
+    let inside = collar_hosted(Some(100), 10.0, 10.05, buy(1.0));
+    assert!(reasons(&inside).is_empty());
+    let unset = collar_hosted(None, 10.0, 11.0, buy(1.0));
+    assert!(reasons(&unset).is_empty());
+    // A sell crosses the bid, so a wild ask does not matter.
+    let sell_ok = collar_hosted(Some(100), 10.0, 20.0, sell(1.0));
+    assert!(reasons(&sell_ok).is_empty());
+}

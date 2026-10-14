@@ -52,6 +52,8 @@ pub struct Engine {
     positions: HashMap<InstrumentId, f64>,
     /// Last bar close or trade price per instrument: the stage's `reference_price`.
     last_px: HashMap<InstrumentId, f64>,
+    /// Last quoted `(bid, ask)` per instrument: the price collar's `expected_price` source.
+    last_quote: HashMap<InstrumentId, (f64, f64)>,
     /// Last market-data feed timestamp per instrument.
     last_feed_ts: HashMap<InstrumentId, UnixNanos>,
     risk: Option<RiskStage>,
@@ -82,6 +84,7 @@ impl Engine {
             orders: HashMap::new(),
             positions: HashMap::new(),
             last_px: HashMap::new(),
+            last_quote: HashMap::new(),
             last_feed_ts: HashMap::new(),
             risk: None,
             fill_ledger: FillLedger::new(),
@@ -413,6 +416,10 @@ impl Engine {
             Event::Quote(quote) => {
                 self.last_feed_ts
                     .insert(quote.instrument_id().clone(), quote.ts_event());
+                self.last_quote.insert(
+                    quote.instrument_id().clone(),
+                    (quote.bid_price(), quote.ask_price()),
+                );
             }
             Event::Bar(bar) => {
                 self.last_feed_ts
@@ -704,6 +711,20 @@ impl Engine {
         });
     }
 
+    /// The touch a market order would cross (ask for a buy, bid for a sell) from the latest
+    /// quote; `None` for priced orders or before any quote (the collar then skips).
+    fn expected_price(&self, order: &Order) -> Option<f64> {
+        if order.price().is_some() {
+            return None;
+        }
+        let (bid, ask) = *self.last_quote.get(order.instrument_id())?;
+        match order.side() {
+            OrderSide::Buy => Some(ask),
+            OrderSide::Sell => Some(bid),
+            _ => None,
+        }
+    }
+
     /// Runs the stage (or, without one, the state rules) over `order`.
     fn risk_check(&mut self, order: &Order) -> Option<honba_risk::RiskRefusal> {
         let instrument = order.instrument_id();
@@ -720,7 +741,7 @@ impl Engine {
             trading_state: self.trading_state,
             ts: self.clock.now(),
             last_feed_ts: self.last_feed_ts.get(instrument).copied(),
-            expected_price: None,
+            expected_price: self.expected_price(order),
         };
         match self.risk.as_mut() {
             Some(stage) => match stage.check(&request) {

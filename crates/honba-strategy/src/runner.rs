@@ -126,6 +126,8 @@ pub struct StrategyRunner<S: Strategy, E: ExecutionEngine> {
     sides: HashMap<String, (InstrumentId, OrderSide)>,
     /// Last bar close or trade price per instrument: the stage's `reference_price`.
     last_px: HashMap<InstrumentId, f64>,
+    /// Last quoted `(bid, ask)` per instrument: the price collar's `expected_price` source.
+    last_quote: HashMap<InstrumentId, (f64, f64)>,
     /// Pre-gate `Rejected` events, booked ahead of the next drain.
     pre_gate: Vec<ExecutionEvent>,
 }
@@ -161,6 +163,7 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
             pending_audit: Vec::new(),
             sides: HashMap::new(),
             last_px: HashMap::new(),
+            last_quote: HashMap::new(),
             pre_gate: Vec::new(),
         }
     }
@@ -231,6 +234,20 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
             .sum::<f64>()
     }
 
+    /// The touch a market order would cross (ask for a buy, bid for a sell) from the latest
+    /// quote; `None` for priced orders or before any quote (the collar then skips).
+    fn expected_price(&self, order: &Order) -> Option<f64> {
+        if order.price().is_some() {
+            return None;
+        }
+        let (bid, ask) = *self.last_quote.get(order.instrument_id())?;
+        match order.side() {
+            OrderSide::Buy => Some(ask),
+            OrderSide::Sell => Some(bid),
+            _ => None,
+        }
+    }
+
     /// Runs the stage (or, without one, the state rules) over `order`, which is being submitted
     /// during the event at `ts_init`.
     fn risk_check(&mut self, order: &Order, ts_init: UnixNanos) -> Option<RiskRefusal> {
@@ -249,7 +266,7 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
             trading_state: self.trading_state,
             ts: ts_init,
             last_feed_ts: None,
-            expected_price: None,
+            expected_price: self.expected_price(order),
         };
         match self.risk.as_mut() {
             Some(stage) => match stage.check(&request) {
@@ -566,6 +583,12 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
             Event::Trade(tick) => {
                 self.last_px
                     .insert(tick.instrument_id().clone(), tick.price());
+            }
+            Event::Quote(quote) => {
+                self.last_quote.insert(
+                    quote.instrument_id().clone(),
+                    (quote.bid_price(), quote.ask_price()),
+                );
             }
             _ => {}
         }

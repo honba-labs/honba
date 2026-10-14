@@ -536,7 +536,7 @@ event and REST share one vocabulary (this ADR and ADR 0019 decision 5). The lite
 | Max position per instrument / account (`risk_max_position_exceeded`) | deferred to E3-S4 (margin model), code stays reserved |
 | Cash / margin pre-check | deferred to E3-S4 |
 | Drawdown limit, automatic kill switch (`risk_max_drawdown_exceeded`) | deferred to E4-S6 gates with E2-S11 durable state; rejected for this per-order stage, which sees no PnL |
-| Market-order price collar / band check on market orders | **done** (2026-10-15, see Addendum): `price_collar_bps`, REST wired; backtest/engine wiring is follow-up |
+| Market-order price collar / band check on market orders | **done** (2026-10-15, see Addendum): `price_collar_bps`, REST and Rust engine/runner wired from the quote cache; Python session / L2 selection is follow-up |
 | Stale-feed breaker | deferred to E2-S10 (`stale_after_blocks_orders`) |
 | Risk-limited sweeps | deferred until `honba-sweep` trials consume `BacktestRunConfig`; trials apply state rules only |
 | HTTP request-flood limiting | E11-S8 (the rate rule is event-time, not a transport limiter) |
@@ -605,9 +605,18 @@ E3-S1b/S1d shipped (ADR 0030), so top-of-book prices exist. Decision, kept small
   quote.
 - Configuration for REST: `honba serve --risk-config <path.toml>` (see the 2026-10-15 decision log
   entry); without it the limits are `RiskLimits::default()` (all rules off), as before.
-- Engine and `StrategyRunner` pass `expected_price: None` (they track only the last close, which
-  is the reference), so the collar is inert in backtests until the L2 simulator's touch is exposed
-  to the risk request. Follow-up.
+- Engine and `StrategyRunner` derive `expected_price` from the latest `QuoteTick` they have seen for
+  the instrument (ask for a buy, bid for a sell; priced orders and instruments with no quote yet
+  get `None`, so the collar skips). The reference stays the last bar close or trade price, so a
+  collar needs both a quote and a bar/trade in the stream (a quote-only feed has no reference and
+  skips). Quote-bearing event streams are the only ones affected; bar-only backtests and every
+  existing vector are unchanged.
+- Still open: (1) the Python `BacktestSession` is bar-only (its `DataProvider` yields bars, no
+  quotes) and has no `risk=` option, so no Python backtest carries a quote to the collar; (2) the
+  Python `StrategyRunner` risk request does not yet take an `expected_price`; (3) the L2 simulator
+  (`make_simulator(fill="l2")`) is selectable only by constructing the port directly, and is not
+  wired into `BacktestSession` / `BacktestRunConfig`, which needs a quote/trade data source and a
+  schema change. Follow-up.
 
 ## Decision log
 
@@ -632,3 +641,8 @@ E3-S1b/S1d shipped (ADR 0030), so top-of-book prices exist. Decision, kept small
   with backtests, no per-field flag/validation duplication, nested `order_rate` stays expressible;
   individual flags can be added later as overrides. No wire types or endpoints. Resolves the earlier
   "no config yet for REST" gap: `AppState::with_risk_limits` is now fed by the CLI.
+- 2026-10-15: collar wired into the Rust `Engine` and `StrategyRunner`: each remembers the last
+  `(bid, ask)` per instrument from `Event::Quote` and passes the touch on the order's side as
+  `expected_price` for orders without a limit price. No quote means `None` and the rule skips.
+  Deterministic (event-time state only). No wire, schema or endpoint change. Python session and
+  L2 selection remain open (see the addendum).

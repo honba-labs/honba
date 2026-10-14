@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Price collar in the engine and runner (ADR 0018 addendum)
+
+- `Engine` and `StrategyRunner` now fill `RiskRequest.expected_price` from the latest `QuoteTick`
+  (ask for a buy, bid for a sell) for orders without a limit price, so `price_collar_bps` refuses
+  market orders in event-driven backtests. No quote yet or no collar means no change. Python
+  `BacktestSession` and `fill="l2"` selection in run configs are not wired yet.
+
 ### Runtime trading-state route (ADR 0018 decision 7, ADR 0023)
 
 - `GET /trading-state` and `PUT /trading-state` (`{state: active|reducing|halted, reason?}` ->
