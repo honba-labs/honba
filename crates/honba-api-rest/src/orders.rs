@@ -1,5 +1,5 @@
 //! The `POST /orders` risk gate (ADR 0018 decision 7): approval queue (E5-S4) ->
-//! risk stage -> execution gateway (simulator only until E3-S7).
+//! risk stage -> execution gateway (the embedded `NextOpenSim`; no venue until E3-S7).
 //!
 //! The handler builds a [`RiskRequest`] from the request body plus the ports the
 //! composition root already wires: rules come from the `null` profile over the
@@ -10,8 +10,11 @@
 //! `reference_price` comes from `QuoteReader` (the close of the latest bar, via
 //! mid when a book exists; the limit price when no quote exists), and `ts` /
 //! `last_feed_ts` are the latest quote's `ts_event` (no wall clock; both 0 / `None`
-//! when no quote exists). Known limits: the ledger holds submitted orders only (no
-//! venue fills), and order rows themselves still carry a zero timestamp.
+//! when no quote exists). Approved orders are also submitted to the embedded simulator ([`crate::exec`]);
+//! fills arrive when the market advances ([`AppState::advance_market`]) and move the
+//! ledger row to `Filled`. Known limits: market orders only (a limit order is
+//! `Rejected` by the simulator), no partial-fill quantity on the row, and order rows
+//! still carry a zero timestamp.
 //!
 //! When the approval queue is enabled (E5-S4), placements are held in the queue
 //! until approved by an operator. Cancel and modify bypass the queue.
@@ -48,8 +51,8 @@ use crate::state::AppState;
 /// The in-memory order store behind the write ledger (ADR 0019 decision 3).
 ///
 /// One row per client order id, in insertion order. The store starts empty and
-/// only records orders the risk stage approved, so a restart forgets nothing it
-/// ever promised: nothing is promised yet (the venue gateway is not wired).
+/// only records orders the risk stage approved. Rows are advanced by the embedded
+/// simulator (`Submitted` -> `Filled` / `Rejected`); no venue gateway is wired.
 #[derive(Clone, Debug, Default)]
 pub struct OrderLedger {
     inner: Arc<Mutex<BTreeMap<String, Order>>>,
@@ -59,6 +62,30 @@ impl OrderLedger {
     /// An empty ledger.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Sets the status of row `order_id`, returning `false` for an unknown id.
+    ///
+    /// Terminal rows (`Filled`, `Cancelled`, `Rejected`, `Expired`) are never changed.
+    pub fn set_status(&self, order_id: &str, status: OrderStatus) -> bool {
+        let mut guard = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Some(row) = guard.get_mut(order_id) else {
+            return false;
+        };
+        if matches!(
+            row.status(),
+            OrderStatus::Filled
+                | OrderStatus::Cancelled
+                | OrderStatus::Rejected
+                | OrderStatus::Expired
+        ) {
+            return true;
+        }
+        *row = row.clone().with_status(status);
+        true
     }
 
     /// Records `order` under its id, replacing any earlier row with the same id.
@@ -84,7 +111,7 @@ impl OrderLedger {
     /// `PartiallyFilled`, `Filled`). Cancelled, rejected, expired and not-yet-submitted
     /// rows are excluded.
     ///
-    /// `Order` carries no filled quantity and no venue fills reach this ledger yet, so a
+    /// `Order` carries no filled quantity, so a
     /// working or partly filled row counts at its full quantity: a conservative upper
     /// bound on exposure, which is the safe side for risk rules.
     pub fn position(&self, instrument_id: &InstrumentId) -> f64 {
@@ -384,7 +411,10 @@ pub(crate) async fn post_orders(
             )
             .with_status(OrderStatus::Submitted);
             state.orders.record(order.clone());
-            success(order_json(&order))
+            state.exec.submit(&state.orders, order.clone());
+            success(order_json(
+                &state.orders.get(order.order_id().as_str()).unwrap_or(order),
+            ))
         }
         RiskDecision::Refused(refusal) => refusal_response(&refusal),
     }
@@ -430,7 +460,9 @@ pub(crate) async fn delete_order(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Response {
-    state.orders.cancel(id.as_str());
+    if state.orders.cancel(id.as_str()) == Some(true) {
+        state.exec.cancel(id.as_str(), UnixNanos::new(0));
+    }
     success(serde_json::json!({"status": "cancelled"}))
 }
 
@@ -573,7 +605,8 @@ async fn gate_and_record(
             )
             .with_status(OrderStatus::Submitted);
             state.orders.record(order.clone());
-            Ok(order)
+            state.exec.submit(&state.orders, order.clone());
+            Ok(state.orders.get(order.order_id().as_str()).unwrap_or(order))
         }
         RiskDecision::Refused(refusal) => Err(refusal_response(&refusal)),
     }

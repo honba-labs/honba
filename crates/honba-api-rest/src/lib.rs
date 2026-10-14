@@ -32,6 +32,7 @@ use tower_http::{
 mod approval;
 mod auth;
 mod dispatch;
+mod exec;
 mod executor;
 mod journal;
 mod market;

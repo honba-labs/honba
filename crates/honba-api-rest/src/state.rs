@@ -55,6 +55,8 @@ pub struct AppState {
     /// The write ledger every risk-approved placement lands in (E11-S7, ADR 0019
     /// decision 3). `GET /orders` reads it; a restart empties it.
     pub orders: OrderLedger,
+    /// The embedded `NextOpenSim` approved orders are submitted to (ADR 0016).
+    pub(crate) exec: crate::exec::ExecGateway,
 }
 
 impl AppState {
@@ -76,6 +78,7 @@ impl AppState {
             trading_state: TradingState::Active,
             approval_queue: None,
             orders: OrderLedger::default(),
+            exec: crate::exec::ExecGateway::default_sim(),
         }
     }
 
@@ -86,6 +89,22 @@ impl AppState {
     pub fn with_approval_queue(mut self, max_size: usize) -> Self {
         self.approval_queue = Some(Arc::new(ApprovalQueue::new(max_size)));
         self
+    }
+
+    /// Replaces the embedded execution simulator (cash, costs, slippage, seed).
+    pub fn with_execution_sim(mut self, sim: honba_sim::NextOpenSim) -> Self {
+        self.exec = crate::exec::ExecGateway::new(sim);
+        self
+    }
+
+    /// Advances the market: feeds `bars` (ascending `ts_event`) to the embedded simulator.
+    ///
+    /// Market orders submitted earlier fill at the open of their instrument's first bar in a
+    /// later session, and each fill, rejection or cancel updates the matching ledger row (so
+    /// [`OrderLedger::position`] follows). This is the hook a live bar feed calls; event time is
+    /// the bars' `ts_event`, never the wall clock. An out-of-order bar is an error.
+    pub fn advance_market(&self, bars: &[honba_messages::Bar]) -> Result<(), ErrorDetail> {
+        self.exec.advance(&self.orders, bars)
     }
 
     /// Sets the operator trading state the write routes evaluate against.

@@ -115,7 +115,7 @@ async fn post_order_flows_to_sim_only() {
     // An approved order answers with its ledger row and is recorded, so
     // `GET /orders` reads it back with the rest of the ledger.
     let app = api_router_with(state());
-    let mut placed = order("X", "NSE", "buy", 25.0, Some(100.0));
+    let mut placed = order("X", "NSE", "buy", 25.0, None);
     placed["client_order_id"] = json!("post-flow");
     let (status, body) = call(app.clone(), Method::POST, "/orders", Some(placed)).await;
     assert_eq!(status, StatusCode::OK);
@@ -139,7 +139,7 @@ async fn post_order_flows_to_sim_only() {
 #[tokio::test]
 async fn a_repeated_idempotency_key_returns_the_first_row_and_adds_nothing() {
     let app = api_router_with(state());
-    let mut placed = order("X", "NSE", "buy", 25.0, Some(100.0));
+    let mut placed = order("X", "NSE", "buy", 25.0, None);
     placed["client_order_id"] = json!("dup-key");
     for _ in 0..2 {
         let (status, body) = call(app.clone(), Method::POST, "/orders", Some(placed.clone())).await;
@@ -255,7 +255,7 @@ async fn approve_flows_through_risk_to_sim() {
     // Approve a queued order: it re-enters the risk stage, lands in the ledger
     // and answers with its row.
     let app = api_router_with(state().with_approval_queue(10));
-    let mut placed = order("X", "NSE", "buy", 25.0, Some(100.0));
+    let mut placed = order("X", "NSE", "buy", 25.0, None);
     placed["client_order_id"] = json!("approve-flow");
     let (status, body) = call(app.clone(), Method::POST, "/orders", Some(placed)).await;
     assert_eq!(status, StatusCode::OK);
