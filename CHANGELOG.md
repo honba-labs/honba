@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Webhook order ingestion (E5-S6, ADR 0026)
+
+- `honba.api.webhooks`: an ordered, fail-closed pipeline (`WebhookIngestor`) that turns an inbound
+  HTTP webhook into an `OrderIntent` — kill switch, IP allowlist, size cap, hashed token, parse,
+  live gate, idempotency, cool-off, risk, journal — stopping at the first refusal. Stages 1, 2 and 4
+  share one opaque `401 {"status":"rejected"}` so the endpoint is not a token oracle; tokens are
+  stored as `sha256:<hex>` and compared with `hmac.compare_digest`; the size cap is checked on the
+  raw bytes before any parse; idempotency and cool-off are TTL caches driven by an injected
+  monotonic clock; the terminal response (acceptance or risk refusal) is cached per idempotency key
+  only after the risk/journal stages. `WebhookConfig.from_dict` parses a `[webhooks]` table and
+  refuses unknown keys. Every decision is written to the shared `honba.api.auth` NDJSON audit log.
+- Tests: unit `python/tests/unit/test_webhooks.py` (`test_stage_order_blocks_before_parse`,
+  `test_size_cap_rejects_oversize_body`, `test_unknown_and_malformed_tokens_are_indistinguishable`,
+  `test_ip_allowlist_refuses_unlisted_client`, `test_hashed_token_never_compared_in_plaintext`,
+  `test_idempotent_replay_returns_cached_response`,
+  `test_idempotency_caches_the_refusal_not_a_premature_accept`,
+  `test_cool_off_limits_repeat_deliveries`,
+  `test_ttl_expiry_is_deterministic_under_a_fake_clock`); integration
+  `python/tests/integration/test_webhook_ingest.py` (`test_webhook_order_passes_risk_and_journals`,
+  `test_webhook_risk_refusal_is_audited`).
+
 ### Indicator render contract (E6-S5)
 
 - `honba-indicators::render`: a pure presentation contract next to the indicator compute.
