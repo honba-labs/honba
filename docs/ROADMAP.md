@@ -6,8 +6,8 @@ still resolve. Nothing here has been filed as an issue. This file lives in the `
 to the `honba/` root unless they name a sibling repo. Evidence is from the `honba/` tree and its git log, read-only; test baselines are
 from `honba/.claude/HANDOFF.md` (cargo ~1045, python ~2413 passed, 8 skipped) and were not re-measured for v6.
 
-v6 changes: E10-S7 DONE (commits edb4921, 91bff5b, 2c10630; ADR 0015 implemented); E3-S1a chunk 1 DONE (ADR 0016, commits
-b12e5ba..1b2f6ce). Also done since v5 (see 1.1): cancel-time rule, rejection-queue hardening, IST timestamps, typed registry, SDK
+v6 changes: E10-S7 DONE (commits edb4921, 91bff5b, 2c10630; ADR 0015 implemented); E3-S1a DONE, all three chunks (ADR 0016, commits
+b12e5ba..c71424e: chunk 1 b12e5ba..1b2f6ce, chunk 2 d1299d3..c61d578, chunk 3a 9ced8d8..a6ffef5, chunk 3b 2c02b74..c71424e). Also done since v5 (see 1.1): cancel-time rule, rejection-queue hardening, IST timestamps, typed registry, SDK
 capabilities/schema, WASM hardening, ADR 0014/0015, golden vectors validated against the schema, honba-docs chunks.
 E5-S5 done (2026-10-11): AI strategy verifier (ADR 0022).
 E11-S8 done (2026-10-11): Minimal auth (Bearer token, scope map, file token store, audit log) (ADR 0023).
@@ -81,7 +81,7 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | E10-S4 shared dataset (partial: Arc and columnar read only) | `honba-data` `Dataset`, `ColumnarSlice`, `DatasetFeed`, commit c7ef86b |
 | E10-S5 sweep | `crates/honba-sweep` (one engine per trial, `spawn_blocking`, results in trial order), commit fb64146 |
 | E10-S7 Python runtime bridge | ADR 0015 implemented: `honba.event_loop`, `honba.async_run`; commits edb4921, 91bff5b, 2c10630 |
-| E3-S1a chunk 1 (next-open Rust port, part 1) | ADR 0016; commits b12e5ba..1b2f6ce. Chunks 2 and 3 remain (see section 4) |
+| E3-S1a next-open Rust port (chunks 1-3) | ADR 0016; chunk 1 b12e5ba..1b2f6ce, chunk 2 d1299d3..c61d578, chunk 3a 9ced8d8..a6ffef5, chunk 3b 2c02b74..c71424e. Rust core, PyO3 binding and Python delegation shipped |
 | Cancel-time rule | ADR 0008 decision 13 addendum, commit 1c50fc7 |
 | Rejection-queue hardening | commits 2620b12, e1f6b76, 081fd12, 53a3ef7 |
 | IST timestamps | commit 31510cb |
@@ -294,7 +294,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 
 | ID | Scope | Size | Deps | Acceptance | Owner |
 |---|---|---|---|---|---|
-| E3-S1a | Rust port of the next-open simulator behind `ExecutionEngine`, Python `NextOpenExecution` API unchanged; harden L1 stop/limit (3 `#[ignore]` known-gap tests). **Chunk 1 DONE** (ADR 0016, commits b12e5ba..1b2f6ce). Remaining per ADR 0016: chunk 2 settlement + costs + `SessionOpen`; chunk 3 PyO3 binding and Python delegation. Note: the Python reference never fills limit or stop orders (they are rejected `unsupported_order_type`), so "harden L1 stop/limit" needs a product decision before it can be scheduled | L -> split (port, order types, partial by volume) | ADR D1 | `next_open_fills_match_vectors` / `schema/conformance/next_open.json` run by Rust, Python and `honba._honba` and asserted equal | honba |
+| E3-S1a (DONE) | Rust port of the next-open simulator behind `ExecutionEngine`, Python `NextOpenExecution` API unchanged. **All chunks shipped** (ADR 0016): chunk 1 port, chunk 2 settlement + costs + `SessionOpen`, chunk 3a PyO3 binding, chunk 3b Python delegation (native backend with a pure-Python fallback). Note: the Python reference never fills limit or stop orders (they are rejected `unsupported_order_type`), so "harden L1 stop/limit" needs a product decision before it can be scheduled | L -> split (port, order types, partial by volume) | ADR D1 | `crates/honba-sim/tests/next_open_conformance.rs::next_open_vectors_match_the_python_reference` (Rust), `crates/honba-py/tests/next_open_native.rs::every_chunk_one_and_two_vector_matches_the_python_reference` (`honba._honba` core), `python/tests/integration/test_next_open_sim_conformance.py::test_next_open_vector_matches_the_python_reference` (Python + native backends) replay `schema/conformance/next_open_sim.json` and assert equal | honba |
 | E3-S1b | L2 quote/tick matching: marketable orders walk top of book, resting limits, stops from ticks, IOC/FOK/day | L -> split | E2-S6, E3-S2, tick data decision | `limit_fills_on_trade_through` / L1 vs L2 conformance on same stream | honba |
 | E3-S1d | Differential oracle: naive reference matcher vs optimised sim | M | E3-S1b | `oracle_agrees_seeded_streams` / same | honba |
 | E3-S2 | `FillModel`, `LatencyModel` traits, seeded; slippage, ack delay, queue position; depth survival discount | M | E3-S1a | `seeded_slippage_reproducible` / `same_seed_byte_identical_fills` | honba |
@@ -388,7 +388,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 | D17 | NSE settlement default and intraday cycle (counts bars, not sessions) in simulators | E3-S1a | Settle in the port ADR |
 
 Already decided: pyo3 single cdylib (ADR 0014 decision, `honba-py`), Strategy ABC with shim (ADR 0008), schema from Rust (ADR 0014),
-integer money (0011), versioning and nanosecond strings (0012), REST read ports (0013), explicit runtime (0015, implemented in E10-S7), next-open Rust port split into three chunks (0016, chunk 1 done),
+integer money (0011), versioning and nanosecond strings (0012), REST read ports (0013), explicit runtime (0015, implemented in E10-S7), next-open Rust port (0016, all three chunks done),
 run lifecycle and `run_id` (0017, D1), risk stage (0018, D4), `OrderState` FSM and client order ids (0019, D5/D2), SSE streaming (0021, D6).
 
 ---
