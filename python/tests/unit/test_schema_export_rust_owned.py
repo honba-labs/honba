@@ -22,7 +22,14 @@ runner = CliRunner()
 
 
 def test_the_extension_offers_every_artifact() -> None:
-    assert _honba.codegen_artifacts() == ["json_schema", "openapi", "typescript", "pyi", "mcp"]
+    assert _honba.codegen_artifacts() == [
+        "json_schema",
+        "openapi",
+        "typescript",
+        "client",
+        "pyi",
+        "mcp",
+    ]
 
 
 def test_an_unknown_artifact_is_a_value_error() -> None:

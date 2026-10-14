@@ -15,8 +15,13 @@ use crate::schemas::{SchemaSet, COMPONENTS_PREFIX};
 /// The 200 response for these carries a `StreamFrame` per line, not an envelope.
 const STREAM_PATHS: &[(&str, &str)] = &[("GET", "/backtests/{id}/events")];
 
+/// Whether `method path` streams its response instead of answering one JSON body.
+pub(crate) fn is_stream(method: &str, path: &str) -> bool {
+    STREAM_PATHS.iter().any(|(m, p)| *m == method && *p == path)
+}
+
 /// The response payload type for each endpoint, so a path can name it.
-fn response_type_for(method: &str, path: &str) -> Option<&'static str> {
+pub(crate) fn response_type_for(method: &str, path: &str) -> Option<&'static str> {
     Some(match (method, path) {
         ("GET", "/capabilities") => "Capabilities",
         ("GET", "/health") => "Capabilities",
@@ -46,7 +51,7 @@ fn response_type_for(method: &str, path: &str) -> Option<&'static str> {
 }
 
 /// The request body type for each endpoint that takes one.
-fn request_type_for(method: &str, path: &str) -> Option<&'static str> {
+pub(crate) fn request_type_for(method: &str, path: &str) -> Option<&'static str> {
     Some(match (method, path) {
         ("POST", "/strategies") => "StrategiesRequest",
         ("POST", "/strategies/verify") => "StrategyManifest",
@@ -118,7 +123,7 @@ fn operation(set: &SchemaSet, method: &str, path: &'static str) -> Value {
         .map(|name| format!("{COMPONENTS_PREFIX}{name}"))
         .unwrap_or_else(|| format!("{COMPONENTS_PREFIX}Capabilities"));
 
-    let is_stream = STREAM_PATHS.iter().any(|(m, p)| *m == method && *p == path);
+    let is_stream = is_stream(method, path);
 
     let mut responses = Map::new();
     if is_stream {
@@ -236,7 +241,7 @@ fn tag_for(path: &str) -> String {
 }
 
 /// Builds a stable, unique operation id from method and path.
-fn operation_id(method: &str, path: &str) -> String {
+pub(crate) fn operation_id(method: &str, path: &str) -> String {
     let verb = method.to_ascii_lowercase();
     let rest: Vec<String> = path
         .trim_start_matches('/')

@@ -6,7 +6,14 @@ use crate::pyclasses::codegen::{artifact_names, render};
 fn every_artifact_is_offered_by_name() {
     assert_eq!(
         artifact_names(),
-        vec!["json_schema", "openapi", "typescript", "pyi", "mcp"]
+        vec![
+            "json_schema",
+            "openapi",
+            "typescript",
+            "client",
+            "pyi",
+            "mcp"
+        ]
     );
 }
 

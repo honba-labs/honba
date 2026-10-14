@@ -106,7 +106,7 @@ def verify_manifest(manifest_json: str) -> str:
     """
 
 def codegen_artifacts() -> list[str]:
-    """Names accepted by ``codegen_render``: json_schema, openapi, typescript, pyi, mcp."""
+    """Names accepted by ``codegen_render``: json_schema, openapi, typescript, client, pyi, mcp."""
 
 def codegen_render(kind: str) -> tuple[str, str]:
     """Render one honba-codegen artifact as ``(file_name, content)``.

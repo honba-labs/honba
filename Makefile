@@ -1,5 +1,6 @@
 .PHONY: build test lint fmt python schema check-schema check-schema-ts openapi check-openapi \
-	pyi check-pyi mcp check-mcp codegen check-codegen check-codegen-ci check-wasm test-wasm
+	pyi check-pyi mcp check-mcp client check-client codegen check-codegen check-codegen-ci \
+	check-wasm test-wasm
 
 build:
 	cargo build --workspace
@@ -29,6 +30,7 @@ python:
 	cd python && maturin develop
 
 FRONTEND_TS_DIR ?= ../honba-frontend/src/core/types/generated
+FRONTEND_CLIENT_DIR ?= ../honba-frontend/src/core/api/generated
 
 # Rust is the codegen source of truth (honba-codegen). Every surface derives from it:
 # schema/domain, schema/openapi, schema/mcp, python/src/honba/wire/generated and the frontend
@@ -60,6 +62,16 @@ check-schema-ts:
 	$(call no_drift,.,schema/domain)
 	$(call no_drift,$(FRONTEND_TS_DIR),.)
 
+# The typed fetch client, generated from the same endpoint registry as OpenAPI.
+client:
+	$(HONBA) schema export --client $(FRONTEND_CLIENT_DIR)
+
+# LOCAL ONLY: writes into the sibling ../honba-frontend checkout.
+check-client:
+	$(HONBA) schema export --client $(FRONTEND_CLIENT_DIR)
+	$(call no_drift,.,schema/domain)
+	$(call no_drift,$(FRONTEND_CLIENT_DIR),.)
+
 openapi:
 	$(HONBA) schema export --openapi schema/openapi
 
@@ -81,13 +93,13 @@ check-mcp:
 	$(HONBA) schema export --mcp schema/mcp
 	$(call no_drift,.,schema/mcp)
 
-# Regenerate everything this repo commits, plus the frontend TypeScript.
-codegen: schema openapi pyi mcp
+# Regenerate everything this repo commits, plus the frontend TypeScript and client.
+codegen: schema client openapi pyi mcp
 
-# Every drift check, including the cross-repo TypeScript one (local only).
-check-codegen: check-schema check-schema-ts check-openapi check-pyi check-mcp
+# Every drift check, including the cross-repo TypeScript ones (local only).
+check-codegen: check-schema check-schema-ts check-client check-openapi check-pyi check-mcp
 	@echo "all codegen drift checks passed"
 
 # Every drift check that needs only this repo (what CI runs).
 check-codegen-ci: check-schema check-openapi check-pyi check-mcp
-	@echo "codegen drift checks passed (TypeScript: run make check-schema-ts locally)"
+	@echo "codegen drift checks passed (TypeScript: run make check-schema-ts / check-client locally)"

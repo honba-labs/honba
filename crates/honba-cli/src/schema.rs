@@ -4,6 +4,7 @@ use std::path::PathBuf;
 pub(crate) fn export(
     output: &Option<PathBuf>,
     typescript_dir: &Option<PathBuf>,
+    client_dir: &Option<PathBuf>,
     openapi_output: &Option<PathBuf>,
     pyi_output: &Option<PathBuf>,
     mcp_output: &Option<PathBuf>,
@@ -19,6 +20,10 @@ pub(crate) fn export(
         let p = codegen.write_typescript(dir)?;
         println!("domain.ts written to {}", p.display());
     }
+    if let Some(dir) = client_dir.as_ref() {
+        let p = codegen.write_client(dir)?;
+        println!("client.ts written to {}", p.display());
+    }
     if let Some(dir) = openapi_output.as_ref() {
         let p = codegen.write_openapi(dir)?;
         println!("openapi.json written to {}", p.display());
@@ -32,11 +37,12 @@ pub(crate) fn export(
         println!("mcp_tools.json written to {}", p.display());
     }
     if typescript_dir.is_none()
+        && client_dir.is_none()
         && openapi_output.is_none()
         && pyi_output.is_none()
         && mcp_output.is_none()
     {
-        println!("Note: no --typescript/--openapi/--pyi/--mcp dirs given; only domain_schema.json emitted. Pass one to generate that artifact.");
+        println!("Note: no --typescript/--client/--openapi/--pyi/--mcp dirs given; only domain_schema.json emitted. Pass one to generate that artifact.");
     }
     Ok(())
 }
@@ -45,6 +51,7 @@ pub(crate) fn export(
 pub(crate) fn export_all(
     schema_dir: &PathBuf,
     typescript_dir: &Option<PathBuf>,
+    client_dir: &Option<PathBuf>,
     openapi_dir: &Option<PathBuf>,
     pyi_dir: &Option<PathBuf>,
     mcp_dir: &Option<PathBuf>,
@@ -53,6 +60,9 @@ pub(crate) fn export_all(
     codegen.write_json_schema(schema_dir)?;
     if let Some(dir) = typescript_dir.as_ref() {
         codegen.write_typescript(dir)?;
+    }
+    if let Some(dir) = client_dir.as_ref() {
+        codegen.write_client(dir)?;
     }
     if let Some(dir) = openapi_dir.as_ref() {
         codegen.write_openapi(dir)?;

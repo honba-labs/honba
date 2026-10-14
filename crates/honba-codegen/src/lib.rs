@@ -28,6 +28,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use serde_json::{json, Value};
 
+pub mod client;
 pub mod endpoints;
 pub mod instance;
 pub mod mcp;
@@ -69,6 +70,8 @@ pub enum Artifact {
     OpenApi,
     /// TypeScript declarations for `honba-frontend`, `domain.ts`.
     TypeScript,
+    /// Typed TypeScript fetch client for `honba-frontend`, `client.ts`.
+    Client,
     /// Python type stubs, `__init__.pyi`.
     Pyi,
     /// MCP tool schemas, `mcp_tools.json`.
@@ -81,6 +84,7 @@ impl Artifact {
         Artifact::JsonSchema,
         Artifact::OpenApi,
         Artifact::TypeScript,
+        Artifact::Client,
         Artifact::Pyi,
         Artifact::Mcp,
     ];
@@ -91,6 +95,7 @@ impl Artifact {
             Artifact::JsonSchema => "json_schema",
             Artifact::OpenApi => "openapi",
             Artifact::TypeScript => "typescript",
+            Artifact::Client => "client",
             Artifact::Pyi => "pyi",
             Artifact::Mcp => "mcp",
         }
@@ -107,6 +112,7 @@ impl Artifact {
             Artifact::JsonSchema => "domain_schema.json",
             Artifact::OpenApi => "openapi.json",
             Artifact::TypeScript => "domain.ts",
+            Artifact::Client => "client.ts",
             Artifact::Pyi => "__init__.pyi",
             Artifact::Mcp => "mcp_tools.json",
         }
@@ -138,6 +144,7 @@ impl Codegen {
             Artifact::JsonSchema => to_pretty_json(&self.json_schema()),
             Artifact::OpenApi => to_pretty_json(&self.openapi()),
             Artifact::TypeScript => self.typescript(),
+            Artifact::Client => self.client(),
             Artifact::Pyi => self.pyi(),
             Artifact::Mcp => to_pretty_json(&self.mcp()),
         }
@@ -220,6 +227,21 @@ impl Codegen {
         Ok(path)
     }
 
+    /// The typed TypeScript fetch client for `honba-frontend`.
+    ///
+    /// Imports its request and response types from the sibling `domain.ts`
+    /// ([`Codegen::typescript`]); both are regenerated from the same registry.
+    pub fn client(&self) -> String {
+        client::render()
+    }
+
+    /// Writes [`Codegen::client`] into `output_dir/client.ts`.
+    pub fn write_client(&self, output_dir: &Path) -> Result<PathBuf> {
+        let path = self.write(Artifact::Client, output_dir)?;
+        println!("Generated TypeScript client: {}", path.display());
+        Ok(path)
+    }
+
     /// The Python type stubs for the `honba` package.
     pub fn pyi(&self) -> String {
         typings::render_pyi(&self.set, SCHEMA_VERSION, API_VERSION)
@@ -251,12 +273,13 @@ impl Codegen {
     /// Writes every artifact under `base_dir`.
     ///
     /// Layout matches the Makefile targets: `domain/`, `openapi/`, `typescript/`,
-    /// `python/`, `mcp/`.
+    /// `client/`, `python/`, `mcp/`.
     pub fn write_all(&self, base_dir: &Path) -> Result<Vec<PathBuf>> {
         Ok(vec![
             self.write_json_schema(&base_dir.join("domain"))?,
             self.write_openapi(&base_dir.join("openapi"))?,
             self.write_typescript(&base_dir.join("typescript"))?,
+            self.write_client(&base_dir.join("client"))?,
             self.write_pyi(&base_dir.join("python"))?,
             self.write_mcp(&base_dir.join("mcp"))?,
         ])

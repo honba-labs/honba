@@ -35,3 +35,8 @@ def export_json_schema(output_dir: Path) -> Path:
 def generate_typescript(ts_output_dir: Path) -> Path:
     """Write `domain.ts`, the TypeScript declarations for honba-frontend."""
     return export_artifact("typescript", ts_output_dir)
+
+
+def generate_client(ts_output_dir: Path) -> Path:
+    """Write `client.ts`, the typed TypeScript fetch client for honba-frontend."""
+    return export_artifact("client", ts_output_dir)

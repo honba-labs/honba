@@ -10,7 +10,12 @@ from pathlib import Path
 
 import typer
 
-from honba.cli._schema_export import export_artifact, export_json_schema, generate_typescript
+from honba.cli._schema_export import (
+    export_artifact,
+    export_json_schema,
+    generate_client,
+    generate_typescript,
+)
 
 app = typer.Typer(
     help="Export canonical schemas and generate client contracts", no_args_is_help=True
@@ -36,6 +41,11 @@ def export_command(
         "--ts-out-dir",
         help="Target directory for generated TypeScript definitions",
     ),
+    client_out_dir: str | None = typer.Option(
+        None,
+        "--client-out-dir",
+        help="Also write client.ts (the typed fetch client) into this directory",
+    ),
     openapi_dir: str | None = typer.Option(
         None, "--openapi-dir", help="Also write openapi.json into this directory"
     ),
@@ -54,6 +64,10 @@ def export_command(
     if generate_ts:
         ts_file = generate_typescript(base_dir / ts_out_dir)
         typer.echo(f"Generated TypeScript definitions to {ts_file}")
+
+    if client_out_dir is not None:
+        client_file = generate_client(base_dir / client_out_dir)
+        typer.echo(f"Generated TypeScript client to {client_file}")
 
     for kind, target in (("openapi", openapi_dir), ("pyi", pyi_dir), ("mcp", mcp_dir)):
         if target is not None:

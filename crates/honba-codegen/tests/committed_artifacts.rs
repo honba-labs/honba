@@ -3,9 +3,10 @@
 //!
 //! This is the drift check inside `cargo test`: a wire type that changes
 //! without `make schema openapi pyi mcp` fails here, in the Rust CI job, before
-//! the Makefile's `git status` checks ever run. The TypeScript output lives in
-//! the sibling `honba-frontend` repo, so it is only rendered here (the
-//! cross-repo comparison is `make check-schema-ts`, local only).
+//! the Makefile's `git status` checks ever run. The TypeScript output
+//! (`domain.ts`) and the typed client (`client.ts`) live in the sibling
+//! `honba-frontend` repo, so they are only rendered here (the cross-repo
+//! comparison is `make check-schema-ts` / `make check-client`, local only).
 
 use std::path::{Path, PathBuf};
 
@@ -37,6 +38,7 @@ fn generate(name: &str) -> Vec<(PathBuf, PathBuf)> {
         root.join("schema/domain/domain_schema.json"),
         root.join("schema/openapi/openapi.json"),
         PathBuf::new(), // TypeScript: committed in honba-frontend, not here.
+        PathBuf::new(), // Client: committed in honba-frontend, not here.
         root.join("python/src/honba/wire/generated/__init__.pyi"),
         root.join("schema/mcp/mcp_tools.json"),
     ];

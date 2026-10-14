@@ -51,6 +51,8 @@ enum Commands {
         #[arg(long)]
         typescript: Option<PathBuf>,
         #[arg(long)]
+        client: Option<PathBuf>,
+        #[arg(long)]
         openapi: Option<PathBuf>,
         #[arg(long)]
         pyi: Option<PathBuf>,
@@ -119,6 +121,9 @@ enum SchemaCommands {
         /// Also render TypeScript into DIR (frontend)
         #[arg(long)]
         typescript: Option<PathBuf>,
+        /// Also render the typed TypeScript client into DIR (frontend)
+        #[arg(long)]
+        client: Option<PathBuf>,
         /// Also render OpenAPI into DIR
         #[arg(long)]
         openapi: Option<PathBuf>,
@@ -149,18 +154,20 @@ fn main() -> Result<()> {
             SchemaCommands::Export {
                 output,
                 typescript,
+                client,
                 openapi,
                 pyi,
                 mcp,
-            } => schema::export(&output, &typescript, &openapi, &pyi, &mcp),
+            } => schema::export(&output, &typescript, &client, &openapi, &pyi, &mcp),
         },
         Commands::Codegen {
             schema_dir,
             typescript,
+            client,
             openapi,
             pyi,
             mcp,
-        } => schema::export_all(&schema_dir, &typescript, &openapi, &pyi, &mcp),
+        } => schema::export_all(&schema_dir, &typescript, &client, &openapi, &pyi, &mcp),
         Commands::Serve {
             data_dir,
             addr,

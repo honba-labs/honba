@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Generated typed TypeScript client (E11-S6 / E9-S8)
+
+- `honba-codegen` gained a `client` artifact (`crates/honba-codegen/src/client.rs`): renders a typed
+  `HonbaClient` (plus `request<T>`, `apiUrl`, `HonbaApiError` and the SSE `streamBacktestEvents`)
+  from the same Rust `ENDPOINTS` registry that generates OpenAPI, covering every route with the
+  registry's request/response type names. `honba schema export --client` and `make client` write it
+  to `../honba-frontend/src/core/api/generated/client.ts` (see that repo's `ee2e1cb`); `make codegen`
+  and `make check-codegen` now include it, and `make check-client` guards it locally like
+  `check-schema-ts` (honba-CI drift check unchanged). The Python `honba schema export` surface grew
+  the same `--client-out-dir` (and `.pyi`) plumbing.
+- Tests: codegen unit tests (`crates/honba-codegen/src/tests/client.rs`: endpoint coverage,
+  imports, stream helper, determinism) plus the committed-artifact drift test; the frontend's
+  vitest contract test (`client.test.ts`) pins `getCapabilities()` to
+  `Promise<ResponseEnvelope<Capabilities>>`.
+
 ### Rust-native NSE bhavcopy connector (E10-S8, ADR 0028)
 
 - `honba-feed::bhavcopy::BhavcopyConnector`: a `MarketDataConnector` that replays a static NSE
