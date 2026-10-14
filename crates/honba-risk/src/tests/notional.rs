@@ -14,6 +14,7 @@ fn limit(max: f64) -> RiskLimits {
         order_rate: None,
         max_participation: None,
         stale_after_ms: None,
+        price_collar_bps: None,
     }
 }
 
@@ -137,6 +138,7 @@ fn invalid_limits_rejected_by_new() {
         }),
         max_participation: None,
         stale_after_ms: None,
+        price_collar_bps: None,
     };
     assert!(matches!(
         RiskStage::new(rate(0, 1000), Currency::Inr, super::rules()).err(),

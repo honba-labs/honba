@@ -29,6 +29,9 @@ pub enum RiskConfigError {
     /// `stale_after_ms` must be at least 1.
     #[error("stale_after_ms must be >= 1, got {0}")]
     InvalidStaleAfter(u64),
+    /// `price_collar_bps` must be at least 1.
+    #[error("price_collar_bps must be >= 1, got {0}")]
+    InvalidPriceCollar(u32),
 }
 
 /// Tolerance for fractional positions in the reduce-only comparison.
@@ -166,6 +169,33 @@ impl RiskStage {
         }
     }
 
+    /// Price collar: a market order's expected execution price must stay within
+    /// `price_collar_bps` of the reference price. Skipped (never refused) when the order has a
+    /// limit price, or the expected or reference price is missing or not a positive finite
+    /// number: data loss is the stale-feed breaker's job. The boundary is inclusive.
+    fn price_collar_rule(&self, req: &RiskRequest) -> Option<RiskRefusal> {
+        let collar_bps = self.limits.price_collar_bps?;
+        if req.price.is_some() {
+            return None;
+        }
+        let (expected, reference) = (req.expected_price?, req.reference_price?);
+        if !(expected.is_finite() && expected > 0.0 && reference.is_finite() && reference > 0.0) {
+            return None;
+        }
+        let diff = (expected - reference).abs();
+        // diff / reference > collar / 10_000, without dividing so the boundary is exact.
+        if diff * 10_000.0 > f64::from(collar_bps) * reference {
+            return Some(RiskRefusal::PriceCollar {
+                side: req.side,
+                expected_price: expected,
+                reference_price: reference,
+                deviation_bps: diff / reference * 10_000.0,
+                collar_bps,
+            });
+        }
+        None
+    }
+
     /// Participation rule: order quantity must not exceed `max_participation * ADV`.
     /// Runs after price rules (so ADV is available in the request) and before notional,
     /// so a market-absorption refusal wins over an account-value refusal.
@@ -278,6 +308,9 @@ impl RiskCheck for RiskStage {
             return RiskDecision::Refused(refusal);
         }
         if let Some(refusal) = self.feed_staleness_rule(req) {
+            return RiskDecision::Refused(refusal);
+        }
+        if let Some(refusal) = self.price_collar_rule(req) {
             return RiskDecision::Refused(refusal);
         }
         if let Some(refusal) = self.max_participation_rule(req) {

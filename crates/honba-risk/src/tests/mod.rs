@@ -1,5 +1,6 @@
 //! Unit tests for this crate, one file per area.
 
+mod collar;
 mod durable_ledger;
 mod instrument;
 mod limits;
@@ -71,6 +72,7 @@ pub(crate) fn req() -> RiskRequest {
         trading_state: TradingState::Active,
         ts: UnixNanos::new(1),
         last_feed_ts: None,
+        expected_price: None,
     }
 }
 

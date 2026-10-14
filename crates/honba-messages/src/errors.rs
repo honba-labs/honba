@@ -132,6 +132,8 @@ crate::enum_with_all! {
         RiskMaxParticipationExceeded,
         /// Feed quote or bar data is stale relative to event time (E2-S10).
         RiskFeedStale,
+        /// A market order's expected execution price is outside the price collar (ADR 0018).
+        RiskPriceCollar,
         /// The exchange or gateway rejected the order.
         OrderRejected,
         /// No execution engine is attached to receive the order (ADR 0018).
@@ -181,7 +183,8 @@ impl ErrorCode {
             | Self::RiskReduceOnlyViolation
             | Self::RiskInstrumentUnknown
             | Self::RiskMaxParticipationExceeded
-            | Self::RiskFeedStale => ErrorCategory::Risk,
+            | Self::RiskFeedStale
+            | Self::RiskPriceCollar => ErrorCategory::Risk,
             Self::OrderRejected | Self::OrderExecutionUnavailable => ErrorCategory::Order,
             Self::MarketDataUnavailable => ErrorCategory::MarketData,
             Self::Timeout | Self::TransportError => ErrorCategory::Transport,
@@ -226,6 +229,7 @@ impl ErrorCode {
             Self::RiskInstrumentUnknown => "risk_instrument_unknown",
             Self::RiskMaxParticipationExceeded => "risk_max_participation_exceeded",
             Self::RiskFeedStale => "risk_feed_stale",
+            Self::RiskPriceCollar => "risk_price_collar",
             Self::OrderRejected => "order_rejected",
             Self::OrderExecutionUnavailable => "order_execution_unavailable",
             Self::OrderNotFound => "order_not_found",

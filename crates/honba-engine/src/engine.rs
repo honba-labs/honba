@@ -720,6 +720,7 @@ impl Engine {
             trading_state: self.trading_state,
             ts: self.clock.now(),
             last_feed_ts: self.last_feed_ts.get(instrument).copied(),
+            expected_price: None,
         };
         match self.risk.as_mut() {
             Some(stage) => match stage.check(&request) {

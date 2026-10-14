@@ -126,6 +126,19 @@ pub enum RiskRefusal {
         /// Staleness limit in nanoseconds.
         stale_after_ns: u64,
     },
+    /// A market order's expected execution price is outside the price collar.
+    PriceCollar {
+        /// The order's side.
+        side: OrderSide,
+        /// The expected execution price (the touch).
+        expected_price: f64,
+        /// The reference price it was compared to.
+        reference_price: f64,
+        /// Absolute deviation in basis points of the reference price.
+        deviation_bps: f64,
+        /// The configured collar in basis points.
+        collar_bps: u32,
+    },
 }
 
 impl RiskRefusal {
@@ -144,6 +157,7 @@ impl RiskRefusal {
             Self::OrderRate { .. } => "order_rate",
             Self::MaxParticipation { .. } => "max_participation",
             Self::FeedStale { .. } => "feed_staleness",
+            Self::PriceCollar { .. } => "price_collar",
         }
     }
 
@@ -164,6 +178,7 @@ impl RiskRefusal {
             Self::OrderRate { .. } => ErrorCode::RiskOrderRateExceeded,
             Self::MaxParticipation { .. } => ErrorCode::RiskMaxParticipationExceeded,
             Self::FeedStale { .. } => ErrorCode::RiskFeedStale,
+            Self::PriceCollar { .. } => ErrorCode::RiskPriceCollar,
         }
     }
 
@@ -271,6 +286,24 @@ impl RiskRefusal {
                 "instrument_id": instrument_id.to_string(),
                 "age_ns": age_ns,
                 "stale_after_ns": stale_after_ns,
+            }),
+            Self::PriceCollar {
+                side,
+                expected_price,
+                reference_price,
+                deviation_bps,
+                collar_bps,
+            } => json!({
+                "rule": rule,
+                "side": match side {
+                    OrderSide::Buy => "buy",
+                    OrderSide::Sell => "sell",
+                    _ => "no_order_side",
+                },
+                "expected_price": expected_price,
+                "reference_price": reference_price,
+                "deviation_bps": deviation_bps,
+                "collar_bps": collar_bps,
             }),
         }
     }

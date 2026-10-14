@@ -26,6 +26,7 @@ CODES = [
     "risk_instrument_unknown",
     "risk_max_participation_exceeded",
     "risk_feed_stale",
+    "risk_price_collar",
     "order_rejected",
     "order_execution_unavailable",
     "order_not_found",

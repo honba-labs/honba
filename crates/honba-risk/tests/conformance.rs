@@ -88,6 +88,10 @@ fn limits(v: &Value) -> RiskLimits {
             }),
         max_participation: opt_f(v, "max_participation"),
         stale_after_ms: v.get("stale_after_ms").and_then(|x| x.as_u64()),
+        price_collar_bps: v
+            .get("price_collar_bps")
+            .and_then(|x| x.as_u64())
+            .map(|x| u32::try_from(x).expect("price_collar_bps fits u32")),
     }
 }
 
@@ -122,6 +126,7 @@ fn request(v: &Value) -> RiskRequest {
         trading_state: state(v["trading_state"].as_str().expect("trading_state")),
         ts: UnixNanos::new(v["ts"].as_u64().expect("ts is an integer of nanoseconds")),
         last_feed_ts: None,
+        expected_price: None,
     }
 }
 

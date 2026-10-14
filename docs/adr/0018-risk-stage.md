@@ -536,7 +536,7 @@ event and REST share one vocabulary (this ADR and ADR 0019 decision 5). The lite
 | Max position per instrument / account (`risk_max_position_exceeded`) | deferred to E3-S4 (margin model), code stays reserved |
 | Cash / margin pre-check | deferred to E3-S4 |
 | Drawdown limit, automatic kill switch (`risk_max_drawdown_exceeded`) | deferred to E4-S6 gates with E2-S11 durable state; rejected for this per-order stage, which sees no PnL |
-| Market-order price collar / band check on market orders | deferred to E3-S1b (L2 fill model has the execution price) |
+| Market-order price collar / band check on market orders | **done** (2026-10-15, see Addendum): `price_collar_bps`, REST wired; backtest/engine wiring is follow-up |
 | Stale-feed breaker | deferred to E2-S10 (`stale_after_blocks_orders`) |
 | Risk-limited sweeps | deferred until `honba-sweep` trials consume `BacktestRunConfig`; trials apply state rules only |
 | HTTP request-flood limiting | E11-S8 (the rate rule is event-time, not a transport limiter) |
@@ -580,3 +580,35 @@ Accepted 2026-10-07 with these changes from the proposed text, resolving the cri
     guard. 16. Cross-repo consumers; citation fixes (`engine.rs:259`/`:234`, `ROADMAP.md:424`/`:440`,
     `state.rs:10`, `audit.rs:24`/`:78`, `errors.rs:79`, `lib.rs:21`, `endpoints.rs:54`, `rules.rs:11`,
     `india/profile.rs:18`/`:82`).
+
+## Addendum: market-order price collar (2026-10-15)
+
+E3-S1b/S1d shipped (ADR 0030), so top-of-book prices exist. Decision, kept small and conservative:
+
+- New optional limit `RiskLimits.price_collar_bps: Option<u32>`; default `None` = rule off, so no
+  existing config, vector or test changes behaviour. `Some` must be `>= 1` (`InvalidPriceCollar`).
+  It is a config type, so `domain_schema`, OpenAPI, MCP and Python stubs gain the key.
+- New optional `RiskRequest.expected_price: Option<f64>` (Rust-internal, not a wire type): the touch
+  the order would cross, ask for a buy and bid for a sell, supplied by the submitter.
+- Rule `price_collar`, code `risk_price_collar` (`ErrorCode::RiskPriceCollar`, category `risk`,
+  `RiskRefusal::PriceCollar`). Applies to orders with no limit `price` (market and the market leg of
+  a stop). Refuses when `|expected - reference| / reference > collar_bps / 10_000`, absolute in both
+  directions; the boundary is inclusive (exactly at the collar passes). Evaluated without division
+  so the boundary is exact. Context: `side`, `expected_price`, `reference_price`, `deviation_bps`,
+  `collar_bps`.
+- Order: after feed staleness, before participation and notional.
+- Missing data: if `expected_price` or `reference_price` is absent, non-finite or `<= 0`, the check
+  is skipped and never refuses; data loss is the stale-feed breaker's job (`stale_after_ms`).
+- REST: `AppState::with_risk_limits`; `risk_request` takes `expected_price` from the live quote
+  (`QuoteReader`) ask or bid; the reference is the existing `last_price` (quote mid, else limit
+  price). A bar-derived quote has bid = ask = close, so the collar only bites on a real two-sided
+  quote.
+- Engine and `StrategyRunner` pass `expected_price: None` (they track only the last close, which
+  is the reference), so the collar is inert in backtests until the L2 simulator's touch is exposed
+  to the risk request. Follow-up.
+
+## Decision log
+
+- 2026-10-07: accepted with review amendments (see Amendments).
+- 2026-10-15: addendum: market-order price collar `price_collar_bps` / `risk_price_collar`, off by
+  default, REST wired, engine/backtest wiring deferred.

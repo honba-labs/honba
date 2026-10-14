@@ -249,6 +249,7 @@ impl<S: Strategy, E: ExecutionEngine> StrategyRunner<S, E> {
             trading_state: self.trading_state,
             ts: ts_init,
             last_feed_ts: None,
+            expected_price: None,
         };
         match self.risk.as_mut() {
             Some(stage) => match stage.check(&request) {

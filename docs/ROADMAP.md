@@ -299,8 +299,8 @@ Done work is removed. Sizes: S (<=1 day), M (2-4 days), L (split before start). 
 
 R6 and R7 can run in parallel with R4 once R2 exits. R5 needs R1 for write tools and R2 for runs.
 
-**Milestone status (2026-10-14):** R1 (Safe writes), R2 (Runs), R3 (Live-shaped runtime), R4 (Trustworthy research) and R5 (Agent surfaces) are **complete** (E5-S6 webhook ingestion and E5-S9 report builder shipped). R6 (Live-ready) is complete except the L2 simulator
-(E3-S1b/S1d, **ADR 0030 (accepted) defines the stream/book/vectors; scheduled**); E10-S8 shipped the bhavcopy Rust connector. R7 (Frontend) is **complete**
+**Milestone status (2026-10-14):** R1 (Safe writes), R2 (Runs), R3 (Live-shaped runtime), R4 (Trustworthy research) and R5 (Agent surfaces) are **complete** (E5-S6 webhook ingestion and E5-S9 report builder shipped). R6 (Live-ready) is **complete** (the L2 simulator,
+E3-S1b/S1d, shipped per ADR 0030); E10-S8 shipped the bhavcopy Rust connector. R7 (Frontend) is **complete**
 (E9-S1..S7 shipped: core graph/code/verify/assistant in `4e15416`, React Flow canvas and views in frontend `7050c49`).
 R8 (Optional) stays unscheduled.
 

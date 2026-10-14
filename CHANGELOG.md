@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Market-order price collar (ADR 0018 addendum)
+
+- `honba-risk`: new optional `RiskLimits.price_collar_bps` (default off), `RiskRequest.expected_price`,
+  `RiskRefusal::PriceCollar` and `ErrorCode::RiskPriceCollar` (`risk_price_collar`, rule
+  `price_collar`). Market orders whose expected touch deviates from the reference by more than the
+  collar are refused; missing data skips the check. `honba-api-rest`: `AppState::with_risk_limits`
+  and the ask/bid touch in the order gate. Engine/backtest wiring is a follow-up. Codegen
+  artifacts, Python `RiskLimits(price_collar_bps=...)` and the client error tables updated.
+
 ### Stable error reasons on the WASM compute surface (§7 gap (d))
 
 - `crates/honba-api-wasm`: every refusal is now a `reason: message` pair (ADR 0012 rule 4), so a

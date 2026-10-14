@@ -566,3 +566,84 @@ async fn close_goes_through_the_approval_queue_when_enabled() {
     assert_eq!(rows[0].side(), honba_messages::OrderSide::Sell);
     assert_eq!(rows[0].quantity(), 25.0);
 }
+
+/// Price collar (ADR 0018 addendum): a pumped bar sets the reference, a wide live quote
+/// sets the touch, and a market order whose touch is outside the collar is refused.
+mod collar {
+    use super::*;
+    use honba_messages::{Bar, BarAggregation, BarSpecification, BarType, PriceType, QuoteTick};
+    use honba_risk::RiskLimits;
+
+    fn limits(bps: u32) -> RiskLimits {
+        RiskLimits {
+            price_collar_bps: Some(bps),
+            ..Default::default()
+        }
+    }
+
+    fn pumped(bps: Option<u32>, bid: f64, ask: f64) -> AppState {
+        let mut st = state();
+        if let Some(bps) = bps {
+            st = st.with_risk_limits(limits(bps));
+        }
+        let t = UnixNanos::from_u64(2);
+        let bt = BarType::new(
+            instrument_id(),
+            BarSpecification::new(1, BarAggregation::Minute, PriceType::Last),
+        );
+        let live = st.live_quotes().expect("live store").clone();
+        live.put_bar(&Bar::new(bt, 100.0, 100.0, 100.0, 100.0, 10.0, t, t));
+        let t3 = UnixNanos::from_u64(3);
+        live.put_quote(QuoteTick::new(instrument_id(), bid, ask, 0.0, 0.0, t3, t3));
+        st
+    }
+
+    async fn place(st: AppState, side: &str) -> (StatusCode, Value) {
+        call(
+            api_router_with(st),
+            Method::POST,
+            "/orders",
+            Some(order("X", "NSE", side, 25.0, None)),
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn off_by_default_a_wide_quote_is_accepted() {
+        let (status, _) = place(pumped(None, 90.0, 110.0), "buy").await;
+        assert_eq!(status, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn market_buy_beyond_the_collar_is_refused_on_the_ask() {
+        // mid = 100 (reference), ask 103 -> 300 bps > 200.
+        let (status, body) = place(pumped(Some(200), 97.0, 103.0), "buy").await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(body["error"]["code"], json!("risk_price_collar"));
+        assert_eq!(body["error"]["context"]["rule"], json!("price_collar"));
+        assert_eq!(body["error"]["context"]["expected_price"], json!(103.0));
+        assert_eq!(body["error"]["context"]["collar_bps"], json!(200));
+    }
+
+    #[tokio::test]
+    async fn market_sell_beyond_the_collar_is_refused_on_the_bid() {
+        let (status, body) = place(pumped(Some(200), 97.0, 103.0), "sell").await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(body["error"]["code"], json!("risk_price_collar"));
+        assert_eq!(body["error"]["context"]["expected_price"], json!(97.0));
+    }
+
+    #[tokio::test]
+    async fn within_the_collar_and_limit_orders_pass() {
+        let (status, _) = place(pumped(Some(400), 97.0, 103.0), "buy").await;
+        assert_eq!(status, StatusCode::OK);
+        let (status, _) = call(
+            api_router_with(pumped(Some(200), 97.0, 103.0)),
+            Method::POST,
+            "/orders",
+            Some(order("X", "NSE", "buy", 25.0, Some(100.0))),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+    }
+}

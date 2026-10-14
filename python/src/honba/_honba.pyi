@@ -456,6 +456,7 @@ class RiskLimits:
         order_rate: tuple[int, int] | None = None,
         max_participation: float | None = None,
         stale_after_ms: int | None = None,
+        price_collar_bps: int | None = None,
     ) -> Self: ...
     @staticmethod
     def from_dict(d: dict[str, Any] | str) -> RiskLimits:
@@ -469,6 +470,8 @@ class RiskLimits:
     def max_participation(self) -> float | None: ...
     @property
     def stale_after_ms(self) -> int | None: ...
+    @property
+    def price_collar_bps(self) -> int | None: ...
     def require_live(self) -> None:
         """Raise ``ValueError`` unless both limits are set (the live-run guard)."""
     def __eq__(self, other: object, /) -> bool: ...

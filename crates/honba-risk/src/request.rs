@@ -21,6 +21,10 @@ pub struct RiskRequest {
     pub trigger_price: Option<f64>,
     /// Last observed price, supplied by the submitter; used to price the notional.
     pub reference_price: Option<f64>,
+    /// Expected execution price of a market order: the touch on the order's side (ask for a
+    /// buy, bid for a sell), supplied by the submitter. `None` = unknown; the price collar
+    /// then skips (ADR 0018 addendum).
+    pub expected_price: Option<f64>,
     /// Average daily volume for the instrument; `None` means the participation
     /// rule cannot evaluate and fails closed.
     pub adv: Option<f64>,

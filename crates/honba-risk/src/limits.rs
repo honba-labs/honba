@@ -24,6 +24,11 @@ pub struct RiskLimits {
     /// `None` = no feed staleness rule; `Some` must be `>= 1`.
     #[serde(default)]
     pub stale_after_ms: Option<u64>,
+    /// Market-order price collar in basis points (ADR 0018 addendum): a market order (and
+    /// the market leg of a stop) is refused when its expected execution price deviates from
+    /// the reference price by more than this. `None` = no collar; `Some` must be `>= 1`.
+    #[serde(default)]
+    pub price_collar_bps: Option<u32>,
 }
 
 /// At most `max_orders` approved orders in any `window_ms` of event time.
@@ -59,6 +64,9 @@ impl RiskLimits {
             if ms == 0 {
                 return Err(RiskConfigError::InvalidStaleAfter(ms));
             }
+        }
+        if self.price_collar_bps == Some(0) {
+            return Err(RiskConfigError::InvalidPriceCollar(0));
         }
         Ok(())
     }

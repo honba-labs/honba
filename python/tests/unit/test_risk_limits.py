@@ -40,6 +40,7 @@ def test_to_dict_round_trips_through_from_dict() -> None:
         "order_rate": {"max_orders": 2, "window_ms": 10},
         "max_participation": None,
         "stale_after_ms": None,
+        "price_collar_bps": None,
     }
     assert RiskLimits.from_dict(limits.to_dict()) == limits
     assert RiskLimits().to_dict() == {
@@ -47,6 +48,7 @@ def test_to_dict_round_trips_through_from_dict() -> None:
         "order_rate": None,
         "max_participation": None,
         "stale_after_ms": None,
+        "price_collar_bps": None,
     }
 
 

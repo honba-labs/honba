@@ -46,6 +46,7 @@ fn round_trips() {
         }),
         max_participation: None,
         stale_after_ms: None,
+        price_collar_bps: None,
     };
     let back: RiskLimits = serde_json::from_str(&serde_json::to_string(&l).unwrap()).unwrap();
     assert_eq!(back, l);
@@ -62,6 +63,7 @@ fn validate_accepts_default_and_valid_limits() {
         }),
         max_participation: None,
         stale_after_ms: None,
+        price_collar_bps: None,
     };
     assert_eq!(l.validate(), Ok(()));
 }
@@ -75,6 +77,7 @@ fn validate_rejects_bad_notional_and_rate() {
             order_rate: None,
             max_participation: None,
             stale_after_ms: None,
+            price_collar_bps: None,
         };
         assert!(
             matches!(l.validate(), Err(RiskConfigError::InvalidMaxNotional(_))),
@@ -90,6 +93,7 @@ fn validate_rejects_bad_notional_and_rate() {
             }),
             max_participation: None,
             stale_after_ms: None,
+            price_collar_bps: None,
         };
         assert_eq!(l.validate(), Err(RiskConfigError::InvalidOrderRate));
     }
@@ -109,12 +113,14 @@ fn live_run_without_limits_refused() {
             order_rate: None,
             max_participation: None,
             stale_after_ms: None,
+            price_collar_bps: None,
         },
         RiskLimits {
             max_notional: None,
             order_rate: Some(rate),
             max_participation: None,
             stale_after_ms: None,
+            price_collar_bps: None,
         },
     ] {
         assert_eq!(l.require_live(), Err(RiskConfigError::LiveRunWithoutLimit));
@@ -124,6 +130,7 @@ fn live_run_without_limits_refused() {
         order_rate: Some(rate),
         max_participation: None,
         stale_after_ms: None,
+        price_collar_bps: None,
     };
     assert_eq!(both.require_live(), Ok(()));
 }
@@ -139,6 +146,7 @@ fn live_run_rejects_invalid_limits_with_the_validation_error() {
         }),
         max_participation: None,
         stale_after_ms: None,
+        price_collar_bps: None,
     };
     assert!(matches!(
         l.require_live(),

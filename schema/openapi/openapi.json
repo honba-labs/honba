@@ -294,6 +294,7 @@
               "max_notional": null,
               "max_participation": null,
               "order_rate": null,
+              "price_collar_bps": null,
               "stale_after_ms": null
             },
             "description": "Pre-trade risk limits (ADR 0018). Absent means no limits."
@@ -1067,6 +1068,13 @@
             "description": "Feed quote or bar data is stale relative to event time (E2-S10).",
             "enum": [
               "risk_feed_stale"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "A market order's expected execution price is outside the price collar (ADR 0018).",
+            "enum": [
+              "risk_price_collar"
             ],
             "type": "string"
           },
@@ -3170,6 +3178,16 @@
             ],
             "default": null,
             "description": "Orders-per-window ceiling in event time. `None` = no rate rule."
+          },
+          "price_collar_bps": {
+            "default": null,
+            "description": "Market-order price collar in basis points (ADR 0018 addendum): a market order (and the market leg of a stop) is refused when its expected execution price deviates from the reference price by more than this. `None` = no collar; `Some` must be `>= 1`.",
+            "format": "uint32",
+            "minimum": 0.0,
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "stale_after_ms": {
             "default": null,

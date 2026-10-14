@@ -143,6 +143,7 @@ pub(crate) fn parse_request(v: &Value) -> Result<RiskRequest, String> {
         trading_state,
         ts: UnixNanos::new(ts),
         last_feed_ts: None,
+        expected_price: None,
     })
 }
 
@@ -492,12 +493,13 @@ impl PyRiskLimits {
 #[pymethods]
 impl PyRiskLimits {
     #[new]
-    #[pyo3(signature = (max_notional=None, order_rate=None, max_participation=None, stale_after_ms=None))]
+    #[pyo3(signature = (max_notional=None, order_rate=None, max_participation=None, stale_after_ms=None, price_collar_bps=None))]
     fn new(
         max_notional: Option<f64>,
         order_rate: Option<(u32, u64)>,
         max_participation: Option<f64>,
         stale_after_ms: Option<u64>,
+        price_collar_bps: Option<u32>,
     ) -> PyResult<Self> {
         let limits = RiskLimits {
             max_notional,
@@ -507,6 +509,7 @@ impl PyRiskLimits {
             }),
             max_participation,
             stale_after_ms,
+            price_collar_bps,
         };
         limits
             .validate()
@@ -532,6 +535,7 @@ impl PyRiskLimits {
             })),
             "max_participation": self.limits.max_participation,
             "stale_after_ms": self.limits.stale_after_ms,
+            "price_collar_bps": self.limits.price_collar_bps,
         });
         to_py(py, &v)
     }
@@ -558,6 +562,11 @@ impl PyRiskLimits {
     #[getter]
     fn stale_after_ms(&self) -> Option<u64> {
         self.limits.stale_after_ms
+    }
+
+    #[getter]
+    fn price_collar_bps(&self) -> Option<u32> {
+        self.limits.price_collar_bps
     }
 
     /// Raises `ValueError` unless both limits are set (the guard for a live run).

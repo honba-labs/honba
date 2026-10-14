@@ -42,7 +42,7 @@ use honba_messages::{
     ErrorCode, ErrorDetail, InstrumentId, Order, OrderId, OrderSide, OrderStatus, OrderType,
     TimeInForce, UnixNanos,
 };
-use honba_risk::{ProfileRulesSource, RiskCheck, RiskDecision, RiskLimits, RiskRequest, RiskStage};
+use honba_risk::{ProfileRulesSource, RiskCheck, RiskDecision, RiskRequest, RiskStage};
 use serde_json::json;
 
 use crate::market::{failure, success, ApiQuery};
@@ -219,10 +219,16 @@ async fn risk_request(
     price: Option<f64>,
     reference_price: Option<f64>,
 ) -> RiskRequest {
-    let feed_ts = match state.quotes.read_quote(instrument_id, None).await {
-        Ok(Some(quote)) => Some(quote.ts_event()),
+    let quote = match state.quotes.read_quote(instrument_id, None).await {
+        Ok(Some(quote)) => Some(quote),
         _ => None,
     };
+    let feed_ts = quote.as_ref().map(|q| q.ts_event());
+    // The touch a market order would cross: ask for a buy, bid for a sell (price collar).
+    let expected_price = quote.as_ref().map(|q| match side {
+        OrderSide::Buy => q.ask_price(),
+        _ => q.bid_price(),
+    });
     RiskRequest {
         order_id,
         instrument_id: instrument_id.clone(),
@@ -231,6 +237,7 @@ async fn risk_request(
         price,
         trigger_price: None,
         reference_price,
+        expected_price,
         adv: None,
         position: state.orders.position(instrument_id),
         trading_state: state.trading_state,
@@ -342,7 +349,7 @@ pub(crate) async fn post_orders(
     // `InstrumentUnknown` at rule 3, after the state rules 1-2 (ADR 0018
     // decision 4); resolving it here first would hoist rule 3 above them.
     let mut stage = match RiskStage::new(
-        RiskLimits::default(),
+        state.risk_limits.clone(),
         state.account_currency,
         Arc::new(ProfileRulesSource::new(profile, instrument)),
     ) {
@@ -572,7 +579,7 @@ async fn gate_and_record(
     };
     let profile = Arc::new(NullMarketProfile::default());
     let mut stage = RiskStage::new(
-        RiskLimits::default(),
+        state.risk_limits.clone(),
         state.account_currency,
         Arc::new(ProfileRulesSource::new(profile, instrument)),
     )

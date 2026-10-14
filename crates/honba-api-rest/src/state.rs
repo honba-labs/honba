@@ -47,6 +47,9 @@ pub struct AppState {
     /// registered route changes it at runtime. `Halted` refuses placements while cancel and
     /// close still pass.
     pub trading_state: TradingState,
+    /// Risk limits the order routes build their stage with (default: none). Set in process
+    /// by the composition root ([`AppState::with_risk_limits`]).
+    pub risk_limits: honba_risk::RiskLimits,
     /// Approval queue for order placements (E5-S4).
     ///
     /// When enabled, `POST /orders` is held here until approved by an operator.
@@ -82,6 +85,7 @@ impl AppState {
             runs: None,
             account_currency: Currency::Inr,
             trading_state: TradingState::Active,
+            risk_limits: honba_risk::RiskLimits::default(),
             approval_queue: None,
             orders: OrderLedger::default(),
             exec: crate::exec::ExecGateway::default_sim(),
@@ -134,6 +138,12 @@ impl AppState {
     /// Sets the operator trading state the write routes evaluate against.
     pub fn with_trading_state(mut self, state: TradingState) -> Self {
         self.trading_state = state;
+        self
+    }
+
+    /// Sets the risk limits the order routes enforce (ADR 0018), e.g. `price_collar_bps`.
+    pub fn with_risk_limits(mut self, limits: honba_risk::RiskLimits) -> Self {
+        self.risk_limits = limits;
         self
     }
 
