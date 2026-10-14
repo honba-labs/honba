@@ -389,8 +389,8 @@ async fn delete_order(State(state): State<Arc<AppState>>, Path(id): Path<String>
     orders::delete_order(State(state), Path(id)).await
 }
 
-async fn post_close_positions() -> Response {
-    orders::post_close_positions().await
+async fn post_close_positions(State(state): State<Arc<AppState>>) -> Response {
+    orders::post_close_positions(State(state)).await
 }
 
 #[cfg(test)]

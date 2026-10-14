@@ -428,3 +428,141 @@ async fn flat_ledger_refuses_everything_when_reducing() {
     .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
+
+/// Seeds one submitted market order of `qty` on `X.NSE` with the given side.
+fn seed(state: &AppState, id: &str, side: honba_messages::OrderSide, qty: f64) {
+    state.orders.record(
+        honba_messages::Order::new(
+            honba_messages::OrderId::new(id),
+            instrument_id(),
+            side,
+            honba_messages::OrderType::Market,
+            qty,
+            None,
+            honba_messages::TimeInForce::Day,
+            UnixNanos::new(0),
+            UnixNanos::new(0),
+        )
+        .with_status(honba_messages::OrderStatus::Submitted),
+    );
+}
+
+/// The ledger rows other than the seeded ones.
+fn close_orders(state: &AppState) -> Vec<honba_messages::Order> {
+    state
+        .orders
+        .list()
+        .into_iter()
+        .filter(|o| !o.order_id().as_str().starts_with("seed"))
+        .collect()
+}
+
+#[tokio::test]
+async fn close_of_a_long_position_sells_the_full_quantity() {
+    let st = state();
+    seed(&st, "seed-1", honba_messages::OrderSide::Buy, 50.0);
+    let (status, body) = call(
+        api_router_with(st.clone()),
+        Method::POST,
+        "/positions/close",
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["data"]["status"], json!("closing"));
+    let rows = close_orders(&st);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].side(), honba_messages::OrderSide::Sell);
+    assert_eq!(rows[0].quantity(), 50.0);
+    assert_eq!(rows[0].order_type(), honba_messages::OrderType::Market);
+    assert_eq!(st.orders.position(&instrument_id()), 0.0);
+}
+
+#[tokio::test]
+async fn close_of_a_short_position_buys_the_full_quantity() {
+    let st = state();
+    seed(&st, "seed-1", honba_messages::OrderSide::Sell, 25.0);
+    let (status, _) = call(
+        api_router_with(st.clone()),
+        Method::POST,
+        "/positions/close",
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let rows = close_orders(&st);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].side(), honba_messages::OrderSide::Buy);
+    assert_eq!(rows[0].quantity(), 25.0);
+    assert_eq!(st.orders.position(&instrument_id()), 0.0);
+}
+
+#[tokio::test]
+async fn close_of_a_flat_ledger_generates_no_orders() {
+    let st = state();
+    seed(&st, "seed-1", honba_messages::OrderSide::Buy, 25.0);
+    seed(&st, "seed-2", honba_messages::OrderSide::Sell, 25.0);
+    let (status, body) = call(
+        api_router_with(st.clone()),
+        Method::POST,
+        "/positions/close",
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["data"]["status"], json!("closing"));
+    assert!(close_orders(&st).is_empty());
+    assert_eq!(st.orders.list().len(), 2);
+}
+
+#[tokio::test]
+async fn close_passes_the_reduce_only_gate_when_reducing() {
+    let st = reducing_state_with_long_25();
+    let (status, body) = call(
+        api_router_with(st.clone()),
+        Method::POST,
+        "/positions/close",
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let rows = close_orders(&st);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].side(), honba_messages::OrderSide::Sell);
+    assert_eq!(rows[0].quantity(), 25.0);
+}
+
+#[tokio::test]
+async fn close_with_a_position_is_refused_when_halted() {
+    let st = state().with_trading_state(TradingState::Halted);
+    seed(&st, "seed-1", honba_messages::OrderSide::Buy, 25.0);
+    let (status, body) = call(
+        api_router_with(st.clone()),
+        Method::POST,
+        "/positions/close",
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(body["error"]["code"], json!("risk_trading_halted"));
+    assert!(close_orders(&st).is_empty());
+}
+
+#[tokio::test]
+async fn close_goes_through_the_approval_queue_when_enabled() {
+    let st = state().with_approval_queue(10);
+    seed(&st, "seed-1", honba_messages::OrderSide::Buy, 25.0);
+    let app = api_router_with(st.clone());
+    let (status, body) = call(app.clone(), Method::POST, "/positions/close", None).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    // Held, not yet in the ledger.
+    assert!(close_orders(&st).is_empty());
+    let (_, queue) = call(app.clone(), Method::GET, "/approval/queue", None).await;
+    assert_eq!(queue["data"]["queue"].as_array().unwrap().len(), 1);
+    let (status, _) = call(app, Method::POST, "/approval/approve", None).await;
+    assert_eq!(status, StatusCode::OK);
+    let rows = close_orders(&st);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].side(), honba_messages::OrderSide::Sell);
+    assert_eq!(rows[0].quantity(), 25.0);
+}

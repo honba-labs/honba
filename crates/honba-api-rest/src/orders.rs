@@ -19,9 +19,13 @@
 //! reaches the gateway. Approved placements land in the [`OrderLedger`] keyed by
 //! the ADR 0019 decision 3 idempotency key; the decision 6 audit record is not
 //! written yet.
-//! `DELETE /orders/{id}` and `POST /positions/close` cannot add exposure, so
-//! they are never risk-checked and are allowed in every state; close does not yet
-//! generate the reduce-only orders a position close implies.
+//! `DELETE /orders/{id}` cannot add exposure, so it is never risk-checked and is
+//! allowed in every state. `POST /positions/close` takes no body: for every instrument
+//! with a non-zero ledger position it generates one market order on the opposite side
+//! for the full net quantity (it can only reduce the position, so it passes the
+//! reduce-only state). Those orders take the same path as `POST /orders` (approval
+//! queue when enabled, else the risk stage, then the ledger), so a halted engine still
+//! refuses them. `Order` has no reduce-only flag; the reduction is by construction.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
@@ -106,6 +110,25 @@ impl OrderLedger {
                 _ => 0.0,
             })
             .sum()
+    }
+
+    /// The non-zero signed position of every instrument in the ledger, in
+    /// instrument order (see [`OrderLedger::position`] for the netting rules).
+    pub fn positions(&self) -> Vec<(InstrumentId, f64)> {
+        let ids: std::collections::BTreeSet<InstrumentId> = {
+            let guard = self
+                .inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            guard.values().map(|o| o.instrument_id().clone()).collect()
+        };
+        ids.into_iter()
+            .map(|id| {
+                let qty = self.position(&id);
+                (id, qty)
+            })
+            .filter(|(_, qty)| qty.abs() > 1e-9)
+            .collect()
     }
 
     /// Every row, oldest insertion first.
@@ -411,10 +434,38 @@ pub(crate) async fn delete_order(
     success(serde_json::json!({"status": "cancelled"}))
 }
 
-/// `POST /positions/close` is not risk-checked (it cannot add exposure) and is
-/// allowed in every state, including halted. The seam only acknowledges; the
-/// E11-S7 ledger will generate the reduce-only orders it evaluates.
-pub(crate) async fn post_close_positions() -> Response {
+/// `POST /positions/close`: for each instrument with a non-zero ledger position,
+/// a market order on the opposite side for the full net quantity, which can only
+/// reduce the position (so it passes the reduce-only state). Each order takes the
+/// `POST /orders` path: held in the approval queue when one is enabled, else risk
+/// checked and recorded; a refusal (for example a halted engine) is returned as is.
+/// A flat ledger generates nothing. The body is not read, so there is no filter.
+pub(crate) async fn post_close_positions(State(state): State<Arc<AppState>>) -> Response {
+    for (instrument_id, net) in state.orders.positions() {
+        let side = if net > 0.0 { "sell" } else { "buy" };
+        let key = format!(
+            "close-{}.{}-{}",
+            instrument_id.symbol(),
+            instrument_id.exchange(),
+            state.orders.list().len()
+        );
+        let req = OrdersRequest {
+            instrument_id: Some(instrument_id),
+            side: Some(side.to_string()),
+            order_type: Some("market".to_string()),
+            qty: Some(net.abs()),
+            price: None,
+            tif: None,
+            client_order_id: Some(key.clone()),
+        };
+        if let Some(queue) = &state.approval_queue {
+            if let Err(detail) = queue.enqueue(OrderId::new(key), req) {
+                return failure(StatusCode::TOO_MANY_REQUESTS, detail);
+            }
+        } else if let Err(response) = gate_and_record(&state, &req, OrderId::new(key)).await {
+            return response;
+        }
+    }
     success(serde_json::json!({"status": "closing"}))
 }
 
@@ -464,38 +515,41 @@ async fn post_orders_direct(
     crate::ApiJson(req): crate::ApiJson<OrdersRequest>,
     order_id: OrderId,
 ) -> Response {
-    let (instrument_id, side, quantity, price) = match parse_order(&req) {
-        Ok(v) => v,
-        Err(detail) => {
-            return failure(StatusCode::UNPROCESSABLE_ENTITY, detail);
-        }
-    };
-    let instrument = match known_instrument(&state, &instrument_id).await {
-        Ok(instrument) => instrument,
-        Err(detail) => {
-            return failure(StatusCode::INTERNAL_SERVER_ERROR, detail);
-        }
-    };
-    let reference_price = match last_price(&state, &instrument_id).await {
+    match gate_and_record(&state, &req, order_id).await {
+        Ok(order) => success(order_json(&order)),
+        Err(response) => response,
+    }
+}
+
+/// Runs the risk stage for `req` and, when approved, records the order in the ledger.
+async fn gate_and_record(
+    state: &AppState,
+    req: &OrdersRequest,
+    order_id: OrderId,
+) -> Result<Order, Response> {
+    let (instrument_id, side, quantity, price) =
+        parse_order(req).map_err(|detail| failure(StatusCode::UNPROCESSABLE_ENTITY, detail))?;
+    let instrument = known_instrument(state, &instrument_id)
+        .await
+        .map_err(|detail| failure(StatusCode::INTERNAL_SERVER_ERROR, detail))?;
+    let reference_price = match last_price(state, &instrument_id).await {
         Some(px) => Some(px),
         None => price,
     };
     let profile = Arc::new(NullMarketProfile::default());
-    let mut stage = match RiskStage::new(
+    let mut stage = RiskStage::new(
         RiskLimits::default(),
         state.account_currency,
         Arc::new(ProfileRulesSource::new(profile, instrument)),
-    ) {
-        Ok(stage) => stage,
-        Err(e) => {
-            return failure(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                ErrorDetail::new(ErrorCode::InternalError, e.to_string()),
-            );
-        }
-    };
+    )
+    .map_err(|e| {
+        failure(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorDetail::new(ErrorCode::InternalError, e.to_string()),
+        )
+    })?;
     let request = risk_request(
-        &state,
+        state,
         order_id.clone(),
         &instrument_id,
         side,
@@ -510,7 +564,7 @@ async fn post_orders_direct(
                 order_id,
                 instrument_id,
                 side,
-                order_type_of(&req),
+                order_type_of(req),
                 quantity,
                 price,
                 TimeInForce::Day,
@@ -519,9 +573,9 @@ async fn post_orders_direct(
             )
             .with_status(OrderStatus::Submitted);
             state.orders.record(order.clone());
-            success(order_json(&order))
+            Ok(order)
         }
-        RiskDecision::Refused(refusal) => refusal_response(&refusal),
+        RiskDecision::Refused(refusal) => Err(refusal_response(&refusal)),
     }
 }
 
