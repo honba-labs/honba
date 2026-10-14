@@ -385,3 +385,71 @@ fn bar_ingest_flag_turns_on_post_bars_and_the_quote_follows() {
         .unwrap();
     assert!(err.contains("bar ingest: 1 bars, 0 errors"), "{err}");
 }
+
+fn risk_toml(name: &str, text: &str) -> PathBuf {
+    let path = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+        .join("honba-cli-serve")
+        .join(format!("{name}.toml"));
+    std::fs::write(&path, text).unwrap();
+    path
+}
+
+#[test]
+fn risk_config_sets_the_rest_limits_and_defaults_are_unchanged_without_it() {
+    let dir = data_dir("risk-config");
+    let d = dir.to_str().unwrap();
+    // 100.0 * 1 = 100 notional, above a 50 ceiling.
+    let big = r#"{"instrument_id":{"symbol":"TCS","exchange":"NSE"},"side":"buy","qty":1.0,
+        "order_type":"limit","price":100.0}"#;
+
+    // No flag: no limits, the order is accepted.
+    let (child, addr) = start(&["--data-dir", d, "--addr", "127.0.0.1:0"]);
+    let (status, body) = post(addr, "/orders", big);
+    assert_eq!(status, 200, "{body}");
+    stop(child);
+
+    let cfg = risk_toml(
+        "risk-ok",
+        "[risk]\nmax_notional = 50.0\nprice_collar_bps = 200\n",
+    );
+    let (child, addr) = start(&[
+        "--data-dir",
+        d,
+        "--addr",
+        "127.0.0.1:0",
+        "--risk-config",
+        cfg.to_str().unwrap(),
+    ]);
+    let (status, body) = post(addr, "/orders", big);
+    assert_eq!(status, 422, "{body}");
+    assert_eq!(
+        body["error"]["code"],
+        Value::from("risk_max_notional_exceeded")
+    );
+    assert_eq!(
+        body["error"]["context"]["rule"],
+        Value::from("max_notional")
+    );
+    stop(child);
+}
+
+#[test]
+fn an_invalid_risk_config_fails_before_listening_and_names_the_field() {
+    let dir = data_dir("risk-config-bad");
+    let cfg = risk_toml("risk-bad", "[risk]\nprice_collar_bps = 0\n");
+    let out = Command::new(env!("CARGO_BIN_EXE_honba"))
+        .args([
+            "serve",
+            "--data-dir",
+            dir.to_str().unwrap(),
+            "--addr",
+            "127.0.0.1:0",
+        ])
+        .args(["--risk-config", cfg.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    assert!(out.stdout.is_empty(), "must not listen");
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("price_collar_bps"), "{err}");
+}

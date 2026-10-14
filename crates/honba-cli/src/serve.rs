@@ -91,6 +91,36 @@ pub(crate) struct IngestArgs {
     pub bar_ingest_capacity: u64,
 }
 
+/// Pre-trade risk limits for the write routes (ADR 0018 decision 8, collar addendum).
+#[derive(clap::Args, Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RiskArgs {
+    /// TOML file with a `[risk]` table, the same shape as a backtest config's `[risk]`
+    /// (max_notional, max_participation, stale_after_ms, price_collar_bps, [risk.order_rate]).
+    /// Default: no limits
+    #[arg(long)]
+    pub risk_config: Option<PathBuf>,
+}
+
+/// The file shape behind `--risk-config`: the `[risk]` table of `BacktestRunConfig`.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RiskFile {
+    #[serde(default)]
+    risk: honba_risk::RiskLimits,
+}
+
+/// Reads and validates a `--risk-config` file. Errors carry the path and name the field.
+pub(crate) fn load_risk_limits(path: &Path) -> Result<honba_risk::RiskLimits> {
+    let text = std::fs::read_to_string(path)
+        .with_context(|| format!("reading --risk-config {}", path.display()))?;
+    let file: RiskFile = toml::from_str(&text)
+        .with_context(|| format!("parsing --risk-config {}", path.display()))?;
+    file.risk
+        .validate()
+        .with_context(|| format!("invalid [risk] in --risk-config {}", path.display()))?;
+    Ok(file.risk)
+}
+
 impl RunsArgs {
     /// The run-service tunables these flags spell.
     pub(crate) fn service_config(&self) -> RunServiceConfig {
@@ -113,6 +143,7 @@ fn clamp_usize(n: u64) -> usize {
     usize::try_from(n).unwrap_or(usize::MAX)
 }
 
+#[allow(clippy::too_many_arguments)] // one parameter per flag group of `honba serve`
 pub fn run(
     data_dir: &Path,
     addr: SocketAddr,
@@ -121,7 +152,12 @@ pub fn run(
     runs: &RunsArgs,
     auth: &AuthArgs,
     ingest: &IngestArgs,
+    risk: &RiskArgs,
 ) -> Result<()> {
+    let risk_limits = match &risk.risk_config {
+        Some(path) => load_risk_limits(path)?,
+        None => honba_risk::RiskLimits::default(),
+    };
     let mut config = ApiConfig::default()
         .with_cors_origins(cors_origins)
         .map_err(|e| anyhow::anyhow!(e))
@@ -140,6 +176,7 @@ pub fn run(
     let state = AppState::from_parquet_dir(data_dir)
         .with_context(|| format!("loading data directory {}", data_dir.display()))?
         .with_trading_state(trading_state)
+        .with_risk_limits(risk_limits)
         .with_journals_dir(&runs.journals_dir, runs.service_config())
         .map_err(|e| anyhow::anyhow!("{}", e.message))
         .with_context(|| format!("opening journals directory {}", runs.journals_dir.display()))?;

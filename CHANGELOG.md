@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Configurable REST risk limits (ADR 0018)
+
+- `honba serve --risk-config <path.toml>`: a TOML file with the same `[risk]` / `[risk.order_rate]`
+  tables as a backtest config (`max_notional`, `order_rate`, `max_participation`, `stale_after_ms`,
+  `price_collar_bps`) sets the limits `POST /orders` enforces. Validated at start-up with
+  `RiskLimits::validate()`; invalid files exit non-zero naming the field. Without the flag the
+  limits are unchanged (all off). No wire/codegen changes.
+
 ### Market-order price collar (ADR 0018 addendum)
 
 - `honba-risk`: new optional `RiskLimits.price_collar_bps` (default off), `RiskRequest.expected_price`,

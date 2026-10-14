@@ -254,3 +254,21 @@ fn serve_bar_ingest_is_off_by_default_and_opt_in() {
     }
     assert!(parse(&["serve", "--data-dir", "d", "--bar-ingest-capacity", "0"]).is_err());
 }
+
+#[test]
+fn serve_risk_config_is_optional_and_takes_a_path() {
+    match parse(&["serve", "--data-dir", "d"]).unwrap().command {
+        Commands::Serve { risk, .. } => assert_eq!(risk.risk_config, None),
+        _ => panic!("expected serve"),
+    }
+    match parse(&["serve", "--data-dir", "d", "--risk-config", "risk.toml"])
+        .unwrap()
+        .command
+    {
+        Commands::Serve { risk, .. } => {
+            assert_eq!(risk.risk_config, Some(PathBuf::from("risk.toml")))
+        }
+        _ => panic!("expected serve"),
+    }
+    assert!(parse(&["serve", "--data-dir", "d", "--risk-config"]).is_err());
+}

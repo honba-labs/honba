@@ -79,6 +79,8 @@ enum Commands {
         auth: serve::AuthArgs,
         #[command(flatten)]
         ingest: serve::IngestArgs,
+        #[command(flatten)]
+        risk: serve::RiskArgs,
     },
     /// Manage trading state (ADR 0018, E2-S1 rest)
     TradingState {
@@ -182,6 +184,7 @@ fn main() -> Result<()> {
             runs,
             auth,
             ingest,
+            risk,
         } => serve::run(
             &data_dir,
             addr,
@@ -190,6 +193,7 @@ fn main() -> Result<()> {
             &runs,
             &auth,
             &ingest,
+            &risk,
         ),
         Commands::TradingState { command } => trading_state::run(command),
         Commands::Verify { manifest } => verify::run(&manifest),

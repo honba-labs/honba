@@ -603,6 +603,8 @@ E3-S1b/S1d shipped (ADR 0030), so top-of-book prices exist. Decision, kept small
   (`QuoteReader`) ask or bid; the reference is the existing `last_price` (quote mid, else limit
   price). A bar-derived quote has bid = ask = close, so the collar only bites on a real two-sided
   quote.
+- Configuration for REST: `honba serve --risk-config <path.toml>` (see the 2026-10-15 decision log
+  entry); without it the limits are `RiskLimits::default()` (all rules off), as before.
 - Engine and `StrategyRunner` pass `expected_price: None` (they track only the last close, which
   is the reference), so the collar is inert in backtests until the L2 simulator's touch is exposed
   to the risk request. Follow-up.
@@ -612,3 +614,12 @@ E3-S1b/S1d shipped (ADR 0030), so top-of-book prices exist. Decision, kept small
 - 2026-10-07: accepted with review amendments (see Amendments).
 - 2026-10-15: addendum: market-order price collar `price_collar_bps` / `risk_price_collar`, off by
   default, REST wired, engine/backtest wiring deferred.
+- 2026-10-15: `honba serve --risk-config <path.toml>` configures the REST limits. The file holds
+  the same `[risk]` / `[risk.order_rate]` tables as a `BacktestRunConfig` (decision 8), parsed
+  straight into `honba_risk::RiskLimits` (unknown keys rejected) and checked with
+  `RiskLimits::validate()` before the server binds; a bad file exits non-zero with a message
+  naming the file and the field (for example `price_collar_bps must be >= 1, got 0`). A missing
+  `[risk]` table means no limits. Chosen over five `--risk-*` flags: one flag, one schema shared
+  with backtests, no per-field flag/validation duplication, nested `order_rate` stays expressible;
+  individual flags can be added later as overrides. No wire types or endpoints. Resolves the earlier
+  "no config yet for REST" gap: `AppState::with_risk_limits` is now fed by the CLI.
