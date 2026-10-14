@@ -289,13 +289,15 @@ pub fn ohlc_indicator_series(
     Ok(out)
 }
 
-/// Describes the available indicators as JSON: names, inputs, params, outputs and warm-up.
+/// Describes the available indicators as JSON: names, inputs, params, outputs, warm-up and the
+/// render contract (E6-S5).
 ///
 /// Shape: `{"warmup_value":"NaN","indicators":[{"name","input","params":[{"name","type",
-/// "required","default"?,"min"?}],"outputs":[..],"warmup":".."}]}`. `input` is `close` for
-/// [`indicator_series`] indicators and `ohlc` for [`ohlc_indicator_series`] ones (those also carry
-/// `"export":"ohlc_indicator_series"`). The `warmup` text is the
-/// number of leading `NaN` values.
+/// "required","default"?,"min"?}],"outputs":[..],"warmup":"..","presentation":{"pane","plots",
+/// "zones"}}]}`. `input` is `close` for [`indicator_series`] indicators and `ohlc` for
+/// [`ohlc_indicator_series`] ones (those also carry `"export":"ohlc_indicator_series"`). The
+/// `warmup` text is the number of leading `NaN` values. `presentation` is the render contract the
+/// chart consumes: the pane, one plot per output and any zones.
 pub fn list_indicators_json() -> String {
     let period = json!({"name": "period", "type": "integer", "required": true, "min": 1,
         "max": MAX_PERIOD});
@@ -307,26 +309,35 @@ pub fn list_indicators_json() -> String {
         json!({"name": "output", "type": "string", "required": false, "default": opts[0],
             "values": opts})
     };
+    // The render contract is owned by `honba-indicators`; serialize it here so the chart has a
+    // single source of truth (a missing entry is a programming error, caught by the catalog test).
+    let pres = |name: &str| {
+        serde_json::to_value(honba_indicators::render::presentation(name).expect("catalog"))
+            .expect("presentation serializes")
+    };
     json!({
         "warmup_value": "NaN",
         "indicators": [
             {"name": "sma", "input": "close", "params": [period], "outputs": ["value"],
-             "warmup": "period - 1"},
+             "warmup": "period - 1", "presentation": pres("sma")},
             {"name": "ema", "input": "close", "params": [period], "outputs": ["value"],
-             "warmup": "period - 1"},
+             "warmup": "period - 1", "presentation": pres("ema")},
             {"name": "rsi", "input": "close", "params": [period], "outputs": ["value"],
-             "warmup": "period"},
+             "warmup": "period", "presentation": pres("rsi")},
             {"name": "macd", "input": "close",
              "params": [int("fast", 12), int("slow", 26), int("signal", 9),
                         output(&["macd", "signal", "histogram"])],
-             "outputs": ["macd", "signal", "histogram"], "warmup": "slow + signal - 2"},
+             "outputs": ["macd", "signal", "histogram"], "warmup": "slow + signal - 2",
+             "presentation": pres("macd")},
             {"name": "bollinger", "input": "close",
              "params": [period, {"name": "k", "type": "number", "required": false,
                                  "default": 2.0, "min": 0},
                         output(&["middle", "upper", "lower"])],
-             "outputs": ["middle", "upper", "lower"], "warmup": "period - 1"},
+             "outputs": ["middle", "upper", "lower"], "warmup": "period - 1",
+             "presentation": pres("bollinger")},
             {"name": "atr", "input": "ohlc", "export": "ohlc_indicator_series",
-             "params": [period], "outputs": ["value"], "warmup": "period - 1"},
+             "params": [period], "outputs": ["value"], "warmup": "period - 1",
+             "presentation": pres("atr")},
         ],
     })
     .to_string()

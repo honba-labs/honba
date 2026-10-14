@@ -30,6 +30,7 @@ pub mod donchian;
 pub mod ema;
 pub mod indicator;
 pub mod macd;
+pub mod render;
 pub mod rsi;
 pub mod screener;
 pub mod sma;

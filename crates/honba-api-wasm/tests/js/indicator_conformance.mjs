@@ -28,8 +28,28 @@ for (const c of fx.cases) {
     console.error(`FAIL ${c.name} (first mismatch at ${bad})`);
   }
 }
-const names = JSON.parse(wasm.list_indicators()).indicators.map((i) => i.name);
+const catalog = JSON.parse(wasm.list_indicators());
+const names = catalog.indicators.map((i) => i.name);
 if (names.join() !== "sma,ema,rsi,macd,bollinger,atr") { failures++; console.error("FAIL catalog", names); }
+// E6-S5: the chart consumes each indicator's render contract through the catalog.
+for (const i of catalog.indicators) {
+  const p = i.presentation;
+  if (!p || !["overlay", "separate"].includes(p.pane) || !Array.isArray(p.plots)) {
+    failures++;
+    console.error(`FAIL catalog presentation ${i.name}`);
+    continue;
+  }
+  if (p.plots.length !== i.outputs.length) {
+    failures++;
+    console.error(`FAIL catalog presentation plots ${i.name}`);
+  }
+  for (const plot of p.plots) {
+    if (!plot.output || !plot.color || String(plot.color).includes("#")) {
+      failures++;
+      console.error(`FAIL catalog plot ${i.name}`);
+    }
+  }
+}
 let threw = false;
 try { wasm.indicator_series("sma", '{"period":0}', new Float64Array([1])); } catch { threw = true; }
 if (!threw) { failures++; console.error("FAIL bad params must throw"); }

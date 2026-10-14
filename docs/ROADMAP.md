@@ -19,6 +19,10 @@ E5-S2 done (2026-10-13): trust envelope (`honba.ai.trust.wrap_untrusted` / `rend
 `extract_from_llm_rendered`) wraps broker/LLM/instrument text with an origin, content hash and
 `untrusted=True`; the MCP gateway marks free-text result fields
 (`wraps_untrusted_text` / `mcp_tool_output_marked`, commit `d6eb37c`).
+E6-S5 done (2026-10-14): indicator render contract (`honba_indicators::render` — pane, one plot per
+output, theme colour roles, zones, sparse flip signals) embedded in the WASM catalog
+(`honba_api_wasm::indicators::list_indicators_json`) so the chart consumes it with one source of
+truth.
 E4-S6, E4-S7, E4-S8 done (2026-10-11): Overfitting validation gates (DSR, PBO, CSCV, holdout, MC, cost-stress), chunked streaming datasets, and session MTF aggregation (ADR 0024, commit e7da809).
 E1-S2 done (2026-10-11): F&O instruments & grammar (india::fno), OptionType, right-to-left resolution, acceptance suite, Python bindings and stubs.
 E6 batch 4, E1-S3, E3-S3 done (2026-10-12): plain-sum indicators O(1) (`00c75af`, `6f23282`); InstrumentMaster dated snapshots over a Parquet
@@ -49,7 +53,7 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | E3 Execution realism | 6 | 0 | 1 | Bar-fill (L1), Rust/Python next-open, cost-schedule fills, fill/latency, margin/MIS, target-position, lot/freeze, sandbox shipped |
 | E4 Research pipeline | 8 | 0 | 0 | Complete: journal v1, cache, hyperparameters, CLI/REST runner, look-ahead, sweep fitness, overfitting gates, streaming datasets, MTF aggregation |
 | E5 Agent and API | 3 | 1 | 5 | AI verifier, MCP server, scopes, approval queue, GBNF+LLM, synthetic+QLoRA+RLVR shipped; sandbox open |
-| E6 Indicators | n/a | 0 | 1 | Batches 1-4 (O(1) rolling, plain sums) done; render contract (S5) not started |
+| E6 Indicators | n/a | 0 | 0 | Batches 1-4 (O(1) rolling, plain sums) and the render contract (S5) done |
 | E7 Scale and ops | 0 | 0 | 5 | Pull-based; E7-S4 is superseded by `honba-sweep` (E10-S5) |
 | E8 Multi-leg | 0 | 0 | 4 | Optional; not scheduled (open decision D13) |
 | E9 Frontend and AlgoDesigner | 0 | 1 | 7 | Greenfield; generated TS types only |
@@ -98,6 +102,7 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | E4-S7 streaming datasets | ADR 0024, `crates/honba-feed/src/streaming.rs`: `StreamDataset`, `StreamingChunkIterator`, chunk manifests, dataset IDs; unit + integration tests `chunks_cover_slice`, `sweep_over_streamed_dataset` |
 | E4-S8 session MTF aggregation | ADR 0024, `crates/honba-indicators/src/mtf.rs`: `MtfAggregator`, `CalendarSession`, HTF bar emission on period completion; unit + integration tests `htf_bar_only_when_complete`, `mtf_strategy_run` |
 | E6 batch 4 plain-sum indicators | `python/src/honba/strategies/indicators/{moving_average/vwma,volume/chaikin_money_flow,volume/money_flow_index,trend/vortex,momentum/chande_momentum,momentum/ultimate_oscillator,volatility/chaikin_volatility}.py` now O(1) via `_rolling.RollingSum`; `python/tests/unit/test_indicators_rolling_batch4.py` (old-oracle + Fraction), hot-path guard extended; commits 00c75af, 6f23282 |
+| E6-S5 indicator render contract | `crates/honba-indicators/src/render.rs` (`Presentation`/`Plot`/`Zone`/`ColorRole`, `catalog_names`, `presentation`, `validate`); serialized into the WASM catalog `honba_api_wasm::indicators::list_indicators_json`; unit `output_len_matches_input` etc. (`crates/honba-indicators/src/tests/render.rs`), integration `chart_consumes_a_valid_presentation_for_every_indicator` (`crates/honba-api-wasm/tests/render_conformance.rs`) |
 | E1-S3 instrument master snapshots | `crates/honba-ports/src/master.rs` `DatedInstrument`, provided-default `snapshot(as_of)`/`resolve_as_of`; `crates/honba-feed/src/instruments.rs` `CatalogInstrumentMaster` over `{root}/instruments/YYYY-MM-DD.parquet`; tests `resolve_as_of_old_symbol`, `backtest_resolves_expired_contract` |
 | E3-S3 cost schedule in fills | `honba-market::DatedCostScheduleSource`, `edge_after_costs`, `FeeBreakdown::total_bps`; `honba-sim::cost::ScheduleFillCost`, `NextOpenSim::with_schedule`, `BarFillEngine::with_schedule`; tests `charges_effective_dated`, `india_costs_in_backtest_match_python_costmodel` (golden) |
 | E4-S5 sweep fitness & REST | `honba-sweep` `CalmarFitness`, `SortinoFitness`, `OmegaFitness`, `fitness_ranking_stable`; `POST /sweeps`, `GET /sweeps/{id}`, `GET /sweeps/{id}/journal` (422 per-trial); `crates/honba-api-rest/tests/rest_sweep.rs` |
@@ -208,7 +213,7 @@ thin; no live feed or broker exists in Rust.
 | AI decision filter (veto/size-down), report builder | DEFER | Needs verifier, journal and trust envelope first | E5-S7, E5-S9 |
 | Per-source circuit breaker, rate limiter | DEFER | No remote sources yet; Python adapters own it when built | E1-S5 |
 | AST/allowlist/subprocess verification of AI code | ADOPT | `ai/verification/` is empty; blocks any AI authoring path | E5-S5 |
-| Indicator render contract | DEFER | Premise is charting; start with AlgoDesigner/chart work (WASM indicators already serve values) | E6-S5 |
+| Indicator render contract | KEEP | Built (E6-S5): `honba_indicators::render` descriptor embedded in the WASM catalog; consumed by WASM browsers, MCP and alerts | E6-S5 |
 | Ops console, per-run mode | DEFER | Needs risk, streaming, run lifecycle | E9-S6 |
 | Celery/Redis/Kafka, billing, multi-tenant SaaS, crypto breadth, Vue | DROP | Unchanged | none |
 
@@ -336,7 +341,7 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 |---|---|---|---|---|---|
 | E6 b3 (DONE) | Monotonic-deque indicators (donchian, williams_r, stochastic, ...) | M each | none | oracle vs old O(n) plus Fraction reference / shared vectors | honba |
 | E6 b4 (DONE) | Plain-sum indicators O(1): vwma, chaikin_money_flow, money_flow_index, vortex, cmo, ultimate_oscillator, chaikin_volatility | M | none | old-oracle + Fraction reference / `test_indicators_rolling_batch4.py` | honba |
-| E6-S5 | Indicator render contract (pane, plots, zones) | S/M | E9 start | `output_len_matches_input` / chart consumes via WASM | honba |
+| E6-S5 (DONE) | Indicator render contract (pane, plots, zones): `honba_indicators::render` `Presentation`/`Plot`/`Zone`/`ColorRole`, embedded in the WASM catalog | S/M | E0-S4 | `output_len_matches_input` / chart consumes via WASM (`render_conformance.rs`, `indicator_conformance.mjs`) | honba |
 | E7-S1 | Docs from schemas | S | continuous | docs build | honba-docs |
 | E7-S2/S3/S5 | Indexed state, cache persistence, recorder tap | M | pull-based | n/a | honba |
 | E8-S1..S4 | Multi-leg; not scheduled | | D13 | n/a | honba |

@@ -138,6 +138,22 @@ fn catalog_lists_every_indicator_with_params_and_warmup() {
 }
 
 #[test]
+fn catalog_declares_a_presentation_for_every_indicator() {
+    let v: serde_json::Value = serde_json::from_str(&list_indicators_json()).unwrap();
+    for ind in v["indicators"].as_array().unwrap() {
+        let name = ind["name"].as_str().unwrap();
+        let pres = &ind["presentation"];
+        assert!(pres.is_object(), "{name}: presentation missing");
+        assert!(pres["pane"].is_string(), "{name}: pane missing");
+        assert_eq!(
+            pres["plots"].as_array().unwrap().len(),
+            ind["outputs"].as_array().unwrap().len(),
+            "{name}: one plot per output"
+        );
+    }
+}
+
+#[test]
 fn finite_input_that_overflows_is_an_error_not_infinity() {
     let big = [1e308, 1e308, 1e308];
     let err = indicator_series("sma", r#"{"period":2}"#, &big).unwrap_err();

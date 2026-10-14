@@ -5,6 +5,7 @@ mod bollinger;
 mod donchian;
 mod ema;
 mod macd;
+mod render;
 mod rsi;
 mod screener;
 mod sma;

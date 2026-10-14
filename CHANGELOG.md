@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Indicator render contract (E6-S5)
+
+- `honba-indicators::render`: a pure presentation contract next to the indicator compute.
+  `Presentation { pane, plots, zones }` describes one plot per declared output (`PlotKind::Line`,
+  `Histogram` or sparse `Marker`), a `ColorRole` theme token (never a hex literal), and ordered
+  `Zone` bands. `catalog_names()` lists the indicators the WASM surface computes,
+  `presentation(name)` returns the contract for one, and `validate(&presentation, &outputs)` rejects
+  a plot that draws an unknown or unplotted output, a duplicate plot, a marker with no
+  `SignalKind::Flip` (or a signal on a non-marker), and a non-finite or backwards zone. Nothing here
+  is a wire message and nothing here can place an order: an indicator emits no execution columns.
+- `honba-api-wasm::indicators::list_indicators_json`: each catalog entry now carries its
+  `presentation`, serialized from the `honba-indicators` contract, so the chart consumes the render
+  contract through WASM with a single source of truth.
+- Tests: unit `crates/honba-indicators/src/tests/render.rs` (`output_len_matches_input`,
+  `presentation_covers_every_output_exactly_once`, `no_look_ahead_prefix_and_full_runs_agree`,
+  `color_roles_are_theme_tokens_never_hex`, `oscillator_zones_are_optional_and_ordered`,
+  `signals_are_sparse_markers_not_execution_columns`, plus the `validate` refusal cases);
+  integration `crates/honba-api-wasm/tests/render_conformance.rs`
+  (`chart_consumes_a_valid_presentation_for_every_indicator`) and the JS harness
+  `indicator_conformance.mjs` (run by `make test-wasm`).
+
 ### `Command` operator intents exposed in Python and CLI (E2-S1 rest)
 
 - `_honba.Command`: Python bindings for `honba_async::Command` with static constructors
