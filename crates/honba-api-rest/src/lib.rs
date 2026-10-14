@@ -31,6 +31,7 @@ use tower_http::{
 
 mod approval;
 mod auth;
+mod bar_pump;
 mod dispatch;
 mod exec;
 mod executor;
@@ -52,6 +53,7 @@ pub use auth::{
     scope_for, unscoped_routes, AuthConfig, AuthLayer, FileTokenStore, RouteScope, TokenInfo,
     ROUTE_SCOPES,
 };
+pub use bar_pump::BarPumpReport;
 pub use dispatch::{build_target, dispatch, dispatch_stream, DispatchError};
 pub use exec::ExecutionVenue;
 pub use executor::BacktestExecutor;
