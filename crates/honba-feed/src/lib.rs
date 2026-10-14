@@ -4,6 +4,7 @@
 
 //! Market data catalog, Parquet readers/writers, and report exporters for Honba.
 
+pub mod bhavcopy;
 pub mod dataset;
 pub mod export;
 /// Data import sources and loaders

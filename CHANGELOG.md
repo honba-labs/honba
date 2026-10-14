@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Rust-native NSE bhavcopy connector (E10-S8, ADR 0028)
+
+- `honba-feed::bhavcopy::BhavcopyConnector`: a `MarketDataConnector` that replays a static NSE
+  bhavcopy CSV as 1-day `MarketEvent::Bar`s. Eagerly parses the three NSE CSV shapes
+  (modern UDiFF, Sec Bhavdata full, Old Bhavcopy — uppercase-normalised headers under
+  `TCKRSYMB|SYMBOL` / `SCTYSRS|SERIES` / `OPNPRIC|OPEN_PRICE|OPEN` …) and keeps only equity series
+  (`EQ`/`BE`/`BZ`) at 09:15 IST (`FixedOffset +05:30`, matching the Python regression
+  `EPOCH_NS_2024_01_02_0915_IST = 1_704_167_100 * 1e9`); buffered bars are subscribed to
+  (`subscribe(SubscriptionParams)`, filtered to the caller's instruments), and `next_event()` yields
+  them in input order until `Ok(None)`. Construction is the only fallible path: a missing file or
+  a header shape the connector cannot map does not return an error, it delivers no bars.
+- Tests: unit `crates/honba-feed/src/tests/bhavcopy.rs` (`bhavcopy_connector_parses_fixture`,
+  `bar_ts_is_ist_open_independent_of_local_tz`); integration
+  `crates/honba-feed/tests/bhavcopy_feed_into_engine.rs` (`bhavcopy_feed_into_engine_run`, a real
+  connector drives an `Engine` fed with `MarketEvent::Bar` wrapped as kernel bars).
+
 ### Report builder with a fact snapshot and quality gate (E5-S9, ADR 0027)
 
 - `honba.ai.report`: an immutable snapshot of run facts (`FactSnapshot`) and a deterministic
