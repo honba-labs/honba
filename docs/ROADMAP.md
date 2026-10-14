@@ -22,7 +22,7 @@ were found stale. **E2 Safe engine is now complete** — E2-S1 rest (`2fadc9f`),
 E2-S9 (`efdd717`), E2-S10 (`508316f`), E2-S11 (`51e5650`) — and **E3-S2/S3/S4/S5/S6/S7 are shipped**, so the
 `E2-S6 -> E2-S7 -> E3-S7` critical path is done. E11-S3 rest is complete (`NOT_IMPLEMENTED_ENDPOINTS` is empty; `7298373`).
 Also shipped since v6: E1-S4 (`9a7731a`), E1-S5 (`0df5b75`, `40ae1ec`), and wire/simulator trailing-stop support (`6e01d81`,
-`4e2fbb4`). Still open: **L2 differential oracle (E3-S1d; E3-S1b-1/2/3 DONE per ADR 0030/D14)**, the pull-based and optional epics (E7, E8,
+`4e2fbb4`). Still open: the pull-based and optional epics (E7, E8,
 E10-S8, E11-S6) and the deferred agent stories (E5-S6, E5-S9). v6 changes are kept below for history.
 
 v6 changes: E10-S7 DONE (commits edb4921, 91bff5b, 2c10630; ADR 0015 implemented); E3-S1a DONE, all three chunks (ADR 0016, commits
@@ -70,7 +70,7 @@ E10-S1..S8, E11-S1..S8). E6 batches 1-2, E7 and E8 are tracked separately below.
 | E0 Contract spine | 8 | 0 | 0 | Complete: wire types, codegen, versions, money, market packs, manifest, `honba verify` |
 | E1 Instruments and adapters | 6 | 0 | 0 | Adapter Protocol, contract suite, F&O grammar, dated master, session/rate/secret, feed connector, product/TIF tables shipped |
 | E2 Safe engine | 10 | 0 | 1 | Risk stage, order FSM, reconciliation, cache, staleness breaker, durable ledger and kill switch all shipped; E2-S8 dropped |
-| E3 Execution realism | 7 | 0 | 0 | Bar-fill (L1), Rust/Python next-open, cost-schedule fills, fill/latency, margin/MIS, target-position, lot/freeze, sandbox shipped; **L2 core, Python parity and conformance (E3-S1b-1/2/3) shipped per ADR 0030; E3-S1d open** |
+| E3 Execution realism | 7 | 0 | 0 | Bar-fill (L1), Rust/Python next-open, cost-schedule fills, fill/latency, margin/MIS, target-position, lot/freeze, sandbox shipped; **L2 core, Python parity, conformance (E3-S1b-1/2/3) and differential oracle (E3-S1d) shipped per ADR 0030** |
 | E4 Research pipeline | 8 | 0 | 0 | Complete: journal v1, cache, hyperparameters, CLI/REST runner, look-ahead, sweep fitness, overfitting gates, streaming datasets, MTF aggregation |
 | E5 Agent and API | 9 | 0 | 0 | Complete: verifier, MCP server, scopes, approval queue, typed decisions, webhook ingestion (S6), report builder (S9), GBNF+LLM, synthetic+QLoRA+RLVR — no deferred stories |
 | E6 Indicators | 1 | 0 | 0 | Batches 1-4 (O(1) rolling, plain sums) and the render contract (S5) done |
@@ -277,7 +277,7 @@ thin; no live feed or broker exists in Rust.
 
 | Idea | Decision | Reason | Lands |
 |---|---|---|---|
-| Naive reference matcher vs optimised sim | DEFER | Do with L2; L1 has simple semantics covered by shared vectors | E3-S1d |
+| Naive reference matcher vs optimised sim | ADOPT (DONE) | `crates/honba-sim/tests/l2_oracle.rs`: independent O(n^2) matcher vs `L2Sim` on seeded streams | E3-S1d |
 | L3 full-book replay | DROP | No full-depth data source; broker feeds give a few levels; would add false precision | none |
 
 ---
@@ -305,9 +305,9 @@ R6 and R7 can run in parallel with R4 once R2 exits. R5 needs R1 for write tools
 R8 (Optional) stays unscheduled.
 
 **Critical path:** E2-S2 -> E11-S7 (write endpoints) and E5-S4 (all DONE); ADR-Run -> E4-S3 -> `POST /backtests` -> E4-S5 -> E11-S4 -> E9-S7
-(all DONE in `honba`, E9-S7 in `honba-frontend`); E3-S1a (next-open Rust) -> E3-S2 -> E3-S7 (all DONE; **E3-S1b/S1d now schedulable per ADR 0030**);
+(all DONE in `honba`, E9-S7 in `honba-frontend`); E3-S1a (next-open Rust) -> E3-S2 -> E3-S7 (all DONE; E3-S1b/S1d DONE per ADR 0030);
 E10-S7 (done) gates Python callers of any async Rust API; E2-S6(a) -> E2-S6(b..d) -> E2-S7 -> E3-S7 (all DONE). What remains is off the
-old critical path: **E3-S1d (scheduled per ADR 0030; E3-S1b-1/2/3 DONE)** and the pull-based E7 and optional E8 epics.
+old critical path: the pull-based E7 and optional E8 epics.
 
 ### E1 Instruments and adapters
 
@@ -343,7 +343,7 @@ old critical path: **E3-S1d (scheduled per ADR 0030; E3-S1b-1/2/3 DONE)** and th
 | E3-S1b-1 (DONE) | L2 matching core (`crates/honba-sim/src/l2/`, `L2Sim`; unit tests `crates/honba-sim/src/tests/l2.rs`): top-of-book book, marketable walks, resting limits trade-through, stops from TradeTick, IOC/FOK/day, L2 cancel timing (ADR 0019) | M | E2-S6, E3-S2, ADR 0030 | `limit_fills_on_trade_through` / L1 vs L2 conformance on same stream | honba |
 | E3-S1b-2 (DONE) | Python parity: `make_simulator(fill="l2")`, native binding via `honba._honba`, fallback reference | M | E3-S1b-1 | parity on `l2_sim.json` vectors | honba |
 | E3-S1b-3 (DONE) | Conformance vectors: `l2_sim.json`, `gen_l2_vectors.py`, replay (Rust + Python); Rust replay `crates/honba-sim/tests/l2_conformance.rs`, `make check-l2-vectors` | M | E3-S1b-1 | `l2_sim.json` replayed byte-identically | honba |
-| E3-S1d | Differential oracle: naive reference matcher vs optimised sim on seeded streams | M | E3-S1b-3 | `oracle_agrees_seeded_streams` | honba |
+| E3-S1d (DONE) | Differential oracle: naive reference matcher vs optimised sim on seeded streams; `crates/honba-sim/tests/l2_oracle.rs` (600 seeds per run, 20k checked once; no L2Sim divergence found) | M | E3-S1b-3 | `oracle_agrees_seeded_streams` | honba |
 | E3-S2 (DONE) | `FillModel`, `LatencyModel` traits, seeded; slippage, ack delay, queue position (commit `695a549`, `crates/honba-sim/tests/fill_latency_models.rs`); depth-survival discount deferred to L2 (ADR 0025) | M | E3-S1a | `seeded_slippage_reproducible` / `same_seed_byte_identical_fills` | honba |
 | E3-S3 (DONE) | Wire Rust `CostSchedule` into fills; `edge_after_costs` (named charges on `Trade` deferred) | M | E0-S7 | `charges_effective_dated` / `india_costs_in_backtest_match_python_costmodel` golden | honba |
 | E3-S4 (DONE) | Margin model and MIS square-off from `MarketProfile` (commit `1ffa180`) | M | E3-S3, E2-S3 | `mis_run_flat_by_close` (`crates/honba-sim/tests/mis_square_off.rs`) | honba |
