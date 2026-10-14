@@ -8,6 +8,7 @@ pub(crate) fn export(
     openapi_output: &Option<PathBuf>,
     pyi_output: &Option<PathBuf>,
     mcp_output: &Option<PathBuf>,
+    docs_output: &Option<PathBuf>,
 ) -> Result<()> {
     let codegen = honba_codegen::Codegen::new();
     let schema_dir = output
@@ -36,13 +37,18 @@ pub(crate) fn export(
         let p = codegen.write_mcp(dir)?;
         println!("mcp_tools.json written to {}", p.display());
     }
+    if let Some(dir) = docs_output.as_ref() {
+        let p = codegen.write_docs(dir)?;
+        println!("api-reference.md written to {}", p.display());
+    }
     if typescript_dir.is_none()
         && client_dir.is_none()
         && openapi_output.is_none()
         && pyi_output.is_none()
         && mcp_output.is_none()
+        && docs_output.is_none()
     {
-        println!("Note: no --typescript/--client/--openapi/--pyi/--mcp dirs given; only domain_schema.json emitted. Pass one to generate that artifact.");
+        println!("Note: no --typescript/--client/--openapi/--pyi/--mcp/--docs dirs given; only domain_schema.json emitted. Pass one to generate that artifact.");
     }
     Ok(())
 }

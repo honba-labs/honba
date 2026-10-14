@@ -1,4 +1,4 @@
-//! honba-codegen: one registry of Rust wire types, rendered five ways.
+//! honba-codegen: one registry of Rust wire types, rendered many ways.
 //!
 //! Rust is the source of truth for the contract (docs/archive/plan.md §4.1). This crate walks
 //! the wire types once and emits:
@@ -8,9 +8,12 @@
 //!   registry, so the served spec cannot describe a route the router lacks.
 //! - **TypeScript** — for `honba-frontend`, with enums as literal unions rather
 //!   than `any`.
+//! - **TypeScript client** — the typed fetch client, from the same endpoint registry.
 //! - **Python `.pyi`** — type stubs for the `honba` package.
 //! - **MCP tool schemas** — built from the same types, so a tool's arguments
 //!   cannot drift from the DTOs.
+//! - **Markdown docs** — the REST and domain reference for `honba-docs`,
+//!   generated from the endpoint registry and the published type list.
 //!
 //! Generation is checked in CI by drift, not by review: regenerate and
 //! `git diff --exit-code`.
@@ -29,6 +32,7 @@ use anyhow::{Context, Result};
 use serde_json::{json, Value};
 
 pub mod client;
+pub mod docs;
 pub mod endpoints;
 pub mod instance;
 pub mod mcp;
@@ -76,6 +80,8 @@ pub enum Artifact {
     Pyi,
     /// MCP tool schemas, `mcp_tools.json`.
     Mcp,
+    /// Markdown API reference for `honba-docs`, `api-reference.md`.
+    Docs,
 }
 
 impl Artifact {
@@ -87,6 +93,7 @@ impl Artifact {
         Artifact::Client,
         Artifact::Pyi,
         Artifact::Mcp,
+        Artifact::Docs,
     ];
 
     /// The stable name used across the FFI boundary and on the command line.
@@ -98,6 +105,7 @@ impl Artifact {
             Artifact::Client => "client",
             Artifact::Pyi => "pyi",
             Artifact::Mcp => "mcp",
+            Artifact::Docs => "docs",
         }
     }
 
@@ -115,6 +123,7 @@ impl Artifact {
             Artifact::Client => "client.ts",
             Artifact::Pyi => "__init__.pyi",
             Artifact::Mcp => "mcp_tools.json",
+            Artifact::Docs => "api-reference.md",
         }
     }
 }
@@ -147,6 +156,7 @@ impl Codegen {
             Artifact::Client => self.client(),
             Artifact::Pyi => self.pyi(),
             Artifact::Mcp => to_pretty_json(&self.mcp()),
+            Artifact::Docs => self.docs(),
         }
     }
 
@@ -270,6 +280,25 @@ impl Codegen {
         Ok(path)
     }
 
+    /// The Markdown API reference for `honba-docs`.
+    ///
+    /// Rendered from the endpoint registry and the published type list, so the
+    /// committed docs page cannot describe a route or type the contract lacks.
+    pub fn docs(&self) -> String {
+        docs::render(SCHEMA_VERSION, API_VERSION)
+    }
+
+    /// Writes [`Codegen::docs`] into `output_dir/api-reference.md`.
+    ///
+    /// The committed target is `honba-docs/docs/api/api-reference.md`
+    /// (`make docs`): generated and never edited, with the hand-written prose
+    /// pages living beside it.
+    pub fn write_docs(&self, output_dir: &Path) -> Result<PathBuf> {
+        let path = self.write(Artifact::Docs, output_dir)?;
+        println!("Generated docs reference: {}", path.display());
+        Ok(path)
+    }
+
     /// Writes every artifact under `base_dir`.
     ///
     /// Layout matches the Makefile targets: `domain/`, `openapi/`, `typescript/`,
@@ -282,6 +311,7 @@ impl Codegen {
             self.write_client(&base_dir.join("client"))?,
             self.write_pyi(&base_dir.join("python"))?,
             self.write_mcp(&base_dir.join("mcp"))?,
+            self.write_docs(&base_dir.join("docs"))?,
         ])
     }
 }

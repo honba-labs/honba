@@ -41,6 +41,7 @@ fn generate(name: &str) -> Vec<(PathBuf, PathBuf)> {
         PathBuf::new(), // Client: committed in honba-frontend, not here.
         root.join("python/src/honba/wire/generated/__init__.pyi"),
         root.join("schema/mcp/mcp_tools.json"),
+        PathBuf::new(), // Docs: committed in honba-docs, not here.
     ];
     assert_eq!(written.len(), committed.len(), "artifact list changed");
     written

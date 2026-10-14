@@ -12,7 +12,8 @@ fn every_artifact_is_offered_by_name() {
             "typescript",
             "client",
             "pyi",
-            "mcp"
+            "mcp",
+            "docs"
         ]
     );
 }

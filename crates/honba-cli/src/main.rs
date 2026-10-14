@@ -133,6 +133,9 @@ enum SchemaCommands {
         /// Also render MCP tool schemas into DIR
         #[arg(long)]
         mcp: Option<PathBuf>,
+        /// Also render Markdown docs into DIR (honba-docs)
+        #[arg(long)]
+        docs: Option<PathBuf>,
     },
 }
 
@@ -158,7 +161,8 @@ fn main() -> Result<()> {
                 openapi,
                 pyi,
                 mcp,
-            } => schema::export(&output, &typescript, &client, &openapi, &pyi, &mcp),
+                docs,
+            } => schema::export(&output, &typescript, &client, &openapi, &pyi, &mcp, &docs),
         },
         Commands::Codegen {
             schema_dir,

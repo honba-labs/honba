@@ -31,6 +31,7 @@ python:
 
 FRONTEND_TS_DIR ?= ../honba-frontend/src/core/types/generated
 FRONTEND_CLIENT_DIR ?= ../honba-frontend/src/core/api/generated
+DOCS_DIR ?= ../honba-docs/docs/api
 
 # Rust is the codegen source of truth (honba-codegen). Every surface derives from it:
 # schema/domain, schema/openapi, schema/mcp, python/src/honba/wire/generated and the frontend
@@ -93,11 +94,20 @@ check-mcp:
 	$(HONBA) schema export --mcp schema/mcp
 	$(call no_drift,.,schema/mcp)
 
-# Regenerate everything this repo commits, plus the frontend TypeScript and client.
-codegen: schema client openapi pyi mcp
+# Markdown docs for honba-docs (LOCAL ONLY: writes into the sibling ../honba-docs checkout).
+docs:
+	$(HONBA) schema export --docs $(DOCS_DIR)
+
+check-docs:
+	$(HONBA) schema export --docs $(DOCS_DIR)
+	$(call no_drift,.,schema/mcp)
+	$(call no_drift,$(DOCS_DIR),.)
+
+# Regenerate everything this repo commits, plus the frontend TypeScript, client, and docs.
+codegen: schema client openapi pyi mcp docs
 
 # Every drift check, including the cross-repo TypeScript ones (local only).
-check-codegen: check-schema check-schema-ts check-client check-openapi check-pyi check-mcp
+check-codegen: check-schema check-schema-ts check-client check-openapi check-pyi check-mcp check-docs
 	@echo "all codegen drift checks passed"
 
 # Every drift check that needs only this repo. CI also runs the cross-repo TypeScript checks in
