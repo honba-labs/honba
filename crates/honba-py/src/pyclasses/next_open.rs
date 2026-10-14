@@ -45,7 +45,7 @@ pub struct SimError {
 }
 
 impl SimError {
-    fn value(message: impl Into<String>) -> Self {
+    pub(crate) fn value(message: impl Into<String>) -> Self {
         Self {
             kind: SimErrorKind::Value,
             message: message.into(),
@@ -63,7 +63,7 @@ impl From<AlgoError> for SimError {
     }
 }
 
-type Res<T> = Result<T, SimError>;
+pub(crate) type Res<T> = Result<T, SimError>;
 
 /// One bar, as the vectors and the Python reference carry it.
 #[derive(Clone, Debug, PartialEq)]
@@ -185,7 +185,7 @@ pub struct EventOut {
 }
 
 impl EventOut {
-    fn from_event(ev: &ExecutionEvent) -> Self {
+    pub(crate) fn from_event(ev: &ExecutionEvent) -> Self {
         let venue = |v: &Option<honba_messages::VenueOrderId>| v.as_ref().map(|v| v.to_string());
         let base = |kind,
                     order_id: &honba_messages::OrderId,
@@ -330,7 +330,7 @@ impl CostSpec {
         }
     }
 
-    fn into_fn(self, currency: Currency) -> Option<FillCostFn> {
+    pub(crate) fn into_fn(self, currency: Currency) -> Option<FillCostFn> {
         match self {
             CostSpec::None => None,
             CostSpec::IndiaDelivery => Some(schedule_cost_fn(
@@ -361,7 +361,7 @@ pub fn schedule_cost_fn(
     ScheduleFillCost::new(Arc::from(schedule), segment, currency).into_fn()
 }
 
-fn parse_side(side: &str) -> OrderSide {
+pub(crate) fn parse_side(side: &str) -> OrderSide {
     match side {
         "buy" => OrderSide::Buy,
         "sell" => OrderSide::Sell,
@@ -369,7 +369,7 @@ fn parse_side(side: &str) -> OrderSide {
     }
 }
 
-fn side_str(side: OrderSide) -> &'static str {
+pub(crate) fn side_str(side: OrderSide) -> &'static str {
     if side == OrderSide::Buy {
         "buy"
     } else {
@@ -417,7 +417,7 @@ impl SimConfig {
     }
 }
 
-fn iid(symbol: &str, exchange: &str) -> InstrumentId {
+pub(crate) fn iid(symbol: &str, exchange: &str) -> InstrumentId {
     InstrumentId::new(symbol, Exchange::new(exchange))
 }
 
@@ -656,23 +656,29 @@ impl NativeSim {
 // -- Python shell ---------------------------------------------------------------------------
 
 /// First error raised by a Python cost callable, kept so it propagates unchanged.
-type ErrorSlot = Arc<Mutex<Option<PyErr>>>;
+pub(crate) type ErrorSlot = Arc<Mutex<Option<PyErr>>>;
 
-fn to_py_err(e: SimError) -> PyErr {
+pub(crate) fn to_py_err(e: SimError) -> PyErr {
     match e.kind {
         SimErrorKind::Value => PyValueError::new_err(e.message),
         SimErrorKind::Runtime => PyRuntimeError::new_err(e.message),
     }
 }
 
-fn required<'py, T: FromPyObject<'py>>(d: &Bound<'py, PyDict>, key: &str) -> PyResult<T> {
+pub(crate) fn required<'py, T: FromPyObject<'py>>(
+    d: &Bound<'py, PyDict>,
+    key: &str,
+) -> PyResult<T> {
     match d.get_item(key)? {
         Some(v) if !v.is_none() => v.extract(),
         _ => Err(PyValueError::new_err(format!("missing key {key:?}"))),
     }
 }
 
-fn optional<'py, T: FromPyObject<'py>>(d: &Bound<'py, PyDict>, key: &str) -> PyResult<Option<T>> {
+pub(crate) fn optional<'py, T: FromPyObject<'py>>(
+    d: &Bound<'py, PyDict>,
+    key: &str,
+) -> PyResult<Option<T>> {
     match d.get_item(key)? {
         Some(v) if !v.is_none() => v.extract().map(Some),
         _ => Ok(None),
@@ -713,7 +719,11 @@ fn bars_from_py(bars: Vec<Bound<'_, PyDict>>) -> PyResult<Vec<BarIn>> {
 /// A Python callable `(side: str, quantity: float, price: float) -> int` as a fill-cost function.
 /// The callable runs under the GIL the calling method already holds; its exception is stored in
 /// `slot` and re-raised unchanged by the method that failed.
-fn callable_cost_fn(callable: Py<PyAny>, currency: Currency, slot: ErrorSlot) -> FillCostFn {
+pub(crate) fn callable_cost_fn(
+    callable: Py<PyAny>,
+    currency: Currency,
+    slot: ErrorSlot,
+) -> FillCostFn {
     Box::new(move |side, qty, price| {
         Python::with_gil(|py| {
             let result = callable
@@ -731,7 +741,7 @@ fn callable_cost_fn(callable: Py<PyAny>, currency: Currency, slot: ErrorSlot) ->
     })
 }
 
-fn lot_key(key: &Bound<'_, PyAny>) -> PyResult<(String, String)> {
+pub(crate) fn lot_key(key: &Bound<'_, PyAny>) -> PyResult<(String, String)> {
     if let Ok(symbol) = key.extract::<String>() {
         return Ok((symbol, "NSE".into()));
     }

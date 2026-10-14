@@ -1,10 +1,13 @@
 """Generates ``schema/conformance/l2_sim.json``: conformance vectors for the L2 simulator (ADR 0030).
 
-Unlike the L1 generator there is no Python reference to run yet (Python parity is E3-S1b-2).
+Unlike the L1 generator nothing is run to produce the expectations: the Python reference
+(``honba.backtest.l2_sim``) is a second implementation checked against them, not their source.
 Every expected fill, rejection, cash and position below is HAND-DERIVED from the ADR 0030 section 3
 rules and written next to its scenario; nothing is recorded from ``honba_sim::L2Sim``. The Rust
-replay (``crates/honba-sim/tests/l2_conformance.rs``) is the first consumer; the Python replay
-(E3-S1b-2) will read the same file, so the schema below is the contract.
+replay (``crates/honba-sim/tests/l2_conformance.rs``) is the first consumer; the pyclass replay
+(``crates/honba-py/tests/l2_native.rs``) and the Python replays
+(``python/tests/integration/test_l2_sim_conformance.py``, both backends) read the same file, so
+the schema below is the contract.
 
 Run from the repo root: ``python3 scripts/gen_l2_vectors.py`` (``--check`` only compares, exit 1 on
 drift; the Rust test runs it, and ``make check-l2-vectors`` does too). Deterministic: no wall

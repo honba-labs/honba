@@ -95,3 +95,4 @@ All work is opt-in; the default simulator and research pipeline remain L1 (ADR 0
 
 - 2026-10-14: proposed.
 - 2026-10-14: accepted; E3-S1b/S1d scheduling authorized. E3-S1b-1 implemented `L2Sim` (`honba-sim/src/l2/`); `depth_survival_discount` left unwired (matching is instantaneous at event time, no in-flight interval to discount), still an open item for v2.
+- 2026-10-14: E3-S1b-2/3 implemented: `honba._honba.L2Simulator` (`crates/honba-py/src/pyclasses/l2.rs`), Python `L2Execution` (`honba.backtest.l2_sim`, native + pure-Python reference) behind `make_simulator(fill="l2")`; `l2_sim.json` replays on the Rust core, the pyclass and both Python backends, plus a seeded native-vs-Python parity test. Slippage, latency and margin models of the Rust core are not exposed to Python.

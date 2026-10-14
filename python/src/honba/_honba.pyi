@@ -14,6 +14,7 @@ __all__ = [
     "Fill",
     "FnoContract",
     "InstrumentId",
+    "L2Simulator",
     "NextOpenSimulator",
     "OrderIntent",
     "QuoteTick",
@@ -175,6 +176,48 @@ def next_open_fill_cost(pack: str, side: str, quantity: float, price: float) -> 
     to paise once and summed, exactly like ``nse_equity_delivery_fill_cost`` /
     ``nse_equity_intraday_fill_cost``. Raises ``ValueError`` for an unknown pack.
     """
+
+@final
+class L2Simulator:
+    """Rust ``L2Sim`` (ADR 0030): orders match against a top-of-book quote / trade stream.
+
+    Money is integer minor units (ADR 0011); quotes, trades and orders are plain dicts. A quote
+    has ``symbol``, ``ts`` (nanoseconds), ``bid``, ``ask``, ``bid_size``, ``ask_size`` and
+    optional ``exchange``; a trade ``symbol``, ``ts``, ``price``, ``size`` and optional
+    ``aggressor`` (``"buyer"`` / ``"seller"`` / ``"none"``) and ``exchange``; an order the keys
+    of ``NextOpenSimulator`` plus optional ``tif`` (``"day"`` default, ``"gtc"``, ``"ioc"``,
+    ``"fok"``, ``"gtd"``). ``costs`` is as for ``NextOpenSimulator``. ``ValueError`` for rule
+    violations (a crossed or non-finite quote, a duplicate working id, a negative cost).
+    """
+
+    cash: int
+    fees: int
+    traded_notional: int
+    positions: list[tuple[str, str, float]]
+    working_orders: list[str]
+    def __new__(
+        cls,
+        cash: int,
+        currency: str = "INR",
+        *,
+        long_only: bool = True,
+        lot_sizes: dict[str, float] | dict[tuple[str, str], float] | None = None,
+        costs: str | Callable[[str, float, float], int] | None = None,
+    ) -> Self: ...
+    def on_quote(self, quote: dict[str, Any]) -> None: ...
+    def on_trade(self, trade: dict[str, Any]) -> None: ...
+    def submit(self, order: dict[str, Any]) -> None: ...
+    def cancel(self, order_id: str, now: int) -> None: ...
+    def advance_to(self, ts: int) -> None: ...
+    def on_session_close(self, ts: int) -> None: ...
+    def set_lot_size(self, symbol: str, lot_size: float, exchange: str = "NSE") -> None: ...
+    def set_position(self, symbol: str, quantity: float, exchange: str = "NSE") -> None: ...
+    def book(
+        self, symbol: str, exchange: str = "NSE"
+    ) -> tuple[float, float, float, float] | None: ...
+    def drain_events(self) -> list[dict[str, Any]]: ...
+    def drain_fills(self) -> list[dict[str, Any]]: ...
+    def drain_rejections(self) -> list[dict[str, Any]]: ...
 
 @final
 class NextOpenSimulator:

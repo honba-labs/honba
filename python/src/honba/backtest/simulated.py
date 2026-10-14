@@ -101,7 +101,7 @@ __all__ = [
     "zero_costs",
 ]
 
-FillModel = Literal["bar_close", "next_open"]
+FillModel = Literal["bar_close", "next_open", "l2"]
 
 Backend = Literal["python", "native"]
 """The implementation behind a :class:`NextOpenExecution`."""
@@ -473,6 +473,11 @@ def resolve_backend(requested: BackendChoice | None = None) -> Backend:
     ``honba._honba`` is importable and current, else ``python``; ``native`` raises the
     ``ImportError`` / ``RuntimeError`` of the unusable extension, with the backend named.
     """
+    return _resolve(requested, _native_simulator)
+
+
+def _resolve(requested: BackendChoice | None, probe: Callable[[], Any]) -> Backend:
+    """:func:`resolve_backend` for any native class: ``probe()`` raises when it is unusable."""
     if requested is None:
         raw = os.environ.get(BACKEND_ENV, "").strip().lower() or "auto"
         origin = f"{BACKEND_ENV}={os.environ.get(BACKEND_ENV)!r}"
@@ -483,7 +488,7 @@ def resolve_backend(requested: BackendChoice | None = None) -> Backend:
     if raw == "python":
         return "python"
     try:
-        _native_simulator()
+        probe()
     except ImportError as exc:
         if raw == "native":
             raise ImportError(f"the native simulator backend was requested: {exc}") from exc
@@ -952,6 +957,10 @@ def make_simulator(
       explicit ``settlement_days`` because the port counts bars, not trading days.
       ``auction.delay_bars`` (Balch pitfall #8) also counts driving bars, so it needs an
       intraday ``timeframe``.
+    * ``"l2"``: :class:`honba.backtest.l2_sim.L2Execution` (ADR 0030), matching orders against a
+      ``QuoteTick`` / ``TradeTick`` stream. Opt-in; there is no settlement cycle, so
+      ``settlement_days`` / ``timeframe`` / ``as_of`` / ``exchange`` do not apply, and ``impact=``
+      and ``auction=`` are refused.
     * ``"bar_close"``: the single-price conformance simulator
       ``honba.strategies.testing.BarCloseFills`` (fills at the decision bar's close; costs
       and cash rules do not apply). Kept for the cross-language conformance suite.
@@ -982,6 +991,19 @@ def make_simulator(
             impact=impact,
             auction=auction,
         )
+    if fill == "l2":
+        if impact is not None:
+            raise ValueError(
+                "impact= requires fill='next_open': the L2 simulator has no impact model"
+            )
+        if auction is not None:
+            raise ValueError(
+                "auction= requires fill='next_open': the L2 simulator has no opening-auction model"
+            )
+        from honba.backtest.l2_sim import L2Execution
+
+        cost_fn = resolve_fill_costs(costs) if isinstance(costs, str) else costs
+        return L2Execution(cash=cash, costs=cost_fn, long_only=long_only, lot_sizes=lot_sizes)
     if fill == "bar_close":
         if impact is not None:
             raise ValueError(
@@ -996,4 +1018,4 @@ def make_simulator(
         from honba.strategies.testing import BarCloseFills
 
         return BarCloseFills(currency=cash.currency)
-    raise ValueError(f"unknown fill model {fill!r}; expected 'next_open' or 'bar_close'")
+    raise ValueError(f"unknown fill model {fill!r}; expected 'next_open', 'l2' or 'bar_close'")
