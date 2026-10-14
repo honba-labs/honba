@@ -22,7 +22,7 @@ were found stale. **E2 Safe engine is now complete** — E2-S1 rest (`2fadc9f`),
 E2-S9 (`efdd717`), E2-S10 (`508316f`), E2-S11 (`51e5650`) — and **E3-S2/S3/S4/S5/S6/S7 are shipped**, so the
 `E2-S6 -> E2-S7 -> E3-S7` critical path is done. E11-S3 rest is complete (`NOT_IMPLEMENTED_ENDPOINTS` is empty; `7298373`).
 Also shipped since v6: E1-S4 (`9a7731a`), E1-S5 (`0df5b75`, `40ae1ec`), and wire/simulator trailing-stop support (`6e01d81`,
-`4e2fbb4`). Still open: L2 matching (E3-S1b/S1d, deferred by ADR 0025/D14), the pull-based and optional epics (E7, E8,
+`4e2fbb4`). Still open: **L2 matching (E3-S1b-1/2/3, E3-S1d, schedulable per ADR 0030/D14)**, the pull-based and optional epics (E7, E8,
 E10-S8, E11-S6) and the deferred agent stories (E5-S6, E5-S9). v6 changes are kept below for history.
 
 v6 changes: E10-S7 DONE (commits edb4921, 91bff5b, 2c10630; ADR 0015 implemented); E3-S1a DONE, all three chunks (ADR 0016, commits
@@ -70,7 +70,7 @@ E10-S1..S8, E11-S1..S8). E6 batches 1-2, E7 and E8 are tracked separately below.
 | E0 Contract spine | 8 | 0 | 0 | Complete: wire types, codegen, versions, money, market packs, manifest, `honba verify` |
 | E1 Instruments and adapters | 6 | 0 | 0 | Adapter Protocol, contract suite, F&O grammar, dated master, session/rate/secret, feed connector, product/TIF tables shipped |
 | E2 Safe engine | 10 | 0 | 1 | Risk stage, order FSM, reconciliation, cache, staleness breaker, durable ledger and kill switch all shipped; E2-S8 dropped |
-| E3 Execution realism | 7 | 0 | 0 | Bar-fill (L1), Rust/Python next-open, cost-schedule fills, fill/latency, margin/MIS, target-position, lot/freeze, sandbox shipped; L2 (E3-S1b/S1d) deferred (ADR 0025) |
+| E3 Execution realism | 7 | 0 | 0 | Bar-fill (L1), Rust/Python next-open, cost-schedule fills, fill/latency, margin/MIS, target-position, lot/freeze, sandbox shipped; **L2 (E3-S1b-1/2/3, E3-S1d) schedulable per ADR 0030** |
 | E4 Research pipeline | 8 | 0 | 0 | Complete: journal v1, cache, hyperparameters, CLI/REST runner, look-ahead, sweep fitness, overfitting gates, streaming datasets, MTF aggregation |
 | E5 Agent and API | 9 | 0 | 0 | Complete: verifier, MCP server, scopes, approval queue, typed decisions, webhook ingestion (S6), report builder (S9), GBNF+LLM, synthetic+QLoRA+RLVR — no deferred stories |
 | E6 Indicators | 1 | 0 | 0 | Batches 1-4 (O(1) rolling, plain sums) and the render contract (S5) done |
@@ -300,14 +300,14 @@ Done work is removed. Sizes: S (<=1 day), M (2-4 days), L (split before start). 
 R6 and R7 can run in parallel with R4 once R2 exits. R5 needs R1 for write tools and R2 for runs.
 
 **Milestone status (2026-10-14):** R1 (Safe writes), R2 (Runs), R3 (Live-shaped runtime), R4 (Trustworthy research) and R5 (Agent surfaces) are **complete** (E5-S6 webhook ingestion and E5-S9 report builder shipped). R6 (Live-ready) is complete except the L2 simulator
-(E3-S1b/S1d, deferred by ADR 0025/D14); E10-S8 shipped the bhavcopy Rust connector. R7 (Frontend) is **complete**
+(E3-S1b/S1d, **ADR 0030 defines the stream/book/vectors; scheduling decision pending**); E10-S8 shipped the bhavcopy Rust connector. R7 (Frontend) is **complete**
 (E9-S1..S7 shipped: core graph/code/verify/assistant in `4e15416`, React Flow canvas and views in frontend `7050c49`).
 R8 (Optional) stays unscheduled.
 
 **Critical path:** E2-S2 -> E11-S7 (write endpoints) and E5-S4 (all DONE); ADR-Run -> E4-S3 -> `POST /backtests` -> E4-S5 -> E11-S4 -> E9-S7
-(all DONE in `honba`, E9-S7 in `honba-frontend`); E3-S1a (next-open Rust) -> E3-S2 -> E3-S7 (all DONE; E3-S1b is deferred by ADR 0025);
+(all DONE in `honba`, E9-S7 in `honba-frontend`); E3-S1a (next-open Rust) -> E3-S2 -> E3-S7 (all DONE; **E3-S1b/S1d now schedulable per ADR 0030**);
 E10-S7 (done) gates Python callers of any async Rust API; E2-S6(a) -> E2-S6(b..d) -> E2-S7 -> E3-S7 (all DONE). What remains is off the
-old critical path: L2 matching (E3-S1b/S1d) and the pull-based E7 and optional E8 epics.
+old critical path: **E3-S1b-1/2/3, E3-S1d (ADR 0030 blocks scheduling)** and the pull-based E7 and optional E8 epics.
 
 ### E1 Instruments and adapters
 
