@@ -599,3 +599,52 @@ async fn one_handle_is_one_engine() {
         vec!["submitted O-11".to_string(), "submitted O-12".to_string(),]
     );
 }
+
+/// One seeded run through [`EngineHandle`] on a fresh multi-thread runtime with `worker_threads`
+/// workers, returning the serialised audit. The runtime is built on its own OS thread, so the
+/// engine task really runs on that runtime's worker threads (`EngineHandle::spawn` is a
+/// `tokio::spawn`), unlike the run service's own OS pool.
+fn audit_under_worker_threads(worker_threads: usize) -> Vec<u8> {
+    std::thread::Builder::new()
+        .name(format!("determinism-{worker_threads}"))
+        .spawn(move || {
+            let runtime = tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(worker_threads)
+                .enable_all()
+                .build()
+                .expect("a multi-thread runtime");
+            runtime.block_on(async {
+                const TIMESTAMPS: [u64; 6] = [1, 2, 3, 4, 5, 6];
+                format!("{:?}", run_one(101.0, &TIMESTAMPS).await).into_bytes()
+            })
+        })
+        .expect("a determinism thread")
+        .join()
+        .expect("the run must not panic")
+}
+
+/// The single-worker audit every other worker count must match byte for byte.
+fn single_worker_audit() -> Vec<u8> {
+    let audit = audit_under_worker_threads(1);
+    assert!(
+        audit.len() > 100,
+        "audit suspiciously small: {} bytes",
+        audit.len()
+    );
+    audit
+}
+
+#[test]
+fn determinism_under_threads_one_worker() {
+    assert_eq!(single_worker_audit(), audit_under_worker_threads(1));
+}
+
+#[test]
+fn determinism_under_threads_four_workers() {
+    assert_eq!(single_worker_audit(), audit_under_worker_threads(4));
+}
+
+#[test]
+fn determinism_under_threads_sixteen_workers() {
+    assert_eq!(single_worker_audit(), audit_under_worker_threads(16));
+}

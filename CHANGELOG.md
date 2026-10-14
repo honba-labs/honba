@@ -2,14 +2,15 @@
 
 ## [Unreleased]
 
-### Determinism guard for backtest runs (extends E10-S6)
+### Determinism guard for a run across worker threads (extends E10-S6)
 
-- `crates/honba-api-rest/tests/runs_determinism.rs` gains
-  `determinism_under_threads_{one,four,sixteen}_workers`: the same seeded backtest
-  (`BacktestExecutor` over the fixture bars, written to `events.ndjson`) is driven from a
-  multi-thread tokio runtime with 1, 4 and 16 `worker_threads` and must be byte-identical to the
-  single-threaded run. This is the `honba-sweep` `determinism_under_threads_*` shape applied to a
-  run; the existing `determinism_under_workers` still covers the run service's worker pool.
+- `crates/honba-async/tests/shell.rs` gains
+  `determinism_under_threads_{one,four,sixteen}_workers`: the same seeded run driven through
+  `EngineHandle` (a `tokio::spawn`, so the engine really runs on the runtime's worker threads)
+  must produce a byte-identical audit trail at 1, 4 and 16 `worker_threads`. This is the
+  `honba-sweep` `determinism_under_threads_*` argument applied to a run. The run service's own
+  worker pool is already covered by `crates/honba-api-rest/tests/runs_determinism.rs`
+  `determinism_under_workers`.
 
 ### Blocking TypeScript codegen drift check in CI (E9-S8 / E11-S6)
 

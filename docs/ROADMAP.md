@@ -7,11 +7,11 @@ to the `honba/` root unless they name a sibling repo. Evidence is from the `honb
 from `honba/.claude/HANDOFF.md` (cargo ~1045, python ~2413 passed, 8 skipped); they were not re-measured for v6, v7 or v8.
 
 v8 changes (2026-10-14): two open architecture-level items (§7) are closed on the `honba` side.
-Run determinism now matches the sweep shape: `crates/honba-api-rest/tests/runs_determinism.rs`
-drives the same seeded backtest from multi-thread tokio runtimes with 1, 4 and 16
-`worker_threads` and asserts a byte-identical `events.ndjson`
-(`determinism_under_threads_{one,four,sixteen}_workers`), beside the existing run-service pool
-check. The TypeScript codegen drift check is now blocking: the new `codegen-drift-frontend` CI job
+Run determinism now matches the sweep shape: `crates/honba-async/tests/shell.rs` drives the same
+seeded run through `EngineHandle` (a `tokio::spawn`, so the engine runs on the runtime's worker
+threads) from runtimes with 1, 4 and 16 `worker_threads` and asserts a byte-identical audit trail
+(`determinism_under_threads_{one,four,sixteen}_workers`); the run service's own pool is already
+covered by `runs_determinism.rs` `determinism_under_workers`. The TypeScript codegen drift check is now blocking: the new `codegen-drift-frontend` CI job
 checks out `honba-frontend` beside `honba` and runs `make check-schema-ts check-client` (E9-S8 /
 E11-S6). This also corrects the v7 "still open" list below: E5-S6, E5-S9, E10-S8 and E11-S6 have
 shipped and are marked DONE.
@@ -112,7 +112,7 @@ E10-S1..S8, E11-S1..S8). E6 batches 1-2, E7 and E8 are tracked separately below.
 | E11-S4 SSE streaming | ADR 0021, `crates/honba-api-rest/src/streams.rs`, `crates/honba-api/src/responses.rs::StreamFrame`, `crates/honba-messages/src/endpoints.rs` `GET /backtests/{id}/events`, `honba._honba.api_request_stream`, `python/honba/client/transport.py` `stream()`, `honba.client.Client.stream_backtest()`, `schema/conformance/stream_frames.json`, commits 523bca5..eac57f6 |
 | honba-docs chunks | documentation chunks in the `honba-docs` repo (not itemised here) |
 | E10-S6 determinism under threads | `crates/honba-sweep/tests/sweep.rs` `determinism_under_threads_{one,four,sixteen}_worker(s)` compare journal and ranking across thread counts |
-| E10-S6 extended to runs | `crates/honba-api-rest/tests/runs_determinism.rs` `determinism_under_workers` (run-service pool) and `determinism_under_threads_{one,four,sixteen}_workers` (tokio `worker_threads` 1/4/16) compare `events.ndjson` byte-for-byte |
+| E10-S6 extended to runs | `crates/honba-async/tests/shell.rs` `determinism_under_threads_{one,four,sixteen}_workers` compare the audit trail byte-for-byte at tokio `worker_threads` 1/4/16 (`EngineHandle` runs the engine as a task, so it really uses those threads); `crates/honba-api-rest/tests/runs_determinism.rs` `determinism_under_workers` covers the run-service pool |
 | Blocking TS codegen drift | `.github/workflows/ci.yml` `codegen-drift-frontend` checks out `honba-frontend` beside `honba` and runs `make check-schema-ts check-client`; wired into `ci-ok` |
 | E11-S1 envelope and registry | `crates/honba-api`, `crates/honba-messages/src/endpoints.rs` (22 routes, `WRITE_PATHS`), `GET /capabilities` (cf1366e) |
 | E11-S2 timestamps as strings | ADR 0012 rule 4, commits 4006ff1, 9530251 |
@@ -447,7 +447,7 @@ tick/depth scope (0025, D14), bhavcopy connector + D10 default (0028), StrategyG
 | `honba-adapters` | dhan + zerodha certified (E1-S1b, `MIGRATION.md`); six adapters scaffold-only (future). Will need FSM events (E2-S6), reconcile reports (E2-S7), session/rate-limit (E1-S5) when they land | E1-S1b, E2-S6, D10 |
 | `honba-strategies` | Catalog passes `verify` and the loader; add `hyperparameters()` (E4-S2); `backtest_result.json` are placeholders with no regen script; alpha strategies excluded from the next-open replay test; 72 pre-existing ruff errors; `ai_generated/` must route through E5-S5 | E4-S2, E4-S3, E5-S5 |
 | `honba-examples` | **Another agent owns it: ask first, new files only below.** Existing follow-ups (use core `NextOpenExecution`/loader, `*_minor` names, settlement default T+1) are theirs, not part of this roadmap | R2, R4, R5 |
-| `honba-frontend` | Generated client + types (E9-S8/E11-S6) and test/lint/typecheck scripts shipped (`ee2e1cb`); still needs SSE consumer (E11-S4) and WASM loader (E11-S5), then E9. TS drift check is local only (`make check-schema-ts`/`check-client`) | E11-S6, E9 |
+| `honba-frontend` | Generated client + types (E9-S8/E11-S6) and test/lint/typecheck scripts shipped (`ee2e1cb`); still needs SSE consumer (E11-S4) and WASM loader (E11-S5), then E9. TS drift check runs in CI (`codegen-drift-frontend`: `make check-schema-ts`/`check-client`) | E11-S6, E9 |
 | `honba-docs` | `docs/architecture/money.md` never built (`make build`); missing pages: reject/cancel contract, quotes/depth/serve, WASM, SDK; strategy pages still describe APIs that never existed (`on_stop` intents) | every story; docs ticket per story |
 
 ### 6.1 honba-examples E4/E5 demonstrations (new example files only; do not edit existing)
@@ -494,7 +494,7 @@ A story is done only when all of the following hold (merges roadmap v4 DoD, `doc
 Architecture-level done (`docs/archive/plan.md` section 10), still open: (a) one strategy runs unchanged in-process, over REST and in `honba-examples`
 (section 6.1); (b) frontend computes indicators, screener and replay in WASM with no Python (replay and screener export open); (c) five
 codegen artifacts with blocking drift checks (met; the TS check now runs in CI via `codegen-drift-frontend`); (d) every surface error carries a stable code (met for
-REST); (e) determinism at 1/4/16 threads (met for sweeps and runs — `runs_determinism.rs`).
+REST); (e) determinism at 1/4/16 threads (met for sweeps and runs — `honba-async` `determinism_under_threads_*`).
 
 ---
 

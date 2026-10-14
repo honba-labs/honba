@@ -42,8 +42,8 @@ DO NOT EDIT marker):
 - Drift: `cargo test -p honba-codegen` compares freshly generated artifacts with the committed
   ones (`tests/committed_artifacts.rs`). `make check-codegen-ci` (schema, openapi, pyi, mcp) runs
   in CI and fails on any modified **or untracked** file in the generated dirs.
-  `make check-codegen` adds `check-schema-ts`, which is LOCAL ONLY: it writes into the sibling
-  `../honba-frontend` checkout.
+  `make check-codegen` adds `check-schema-ts` and `check-client`, which write into the sibling
+  `../honba-frontend` checkout; CI runs both in its own `codegen-drift-frontend` job.
 - Renderer goldens live in `crates/honba-codegen/tests/golden/`; `HONBA_BLESS=1 cargo test -p
   honba-codegen --test renderer_golden` rewrites them after an intended change.
 
@@ -62,7 +62,7 @@ REST SDK: `honba.client` (`Client`, `HttpTransport`, `InprocTransport`) is the t
 
 Optional extras: `ai` (openai, anthropic, litellm, mcp), `rl` (torch, gymnasium). CLI entry point: `honba` → `honba.cli.main:app` (typer; subcommands in `python/honba/cli/`: backtest, data, optimize, research, strategy, ai).
 
-CI (`.github/workflows/ci.yml`), all blocking: Rust job (fmt, check, check `honba-market` without default features, clippy `--workspace --all-targets -D warnings`, test, doctest, codegen drift via `make check-codegen-ci`, doc with `-D warnings`; cargo cache via `Swatinem/rust-cache`), dependency-graph check, and Python job (deps, maturin develop, stubtest, pytest, ruff lint: `ruff check python` and `ruff format --check python`). The frontend TypeScript drift check is not in CI.
+CI (`.github/workflows/ci.yml`), all blocking: Rust job (fmt, check, check `honba-market` without default features, clippy `--workspace --all-targets -D warnings`, test, doctest, codegen drift via `make check-codegen-ci`, doc with `-D warnings`; cargo cache via `Swatinem/rust-cache`), dependency-graph check, and Python job (deps, maturin develop, stubtest, pytest, ruff lint: `ruff check python` and `ruff format --check python`). The frontend TypeScript drift check runs in the `codegen-drift-frontend` job, which checks out `honba-frontend` beside this repo and runs `make check-schema-ts check-client`.
 
 ## Rust test layout (ADR 007)
 
