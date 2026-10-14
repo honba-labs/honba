@@ -62,6 +62,7 @@ fn write_endpoints_are_exactly_the_order_position_and_bar_ingest_routes() {
         write_endpoints(),
         vec![
             "POST /bars",
+            "PUT /trading-state",
             "POST /orders",
             "DELETE /orders/{id}",
             "POST /positions/close",
@@ -123,6 +124,7 @@ fn http_methods_serialize_uppercase_for_openapi() {
         serde_json::json!("GET")
     );
     assert_eq!(HttpMethod::Delete.as_str(), "DELETE");
+    assert_eq!(HttpMethod::Put.as_str(), "PUT");
 }
 
 #[test]

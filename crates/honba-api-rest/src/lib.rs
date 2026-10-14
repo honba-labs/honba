@@ -48,6 +48,7 @@ mod service;
 mod state;
 mod streams;
 mod trades;
+mod trading_state;
 
 pub use approval::ApprovalQueue;
 pub use auth::{
@@ -169,6 +170,10 @@ pub fn api_router_with_config(state: AppState, config: &ApiConfig) -> Router {
         .route("/bars/:id", get(market::get_bars))
         .route("/depth/:id", get(market::get_depth))
         .route("/bars", post(ingest::post_bars))
+        .route(
+            "/trading-state",
+            get(trading_state::get_trading_state).put(trading_state::put_trading_state),
+        )
         .route("/strategies", post(post_strategies).get(get_strategies))
         .route("/strategies/verify", post(post_verify_strategy))
         .route("/backtests", post(runs::post_backtests))
@@ -233,7 +238,13 @@ fn cors_layer(config: &ApiConfig) -> CorsLayer {
     }
     CorsLayer::new()
         .allow_origin(AllowOrigin::list(config.cors_origins.clone()))
-        .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
         .allow_headers([axum::http::header::CONTENT_TYPE])
 }
 

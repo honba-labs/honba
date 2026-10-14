@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Runtime trading-state route (ADR 0018 decision 7, ADR 0023)
+
+- `GET /trading-state` and `PUT /trading-state` (`{state: active|reducing|halted, reason?}` ->
+  `{state, previous}`): the operator changes the trading state of a running server. The state is
+  one shared cell in `AppState` (`trading_state()` / `set_trading_state()`), so the order gate and
+  `POST /positions/close` see a change on the next request. Every transition is allowed, a repeat
+  is an idempotent no-op (`previous == state`), the change and optional `reason` are logged, an
+  unknown state is a 422. Scope `write:orders` (no operator scope exists in ADR 0023); both routes
+  are in `WRITE_PATHS`. `AppState.trading_state` is no longer a public field (use the getter).
+  New wire types `TradingStateRequest`, `TradingStateResponse`, `TradingStateChange`,
+  `HttpMethod::Put`; OpenAPI, domain schema, Python `.pyi` and the `ClientMethod` generator
+  regenerated (the TypeScript client/types in honba-frontend need `make client schema`).
+
 ### Configurable REST risk limits (ADR 0018)
 
 - `honba serve --risk-config <path.toml>`: a TOML file with the same `[risk]` / `[risk.order_rate]`

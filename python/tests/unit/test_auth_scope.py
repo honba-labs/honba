@@ -30,6 +30,8 @@ KNOWN_ROUTES = [
     ("GET", "/orders"),
     ("DELETE", "/orders/abc"),
     ("POST", "/positions/close"),
+    ("GET", "/trading-state"),
+    ("PUT", "/trading-state"),
     ("GET", "/approval/queue"),
     ("POST", "/approval/approve"),
     ("POST", "/approval/reject"),
@@ -58,3 +60,8 @@ def test_drift_fails_on_new_route() -> None:
     assert unscoped_routes([("GET", "/brand/new")]) == ["GET /brand/new"]
     # Public routes are never reported.
     assert unscoped_routes([("GET", "/health")]) == []
+
+
+def test_trading_state_routes_need_the_write_scope() -> None:
+    for method in ("GET", "PUT"):
+        assert required_scope_for_route(method, "/trading-state") == "write:orders"

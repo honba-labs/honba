@@ -41,14 +41,14 @@ pub use market::{
 pub use requests::{
     BacktestEventsQuery, BacktestRequest, BarsIngestRequest, BarsQuery, DepthQuery,
     InstrumentsQuery, OrdersQuery, OrdersRequest, QuotesQuery, ScreenerQuery, StrategiesRequest,
-    SweepRequest,
+    SweepRequest, TradingStateRequest,
 };
 pub use responses::{
     BacktestMetrics, BacktestResponse, BacktestStatus, BarsIngestResponse, BarsResponse,
     CapabilitiesResponse, CompiledStrategy, DepthLevel, DepthResponse, InstrumentsResponse,
     OrdersResponse, PositionsResponse, QuotesResponse, RunStatus, ScreenerResponse,
     ScreenerResultRow, StrategiesResponse, StreamFrame, SweepReportResponse, SweepResponse,
-    SweepStatus, TradesResponse,
+    SweepStatus, TradesResponse, TradingStateChange, TradingStateResponse,
 };
 pub use run_id::{RunId, RunIdError, RunIdGenerator};
 pub use run_ports::{JournalWriter, RunExecutor, RunJob, RunOutcome};

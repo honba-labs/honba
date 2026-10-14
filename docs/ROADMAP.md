@@ -30,6 +30,7 @@ b12e5ba..c71424e: chunk 1 b12e5ba..1b2f6ce, chunk 2 d1299d3..c61d578, chunk 3a 9
 capabilities/schema, WASM hardening, ADR 0014/0015, golden vectors validated against the schema, honba-docs chunks.
 E5-S5 done (2026-10-11): AI strategy verifier (ADR 0022).
 E11-S8 done (2026-10-11): Minimal auth (Bearer token, scope map, file token store, audit log) (ADR 0023).
+Runtime trading state done (2026-10-15): `GET`/`PUT /trading-state` change the operator state of a running server (ADR 0018 decision 7), scope `write:orders`; a dedicated operator scope and a persisted operator journal remain open.
 E5-S10, E5-S11 added (2026-10-11): In-process Llama runtime (GBNF constraints) and financial domain alignment (SFT + RLVR compiler rewards).
 E5-S10/S11 done (2026-10-12): GBNF→LLM grammar, local llama-cpp runner, synthetic dataset, QLoRA scaffold, GRPO compiler reward (`c9579d2`, `827627f`).
 E5-S3 done (2026-10-13): canonical route→scope map (`honba_api_rest::ROUTE_SCOPES`) with the drift guard

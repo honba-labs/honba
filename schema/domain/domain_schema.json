@@ -1913,6 +1913,13 @@
           "type": "string"
         },
         {
+          "description": "Replace a singleton resource.",
+          "enum": [
+            "PUT"
+          ],
+          "type": "string"
+        },
+        {
           "description": "Delete.",
           "enum": [
             "DELETE"
@@ -4221,6 +4228,100 @@
       },
       "required": [
         "trades"
+      ],
+      "type": "object"
+    },
+    "TradingState": {
+      "description": "Whether the engine is trading, winding down, or stopped.\n\nA handler asks for a change with `EngineOutput::StateChange` (in `honba-engine`); the engine applies it through [`TradingState::can_transition_to`] and records it in its audit log.",
+      "oneOf": [
+        {
+          "description": "Normal trading: orders are accepted.",
+          "enum": [
+            "active"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Winding down: orders are still accepted, the strategy is reducing.",
+          "enum": [
+            "reducing"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Stopped: orders are refused until the state changes again.",
+          "enum": [
+            "halted"
+          ],
+          "type": "string"
+        }
+      ]
+    },
+    "TradingStateChange": {
+      "description": "`PUT /trading-state` response: the state now in force and the one it replaced.\n\n`previous == state` means the request changed nothing.",
+      "properties": {
+        "previous": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/TradingState"
+            }
+          ],
+          "description": "The trading state before this request."
+        },
+        "state": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/TradingState"
+            }
+          ],
+          "description": "The trading state now in force."
+        }
+      },
+      "required": [
+        "previous",
+        "state"
+      ],
+      "type": "object"
+    },
+    "TradingStateRequest": {
+      "additionalProperties": false,
+      "description": "`PUT /trading-state` request body: the state the operator wants (ADR 0018 decision 7).\n\nEvery transition is allowed and setting the current state again is a no-op. `reason` is free text for the operator log.",
+      "properties": {
+        "reason": {
+          "description": "Why the state is changing; logged with the change, never interpreted.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/TradingState"
+            }
+          ],
+          "description": "The new trading state: `active`, `reducing` or `halted`."
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "type": "object"
+    },
+    "TradingStateResponse": {
+      "description": "`GET /trading-state` response: the operator trading state the write routes evaluate against.",
+      "properties": {
+        "state": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/TradingState"
+            }
+          ],
+          "description": "The current trading state."
+        }
+      },
+      "required": [
+        "state"
       ],
       "type": "object"
     },

@@ -211,6 +211,20 @@ pub struct OrdersRequest {
     pub client_order_id: Option<String>,
 }
 
+/// `PUT /trading-state` request body: the state the operator wants (ADR 0018 decision 7).
+///
+/// Every transition is allowed and setting the current state again is a no-op. `reason` is
+/// free text for the operator log.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct TradingStateRequest {
+    /// The new trading state: `active`, `reducing` or `halted`.
+    pub state: honba_messages::TradingState,
+    /// Why the state is changing; logged with the change, never interpreted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
 /// `POST /bars` request body: a batch of bars for the live bar pump (E3-S7 follow-up).
 ///
 /// Each bar is validated on deserialization (finite prices, `low <= open, close <= high`,

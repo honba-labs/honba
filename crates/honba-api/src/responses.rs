@@ -242,3 +242,21 @@ pub struct BarsIngestResponse {
     /// Bars queued for the pump; the whole batch, or the request failed.
     pub accepted: u64,
 }
+
+/// `GET /trading-state` response: the operator trading state the write routes evaluate against.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct TradingStateResponse {
+    /// The current trading state.
+    pub state: honba_messages::TradingState,
+}
+
+/// `PUT /trading-state` response: the state now in force and the one it replaced.
+///
+/// `previous == state` means the request changed nothing.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct TradingStateChange {
+    /// The trading state now in force.
+    pub state: honba_messages::TradingState,
+    /// The trading state before this request.
+    pub previous: honba_messages::TradingState,
+}

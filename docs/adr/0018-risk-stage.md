@@ -611,6 +611,15 @@ E3-S1b/S1d shipped (ADR 0030), so top-of-book prices exist. Decision, kept small
 
 ## Decision log
 
+- 2026-10-15: the operator trading state is changeable at runtime. `GET /trading-state` and
+  `PUT /trading-state` (`{state, reason?}` -> `{state, previous}`) read and set the shared cell in
+  `AppState`; the order gate and `POST /positions/close` read it per request, so a change applies
+  to the next request with no restart. All transitions are allowed (as in `Engine::set_trading_state`),
+  a repeat is an idempotent no-op, an unknown state is a 422. The change is logged with the optional
+  `reason` via `tracing`: the REST crate has no operator journal yet (the decision 6 order audit
+  record is also unwritten), so the reason is not persisted. Scope `write:orders`, the strictest
+  existing ADR 0023 scope; a dedicated operator scope is a follow-up decision. Supersedes "no
+  registered route changes it" in decision 7.
 - 2026-10-07: accepted with review amendments (see Amendments).
 - 2026-10-15: addendum: market-order price collar `price_collar_bps` / `risk_price_collar`, off by
   default, REST wired, engine/backtest wiring deferred.

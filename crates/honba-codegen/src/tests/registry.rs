@@ -79,6 +79,8 @@ fn api_responses_are_open_records_and_api_requests_are_closed_inputs() {
         "SweepReportResponse",
         "OrdersResponse",
         "PositionsResponse",
+        "TradingStateResponse",
+        "TradingStateChange",
         "TradesResponse",
         "ScreenerResponse",
         "ScreenerResultRow",

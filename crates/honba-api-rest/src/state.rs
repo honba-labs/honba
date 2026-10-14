@@ -6,7 +6,7 @@
 
 use std::fmt;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError, RwLock};
 
 use honba_api::StrategyCatalog;
 use honba_entities::Currency;
@@ -43,10 +43,11 @@ pub struct AppState {
     pub account_currency: Currency,
     /// The operator trading state the write routes evaluate against (ADR 0018 decision 7).
     ///
-    /// Set in process by the composition root ([`AppState::with_trading_state`]); no
-    /// registered route changes it at runtime. `Halted` refuses placements while cancel and
-    /// close still pass.
-    pub trading_state: TradingState,
+    /// Seeded by the composition root ([`AppState::with_trading_state`]) and changed at runtime
+    /// by `PUT /trading-state` ([`AppState::set_trading_state`]). One cell shared by every
+    /// clone of the state, so the order gate and `POST /positions/close` see a change on the
+    /// next request. `Halted` refuses placements while cancel and close still pass.
+    trading_state: Arc<RwLock<TradingState>>,
     /// Risk limits the order routes build their stage with (default: none). Set in process
     /// by the composition root ([`AppState::with_risk_limits`]).
     pub risk_limits: honba_risk::RiskLimits,
@@ -84,7 +85,7 @@ impl AppState {
             strategies: Arc::default(),
             runs: None,
             account_currency: Currency::Inr,
-            trading_state: TradingState::Active,
+            trading_state: Arc::default(),
             risk_limits: honba_risk::RiskLimits::default(),
             approval_queue: None,
             orders: OrderLedger::default(),
@@ -136,9 +137,30 @@ impl AppState {
     }
 
     /// Sets the operator trading state the write routes evaluate against.
+    ///
+    /// This seeds the state: the cell is replaced, so call it while building the state, before
+    /// cloning it. At runtime use [`AppState::set_trading_state`].
     pub fn with_trading_state(mut self, state: TradingState) -> Self {
-        self.trading_state = state;
+        self.trading_state = Arc::new(RwLock::new(state));
         self
+    }
+
+    /// The operator trading state in force right now.
+    pub fn trading_state(&self) -> TradingState {
+        *self
+            .trading_state
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Sets the operator trading state for every clone of this state and returns the previous
+    /// one. Any transition is allowed; setting the current state again changes nothing.
+    pub fn set_trading_state(&self, state: TradingState) -> TradingState {
+        let mut guard = self
+            .trading_state
+            .write()
+            .unwrap_or_else(PoisonError::into_inner);
+        std::mem::replace(&mut *guard, state)
     }
 
     /// Sets the risk limits the order routes enforce (ADR 0018), e.g. `price_collar_bps`.

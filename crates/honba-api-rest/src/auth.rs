@@ -189,6 +189,18 @@ pub const ROUTE_SCOPES: &[(&str, &str, RouteScope)] = &[
     ("GET", "/bars/{id}", RouteScope::Required("read:market")),
     ("GET", "/depth/{id}", RouteScope::Required("read:market")),
     ("POST", "/bars", RouteScope::Required("write:orders")),
+    // Operator routes: no dedicated operator scope exists (ADR 0023), so the strictest
+    // existing scope applies, the one that gates every route that can move money.
+    (
+        "GET",
+        "/trading-state",
+        RouteScope::Required("write:orders"),
+    ),
+    (
+        "PUT",
+        "/trading-state",
+        RouteScope::Required("write:orders"),
+    ),
     ("GET", "/screener/scan", RouteScope::Required("read:market")),
     ("GET", "/strategies", RouteScope::Required("research")),
     ("POST", "/strategies", RouteScope::Required("research")),

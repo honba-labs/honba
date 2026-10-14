@@ -23,6 +23,8 @@ pub enum HttpMethod {
     Get,
     /// Create.
     Post,
+    /// Replace a singleton resource.
+    Put,
     /// Delete.
     Delete,
 }
@@ -33,6 +35,7 @@ impl HttpMethod {
         match self {
             Self::Get => "GET",
             Self::Post => "POST",
+            Self::Put => "PUT",
             Self::Delete => "DELETE",
         }
     }
@@ -173,6 +176,8 @@ pub const ENDPOINTS: &[(&str, &str)] = &[
     ("GET", "/orders"),
     ("DELETE", "/orders/{id}"),
     ("POST", "/positions/close"),
+    ("GET", "/trading-state"),
+    ("PUT", "/trading-state"),
     ("GET", "/screener/scan"),
     ("GET", "/journals/{id}"),
 ];
@@ -194,8 +199,11 @@ pub fn write_endpoints() -> Vec<String> {
 /// so they are not gated; the order and position routes are. `POST /bars` mutates the
 /// simulated market (it advances event time and fills orders), so it is a write route too
 /// and needs the write scope; it places no order and so queues nothing for approval.
+/// `PUT /trading-state` changes the operator state every write route evaluates against
+/// (ADR 0018 decision 7), so it is a write route too.
 pub const WRITE_PATHS: &[(&str, &str)] = &[
     ("POST", "/bars"),
+    ("PUT", "/trading-state"),
     ("POST", "/orders"),
     ("DELETE", "/orders/{id}"),
     ("POST", "/positions/close"),

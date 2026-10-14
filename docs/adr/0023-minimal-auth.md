@@ -59,6 +59,8 @@ to configure in a dev/CI context but strong enough to not be "security by obscur
 | `POST /orders`, `DELETE /orders/{id}`, `POST /positions/close` | `write:orders` |
 | `GET /approval/queue`, `POST /approval/approve`, `POST /approval/reject` | `write:orders` |
 | `GET /orders` (write ledger, E11-S7, currently 501) | `write:orders` |
+| `POST /bars` | `write:orders` |
+| `GET /trading-state`, `PUT /trading-state` | `write:orders` (no dedicated operator scope; see ADR 0018 decision log 2026-10-15) |
 
 `read:account` is reserved for future account/positions endpoints (not built yet).
 

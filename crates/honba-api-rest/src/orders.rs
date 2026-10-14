@@ -5,8 +5,9 @@
 //! composition root already wires: rules come from the `null` profile over the
 //! `InstrumentMaster` set, `position` is the signed position the write ledger
 //! implies for the instrument ([`OrderLedger::position`]), `trading_state` is the
-//! app's operator-set [`AppState::trading_state`] (default `Active`; no registered
-//! route changes it, it is set in process via `AppState::with_trading_state`),
+//! app's operator-set [`AppState::trading_state`] (default `Active`; seeded via
+//! `AppState::with_trading_state` and changed at runtime by `PUT /trading-state`, read afresh
+//! for every request),
 //! `reference_price` comes from `QuoteReader` (the close of the latest bar, via
 //! mid when a book exists; the limit price when no quote exists), and `ts` /
 //! `last_feed_ts` are the latest quote's `ts_event` (no wall clock; both 0 / `None`
@@ -240,7 +241,7 @@ async fn risk_request(
         expected_price,
         adv: None,
         position: state.orders.position(instrument_id),
-        trading_state: state.trading_state,
+        trading_state: state.trading_state(),
         ts: feed_ts.unwrap_or_else(|| UnixNanos::new(0)),
         last_feed_ts: feed_ts,
     }

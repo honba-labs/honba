@@ -257,7 +257,7 @@ class HoldoutResult:
     retention_ratio: float
     train_sharpe: float
 
-HttpMethod = Literal["GET", "POST", "DELETE"]
+HttpMethod = Literal["GET", "POST", "PUT", "DELETE"]
 
 class InstrumentId:
     exchange: Exchange
@@ -589,6 +589,19 @@ TradeId = str
 
 class TradesResponse:
     trades: list[Trade]
+
+TradingState = Literal["active", "reducing", "halted"]
+
+class TradingStateChange:
+    previous: TradingState
+    state: TradingState
+
+class TradingStateRequest:
+    reason: str | None = None
+    state: TradingState
+
+class TradingStateResponse:
+    state: TradingState
 
 UnitType = Literal["PCT", "PRICE", "RATIO", "SHARES", "CURRENCY"]
 

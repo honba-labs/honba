@@ -34,7 +34,7 @@ pub fn render() -> String {
     out.push_str(&import_block(&endpoints));
 
     out.push_str(
-        r#"export type ClientMethod = 'GET' | 'POST' | 'DELETE';
+        r#"export type ClientMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
 export class HonbaApiError extends Error {
   readonly status: number;

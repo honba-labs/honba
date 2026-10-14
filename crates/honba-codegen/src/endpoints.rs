@@ -45,6 +45,8 @@ pub(crate) fn response_type_for(method: &str, path: &str) -> Option<&'static str
         ("GET", "/orders") => "OrdersResponse",
         ("DELETE", "/orders/{id}") => "OrdersResponse",
         ("POST", "/positions/close") => "PositionsResponse",
+        ("GET", "/trading-state") => "TradingStateResponse",
+        ("PUT", "/trading-state") => "TradingStateChange",
         ("GET", "/screener/scan") => "ScreenerResponse",
         ("GET", "/journals/{id}") => "TradesResponse",
         _ => return None,
@@ -60,6 +62,7 @@ pub(crate) fn request_type_for(method: &str, path: &str) -> Option<&'static str>
         ("POST", "/backtests") => "BacktestRequest",
         ("POST", "/sweeps") => "SweepRequest",
         ("POST", "/orders") => "OrdersRequest",
+        ("PUT", "/trading-state") => "TradingStateRequest",
         ("GET", "/orders") => "OrdersQuery",
         ("GET", "/instruments") => "InstrumentsQuery",
         ("GET", "/quotes") => "QuotesQuery",
@@ -112,7 +115,7 @@ fn operation(set: &SchemaSet, method: &str, path: &'static str) -> Value {
         op.insert("parameters".into(), Value::Array(params));
     }
 
-    if matches!(method, "POST" | "DELETE") {
+    if matches!(method, "POST" | "PUT" | "DELETE") {
         if let Some(body) = request_type_for(method, path) {
             op.insert("requestBody".into(), json!({
                 "required": true,
@@ -236,7 +239,7 @@ pub(crate) fn path_params(path: &str) -> Vec<&str> {
 fn tag_for(path: &str) -> String {
     match path.trim_start_matches('/').split('/').next().unwrap_or("") {
         "backtests" | "sweeps" => "runs".to_string(),
-        "positions" | "orders" => "trading".to_string(),
+        "positions" | "orders" | "trading-state" => "trading".to_string(),
         "capabilities" | "health" | "schema" | "journals" => "meta".to_string(),
         other => other.to_string(),
     }

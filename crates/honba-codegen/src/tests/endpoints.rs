@@ -63,6 +63,28 @@ fn a_write_endpoint_is_labelled_as_one() {
         paths["/positions/close"]["post"]["x-honba-access"],
         json!("write")
     );
+    assert_eq!(
+        paths["/trading-state"]["put"]["x-honba-access"],
+        json!("write")
+    );
+}
+
+#[test]
+fn put_trading_state_has_a_body_and_get_is_read_only() {
+    let paths = paths();
+    let put = &paths["/trading-state"]["put"];
+    assert_eq!(
+        put["requestBody"]["content"]["application/json"]["schema"]["$ref"],
+        json!("#/components/schemas/TradingStateRequest")
+    );
+    assert_eq!(
+        put["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+        json!("#/components/schemas/TradingStateChange")
+    );
+    assert_eq!(
+        paths["/trading-state"]["get"]["x-honba-access"],
+        json!("read_only")
+    );
 }
 
 #[test]
