@@ -344,6 +344,12 @@ impl L2Sim {
         Ok(())
     }
 
+    /// Moves event time to `ts` with no market event, expiring Day orders whose close has
+    /// passed (each stamped at its close instant).
+    pub fn advance_to(&mut self, ts: UnixNanos) -> Result<()> {
+        self.advance(ts.as_u64())
+    }
+
     /// Moves event time to `ts`, expiring Day orders whose close has passed.
     fn advance(&mut self, ts: u64) -> Result<()> {
         let mut i = 0;

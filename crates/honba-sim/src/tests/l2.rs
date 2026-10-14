@@ -578,3 +578,18 @@ fn l1_and_l2_agree_on_a_buy_then_sell_round_trip() {
         l2.position(&any_instrument())
     );
 }
+
+#[test]
+fn advance_to_expires_day_orders_past_the_close_without_an_event() {
+    let mut s = sim();
+    quote(&mut s, 99.0, 101.0, 10.0, 10.0, 1);
+    s.submit(lim("D", OrderSide::Buy, 5.0, 100.0, TimeInForce::Day, 2))
+        .unwrap();
+    let close = 86_340_000_000_000_u64;
+    s.advance_to(t(close - 1)).unwrap();
+    assert_eq!(s.working_orders(), vec!["D"]);
+    s.advance_to(t(close + 5)).unwrap();
+    let ev = s.drain_events().unwrap();
+    assert!(matches!(&ev[..], [ExecutionEvent::Expired { ts, .. }] if ts.as_u64() == close));
+    assert!(s.working_orders().is_empty());
+}

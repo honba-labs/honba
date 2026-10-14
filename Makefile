@@ -1,6 +1,6 @@
 .PHONY: build test lint fmt python schema check-schema check-schema-ts openapi check-openapi \
 	pyi check-pyi mcp check-mcp client check-client codegen check-codegen check-codegen-ci \
-	check-wasm test-wasm
+	check-wasm test-wasm check-l2-vectors
 
 build:
 	cargo build --workspace
@@ -114,3 +114,7 @@ check-codegen: check-schema check-schema-ts check-client check-openapi check-pyi
 # its own job (codegen-drift-frontend), which checks out honba-frontend beside this repo.
 check-codegen-ci: check-schema check-openapi check-pyi check-mcp
 	@echo "codegen drift checks passed (TypeScript: checked by codegen-drift-frontend in CI; locally run make check-schema-ts / check-client)"
+
+# The committed L2 conformance vectors match scripts/gen_l2_vectors.py (ADR 0030).
+check-l2-vectors:
+	python3 scripts/gen_l2_vectors.py --check
