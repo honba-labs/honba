@@ -78,7 +78,7 @@ class ContractProbe(Strategy):
       stop-limit sell one lot (trigger ``price - tick``, limit ``price - 2 * tick``) when long.
     - ``on_fill``: after the first buy fill, stop sell its quantity at ``price - 10 * tick``
       (processed with the next event).
-    - ``on_stop``: sell the position (never executed: the run is over).
+    - ``on_stop``: records an observation (intents submitted here are discarded; the run is over).
     """
 
     name = "contract_probe"
