@@ -1,10 +1,19 @@
 # Honba roadmap (single forward-looking plan)
 
-Status: v6, 2026-10-06 (E5-S5 added 2026-10-11, E11-S8 added 2026-10-11). Supersedes `docs/archive/ROADMAP-borrowed-ideas.md` (v4, 2026-10-01) and merges `docs/archive/plan.md`
+Status: v7, 2026-10-14 (status refresh against `main`; E5-S5 added 2026-10-11, E11-S8 added 2026-10-11). Supersedes `docs/archive/ROADMAP-borrowed-ideas.md` (v4, 2026-10-01) and merges `docs/archive/plan.md`
 (2026-10-03) phases and epics E10 and E11 into one numbering-preserving structure. Story IDs (E0..E11) are unchanged so old references
 still resolve. Nothing here has been filed as an issue. This file lives in the `honba` git repo at `docs/ROADMAP.md`; paths are relative
 to the `honba/` root unless they name a sibling repo. Evidence is from the `honba/` tree and its git log, read-only; test baselines are
-from `honba/.claude/HANDOFF.md` (cargo ~1045, python ~2413 passed, 8 skipped) and were not re-measured for v6.
+from `honba/.claude/HANDOFF.md` (cargo ~1045, python ~2413 passed, 8 skipped); they were not re-measured for v6 and were not re-measured for this v7 refresh.
+
+v7 changes (2026-10-14): a status refresh against `main` (HEAD 102110b) after the v6 snapshot and the R1-R6 critical path
+were found stale. **E2 Safe engine is now complete** — E2-S1 rest (`2fadc9f`), E2-S2 risk stage (`3455467`..`dcd2a22`,
+`b397eff`), E2-S3 rest (`c90dd92`), E2-S4 rest (`17bce15`), E2-S6 (`cd32017`..`084841d`, `9dc5998`), E2-S7 (`9977f87`),
+E2-S9 (`efdd717`), E2-S10 (`508316f`), E2-S11 (`51e5650`) — and **E3-S2/S3/S4/S5/S6/S7 are shipped**, so the
+`E2-S6 -> E2-S7 -> E3-S7` critical path is done. E11-S3 rest is complete (`NOT_IMPLEMENTED_ENDPOINTS` is empty; `7298373`).
+Also shipped since v6: E1-S4 (`9a7731a`), E1-S5 (`0df5b75`, `40ae1ec`), and wire/simulator trailing-stop support (`6e01d81`,
+`4e2fbb4`). Still open: L2 matching (E3-S1b/S1d, deferred by ADR 0025/D14), the pull-based and optional epics (E7, E8,
+E10-S8, E11-S6) and the deferred agent stories (E5-S6, E5-S9). v6 changes are kept below for history.
 
 v6 changes: E10-S7 DONE (commits edb4921, 91bff5b, 2c10630; ADR 0015 implemented); E3-S1a DONE, all three chunks (ADR 0016, commits
 b12e5ba..c71424e: chunk 1 b12e5ba..1b2f6ce, chunk 2 d1299d3..c61d578, chunk 3a 9ced8d8..a6ffef5, chunk 3b 2c02b74..c71424e). Also done since v5 (see 1.1): cancel-time rule, rejection-queue hardening, IST timestamps, typed registry, SDK
@@ -40,26 +49,27 @@ as the record.
 
 ---
 
-## 1. Status snapshot (as of 2026-10-06)
+## 1. Status snapshot (refreshed 2026-10-14; original as of 2026-10-06)
 
 Counts are over the 74 stories the audit tracked (E0-S1..S8, E1-S1..S6, E2-S1..S11, E3-S1..S7, E4-S1..S8, E5-S1..S9, E6-S5, E9-S1..S8,
-E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked separately below.
+E10-S1..S8, E11-S1..S8). E6 batches 1-2, E7 and E8 are tracked separately below. The v7 refresh re-verifies every row against the
+`main` tree and git log; the total is over the 74 tracked stories only (E7/E8 rows are extra).
 
 | Epic | Done | Partial | Not started | One-line state |
 |---|---|---|---|---|
 | E0 Contract spine | 8 | 0 | 0 | Complete: wire types, codegen, versions, money, market packs, manifest, `honba verify` |
-| E1 Instruments and adapters | 6 | 0 | 0 | Adapter Protocol, contract suite, F&O grammar, dated master, session/rate/secret, feed connector shipped |
-| E2 Safe engine | 1 | 4 | 6 | Kill switch, audit log and fill feedback loop work; no risk stage, no order FSM, no reconciliation |
-| E3 Execution realism | 6 | 0 | 1 | Bar-fill (L1), Rust/Python next-open, cost-schedule fills, fill/latency, margin/MIS, target-position, lot/freeze, sandbox shipped |
+| E1 Instruments and adapters | 6 | 0 | 0 | Adapter Protocol, contract suite, F&O grammar, dated master, session/rate/secret, feed connector, product/TIF tables shipped |
+| E2 Safe engine | 10 | 0 | 1 | Risk stage, order FSM, reconciliation, cache, staleness breaker, durable ledger and kill switch all shipped; E2-S8 dropped |
+| E3 Execution realism | 7 | 0 | 0 | Bar-fill (L1), Rust/Python next-open, cost-schedule fills, fill/latency, margin/MIS, target-position, lot/freeze, sandbox shipped; L2 (E3-S1b/S1d) deferred (ADR 0025) |
 | E4 Research pipeline | 8 | 0 | 0 | Complete: journal v1, cache, hyperparameters, CLI/REST runner, look-ahead, sweep fitness, overfitting gates, streaming datasets, MTF aggregation |
-| E5 Agent and API | 3 | 1 | 5 | AI verifier, MCP server, scopes, approval queue, GBNF+LLM, synthetic+QLoRA+RLVR shipped; sandbox open |
-| E6 Indicators | n/a | 0 | 0 | Batches 1-4 (O(1) rolling, plain sums) and the render contract (S5) done |
-| E7 Scale and ops | 0 | 0 | 5 | Pull-based; E7-S4 is superseded by `honba-sweep` (E10-S5) |
-| E8 Multi-leg | 0 | 0 | 4 | Optional; not scheduled (open decision D13) |
+| E5 Agent and API | 7 | 0 | 2 | Verifier, MCP server, scopes, approval queue, typed decisions, GBNF+LLM, synthetic+QLoRA+RLVR shipped; webhook (S6) and report builder (S9) deferred |
+| E6 Indicators | 1 | 0 | 0 | Batches 1-4 (O(1) rolling, plain sums) and the render contract (S5) done |
+| E7 Scale and ops | 0 | 0 | 5 | Pull-based; E7-S4 is superseded by `honba-sweep` (E10-S5); tracked separately from the 74 |
+| E8 Multi-leg | 0 | 0 | 4 | Optional; not scheduled (open decision D13); tracked separately from the 74 |
 | E9 Frontend and AlgoDesigner | 0 | 1 | 7 | Greenfield; generated TS types only |
-| E10 Async core | 6 | 1 | 1 | Ports, shell, engine output, Arc dataset, sweep, determinism test and Python runtime bridge (ADR 0015) shipped; connectors open |
-| E11 Versioned API | 4 | 1 | 2 | Read API, SDK and WASM indicators shipped; SSE streaming shipped; write endpoints and auth shipped |
-| **Total (74)** | **29** | **8** | **37** | |
+| E10 Async core | 7 | 0 | 1 | Ports, shell, engine output, Arc dataset, sweep, determinism test and Python runtime bridge (ADR 0015) shipped; Rust connectors (E10-S8) open |
+| E11 Versioned API | 7 | 0 | 1 | Read API, SDK, WASM, SSE streaming, write endpoints and auth shipped; only the CI TS drift check (E11-S6) open |
+| **Total (74)** | **61** | **1** | **12** | |
 
 ### 1.1 What is shipped (evidence)
 
@@ -78,7 +88,7 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | E10-S1 ports | `crates/honba-ports` (feed, execution, master, clock, sink, secret, snapshot, bar/quote/depth readers), commit 1ed5eb8 |
 | E10-S2 async shell | `crates/honba-async` (`EngineHandle`, `LiveClock`, `HistoricClock`), commit 49ffb32 |
 | E10-S3 engine output | commit daf12d5 |
-| E10-S4 shared dataset (partial: Arc and columnar read only) | `honba-data` `Dataset`, `ColumnarSlice`, `DatasetFeed`, commit c7ef86b |
+| E10-S4 shared dataset (DONE; streaming half is E4-S7) | `honba-feed` `Dataset`, `ColumnarSlice`, `DatasetFeed` (commit c7ef86b); chunked streaming shipped as E4-S7 |
 | E10-S5 sweep | `crates/honba-sweep` (one engine per trial, `spawn_blocking`, results in trial order), commit fb64146 |
 | E10-S7 Python runtime bridge | ADR 0015 implemented: `honba.event_loop`, `honba.async_run`; commits edb4921, 91bff5b, 2c10630 |
 | E3-S1a next-open Rust port (chunks 1-3) | ADR 0016; chunk 1 b12e5ba..1b2f6ce, chunk 2 d1299d3..c61d578, chunk 3a 9ced8d8..a6ffef5, chunk 3b 2c02b74..c71424e. Rust core, PyO3 binding and Python delegation shipped |
@@ -104,6 +114,17 @@ E10-S1..S8, E11-S1..S8) after correction. E6 batches 1-2, E7 and E8 are tracked 
 | E6 batch 4 plain-sum indicators | `python/src/honba/strategies/indicators/{moving_average/vwma,volume/chaikin_money_flow,volume/money_flow_index,trend/vortex,momentum/chande_momentum,momentum/ultimate_oscillator,volatility/chaikin_volatility}.py` now O(1) via `_rolling.RollingSum`; `python/tests/unit/test_indicators_rolling_batch4.py` (old-oracle + Fraction), hot-path guard extended; commits 00c75af, 6f23282 |
 | E6-S5 indicator render contract | `crates/honba-indicators/src/render.rs` (`Presentation`/`Plot`/`Zone`/`ColorRole`, `catalog_names`, `presentation`, `validate`); serialized into the WASM catalog `honba_api_wasm::indicators::list_indicators_json`; unit `output_len_matches_input` etc. (`crates/honba-indicators/src/tests/render.rs`), integration `chart_consumes_a_valid_presentation_for_every_indicator` (`crates/honba-api-wasm/tests/render_conformance.rs`) |
 | E2-S6 OrderState FSM, single event drain, adapter + sim conformance (DONE 2026-10-09) | ADR 0019. (a) `honba-messages` `OrderState`/`OrderEvent`/`IllegalTransition`/`VenueOrderId`/`cancel_requested` + `SCHEMA_VERSION` 4 (`OrderPartiallyFilled`/`OrderCancelRequested`/`OrderExpired`, `OrderAccepted.venue_order_id`); (b) `honba-engine::ExecutionEngine::drain_events`, `Engine::acknowledge_events`, order store, `working_exposure`, `LegacyDrains`/`LegacyPortEvents` shims, every sim in `honba-sim`/`honba-py` and `StrategyRunner`; (c) `OrderReport.venue_order_id` + `honba.adapters.order_events.reduce_order_report` (`ReportReduction`) + `FakeAdapter` conformance; (d) `schema/conformance/order_state.json` (12 scenarios, 2 profiles) replayed on `BarFillEngine`/`PaperExecution`/`NextOpenSim`/`ScriptedExecution` (`crates/honba-sim/tests/order_state_conformance.rs`), `NativeSim` (`crates/honba-py/tests/order_state_conformance.rs`), `NextOpenExecution`/FakeAdapter (`python/tests/integration/test_order_state_conformance.py::test_gateway_normalised_stream_replay`) | honba (+adapters) |
+| E2-S2 risk stage (DONE) | ADR 0018; `crates/honba-risk` (`RiskStage`, `RiskCheck`, typed `RiskRefusal`, `RulesSource`, `RiskLimits`, `PriceField`), config `[risk]` section + live guard, golden `schema/conformance/risk_decisions.json`; unit `max_notional_refused`, `price_band_from_profile`, order-rate and property tests / integration `strategy_engine_risk_fills_refusal_in_audit`, `POST /orders` risk gate (`crates/honba-api-rest/src/tests/orders_risk.rs`) (commits `3455467`, `879eb9f`, `67e92ea`, `605b177`, `b397eff`, `dcd2a22`) | honba |
+| E2-S7 reconciliation (DONE) | `crates/honba-engine/src/reconciliation.rs`; unit `missed_fill_detected` (`crates/honba-engine/src/tests/reconciliation.rs`), integration `crates/honba-engine/tests/reconciliation.rs` (commit `9977f87`) | honba |
+| E2-S9 state cache (DONE) | `crates/honba-engine/src/cache/mod.rs` (`StateCache`, `CacheQuery`, `TrackedOrder`); unit `cache_apply_event` (`crates/honba-engine/src/tests/cache.rs`), integration `context_reads_from_cache` (`crates/honba-strategy/src/tests/context.rs`) (commit `efdd717`) | honba |
+| E2-S10 feed-staleness breaker (DONE) | `honba-risk` `RiskRefusal::FeedStale` on the simulated clock; unit `stale_after_blocks_orders` (`crates/honba-risk/src/tests/staleness.rs`), integration `stale_feed_scenario` (`crates/honba-engine/tests/risk_gate.rs`) (commit `508316f`) | honba |
+| E2-S11 durable risk state and idempotent fill ledger (DONE) | `crates/honba-risk/src/{durable,ledger}.rs` (`DurableRiskState`, `InFlightOrder`, `FillFingerprint`, `FillLedger`); unit `fingerprint_dedup`, `atomic_snapshot` (`crates/honba-risk/src/tests/durable_ledger.rs`), integration `reconnect_replay_no_double_count` (`crates/honba-engine/tests/durable_reconnect.rs`) (commit `51e5650`) | honba |
+| E2-S1 rest / E2-S3 rest / E2-S4 rest (DONE) | Reducing enforced as reduce-only; `TradingState`/`Command::State` exposed in Python and CLI (commit `2fadc9f`; `python/tests/unit/test_trading_state_enforcement.py`, `test_reduce_only_two_orders_in_flight.py`, `test_risk_check_state.py`; `crates/honba-cli/src/tests/trading_state.rs`). Wall-clock-free domain check `no_system_time_in_domain_crates` (`crates/honba-testing/tests/purity.rs`) and `UnixNanos::now` removed (commit `c90dd92`). Audit replay `audit_replay_matches_state`, `run_then_replay_identical_positions` and `journal_writer_roundtrip` (commit `17bce15`) | honba |
+| E3-S2/S4/S5/S6/S7 (DONE) | Seeded `FillModel`/`LatencyModel` (`seeded_slippage_reproducible`, `same_seed_byte_identical_fills`, `crates/honba-sim/tests/fill_latency_models.rs`); margin model + MIS square-off (`mis_run_flat_by_close`, `crates/honba-sim/tests/mis_square_off.rs`); target-position smart order (`target_delta_computed`, `target_position_run`); lot/freeze splitter (`slice_above_freeze`, `order_sliced_in_sim`); `SandboxAdapter` (`virtual_funds_isolated`, `sandbox_vs_backtest_same_fills`) (commits `695a549`, `1ffa180`, `599fb22`, `6f8d509`, `71de25f`) | honba |
+| E1-S4/S5 (DONE) | Canonical `Product` enum + per-adapter mapping tables (`9a7731a`); session provider, shared token-bucket rate limiter and encrypted secret store (`0df5b75`, `40ae1ec`) | honba (+adapters) |
+| E5-S10/S11 (DONE) | GBNF grammar and local llama-cpp GGUF runner (`c9579d2`) — `python/tests/unit/test_ai_gbnf.py::test_grammar_masks_invalid_tokens`, `python/tests/integration/test_ai_local_llm.py::test_ask_runs_offline_zero_syntax_errors`; synthetic financial dataset + QLoRA SFT + GRPO compiler reward (`827627f`) — `python/tests/unit/test_ai_alignment.py::test_benchmark_screener_accuracy_gt_90pct`, `::test_rlvr_rewards_compiler_pass` | honba |
+| E11-S3 rest (DONE) | `NOT_IMPLEMENTED_ENDPOINTS` is empty (`crates/honba-api-rest/src/lib.rs`); no route returns 501. `POST/GET /backtests`, journal routes and `honba serve` run flags (commit `7298373`); sweeps (E4-S5); orders write ledger (E11-S7, commit `91ab361`); read routes, screener and strategies as before | honba |
+| Trailing stop (wire + sim) | `OrderType::TrailingStop` with `trail_amount`/`trail_percent`, opt-in via `AdapterCapabilities.order_types` (`6e01d81`); full Rust/wire/simulator support — `BarFillSim` trails (high/low-water mark), `NextOpenSim` rejects it explicitly (`4e2fbb4`, `2568dab`, `381bbc4`) | honba (+adapters) |
 | E1-S3 instrument master snapshots | `crates/honba-ports/src/master.rs` `DatedInstrument`, provided-default `snapshot(as_of)`/`resolve_as_of`; `crates/honba-feed/src/instruments.rs` `CatalogInstrumentMaster` over `{root}/instruments/YYYY-MM-DD.parquet`; tests `resolve_as_of_old_symbol`, `backtest_resolves_expired_contract` |
 | E3-S3 cost schedule in fills | `honba-market::DatedCostScheduleSource`, `edge_after_costs`, `FeeBreakdown::total_bps`; `honba-sim::cost::ScheduleFillCost`, `NextOpenSim::with_schedule`, `BarFillEngine::with_schedule`; tests `charges_effective_dated`, `india_costs_in_backtest_match_python_costmodel` (golden) |
 | E4-S5 sweep fitness & REST | `honba-sweep` `CalmarFitness`, `SortinoFitness`, `OmegaFitness`, `fitness_ranking_stable`; `POST /sweeps`, `GET /sweeps/{id}`, `GET /sweeps/{id}/journal` (422 per-trial); `crates/honba-api-rest/tests/rest_sweep.rs` |
@@ -261,8 +282,16 @@ Done work is removed. Sizes: S (<=1 day), M (2-4 days), L (split before start). 
 
 R6 and R7 can run in parallel with R4 once R2 exits. R5 needs R1 for write tools and R2 for runs.
 
-**Critical path:** E2-S2 -> E11-S7 (write endpoints) and E5-S4; ADR-Run -> E4-S3 -> `POST /backtests` -> E4-S5 -> E11-S4 -> E9-S7;
-E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python callers of any async Rust API; E2-S6(a) -> E2-S6(b..d) -> E2-S7 -> E3-S7.
+**Milestone status (2026-10-14):** R1 (Safe writes), R2 (Runs), R3 (Live-shaped runtime), R4 (Trustworthy research) and R5 (Agent surfaces,
+except the deferred E5-S6 webhook and E5-S9 report builder) are **complete**. R6 (Live-ready) is complete except the L2 simulator
+(E3-S1b/S1d, deferred by ADR 0025/D14) and the Rust-native connectors (E10-S8). R7 (Frontend) has only the local TS drift check
+(E11-S6) open on the `honba` side; the app work is in `honba-frontend`. R8 (Optional) stays unscheduled.
+
+**Critical path:** E2-S2 -> E11-S7 (write endpoints) and E5-S4 (all DONE); ADR-Run -> E4-S3 -> `POST /backtests` -> E4-S5 -> E11-S4 -> E9-S7
+(all DONE in `honba`, E9-S7 in `honba-frontend`); E3-S1a (next-open Rust) -> E3-S2 -> E3-S7 (all DONE; E3-S1b is deferred by ADR 0025);
+E10-S7 (done) gates Python callers of any async Rust API; E2-S6(a) -> E2-S6(b..d) -> E2-S7 -> E3-S7 (all DONE). What remains is off the
+old critical path: L2 matching (E3-S1b/S1d), Rust connectors (E10-S8), the pull-based E7 and optional E8 epics, E11-S6, and the deferred
+E5-S6/E5-S9.
 
 ### E1 Instruments and adapters
 
@@ -271,23 +300,23 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 | E1-S1b | Second adapter passes the contract suite on recorded fixtures; migration note per adapter | M | E1-S1 | `test_contract_suite[dhan]` / `test_adapter_wiring_recorded_fixture` | honba-adapters (ask first) |
 | E1-S2 (DONE) | `Instrument` gains optional expiry, strike, option type, underlying; `india::fno` grammar parse/format (equity, futures, options, index) | M | E0-S7 | `symbol_round_trip_property`, `ce_suffix_ambiguity`, `weekly_vs_monthly` / `catalog_resolves_fno_symbol` through market registry; Python binding + stub | honba |
 | E1-S3 (DONE) | `InstrumentMaster` impl over Parquet catalog: `snapshot(as_of)`, effective-dated lot/tick/freeze | M | E1-S2 | `resolve_as_of_old_symbol` / `backtest_resolves_expired_contract` | honba |
-| E1-S4 | Product/price-type/TIF table mapping per adapter | S | first real adapter | `mapping_round_trip_property` / `adapter_rejects_unsupported_combo` | honba-adapters |
-| E1-S5 | `SessionProvider`, rate limiter, secret store impl (Python side) | M | E1-S1b | `token_expiry_fake_clock`, `bucket_refill` / `limits_hold_across_workers`, `no_secret_in_logs` | honba (+adapters) |
+| E1-S4 (DONE) | Product/price-type/TIF table mapping per adapter. Canonical `Product` enum + per-adapter JSON mappings in `honba-messages` (commit `9a7731a`) | S | first real adapter | `mapping_round_trip_property` / `adapter_rejects_unsupported_combo` | honba (+adapters) |
+| E1-S5 (DONE) | `SessionProvider`, token-bucket rate limiter, encrypted secret store (Python side) (commits `0df5b75`, `40ae1ec`) | M | E1-S1b | `token_expiry_fake_clock`, `bucket_refill` / `limits_hold_across_workers`, `no_secret_in_logs` | honba (+adapters) |
 | E1-S6 (DONE) | Feed connector contract: reconnect, backoff, gap markers, watchdog, Terminal/Unrecoverable | M | E10-S1, E2-S3 | `backoff_schedule`, `terminal_error_stops` / `simulated_feed_drop_emits_gap_marker`, `feed_into_engine_run` (commit `bc3b20b`) | honba |
 
 ### E2 Safe engine
 
 | ID | Scope | Size | Deps | Acceptance | Owner |
 |---|---|---|---|---|---|
-| E2-S1 rest | Enforce Reducing as reduce-only; expose `TradingState` and `Command::State` in Python and CLI; state change visible in audit | S | none | `reducing_refuses_position_increasing_order` / `python_halt_blocks_orders_in_run` | honba |
-| E2-S2 | New `honba-risk` crate (pure): `RiskCheck` -> approved plus typed refusals; rules max notional, order rate, lot size, price band from `MarketProfile`; refusals are events and audited; config schema; spec: ADR 0018 (accepted), incl. `RulesSource` port, `TickSize`/typed lot rules, working-exposure reduce-only | M | E2-S1, E0-S7 | `max_notional_refused`, `price_band_from_profile` (+ property tests) / `strategy_engine_risk_fills_refusal_in_audit` | honba |
-| E2-S3 rest | Wall-clock-free domain check (lint or test) in CI | S | none | `no_system_time_in_domain_crates` / dependency-graph job | honba |
-| E2-S4 rest | Replay: rebuild final state from `AuditLog`; journal writer | M | E2-S3 | `audit_replay_matches_state` / `run_then_replay_identical_positions` | honba |
+| E2-S1 rest (DONE) | Enforce Reducing as reduce-only; expose `TradingState` and `Command::State` in Python and CLI; state change visible in audit (commits `19e7a1c`, `2fadc9f`) | S | none | `reduce_only_two_orders_in_flight` (`crates/honba-engine/tests/risk_gate.rs`, `python/tests/integration/test_reduce_only_two_orders_in_flight.py`), `test_trading_state_enforcement.py`, `state_command_halts_the_engine` (`crates/honba-async/tests/shell.rs`) | honba |
+| E2-S2 (DONE) | New `honba-risk` crate (pure): `RiskCheck` -> approved plus typed refusals; rules max notional, order rate, lot size, price band from `MarketProfile`; refusals are events and audited; config schema; spec: ADR 0018 (accepted), incl. `RulesSource` port, `TickSize`/typed lot rules, working-exposure reduce-only (commits `3455467`..`dcd2a22`, `b397eff`) | M | E2-S1, E0-S7 | `max_notional_refused`, `price_band_from_profile` (+ property tests) / `strategy_engine_risk_fills_refusal_in_audit`; golden `schema/conformance/risk_decisions.json` | honba |
+| E2-S3 rest (DONE) | Wall-clock-free domain check (lint or test) in CI; `UnixNanos::now` removed (commit `c90dd92`) | S | none | `no_system_time_in_domain_crates` (`crates/honba-testing/tests/purity.rs`) / dependency-graph job | honba |
+| E2-S4 rest (DONE) | Replay: rebuild final state from `AuditLog`; journal writer (commit `17bce15`) | M | E2-S3 | `audit_replay_matches_state`, `journal_writer_roundtrip` / `run_then_replay_identical_positions` | honba |
 | E2-S6 (DONE 2026-10-09) | (a) `OrderState` FSM and client order ids in `honba-messages`; (b) `ExecutionEngine` emits ack/reject/fill/cancel-ack events replacing `drain_*`; (c) adapter contract emits same (event form beside the query form, snapshot-diff reducer — Appendix A); (d) sim and paper identical. ADR 0019 accepted. Evidence: (a) `crates/honba-messages/src/orders/state.rs`, `SCHEMA_VERSION` 4, `crates/honba-entities/src/execution.rs`, `python/src/honba/entities/order_state.py` / `python/src/honba/strategies/execution.py` (commits `cd32017, bb325ba, 11d693b, 209cba8`); (b) `crates/honba-engine/src/execution.rs:104` / `crates/honba-engine/src/engine.rs:490`, every engine in `honba-sim`/`honba-py`/`honba-sweep`/`honba-strategy` + `StrategyRunner` + shims (`089ea11, 3504b01, ad9c3a5`); (c) `python/src/honba/adapters/models.py:303` `venue_order_id`, `FakeAdapter` conformance `python/tests/integration/test_fake_adapter_conformance.py` + `python/tests/unit/test_fake_adapter_order_state.py` + `honba.adapters.order_events.reduce_order_report` (`50cd136, c079288, 084841d`); (d) `crates/honba-sim/tests/order_state_conformance.rs` (BarFill/Paper/NextOpen/Scripted) + `crates/honba-py/tests/order_state_conformance.rs` (NativeSim, `9dc5998`) + `python/tests/integration/test_order_state_conformance.py::test_gateway_normalised_stream_replay` (NextOpen python/native, FakeAdapter) | L | E0-S2 | `illegal_transition_rejected`, `partial_fill_sequence` / one conformance scenario set (market, limit, partial, reject, cancel race, expiry) run on every gateway: `crates/honba-sim/tests/order_state_conformance.rs`, `crates/honba-py/tests/order_state_conformance.rs`, `python/tests/integration/test_order_state_conformance.py`, `python/tests/integration/test_fake_adapter_conformance.py` | honba (+adapters) |
-| E2-S7 | Reconciliation on startup/reconnect | M | E2-S4, E2-S6, E2-S9 | `missed_fill_detected` / recorded fixture scenarios | honba |
-| E2-S9 | Cache/state store (`engine/src/cache/` is a stub): orders, positions, instruments, last quotes; query trait for context | M | E2-S6(a) | `cache_apply_event` / `context_reads_from_cache` | honba |
-| E2-S10 | Feed staleness breaker on the simulated clock | S | E2-S2, E1-S6 | `stale_after_blocks_orders` / `stale_feed_scenario` | honba |
-| E2-S11 | Durable risk state, idempotent fill ledger | M | E2-S2, E2-S6, E2-S7 | `fingerprint_dedup`, `atomic_snapshot` / `reconnect_replay_no_double_count` | honba |
+| E2-S7 (DONE) | Reconciliation on startup/reconnect (`crates/honba-engine/src/reconciliation.rs`, commit `9977f87`) | M | E2-S4, E2-S6, E2-S9 | `missed_fill_detected` / `crates/honba-engine/tests/reconciliation.rs` | honba |
+| E2-S9 (DONE) | State cache (`crates/honba-engine/src/cache/mod.rs`, no longer a stub): orders, positions, instruments, last quotes; `StateCache`/`CacheQuery`/`TrackedOrder` (commit `efdd717`) | M | E2-S6(a) | `cache_apply_event` / `context_reads_from_cache` | honba |
+| E2-S10 (DONE) | Feed staleness breaker (`RiskRefusal::FeedStale`) on the simulated clock (commit `508316f`) | S | E2-S2, E1-S6 | `stale_after_blocks_orders` / `stale_feed_scenario` | honba |
+| E2-S11 (DONE) | Durable risk state, idempotent fill ledger (`crates/honba-risk/src/{durable,ledger}.rs`, commit `51e5650`) | M | E2-S2, E2-S6, E2-S7 | `fingerprint_dedup`, `atomic_snapshot` / `reconnect_replay_no_double_count` | honba |
 | E2-S8 | DROPPED (see 3.2) | | | | |
 
 ### E3 Execution realism
@@ -297,12 +326,12 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 | E3-S1a (DONE) | Rust port of the next-open simulator behind `ExecutionEngine`, Python `NextOpenExecution` API unchanged. **All chunks shipped** (ADR 0016): chunk 1 port, chunk 2 settlement + costs + `SessionOpen`, chunk 3a PyO3 binding, chunk 3b Python delegation (native backend with a pure-Python fallback). Note: the Python reference never fills limit or stop orders (they are rejected `unsupported_order_type`), so "harden L1 stop/limit" needs a product decision before it can be scheduled | L -> split (port, order types, partial by volume) | ADR D1 | `crates/honba-sim/tests/next_open_conformance.rs::next_open_vectors_match_the_python_reference` (Rust), `crates/honba-py/tests/next_open_native.rs::every_chunk_one_and_two_vector_matches_the_python_reference` (`honba._honba` core), `python/tests/integration/test_next_open_sim_conformance.py::test_next_open_vector_matches_the_python_reference` (Python + native backends) replay `schema/conformance/next_open_sim.json` and assert equal | honba |
 | E3-S1b | L2 quote/tick matching: marketable orders walk top of book, resting limits, stops from ticks, IOC/FOK/day | L -> split | E2-S6, E3-S2, tick data decision | `limit_fills_on_trade_through` / L1 vs L2 conformance on same stream | honba |
 | E3-S1d | Differential oracle: naive reference matcher vs optimised sim | M | E3-S1b | `oracle_agrees_seeded_streams` / same | honba |
-| E3-S2 | `FillModel`, `LatencyModel` traits, seeded; slippage, ack delay, queue position; depth survival discount | M | E3-S1a | `seeded_slippage_reproducible` / `same_seed_byte_identical_fills` | honba |
+| E3-S2 (DONE) | `FillModel`, `LatencyModel` traits, seeded; slippage, ack delay, queue position (commit `695a549`, `crates/honba-sim/tests/fill_latency_models.rs`); depth-survival discount deferred to L2 (ADR 0025) | M | E3-S1a | `seeded_slippage_reproducible` / `same_seed_byte_identical_fills` | honba |
 | E3-S3 (DONE) | Wire Rust `CostSchedule` into fills; `edge_after_costs` (named charges on `Trade` deferred) | M | E0-S7 | `charges_effective_dated` / `india_costs_in_backtest_match_python_costmodel` golden | honba |
-| E3-S4 | Margin model and MIS square-off from `MarketProfile` | M | E3-S3, E2-S3 | `square_off_at_session_end` / `mis_run_flat_by_close` | honba |
-| E3-S5 | Target-position (smart order) with per-instrument serialisation | M | E3-S6, E2-S6 | `target_delta_computed` / `target_position_run` | honba |
-| E3-S6 | Lot and freeze-quantity splitter, lot-aware sizing | S | E1-S3 | `slice_above_freeze` / `order_sliced_in_sim` | honba |
-| E3-S7 | `SandboxAdapter`: paper on live data, same matching core and FSM | M | E1-S6, E2-S6, E3-S1..S4 | `virtual_funds_isolated` / `sandbox_vs_backtest_same_fills` | honba |
+| E3-S4 (DONE) | Margin model and MIS square-off from `MarketProfile` (commit `1ffa180`) | M | E3-S3, E2-S3 | `mis_run_flat_by_close` (`crates/honba-sim/tests/mis_square_off.rs`) | honba |
+| E3-S5 (DONE) | Target-position (smart order) with per-instrument serialisation (commit `599fb22`) | M | E3-S6, E2-S6 | `target_delta_computed` / `target_position_run` | honba |
+| E3-S6 (DONE) | Lot and freeze-quantity splitter, lot-aware sizing (commit `6f8d509`) | S | E1-S3 | `slice_above_freeze` / `order_sliced_in_sim` | honba |
+| E3-S7 (DONE) | `SandboxAdapter`: paper on live data, same matching core and FSM (commit `71de25f`) | M | E1-S6, E2-S6, E3-S1..S4 | `virtual_funds_isolated` / `sandbox_vs_backtest_same_fills` | honba |
 
 ### E4 Research pipeline (core in Rust analytics/sweep; orchestration in Python)
 
@@ -328,9 +357,9 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 | E5-S3 (DONE) | Scope map (read:market, read:account, write:orders, research) with CI drift test; audit by token id | S | E5-S1, E11-S8 min | `scope_for_every_endpoint` / `drift_test_fails_on_new_route` | honba |
 | E5-S4 (DONE) | Approval queue for placements; cancel/modify bypass | M | E2-S2, E5-S3 | `placement_held`, `cancel_bypasses` / `approve_flows_through_risk_to_sim` | honba |
 | E5-S7 (DONE) | Typed LLM decisions (veto/size-down only), journaled | S | E5-S5, E4-S1 | `schema_rejects_increase` / `decision_in_journal` | honba |
-| E5-S8 rest | Write routes gated (E11-S7) | S | E2-S2, E5-S4 | see E11-S7 | honba |
-| E5-S10 | Local in-process LLM runtime (llama-cpp-python / GGUF runner) and EBNF->GBNF grammar constraint for zero-syntax-hallucination screening (Design.md §13) | M | E5-S1, ADR 0009 | `grammar_masks_invalid_tokens` / `ask_runs_offline_zero_syntax_errors` | honba |
-| E5-S11 | Financial domain alignment for tiny models (1B-3B): synthetic financial dataset (3k Indian market NL queries), QLoRA SFT, and compiler-reward RLVR (GRPO via parser & screener evaluator) | M | E5-S10 | `benchmark_screener_accuracy_gt_90pct` / `rlvr_rewards_compiler_pass` | honba |
+| E5-S8 rest (DONE) | Write routes gated (E11-S7) | S | E2-S2, E5-S4 | `order_refused_by_risk` / `post_order_flows_to_sim_only` (commit `91ab361`) | honba |
+| E5-S10 (DONE) | Local in-process LLM runtime (llama-cpp / GGUF runner) and EBNF->GBNF grammar constraint for zero-syntax-hallucination screening (Design.md §13) (commit `c9579d2`) | M | E5-S1, ADR 0009 | `grammar_masks_invalid_tokens` (`python/tests/unit/test_ai_gbnf.py`) / `ask_runs_offline_zero_syntax_errors` (`python/tests/integration/test_ai_local_llm.py`) | honba |
+| E5-S11 (DONE) | Financial domain alignment for tiny models (1B-3B): synthetic financial dataset (3k Indian market NL queries), QLoRA SFT, and compiler-reward RLVR (GRPO via parser & screener evaluator) (commit `827627f`) | M | E5-S10 | `benchmark_screener_accuracy_gt_90pct` / `rlvr_rewards_compiler_pass` (`python/tests/unit/test_ai_alignment.py`) | honba |
 | E5-S6, E5-S9 | Deferred (webhook, report builder) | | | | |
 
 ### E6, E7, E8, E9
@@ -346,17 +375,17 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 | E9-S8 | Generated TS client from OpenAPI (types already generated) | S | E11-S6 | `client_types_compile` / contract test against `honba serve` | honba-frontend (approved) |
 | E9-S1..S7 | StrategyGraph editor, graph to code, code to graph, verify/run, AI assistant, ops console, result views | M each | E0-S8, E4-S3, E5-S5, E11-S4 | per old roadmap section E9 | honba-frontend |
 
-### E10 Async core (remaining; E10-S7 done)
+### E10 Async core (remaining: E10-S8; E10-S7 done)
 
 | ID | Scope | Size | Deps | Acceptance | Owner |
 |---|---|---|---|---|---|
 | E10-S8 | Rust-native connectors (NSE bhavcopy first, broker REST later) as `honba-ports` impls; decide Python-adapter bridge (D10) | L -> split | E10-S1, D10 | `bhavcopy_connector_parses_fixture` / `feed_into_engine_run` | honba |
 
-### E11 Versioned API (remaining)
+### E11 Versioned API (remaining: E11-S6)
 
 | ID | Scope | Size | Deps | Acceptance | Owner |
 |---|---|---|---|---|---|
-| E11-S3 rest | Backtests, sweeps, journals, orders routes (backtests and journals built by ADR 0017 q2c; 6 routes still 501: sweeps, orders, positions/close) built in order of R2; known limits in ADR 0013 stand (no real bid/ask, no pagination, no auth) | M each | E4-S3, E4-S5 | route unit tests / `test_client_parity` extended | honba |
+| E11-S3 rest (DONE) | Backtests, sweeps, journals, orders routes built in order of R2; `NOT_IMPLEMENTED_ENDPOINTS` is now empty, so no route returns 501. Backtests and journals built by ADR 0017 q2c (`7298373`), sweeps (E4-S5), orders write ledger (E11-S7, `91ab361`, `GET /orders`); ADR 0013 limits (no real bid/ask, no pagination) stand | M each | E4-S3, E4-S5 | route unit tests / `test_client_parity` extended | honba |
 | E11-S4 | SSE for run progress and journals (resume-from-sequence), WS for events later; schema for streamed events | M | ADR D6, E4-S3 | `resume_from_seq`, `event_schema` / `sse_backtest_progress_inproc_and_http` | honba | **DONE** (ADR 0021, commits 523bca5) |
 | E11-S5 rest **(DONE)** | WASM: screener eval + backtest replay (screener eval had existed in `honba-indicators`, replay over `JournalV1`; both exported via `honba-api-wasm`; wasm-pack exercised via `make test-wasm`) | M | E4-S3 | conformance vectors `screener_scan.json` + journal replay / browser-free node run | honba |
 | E11-S6 | Frontend client from OpenAPI, TS drift check in CI (currently local only) | S | none | `ts_matches_openapi` / frontend build | honba + honba-frontend |
@@ -369,27 +398,29 @@ E3-S1a (next-open Rust) -> E3-S1b/S2 -> E3-S7; E10-S7 (done) gates Python caller
 
 | # | Question | Needed for | Recommendation |
 |---|---|---|---|
-| D1 | **Run lifecycle and `run_id`**: a `Run` is a server-side object (`pending/running/completed/failed/cancelled`), journal addressable by id, retention, restart behaviour. Types exist (`BacktestResponse`, `RunStatus`); routes are 501 — **decided and accepted 2026-10-07 (ADR 0017)**; accepted ADRs 0017, 0018 and 0019 unblock E2-S2, E4-S3 and E11-S3 | E4-S3, E11-S3/S4, E9-S6 | ADR before R2; in-memory plus on-disk journal first |
+| D1 | **Run lifecycle and `run_id`**: a `Run` is a server-side object (`pending/running/completed/failed/cancelled`), journal addressable by id, retention, restart behaviour — **decided and accepted 2026-10-07 (ADR 0017)** and shipped (E4-S3, E11-S3); accepted ADRs 0017, 0018 and 0019 unblocked E2-S2, E4-S3 and E11-S3 | E4-S3, E11-S3/S4, E9-S6 | ADR before R2; in-memory plus on-disk journal first |
 | D2 | **Cancel timestamp rule**: DECIDED 2026-10-06 (ADR 0008 decision 13 addendum, commit 1c50fc7): a cancel is stamped with the time of the cancel (`ExecutionEngine::cancel(order_id, now)`), identical in Rust and Python. L2/live per-fidelity rule: **decided 2026-10-07 (ADR 0019 decision 6)** — `cancel_requested` at `now`, `cancelled` at `now` (L1/L2-v1) or venue-ack time (live) | E2-S6, E3-S1b | State the per-fidelity rule for L2/live in the FSM ADR |
-| D3 | Journal schema v1 and cache key | E4-S1 | ADR with golden journal |
+| D3 | Journal schema v1 and cache key — **decided (ADR 0020)**; E4-S1 shipped | E4-S1 | ADR with golden journal |
 | D4 | Risk stage: crate placement (`honba-risk` at L2), Reducing semantics, rule config schema — **decided 2026-10-07 (ADR 0018)** | E2-S2 | ADR before code |
 | D5 | `OrderState` FSM, event set, `drain_*` replacement (breaking for adapters, Python ports, bindings) — **decided 2026-10-07 (ADR 0019)** | E2-S6 | ADR, then split stories |
-| D6 | Streaming protocol: SSE vs WS, sequence and resume | E11-S4 | SSE first |
-| D7 | Verifier sandbox strength: subprocess rlimits vs container | E5-S5 | Subprocess; revisit for hosted |
-| D8 | Holdout policy: fixed ranges, who resets consumption | E4-S6 | ADR with E4-S6 |
-| D9 | Sampler: Rust seeded sampler vs Optuna extra; pinned version | E4-S5 | Rust sampler; Optuna optional |
-| D10 | Python adapters (ADR 0010) vs Rust `ExecutionGateway`/`MarketDataFeed` ports: who bridges, which side owns the loop | E10-S8, E3-S7 | ADR before E10-S8 |
-| D11 | Minimal auth before non-loopback serve | E11-S8, E5-S3 | Bearer token plus scope map |
-| D12 | ADR 0009 (agentic MCP and local LLM) reconciliation: accept local in-process Llama runtime and the layered alignment strategy (GBNF -> SFT -> RLVR) per Design.md §13 | E5, E5-S10, E5-S11 | Accept with GBNF + RLVR |
+| D6 | Streaming protocol: SSE vs WS, sequence and resume — **decided (ADR 0021)**; SSE shipped (E11-S4) | E11-S4 | SSE first |
+| D7 | Verifier sandbox strength: subprocess rlimits vs container — **decided (ADR 0022)**: subprocess with rlimits/audit hook; revisit for hosted | E5-S5 | Subprocess; revisit for hosted |
+| D8 | Holdout policy: fixed ranges, who resets consumption — **decided (ADR 0024)**; gates shipped (E4-S6) | E4-S6 | ADR with E4-S6 |
+| D9 | Sampler: Rust seeded sampler vs Optuna extra; pinned version — **decided**: Rust seeded sampler shipped (E4-S5); Optuna stays an optional extra | E4-S5 | Rust sampler; Optuna optional |
+| D10 | Python adapters (ADR 0010) vs Rust `ExecutionGateway`/`MarketDataFeed` ports: who bridges, which side owns the loop — **still open** | E10-S8, E3-S7 | ADR before E10-S8 |
+| D11 | Minimal auth before non-loopback serve — **decided (ADR 0023)**; shipped (E11-S8) | E11-S8, E5-S3 | Bearer token plus scope map |
+| D12 | ADR 0009 (agentic MCP and local LLM) reconciliation: accept local in-process Llama runtime and the layered alignment strategy (GBNF -> SFT -> RLVR) per Design.md §13 — **decided 2026-10-12**; E5-S10/S11 shipped | E5, E5-S10, E5-S11 | Accept with GBNF + RLVR |
 | D13 | Is arbitrage a product goal (E8)? | E8 | Unscheduled unless yes |
-| D14 | Tick/depth data source for L2 (bars only today; `/depth` empty) | E3-S1b | Decide before L2; else stay L1 |
+| D14 | Tick/depth data source for L2 (bars only today; `/depth` empty) — **decided (ADR 0025)**: stay L1; E3-S1b/S1d deferred | E3-S1b | Decide before L2; else stay L1 |
 | D15 | Root CLAUDE.md wording for the pack pattern; clean-room log for OpenAlgo/QuantDinger-inspired work; `honba-python` split re-evaluation (needs `honba-py` on crates.io) | housekeeping | Owner approval |
 | D16 | `StrategyGraph` stored form: Python file plus sidecar graph | E9 | Per old roadmap item 18 |
-| D17 | NSE settlement default and intraday cycle (counts bars, not sessions) in simulators | E3-S1a | Settle in the port ADR |
+| D17 | NSE settlement default and intraday cycle (counts bars, not sessions) in simulators — **decided (ADR 0016)**; shipped (E3-S1a) | E3-S1a | Settle in the port ADR |
 
 Already decided: pyo3 single cdylib (ADR 0014 decision, `honba-py`), Strategy ABC with shim (ADR 0008), schema from Rust (ADR 0014),
-integer money (0011), versioning and nanosecond strings (0012), REST read ports (0013), explicit runtime (0015, implemented in E10-S7), next-open Rust port (0016, all three chunks done),
-run lifecycle and `run_id` (0017, D1), risk stage (0018, D4), `OrderState` FSM and client order ids (0019, D5/D2), SSE streaming (0021, D6).
+integer money (0011), versioning and nanosecond strings (0012), REST read ports (0013), explicit runtime (0015, implemented in E10-S7), next-open Rust port (0016, all three chunks done, D17),
+run lifecycle and `run_id` (0017, D1), risk stage (0018, D4), `OrderState` FSM and client order ids (0019, D5/D2), journal schema v1 and result cache (0020, D3),
+SSE streaming (0021, D6), AI strategy verifier (0022, D7), minimal auth (0023, D11), overfitting gates / streaming datasets / session MTF (0024, D8),
+tick/depth scope (0025, D14). Still open: D10 (Python adapters vs Rust ports), D13 (arbitrage), D15 (housekeeping), D16 (`StrategyGraph` form).
 
 ---
 
@@ -452,6 +483,9 @@ REST); (e) determinism at 1/4/16 threads (met for sweeps, extend to runs).
 ---
 
 ## Appendix A: Corrections to the audit (spot-check, 2026-10-06)
+
+This appendix is a historical snapshot of the 2026-10-06 spot-check. Several verdicts below (for example E2-S9, E3-S2, E2-S1, E11-S3)
+have since been superseded by shipped work; see §1.1 and §4 for the current status, not this table.
 
 Checked about 25 verdicts against code, git log and ls/grep (read-only). Counts: the audit's table holds 74 rows (8 DONE, 37 PARTIAL,
 29 NOT STARTED) while its prose said 70 and its summary 10/31/28 = 69. Corrected totals were 18/18/38 at v5; v6 moved E10-S7 to done (19/17/38, see section 1).
