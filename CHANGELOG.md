@@ -500,6 +500,19 @@
   - `PaperExecution` gains `with_ack(bool)` for the `ack` profile (emitting `Accepted` before filling on limit orders), replaying scenarios under the `ack` profile.
   - `NextOpenSim` replays bar-realisable market order scenarios under the `l1` profile.
   - `ScriptedExecution` replays scenarios under the `ack` profile.
+  - `honba._honba.NextOpenSimulator` (`crates/honba-py/tests/order_state_conformance.rs`,
+    `9dc5998`) replays the bar-realisable `market_fill` scenario under the `l1` profile through
+    the native binding's `open_session`/`submit`/`drain_events`, checking the normalised
+    `expect_events` (`order`, `order_filled`) and terminal `expect_state`.
+  - Python gateways (`python/tests/integration/test_order_state_conformance.py`,
+    `9dc5998`) replay the same vectors under the `l1` profile:
+    `NextOpenExecution` on both backends (`python`, `native`) on `market_fill` (a price-driven
+    L1 sim filling at the next session's open), and the query-form `FakeAdapter` (via the
+    snapshot-diff reducer — the direct `ExecutionEvent` driver lives in
+    `python/tests/integration/test_fake_adapter_conformance.py` and its unit twin
+    `python/tests/unit/test_fake_adapter_order_state.py`) on `market_fill` and `limit_fill`. The
+    skipped `test_todo_gateway_normalised_stream_replay` is replaced by
+    `test_gateway_normalised_stream_replay[201]` (4 parametrised cases).
 - Normalised event streams and terminal order states match the canonical conformance vectors across all gateways.
 
 ### Adapter event form, FakeAdapter order-state conformance (E2-S6(c))
@@ -510,7 +523,21 @@
 - `FakeAdapter` accepts injected instruments so `order_state.json` bar-realisable scenarios
   (`market_fill`, `limit_fill` under the `l1` profile) replay through it, producing the
   normalised l1 event stream (`order`, `order_filled`). This is the first adapter to exercise
-  the event form beside the query form.
+  the event form beside the query form. `FakeAdapter._load_instruments_from_store` now recovers
+  when `duckdb` (an optional extra) is absent (`c079288`).
+- `honba.adapters.order_events`: snapshot-diff reducer (`reduce_order_report`, `ReportReduction`,
+  `084841d`) turns consecutive `OrderReport` polls into the ordered port-event stream the kernel
+  speaks (ADR 0019 Appendix A). `Accepted` when the report moved to a working status or a venue
+  order id is first seen, one `Fill` for the quantity delta (priced at the delta-weighted average
+  price, `complete` iff `FILLED`), terminal `Rejected`/`Cancelled`/`Expired` last; a decreasing
+  `filled_quantity` or a backwards status emits nothing and flags the order for reconciliation
+  (E2-S7). Exported from `honba.adapters` (`report:14, report:27`). Tests: 11 unit cases in
+  `python/tests/unit/test_adapter_order_events.py`
+  (`snapshot_reducer_monotone_fills`, `snapshot_reducer_puts_the_terminal_event_last`,
+  `snapshot_reducer_fill_price_is_the_delta_weighted_average`,
+  `snapshot_reducer_decreasing_fill_is_flagged`,
+  `snapshot_reducer_backwards_status_is_flagged`,
+  `snapshot_reducer_venue_id_first_seen_emits_accepted`, ...).
 - `honba-testing/tests/purity.rs` already closes R1; E2-S6(c) is the adapter half of the
   kernel's one-queue contract. The query-form contract suite is unchanged; the event form
   will be verified by `order_state.json` replay on every gateway (E2-S6(d)).
