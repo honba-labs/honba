@@ -66,8 +66,13 @@ fn rendering_is_deterministic() {
 
 /// Mirrors the generator's own camelization, so the test names match the output.
 fn camelize(snake: &str) -> String {
+    let parts: Vec<&str> = snake
+        .split('_')
+        .flat_map(|seg| seg.split('-'))
+        .filter(|p| !p.is_empty())
+        .collect();
     let mut out = String::new();
-    for (i, part) in snake.split('_').enumerate() {
+    for (i, part) in parts.into_iter().enumerate() {
         if i == 0 {
             out.push_str(part);
         } else {

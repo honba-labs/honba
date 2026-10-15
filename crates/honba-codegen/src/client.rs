@@ -311,10 +311,15 @@ fn js_path(path: &str, params: &[&str]) -> String {
     out
 }
 
-/// `get_instruments_by_id` -> `getInstrumentsById`.
+/// `get_instruments_by_id` -> `getInstrumentsById`, `get_trading-state` -> `getTradingState`.
 fn camelize(snake: &str) -> String {
+    let parts: Vec<&str> = snake
+        .split('_')
+        .flat_map(|seg| seg.split('-'))
+        .filter(|p| !p.is_empty())
+        .collect();
     let mut out = String::with_capacity(snake.len());
-    for (i, part) in snake.split('_').enumerate() {
+    for (i, part) in parts.into_iter().enumerate() {
         if i == 0 {
             out.push_str(part);
         } else {
