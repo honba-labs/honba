@@ -189,7 +189,7 @@ class TestAuthIntegration:
             "/instruments",
             "/bars/NIFTY.NSE",
             "/depth/NIFTY.NSE",
-            "/screener/scan?symbols=NIFTY.NSE",
+            "/screener/scan?universe=%5B%22NIFTY.NSE%22%5D&tf=1m",
         ]:
             resp = httpx.get(f"{server_with_auth}{path}", timeout=5)
             assert resp.status_code == 401, (
@@ -205,17 +205,27 @@ class TestAuthIntegration:
             "/instruments",
             "/bars/NIFTY.NSE",
             "/depth/NIFTY.NSE",
-            "/screener/scan?symbols=NIFTY.NSE",
+            "/screener/scan?universe=%5B%22NIFTY.NSE%22%5D&tf=1m",
         ]:
             resp = httpx.get(f"{server_with_auth}{path}", headers=headers, timeout=5)
-            assert resp.status_code == 200, f"{path}: {resp.text}"
+            if path.startswith("/depth/"):
+                # Authorized, but the bars-only fixture dataset holds no order book.
+                assert resp.status_code == 404, f"{path}: {resp.text}"
+                assert resp.json()["error"]["code"] == "market_data_unavailable"
+            else:
+                assert resp.status_code == 200, f"{path}: {resp.text}"
 
     def test_research_routes_work_with_research_token(self, server_with_auth: str) -> None:
         """research endpoints work with research scope."""
         headers = {"Authorization": f"Bearer {TEST_TOKEN}"}
         for path in ["/strategies", "/journals/test"]:
             resp = httpx.get(f"{server_with_auth}{path}", headers=headers, timeout=5)
-            assert resp.status_code == 200, f"{path}: {resp.text}"
+            if path.startswith("/journals/"):
+                # Authorized, but no such run exists in the empty journals dir.
+                assert resp.status_code == 404, f"{path}: {resp.text}"
+                assert resp.json()["error"]["code"] == "not_found"
+            else:
+                assert resp.status_code == 200, f"{path}: {resp.text}"
 
     def test_write_orders_requires_write_scope(self, server_with_auth: str) -> None:
         """write:orders endpoints return 403 with only read:market+research token."""
@@ -228,6 +238,8 @@ class TestAuthIntegration:
                     json={"instrument_id": "NIFTY.NSE", "side": "buy", "qty": 1},
                     timeout=5,
                 )
+            elif path == "/approval/queue":
+                resp = httpx.get(f"{server_with_auth}{path}", headers=headers, timeout=5)
             elif path.startswith("/approval/"):
                 resp = httpx.post(f"{server_with_auth}{path}", headers=headers, timeout=5)
             else:
