@@ -14,6 +14,7 @@ from honba.entities.bar import Bar
 from honba.entities.instrument import Instrument, InstrumentId
 from honba.entities.order import OrderIntent
 from honba.entities.tick import AggressorSide, QuoteTick, TradeTick
+from honba.risk import RiskLimits
 from honba.session import Honba
 from honba.strategies.base import Strategy
 
@@ -163,3 +164,53 @@ def test_ticks_with_the_default_simulator_do_not_break() -> None:
         ticks=[quote(T0 + DAY - SEC, 99.9, 100.1)],
     ).run()
     assert len(result.fills) == 1  # next_open ignores quotes
+
+
+# -- price collar through the session (ADR 0018 addendum) ----------------------------------------
+
+WILD = [quote(T0 + DAY - SEC, 109.0, 110.0)]  # the ask is 10% above the 100.0 bar close
+
+
+def test_collar_refuses_a_market_buy_far_from_the_last_close() -> None:
+    session = _session(WILD, risk=RiskLimits(price_collar_bps=500))
+    result = session.run()
+    assert result.fills == []
+    # the strategy retries on every bar; each attempt is refused
+    assert [r.reason for r in result.order_rejections] == ["risk_price_collar"] * 3
+    refused = session.runner.audit[0]
+    assert refused.context["expected_price"] == pytest.approx(110.0)
+    assert refused.context["reference_price"] == pytest.approx(100.0)
+
+
+def test_collar_wide_enough_lets_the_order_fill_at_the_ask() -> None:
+    result = _session(WILD, risk=RiskLimits(price_collar_bps=1000)).run()
+    (fill,) = result.fills
+    assert fill.price == pytest.approx(110.0)
+
+
+def test_no_risk_option_means_no_collar() -> None:
+    result = _session(WILD).run()
+    assert len(result.fills) == 1
+
+
+def test_risk_limits_are_recorded_on_the_session() -> None:
+    limits = RiskLimits(price_collar_bps=500)
+    session = _session(WILD, risk=limits)
+    assert session.risk_limits == limits
+    assert session.runner.holds_risk_stage
+    assert _session(WILD).risk_limits is None
+
+
+def _session(ticks, **kw):
+    return Honba.backtest(
+        BuyOnce(),
+        symbol="XYZ",
+        start="2024-01-01",
+        end="2024-02-01",
+        cash=100_000.0,
+        costs="none",
+        fill="l2",
+        data=Provider(_bars([100.0, 100.0, 100.0])),
+        ticks=ticks,
+        **kw,
+    )

@@ -70,6 +70,7 @@ from honba.entities.instrument import Instrument, InstrumentId
 from honba.entities.order import OrderSide
 from honba.entities.tick import QuoteTick, TradeTick
 from honba.entities.trade import Trade
+from honba.risk import RiskLimits, RiskStage
 from honba.strategies.base import Strategy
 from honba.strategies.context import LedgerContext, StrategyContext
 from honba.strategies.execution import OrderRejection
@@ -280,9 +281,14 @@ class BacktestSession:
         # Quote / trade ticks merged with the bars by timestamp (ties: ticks first). They reach
         # the simulator's ``on_event`` and the strategy; None asks ``data.ticks(...)`` if it has one.
         ticks: Sequence[QuoteTick | TradeTick] | None = None,
+        # The stage built from ``risk_limits`` (see ``Honba.backtest(risk=...)``); the runner
+        # gates every order through it, passing the latest quote's touch as ``expected_price``.
+        risk: RiskStage | None = None,
+        risk_limits: RiskLimits | None = None,
     ) -> None:
         self.strategy = strategy
         self.ticks = ticks
+        self.risk_limits = risk_limits
         self.config = config
         self.data = data
         self.execution = execution
@@ -296,7 +302,12 @@ class BacktestSession:
         )
         # Runner binds strategy ↔ ctx, gates warm-up and talks to execution.
         self.runner = StrategyRunner(
-            strategy, execution, ctx=self.ctx, warmup_bars=config.warmup_bars
+            strategy,
+            execution,
+            ctx=self.ctx,
+            warmup_bars=config.warmup_bars,
+            risk=risk,
+            risk_limits=risk_limits,
         )
         self._ran = False
 
@@ -448,6 +459,7 @@ class Honba:
         impact: MarketImpact | None = None,
         auction: OpeningAuction | None = None,
         ticks: Sequence[QuoteTick | TradeTick] | None = None,
+        risk: RiskLimits | None = None,
     ) -> BacktestSession:
         """Build a BacktestSession ready for .run().
 
@@ -498,6 +510,12 @@ class Honba:
           The simulator and the strategy (``on_quote`` / ``on_trade``) both see them; with
           ``fill="l2"`` they are what orders match against. None uses ``data.ticks(instrument_id,
           start=, end=)`` when the provider has it, else no ticks.
+        risk:
+          Pre-trade ``RiskLimits`` (ADR 0018) the runner enforces on every order, e.g.
+          ``RiskLimits(price_collar_bps=500)``. A market order's ``expected_price`` is the
+          latest quote's ask (buy) or bid (sell), judged against the last bar close or trade
+          price, so a collar needs ``ticks`` (or a provider with ``ticks``); refusals surface as
+          ``order_rejections`` with reason ``risk_price_collar`` etc. None (default): no limits.
         data / execution:
           Optional overrides for tests or custom infrastructure.
         """
@@ -525,6 +543,11 @@ class Honba:
             execution if execution is not None else _default_execution(config, cost_model)
         )
 
+        stage = (
+            _risk_stage(risk, config, resolved_data.instrument(config.instrument_id))
+            if risk is not None
+            else None
+        )  # the limits stay off BacktestConfig: the native object is neither hashable nor copyable
         return BacktestSession(
             strategy=resolved_strategy,
             config=config,
@@ -535,6 +558,8 @@ class Honba:
             settlement_from_data=execution is None and settlement_days is None,
             on_bar=on_bar,
             ticks=ticks,
+            risk=stage,
+            risk_limits=risk,
         )
 
     # Future: paper / live factories share the same Strategy + different ports.
@@ -624,6 +649,25 @@ def _default_execution(config: BacktestConfig, cost_model: CostModel | None) -> 
         as_of=_parse_time(config.start).date(),
         impact=config.impact,
         auction=config.auction,
+    )
+
+
+def _risk_stage(limits: RiskLimits, config: BacktestConfig, instrument: Instrument) -> RiskStage:
+    """The native stage over ``limits`` for the run's one instrument (market-neutral profile)."""
+    iid = instrument.instrument_id
+    return RiskStage(
+        limits,
+        config.currency,
+        "null",
+        [
+            {
+                "instrument_id": {"symbol": iid.symbol, "exchange": iid.exchange},
+                "kind": instrument.kind.value,
+                "currency": config.currency,
+                "lot_size": instrument.lot_size,
+                "tick_size": instrument.tick_size,
+            }
+        ],
     )
 
 

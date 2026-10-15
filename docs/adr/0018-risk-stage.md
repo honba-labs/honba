@@ -536,7 +536,7 @@ event and REST share one vocabulary (this ADR and ADR 0019 decision 5). The lite
 | Max position per instrument / account (`risk_max_position_exceeded`) | deferred to E3-S4 (margin model), code stays reserved |
 | Cash / margin pre-check | deferred to E3-S4 |
 | Drawdown limit, automatic kill switch (`risk_max_drawdown_exceeded`) | deferred to E4-S6 gates with E2-S11 durable state; rejected for this per-order stage, which sees no PnL |
-| Market-order price collar / band check on market orders | **done** (2026-10-15, see Addendum): `price_collar_bps`, REST and Rust engine/runner wired from the quote cache; Python session / L2 selection is follow-up |
+| Market-order price collar / band check on market orders | **done** (2026-10-15, see Addendum): `price_collar_bps`, REST and Rust engine/runner wired from the quote cache; Python session / L2 selection done, see the addendum |
 | Stale-feed breaker | deferred to E2-S10 (`stale_after_blocks_orders`) |
 | Risk-limited sweeps | deferred until `honba-sweep` trials consume `BacktestRunConfig`; trials apply state rules only |
 | HTTP request-flood limiting | E11-S8 (the rate rule is event-time, not a transport limiter) |
@@ -611,12 +611,18 @@ E3-S1b/S1d shipped (ADR 0030), so top-of-book prices exist. Decision, kept small
   collar needs both a quote and a bar/trade in the stream (a quote-only feed has no reference and
   skips). Quote-bearing event streams are the only ones affected; bar-only backtests and every
   existing vector are unchanged.
-- Still open: (1) the Python `BacktestSession` is bar-only (its `DataProvider` yields bars, no
-  quotes) and has no `risk=` option, so no Python backtest carries a quote to the collar; (2) the
-  Python `StrategyRunner` risk request does not yet take an `expected_price`; (3) the L2 simulator
-  (`make_simulator(fill="l2")`) is selectable only by constructing the port directly, and is not
-  wired into `BacktestSession` / `BacktestRunConfig`, which needs a quote/trade data source and a
-  schema change. Follow-up.
+- Python (2026-10-15, follow-up done): `Honba.backtest(..., ticks=, risk=RiskLimits(...))` /
+  `BacktestSession` replay quote/trade ticks with the bars (time order, ties: ticks first; a
+  provider's optional `ticks(instrument_id, start=, end=)` is the default source) and gate orders
+  through a `RiskStage`. The Python `StrategyRunner` passes `expected_price` (ask for a buy, bid
+  for a sell, from the latest `QuoteTick`; none for priced orders or before a quote) and the
+  native `RiskStage.check` accepts the key. `fill="l2"` selects `L2Execution` in a session.
+  Parity: `schema/conformance/risk_decisions.json` carries the collar vectors (Rust stage, Python
+  stage and Python runner replay).
+- Still open: the wire `BacktestRunConfig.execution.fill_model` enum (`bar_fill`,
+  `bar_fill_through`, `none`) has no `l2` variant and no Rust engine path, so a wire/REST run
+  cannot select the L2 simulator yet; that is a schema change (regenerate artifacts, then flag
+  the sibling repos).
 
 ## Decision log
 
