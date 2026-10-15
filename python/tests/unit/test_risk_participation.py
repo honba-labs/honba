@@ -126,6 +126,8 @@ def test_max_participation_round_trips_through_dict_forms() -> None:
         "max_notional": None,
         "order_rate": None,
         "max_participation": 0.01,
+        "stale_after_ms": None,
+        "price_collar_bps": None,
     }
     assert RiskLimits.from_dict(limits.to_dict()) == limits
     assert RiskLimits.from_dict({"max_participation": 0.02}).max_participation == 0.02
