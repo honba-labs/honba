@@ -178,13 +178,16 @@ class EventBar(TypedDict):
     volume: float
 
 class EventOrder(TypedDict):
+    avg_fill_price: NotRequired[float | None]
     cancel_requested: NotRequired[bool]
+    filled_qty: NotRequired[float]
     instrument_id: InstrumentId
     order_id: OrderId
     order_type: OrderType
     price: NotRequired[float | None]
     product: NotRequired[Product | None]
     quantity: float
+    reject_reason: NotRequired[RejectReason | None]
     side: OrderSide
     status: OrderStatus
     time_in_force: TimeInForce
@@ -328,13 +331,16 @@ class MonteCarloResult:
     simulations_run: int
 
 class Order:
+    avg_fill_price: float | None = None
     cancel_requested: bool | None = None
+    filled_qty: float | None = None
     instrument_id: InstrumentId
     order_id: OrderId
     order_type: OrderType
     price: float | None = None
     product: Product | None = None
     quantity: float
+    reject_reason: RejectReason | None = None
     side: OrderSide
     status: OrderStatus
     time_in_force: TimeInForce
@@ -432,6 +438,10 @@ class QuotesQuery:
 
 class QuotesResponse:
     quotes: list[QuoteTick]
+
+class RejectReason:
+    code: ErrorCode
+    message: str
 
 class ResponseEnvelope(Generic[T]):
     api_version: str

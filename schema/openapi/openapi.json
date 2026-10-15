@@ -1330,9 +1330,22 @@
           {
             "description": "A new order that has been submitted.",
             "properties": {
+              "avg_fill_price": {
+                "description": "Volume-weighted average fill price; `None` until a fill. Additive.",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
               "cancel_requested": {
                 "description": "A cancel was asked for and not yet answered (ADR 0019); only valid while the order is working.",
                 "type": "boolean"
+              },
+              "filled_qty": {
+                "description": "Cumulative filled quantity (`0` until a fill; omitted from the wire while `0`). Additive field: a reader without it decodes as `0` (ADR 0012 rule 1).",
+                "format": "double",
+                "type": "number"
               },
               "instrument_id": {
                 "$ref": "#/components/schemas/InstrumentId"
@@ -1364,6 +1377,17 @@
               "quantity": {
                 "format": "double",
                 "type": "number"
+              },
+              "reject_reason": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RejectReason"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Why the order (or its unfilled remainder) was refused; `None` otherwise. Additive."
               },
               "side": {
                 "$ref": "#/components/schemas/OrderSide"
@@ -2380,9 +2404,22 @@
       "Order": {
         "description": "A client order.\n\n``` use honba_messages::{ InstrumentId, Order, OrderId, OrderSide, OrderStatus, OrderType, TimeInForce, UnixNanos, Exchange, };\n\nlet order = Order::new( OrderId::new(\"O-1\"), InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), OrderSide::Buy, OrderType::Limit, 75.0, Some(22_000.0), TimeInForce::Day, UnixNanos::from_u64(1), UnixNanos::from_u64(1), ); assert_eq!(order.status(), OrderStatus::Initialized); assert_eq!(order.quantity(), 75.0); ```\n\nInvariants (checked by [`Order::validate`] and on deserialization): `quantity` is finite and `> 0`; `price` and `trigger_price` are finite when present; `cancel_requested` is `true` only while the order is `Submitted`, `Accepted` or `PartiallyFilled`. An order is a record (it may come back from an exchange), so `side` may be `no_order_side`; intents are stricter.",
         "properties": {
+          "avg_fill_price": {
+            "description": "Volume-weighted average fill price; `None` until a fill. Additive.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
           "cancel_requested": {
             "description": "A cancel was asked for and not yet answered (ADR 0019); only valid while the order is working.",
             "type": "boolean"
+          },
+          "filled_qty": {
+            "description": "Cumulative filled quantity (`0` until a fill; omitted from the wire while `0`). Additive field: a reader without it decodes as `0` (ADR 0012 rule 1).",
+            "format": "double",
+            "type": "number"
           },
           "instrument_id": {
             "$ref": "#/components/schemas/InstrumentId"
@@ -2414,6 +2451,17 @@
           "quantity": {
             "format": "double",
             "type": "number"
+          },
+          "reject_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RejectReason"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the order (or its unfilled remainder) was refused; `None` otherwise. Additive."
           },
           "side": {
             "$ref": "#/components/schemas/OrderSide"
@@ -3121,6 +3169,22 @@
         },
         "required": [
           "quotes"
+        ],
+        "type": "object"
+      },
+      "RejectReason": {
+        "description": "Why an order was refused: the stable [`ErrorCode`] plus a short human message.\n\n``` use honba_messages::{ErrorCode, RejectReason};\n\nlet r = RejectReason::new(ErrorCode::OrderRejected, \"no_position\"); assert_eq!(r.code(), ErrorCode::OrderRejected); assert_eq!(r.message(), \"no_position\"); ```",
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
         ],
         "type": "object"
       },
