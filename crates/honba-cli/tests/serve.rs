@@ -40,14 +40,38 @@ fn data_dir(name: &str) -> PathBuf {
     dir
 }
 
+/// A spawned `honba serve` that is killed and reaped on drop, so a failed assertion cannot leak it.
+struct Server(Child);
+
+impl std::ops::Deref for Server {
+    type Target = Child;
+    fn deref(&self) -> &Child {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for Server {
+    fn deref_mut(&mut self) -> &mut Child {
+        &mut self.0
+    }
+}
+
+impl Drop for Server {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
 /// Starts `honba serve` and returns the child plus the address it announced.
-fn start(args: &[&str]) -> (Child, SocketAddr) {
+fn start(args: &[&str]) -> (Server, SocketAddr) {
     let mut child = Command::new(env!("CARGO_BIN_EXE_honba"))
         .arg("serve")
         .args(args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
+        .map(Server)
         .unwrap();
     let mut line = String::new();
     BufReader::new(child.stdout.as_mut().unwrap())
@@ -119,7 +143,7 @@ fn head_with_origin(addr: SocketAddr, origin: &str) -> String {
     text.split_once("\r\n\r\n").unwrap().0.to_ascii_lowercase()
 }
 
-fn stop(mut child: Child) {
+fn stop(mut child: Server) {
     Command::new("kill")
         .args(["-INT", &child.id().to_string()])
         .status()
