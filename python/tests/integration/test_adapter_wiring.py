@@ -200,7 +200,12 @@ class TestBoundaryHoldsForThisPackage:
 
 
 class TestDiscoveredEntryPoints:
-    def test_registered_entry_points_contain_installed_adapters(self) -> None:
+    def test_registered_entry_points_contain_installed_adapters(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Live is the default run mode and needs credentials; paper mode needs none.
+        for prefix in ("DHAN_", "ZERODHA_"):
+            monkeypatch.setenv(f"{prefix}MODE", "paper")
         adapters = available_adapters()
         if "dhan" in adapters:
             dhan = resolve_adapter("dhan")
