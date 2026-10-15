@@ -87,8 +87,17 @@ async fn fills_reach_the_ledger_through_the_venue_drain() {
     let vid = gw.venue_ids()[0].clone();
     gw.script_fill(&vid, 10.0, 100.0);
     until(&st, "o1", "partially_filled").await;
-    gw.script_fill(&vid, 15.0, 100.0);
+    let row = serde_json::to_value(st.orders.get("o1").unwrap()).unwrap();
+    assert_eq!(row["filled_qty"], 10.0);
+    gw.script_fill(&vid, 15.0, 102.0);
     until(&st, "o1", "filled").await;
+    let row = serde_json::to_value(st.orders.get("o1").unwrap()).unwrap();
+    assert_eq!(row["filled_qty"], 25.0);
+    let avg = row["avg_fill_price"].as_f64().unwrap();
+    assert!(
+        (avg - (10.0 * 100.0 + 15.0 * 102.0) / 25.0).abs() < 1e-9,
+        "{avg}"
+    );
     drain.abort();
 }
 
@@ -103,6 +112,8 @@ async fn gateway_refusal_rejects_the_ledger_row() {
     });
     call(&st, Method::POST, "/orders", Some(buy(25.0, "o2"))).await;
     until(&st, "o2", "rejected").await;
+    let row = serde_json::to_value(st.orders.get("o2").unwrap()).unwrap();
+    assert_eq!(row["reject_reason"]["code"], "order_rejected");
     drain.abort();
 }
 

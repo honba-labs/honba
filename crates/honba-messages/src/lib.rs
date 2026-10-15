@@ -87,7 +87,9 @@ pub use market_data::{
     bar::{Bar, BarAggregation, BarSpecification, BarType, PriceType},
     tick::{AggressorSide, QuoteTick, Tick, TradeTick},
 };
-pub use orders::order::{Order, OrderSide, OrderStatus, OrderType, Product, TimeInForce};
+pub use orders::order::{
+    Order, OrderSide, OrderStatus, OrderType, Product, RejectReason, TimeInForce,
+};
 pub use orders::state::{IllegalTransition, OrderEvent, OrderEventKind, OrderState};
 pub use trading_state::TradingState;
 pub use validation::InvariantError;

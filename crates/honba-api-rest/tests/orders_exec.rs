@@ -191,3 +191,62 @@ async fn approval_queue_approve_submits_to_the_sim() {
     st.advance_market(&[bar(1_000, 101.0)]).unwrap();
     assert_eq!(status_of(&st, "q1"), "filled");
 }
+
+fn row(state: &AppState, id: &str) -> Value {
+    serde_json::to_value(state.orders.get(id).unwrap()).unwrap()
+}
+
+#[tokio::test]
+async fn a_filled_market_order_reports_filled_qty_and_the_fill_price() {
+    let st = state();
+    call(
+        api_router_with(st.clone()),
+        Method::POST,
+        "/orders",
+        Some(order("buy", 25.0, "o1", None)),
+    )
+    .await;
+    // Unfilled rows carry neither field (additive wire).
+    let before = row(&st, "o1");
+    assert!(before.get("filled_qty").is_none() && before.get("avg_fill_price").is_none());
+
+    st.advance_market(&[bar(1_000, 101.0)]).unwrap();
+    let after = row(&st, "o1");
+    assert_eq!(after["status"], "filled");
+    assert_eq!(after["filled_qty"], 25.0);
+    assert!((after["avg_fill_price"].as_f64().unwrap() - 101.0).abs() < 0.5);
+    assert!(after.get("reject_reason").is_none());
+
+    // GET /orders serves the same fields.
+    let (_, body) = call(api_router_with(st.clone()), Method::GET, "/orders", None).await;
+    assert_eq!(body["data"]["orders"][0]["filled_qty"], 25.0);
+}
+
+#[tokio::test]
+async fn simulator_rejections_carry_a_stable_code_and_the_reason() {
+    let st = state();
+    for (id, side, limit) in [("l1", "buy", Some(99.0)), ("s1", "sell", None)] {
+        call(
+            api_router_with(st.clone()),
+            Method::POST,
+            "/orders",
+            Some(order(side, 25.0, id, limit)),
+        )
+        .await;
+    }
+    st.advance_market(&[bar(1_000, 101.0)]).unwrap();
+    let limit = row(&st, "l1");
+    assert_eq!(limit["status"], "rejected");
+    assert_eq!(limit["reject_reason"]["code"], "order_rejected");
+    assert!(limit["reject_reason"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("unsupported_order_type"));
+    let sell = row(&st, "s1");
+    assert_eq!(sell["reject_reason"]["code"], "order_rejected");
+    assert!(sell["reject_reason"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("no_position"));
+    assert!(sell.get("filled_qty").is_none());
+}

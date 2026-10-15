@@ -14,8 +14,10 @@
 //! when no quote exists). Approved orders are also submitted to the embedded simulator ([`crate::exec`]);
 //! fills arrive when the market advances ([`AppState::advance_market`]) and move the
 //! ledger row to `Filled`. Known limits: market orders only (a limit order is
-//! `Rejected` by the simulator), no partial-fill quantity on the row, and order rows
-//! still carry a zero timestamp.
+//! `Rejected` by the simulator) and order rows still carry a zero timestamp. Rows report
+//! `filled_qty` / `avg_fill_price` from the venue's fills and `reject_reason` (stable
+//! `ErrorCode` plus message) from its refusals (ADR 0030); a risk refusal is a 422 and
+//! never becomes a row, so it has no `reject_reason` on the ledger.
 //!
 //! When the approval queue is enabled (E5-S4), placements are held in the queue
 //! until approved by an operator. Cancel and modify bypass the queue.
@@ -41,13 +43,20 @@ use honba_api::{OrdersQuery, OrdersRequest, OrdersResponse};
 use honba_market::NullMarketProfile;
 use honba_messages::{
     ErrorCode, ErrorDetail, InstrumentId, Order, OrderId, OrderSide, OrderStatus, OrderType,
-    TimeInForce, UnixNanos,
+    RejectReason, TimeInForce, UnixNanos,
 };
 use honba_risk::{ProfileRulesSource, RiskCheck, RiskDecision, RiskRequest, RiskStage};
 use serde_json::json;
 
 use crate::market::{failure, success, ApiQuery};
 use crate::state::AppState;
+
+fn is_terminal(status: OrderStatus) -> bool {
+    matches!(
+        status,
+        OrderStatus::Filled | OrderStatus::Cancelled | OrderStatus::Rejected | OrderStatus::Expired
+    )
+}
 
 /// The in-memory order store behind the write ledger (ADR 0019 decision 3).
 ///
@@ -76,16 +85,72 @@ impl OrderLedger {
         let Some(row) = guard.get_mut(order_id) else {
             return false;
         };
-        if matches!(
-            row.status(),
-            OrderStatus::Filled
-                | OrderStatus::Cancelled
-                | OrderStatus::Rejected
-                | OrderStatus::Expired
-        ) {
+        if is_terminal(row.status()) {
             return true;
         }
         *row = row.clone().with_status(status);
+        true
+    }
+
+    /// Books one fill on row `order_id`: `filled_qty` becomes the venue's cumulative `cum_qty`
+    /// (capped at the order quantity), `avg_fill_price` is the running quantity-weighted
+    /// average over the fills seen so far, and the status becomes `status`.
+    ///
+    /// A terminal row is left untouched (as in [`OrderLedger::set_status`]); an unknown id
+    /// returns `false`.
+    pub fn apply_fill(
+        &self,
+        order_id: &str,
+        fill_qty: f64,
+        fill_price: f64,
+        cum_qty: f64,
+        status: OrderStatus,
+    ) -> bool {
+        let mut guard = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Some(row) = guard.get_mut(order_id) else {
+            return false;
+        };
+        if is_terminal(row.status()) {
+            return true;
+        }
+        let prev_qty = row.filled_qty();
+        let prev_avg = row.avg_fill_price().unwrap_or(fill_price);
+        let seen = prev_qty + fill_qty;
+        let avg = if seen > 0.0 {
+            (prev_qty * prev_avg + fill_qty * fill_price) / seen
+        } else {
+            fill_price
+        };
+        let filled = cum_qty.min(row.quantity()).max(0.0);
+        *row = row.clone().with_status(status).with_fill(filled, avg);
+        true
+    }
+
+    /// Records why the venue refused row `order_id` (or, after a partial fill, its remainder).
+    ///
+    /// The reason is stored on every non-terminal row. A row with no fill becomes `Rejected`;
+    /// a `PartiallyFilled` row keeps its status (the filled part stays exposure). A terminal
+    /// row is left untouched; an unknown id returns `false`.
+    pub fn reject(&self, order_id: &str, reason: RejectReason) -> bool {
+        let mut guard = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Some(row) = guard.get_mut(order_id) else {
+            return false;
+        };
+        if is_terminal(row.status()) {
+            return true;
+        }
+        let status = if row.status() == OrderStatus::PartiallyFilled {
+            OrderStatus::PartiallyFilled
+        } else {
+            OrderStatus::Rejected
+        };
+        *row = row.clone().with_status(status).with_reject_reason(reason);
         true
     }
 
@@ -112,9 +177,9 @@ impl OrderLedger {
     /// `PartiallyFilled`, `Filled`). Cancelled, rejected, expired and not-yet-submitted
     /// rows are excluded.
     ///
-    /// `Order` carries no filled quantity, so a
-    /// working or partly filled row counts at its full quantity: a conservative upper
-    /// bound on exposure, which is the safe side for risk rules.
+    /// A working or partly filled row still counts at its full quantity (not
+    /// `filled_qty`): a conservative upper bound on exposure, which is the safe side for
+    /// risk rules.
     pub fn position(&self, instrument_id: &InstrumentId) -> f64 {
         let guard = self
             .inner

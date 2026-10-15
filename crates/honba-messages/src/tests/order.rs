@@ -198,3 +198,50 @@ fn cancel_requested_invariant_only_for_working_statuses() {
         }
     }
 }
+
+#[test]
+fn fill_and_reject_fields_default_and_are_skipped_when_unset() {
+    let o = order();
+    assert_eq!(o.filled_qty(), 0.0);
+    assert_eq!(o.avg_fill_price(), None);
+    assert_eq!(o.reject_reason(), None);
+    let json = serde_json::to_value(&o).unwrap();
+    for key in ["filled_qty", "avg_fill_price", "reject_reason"] {
+        assert!(json.get(key).is_none(), "{key} must be additive");
+    }
+    // An old payload (no new keys) still parses.
+    assert_eq!(serde_json::from_value::<Order>(json).unwrap(), o);
+}
+
+#[test]
+fn fill_and_reject_fields_roundtrip() {
+    let o = order()
+        .with_status(OrderStatus::PartiallyFilled)
+        .with_fill(2.0, 10.5);
+    let json = serde_json::to_value(&o).unwrap();
+    assert_eq!(json["filled_qty"], 2.0);
+    assert_eq!(json["avg_fill_price"], 10.5);
+    assert_eq!(serde_json::from_value::<Order>(json).unwrap(), o);
+
+    let rejected = order()
+        .with_status(OrderStatus::Rejected)
+        .with_reject_reason(RejectReason::new(
+            crate::ErrorCode::OrderRejected,
+            "no_position",
+        ));
+    let json = serde_json::to_value(&rejected).unwrap();
+    assert_eq!(json["reject_reason"]["code"], "order_rejected");
+    assert_eq!(json["reject_reason"]["message"], "no_position");
+    assert_eq!(serde_json::from_value::<Order>(json).unwrap(), rejected);
+}
+
+#[test]
+fn fill_invariants_reject_negative_overfilled_and_non_positive_price() {
+    let over = order().with_fill(6.0, 10.0);
+    assert!(over.validate().is_err());
+    let negative = order().with_fill(-1.0, 10.0);
+    assert!(negative.validate().is_err());
+    let bad_px = order().with_fill(1.0, 0.0);
+    assert!(bad_px.validate().is_err());
+    assert_eq!(order().with_fill(5.0, 10.0).validate(), Ok(()));
+}

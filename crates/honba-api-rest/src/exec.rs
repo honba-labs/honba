@@ -18,15 +18,15 @@
 //! the sync calls only enqueue commands, and its answers come back as events (ADR 0030).
 //!
 //! Scope: the default simulator handles market orders only. A limit order is refused by it
-//! (`unsupported_order_type`) and its ledger row becomes `Rejected`; the reason is logged
-//! because `Order` carries no reason field. The simulator is long-only, so a sell with no
+//! (`unsupported_order_type`) and its ledger row becomes `Rejected`; the row's
+//! `reject_reason` is `order_rejected` with the simulator's text as the message. The simulator is long-only, so a sell with no
 //! simulated position is `Rejected` (`no_position`). No real broker gateway is wired into `honba serve` (E3-S7).
 
 use std::sync::{Arc, Mutex};
 
 use honba_engine::{ExecutionEngine, Result as EngineResult};
 use honba_entities::{Currency, ExecutionEvent, Money};
-use honba_messages::{Bar, ErrorCode, ErrorDetail, Order, OrderStatus};
+use honba_messages::{Bar, ErrorCode, ErrorDetail, Order, OrderStatus, RejectReason};
 use honba_sim::NextOpenSim;
 
 use crate::OrderLedger;
@@ -79,7 +79,10 @@ impl ExecGateway {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Err(e) = sim.submit(order.clone()) {
             tracing::warn!(order = %order.order_id(), error = %e, "venue refused submit");
-            ledger.set_status(order.order_id().as_str(), OrderStatus::Rejected);
+            ledger.reject(
+                order.order_id().as_str(),
+                RejectReason::new(ErrorCode::OrderRejected, e.to_string()),
+            );
             return;
         }
         apply(sim.as_mut(), ledger);
@@ -119,33 +122,49 @@ impl ExecGateway {
     }
 }
 
+/// The ledger's [`RejectReason`] for a venue's free-form rejection `reason`.
+///
+/// A reason that is already an `ErrorCode` wire string (the [`GatewayVenue`](crate::GatewayVenue)
+/// and pre-gate refusals) keeps that code with its stock description; anything else (a simulator
+/// text such as `no_position`) is an `order_rejected` carrying the text as the message.
+fn reject_reason(reason: &str) -> RejectReason {
+    match serde_json::from_value::<ErrorCode>(serde_json::Value::String(reason.to_owned())) {
+        Ok(code) => RejectReason::new(code, format!("venue refused the order ({code})")),
+        Err(_) => RejectReason::new(ErrorCode::OrderRejected, reason),
+    }
+}
+
 /// Drains the venue's events into ledger status changes.
 fn apply(sim: &mut dyn ExecutionVenue, ledger: &OrderLedger) {
     let events = sim.drain_events().unwrap_or_default();
     for event in events {
         match event {
             ExecutionEvent::Fill {
-                trade, complete, ..
+                trade,
+                cum_qty,
+                complete,
+                ..
             } => {
                 let status = if complete {
                     OrderStatus::Filled
                 } else {
                     OrderStatus::PartiallyFilled
                 };
-                ledger.set_status(trade.order_id().as_str(), status);
+                ledger.apply_fill(
+                    trade.order_id().as_str(),
+                    trade.quantity(),
+                    trade.price(),
+                    cum_qty,
+                    status,
+                );
             }
             ExecutionEvent::Rejected {
                 order_id, reason, ..
             } => {
                 tracing::info!(order = %order_id, %reason, "venue rejected order");
                 // The remainder of a partial fill is also reported as a rejection; the
-                // filled part stays exposure, so the row keeps `PartiallyFilled`.
-                if ledger
-                    .get(order_id.as_str())
-                    .is_some_and(|o| o.status() != OrderStatus::PartiallyFilled)
-                {
-                    ledger.set_status(order_id.as_str(), OrderStatus::Rejected);
-                }
+                // filled part stays exposure, so that row keeps `PartiallyFilled`.
+                ledger.reject(order_id.as_str(), reject_reason(&reason));
             }
             ExecutionEvent::Cancelled { order_id, .. } => {
                 ledger.set_status(order_id.as_str(), OrderStatus::Cancelled);

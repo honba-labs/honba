@@ -3,11 +3,50 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::errors::ErrorCode;
 use crate::events::timestamp::UnixNanos;
 use crate::identifiers::{InstrumentId, OrderId};
 use crate::validation::{
-    finite_opt, positive, serialize_finite, serialize_finite_opt, InvariantError,
+    finite_opt, non_negative, positive, serialize_finite, serialize_finite_opt, InvariantError,
 };
+
+/// Tolerance when checking that the filled quantity does not exceed the order quantity.
+const FILL_EPS: f64 = 1e-9;
+
+/// Why an order was refused: the stable [`ErrorCode`] plus a short human message.
+///
+/// ```
+/// use honba_messages::{ErrorCode, RejectReason};
+///
+/// let r = RejectReason::new(ErrorCode::OrderRejected, "no_position");
+/// assert_eq!(r.code(), ErrorCode::OrderRejected);
+/// assert_eq!(r.message(), "no_position");
+/// ```
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct RejectReason {
+    code: ErrorCode,
+    message: String,
+}
+
+impl RejectReason {
+    /// A reason with the stable `code` and a short `message`.
+    pub fn new(code: ErrorCode, message: impl Into<String>) -> Self {
+        Self {
+            code,
+            message: message.into(),
+        }
+    }
+
+    /// The stable error code.
+    pub fn code(&self) -> ErrorCode {
+        self.code
+    }
+
+    /// The short human-readable message (venue or simulator text).
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
 
 crate::enum_with_all! {
     /// Which side of the book an order sits on.
@@ -176,6 +215,28 @@ pub struct Order {
     /// while the order is working.
     #[serde(default, skip_serializing_if = "is_false")]
     pub(crate) cancel_requested: bool,
+    /// Cumulative filled quantity (`0` until a fill; omitted from the wire while `0`).
+    /// Additive field: a reader without it decodes as `0` (ADR 0012 rule 1).
+    #[serde(
+        default,
+        skip_serializing_if = "is_zero",
+        serialize_with = "serialize_finite"
+    )]
+    pub(crate) filled_qty: f64,
+    /// Volume-weighted average fill price; `None` until a fill. Additive.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_finite_opt"
+    )]
+    pub(crate) avg_fill_price: Option<f64>,
+    /// Why the order (or its unfilled remainder) was refused; `None` otherwise. Additive.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) reject_reason: Option<RejectReason>,
+}
+
+fn is_zero(v: &f64) -> bool {
+    *v == 0.0
 }
 
 fn is_false(v: &bool) -> bool {
@@ -204,6 +265,12 @@ struct OrderRepr {
     ts_init: UnixNanos,
     #[serde(default)]
     cancel_requested: bool,
+    #[serde(default)]
+    filled_qty: f64,
+    #[serde(default)]
+    avg_fill_price: Option<f64>,
+    #[serde(default)]
+    reject_reason: Option<RejectReason>,
 }
 
 impl TryFrom<OrderRepr> for Order {
@@ -226,6 +293,9 @@ impl TryFrom<OrderRepr> for Order {
             ts_event: r.ts_event,
             ts_init: r.ts_init,
             cancel_requested: r.cancel_requested,
+            filled_qty: r.filled_qty,
+            avg_fill_price: r.avg_fill_price,
+            reject_reason: r.reject_reason,
         };
         order.validate()?;
         Ok(order)
@@ -262,6 +332,9 @@ impl Order {
             ts_event,
             ts_init,
             cancel_requested: false,
+            filled_qty: 0.0,
+            avg_fill_price: None,
+            reject_reason: None,
         };
         debug_assert!(
             order.validate().is_ok(),
@@ -292,6 +365,15 @@ impl Order {
                     field: "trail_percent",
                 });
             }
+        }
+        non_negative("filled_qty", self.filled_qty)?;
+        if self.filled_qty > self.quantity + FILL_EPS {
+            return Err(InvariantError::OutsideRange {
+                field: "filled_qty",
+            });
+        }
+        if let Some(px) = self.avg_fill_price {
+            positive("avg_fill_price", px)?;
         }
         if self.cancel_requested
             && !matches!(
@@ -434,6 +516,34 @@ impl Order {
     /// Sets the pending-cancel flag, returning `self` for chaining.
     pub fn with_cancel_requested(mut self, cancel_requested: bool) -> Self {
         self.cancel_requested = cancel_requested;
+        self
+    }
+
+    /// Cumulative filled quantity (`0` when nothing has filled).
+    pub fn filled_qty(&self) -> f64 {
+        self.filled_qty
+    }
+
+    /// Volume-weighted average fill price, if anything has filled.
+    pub fn avg_fill_price(&self) -> Option<f64> {
+        self.avg_fill_price
+    }
+
+    /// Why the order (or its remainder) was refused, if it was.
+    pub fn reject_reason(&self) -> Option<&RejectReason> {
+        self.reject_reason.as_ref()
+    }
+
+    /// Sets the cumulative filled quantity and its average price, returning `self` for chaining.
+    pub fn with_fill(mut self, filled_qty: f64, avg_fill_price: f64) -> Self {
+        self.filled_qty = filled_qty;
+        self.avg_fill_price = Some(avg_fill_price);
+        self
+    }
+
+    /// Sets the refusal reason, returning `self` for chaining.
+    pub fn with_reject_reason(mut self, reason: RejectReason) -> Self {
+        self.reject_reason = Some(reason);
         self
     }
 }
