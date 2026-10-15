@@ -5,3 +5,4 @@ mod feed;
 mod fixtures;
 mod ports;
 mod recorder;
+mod scripted_gateway;

@@ -9,6 +9,7 @@ pub mod feed;
 pub mod fixtures;
 pub mod ports;
 pub mod recorder;
+pub mod scripted_gateway;
 
 pub use assert::{assert_close, assert_close_slice};
 pub use feed::VecFeed;
@@ -18,6 +19,7 @@ pub use ports::{
     StubGateway, StubSecretStore, VecMessageFeed, CONTRACT_PROBE_KEY, CONTRACT_PROBE_SECRET,
 };
 pub use recorder::Recorder;
+pub use scripted_gateway::ScriptedGateway;
 
 #[cfg(test)]
 mod tests;
