@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Order ledger reports fills and rejections (ADR 0030)
+
+- `Order` (the `/orders` row) gains optional, additive `filled_qty` (cumulative, omitted at 0),
+  `avg_fill_price` and `reject_reason` (`{code, message}`: a stable `ErrorCode` plus text), omitted
+  while unset so old clients still parse. The REST execution venue fills them from `NextOpenSim`,
+  `L2Sim` and `GatewayVenue` events (partial fills update both incrementally) and from
+  simulator/venue rejections. Risk refusals stay a 422 and are not rows. Regenerated
+  `schema/domain`, `schema/openapi`, the Python `.pyi` and the frontend `domain.ts`.
+- `RestExecutionAdapter` reports the real filled quantity, average price and reject code, and
+  derives `positions()` with the real average price; `LedgerLimitationError` now only signals an
+  older server without the fields. `trades()` stays a `CapabilityError` (no per-fill history).
+  `LedgerOrder` gains the same fields (new `RejectReason` model).
+
 ### Async execution gateway bridge (ADR 0030)
 
 - `honba_api_rest::GatewayVenue` runs any `honba_ports::ExecutionGateway` behind `/orders`: sync
@@ -17,9 +30,9 @@
   `honba serve` over HTTP (bearer token, timeouts, bounded retries that never resend a `POST`
   without a `client_order_id`). `Client` gains `place_order` and `cancel_order`. Risk and order
   refusals come back as `REJECTED` reports, `unauthorized`/`forbidden` as a fatal `RestAuthError`,
-  other server failures as a recoverable `RestApiError`. The order ledger is status-only (no fill
-  price, filled quantity or reject reason), so `trades()` is unsupported and a fill report needs
-  `fill_price=`; `ledger()` returns the raw rows. No wire change.
+  other server failures as a recoverable `RestApiError`. The order ledger was status-only at this point (superseded by
+  the ledger fill fields above), so `trades()` is unsupported; `ledger()` returns the raw rows.
+  No wire change.
 
 ### Python adapter behind /orders (ADR 0030)
 

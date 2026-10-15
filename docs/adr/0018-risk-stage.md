@@ -649,3 +649,7 @@ E3-S1b/S1d shipped (ADR 0030), so top-of-book prices exist. Decision, kept small
   `expected_price` for orders without a limit price. No quote means `None` and the rule skips.
   Deterministic (event-time state only). No wire, schema or endpoint change. Python session and
   L2 selection remain open (see the addendum).
+- 2026-10-15: ledger reject reasons (ADR 0030). A risk refusal is still the 422 of decision 5 and
+  never becomes a ledger row, so the new `reject_reason` on `Order` is populated only from venue and
+  simulator refusals; the refusal's code and message stay on the error envelope. No change to the
+  risk stage or its error codes.
