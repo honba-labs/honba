@@ -362,3 +362,41 @@ def test_capabilities_and_schema_map_error_envelopes() -> None:
         Client(FakeTransport(failure(422, "validation_invalid_request"))).capabilities()
     with pytest.raises(NotFoundApiError):
         Client(FakeTransport(failure(404, "not_found"))).schema()
+
+
+def _row(order_id: str = "c-1", status: str = "submitted") -> dict[str, Any]:
+    return {
+        "order_id": order_id,
+        "instrument_id": TCS,
+        "side": "buy",
+        "order_type": "market",
+        "quantity": 10.0,
+        "price": None,
+        "trigger_price": None,
+        "status": status,
+        "time_in_force": "day",
+        "ts_event": STAMP,
+        "ts_init": STAMP,
+    }
+
+
+def test_place_order_posts_and_parses_the_ledger_row() -> None:
+    fake = FakeTransport(ok(_row()))
+    got = Client(fake).place_order("TCS.NSE", "buy", 10, client_order_id="c-1")
+    assert got.order_id == "c-1"
+    assert got.status == "submitted"
+    method, path, _, body = fake.calls[0]
+    assert (method, path) == ("POST", "/orders")
+    assert body["client_order_id"] == "c-1"
+
+
+def test_place_order_rejects_a_queued_answer_as_an_invalid_response() -> None:
+    queued = {"status": "queued", "queue_position": 1, "message": "held"}
+    with pytest.raises(InvalidResponseError):
+        Client(FakeTransport(ok(queued))).place_order("TCS.NSE", "buy", 10)
+
+
+def test_cancel_order_deletes_and_returns_none() -> None:
+    fake = FakeTransport(ok({"status": "cancelled"}))
+    assert Client(fake).cancel_order("c-1") is None
+    assert fake.calls == [("DELETE", "/orders/c-1", None, None)]

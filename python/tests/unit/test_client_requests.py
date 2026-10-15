@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime, timedelta, timezone
+from typing import Any
 
 import pytest
 
@@ -334,3 +335,50 @@ def test_screener_scan_validates_tf_and_as_of_like_the_server() -> None:
 def test_capabilities_and_schema_requests_take_no_arguments() -> None:
     assert rq.capabilities() == rq.ApiRequest("GET", "/capabilities")
     assert rq.schema() == rq.ApiRequest("GET", "/schema")
+
+
+def test_place_order_posts_the_orders_body() -> None:
+    got = rq.place_order("TCS.NSE", "buy", 10, client_order_id="c-1")
+    assert got == rq.ApiRequest(
+        "POST",
+        "/orders",
+        None,
+        {
+            "instrument_id": {"symbol": "TCS", "exchange": "NSE"},
+            "side": "buy",
+            "qty": 10.0,
+            "client_order_id": "c-1",
+        },
+    )
+    limit = rq.place_order("TCS.NSE", "sell", 5, order_type="limit", price=99.5, tif="gtc")
+    assert limit.body["order_type"] == "limit"
+    assert limit.body["price"] == 99.5
+    assert limit.body["tif"] == "gtc"
+    assert "client_order_id" not in limit.body
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "field"),
+    [
+        ({"side": "hold"}, "side"),
+        ({"qty": 0}, "qty"),
+        ({"qty": float("nan")}, "qty"),
+        ({"order_type": "stop"}, "order_type"),
+        ({"order_type": "limit"}, "price"),
+        ({"price": -1.0, "order_type": "limit"}, "price"),
+        ({"client_order_id": " "}, "client_order_id"),
+    ],
+)
+def test_place_order_validates_before_sending(kwargs: dict[str, Any], field: str) -> None:
+    args: dict[str, Any] = {"side": "buy", "qty": 1}
+    args.update(kwargs)
+    with pytest.raises(RequestValidationError) as err:
+        rq.place_order("TCS.NSE", **args)
+    assert err.value.field == field
+
+
+def test_cancel_order_deletes_by_percent_encoded_id() -> None:
+    assert rq.cancel_order("c-1") == rq.ApiRequest("DELETE", "/orders/c-1")
+    assert rq.cancel_order("a/b c").path == "/orders/a%2Fb%20c"
+    with pytest.raises(RequestValidationError):
+        rq.cancel_order("")

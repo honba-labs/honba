@@ -30,6 +30,7 @@ __all__ = [
     "TimeLike",
     "backtest_journal",
     "bars",
+    "cancel_order",
     "capabilities",
     "compile_strategy",
     "depth",
@@ -38,6 +39,7 @@ __all__ = [
     "instrument",
     "instruments",
     "orders",
+    "place_order",
     "quotes",
     "schema",
     "screener_scan",
@@ -140,6 +142,73 @@ def orders(*, exchange: str | None = None, symbol: str | None = None) -> ApiRequ
     if symbol is not None:
         query["symbol"] = _non_empty("symbol", symbol)
     return ApiRequest("GET", "/orders", query or None)
+
+
+_ORDER_SIDES = ("buy", "sell")
+_ORDER_TYPES = ("market", "limit")
+
+
+def place_order(
+    instrument_id: str | InstrumentId,
+    side: str,
+    qty: float,
+    *,
+    order_type: str = "market",
+    price: float | None = None,
+    tif: str | None = None,
+    client_order_id: str | None = None,
+) -> ApiRequest:
+    """``POST /orders``: one order. ``client_order_id`` is the idempotency key (ADR 0019): the
+    server records the order under it and answers a repeat with the first row.
+
+    ``side`` is ``buy``/``sell``; ``order_type`` is ``market``/``limit`` (a limit order needs a
+    positive ``price``). ``tif`` is sent verbatim when given: the server reads it but the
+    ledger row is always ``day`` today.
+    """
+    if side not in _ORDER_SIDES:
+        raise RequestValidationError("side", "invalid_value", f"side must be buy or sell: {side!r}")
+    if (
+        isinstance(qty, bool)
+        or not isinstance(qty, (int, float))
+        or not math.isfinite(qty)
+        or qty <= 0
+    ):
+        raise RequestValidationError("qty", "invalid_value", f"qty must be > 0, got {qty!r}")
+    if order_type not in _ORDER_TYPES:
+        raise RequestValidationError(
+            "order_type", "invalid_value", f"order_type must be market or limit: {order_type!r}"
+        )
+    if order_type == "limit" and price is None:
+        raise RequestValidationError("price", "missing", "limit orders need price")
+    if price is not None and (
+        isinstance(price, bool)
+        or not isinstance(price, (int, float))
+        or not math.isfinite(price)
+        or price <= 0
+    ):
+        raise RequestValidationError("price", "invalid_value", f"price must be > 0, got {price!r}")
+    text = _id_text(instrument_id, "instrument_id")
+    symbol, _, exchange = text.rpartition(".")
+    body: dict[str, Any] = {
+        "instrument_id": {"symbol": symbol, "exchange": exchange},
+        "side": side,
+        "qty": float(qty),
+    }
+    if order_type != "market":
+        body["order_type"] = order_type
+    if price is not None:
+        body["price"] = float(price)
+    if tif is not None:
+        body["tif"] = _non_empty("tif", tif)
+    if client_order_id is not None:
+        body["client_order_id"] = _non_empty("client_order_id", client_order_id)
+    return ApiRequest("POST", "/orders", None, body)
+
+
+def cancel_order(order_id: str) -> ApiRequest:
+    """``DELETE /orders/{id}``: cancel a working order. The server answers 200 for a terminal or
+    unknown id too, so the caller reads the ledger to tell what happened."""
+    return ApiRequest("DELETE", f"/orders/{quote(_non_empty('order_id', order_id), safe='')}")
 
 
 _MAX_NS = 2**63 - 1

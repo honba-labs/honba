@@ -158,6 +158,40 @@ class Client:
         data = self._data(rq.orders(exchange=exchange, symbol=symbol))
         return self._parse_list(data, "orders", LedgerOrder)
 
+    def place_order(
+        self,
+        instrument_id: str | InstrumentId,
+        side: str,
+        qty: float,
+        *,
+        order_type: str = "market",
+        price: float | None = None,
+        tif: str | None = None,
+        client_order_id: str | None = None,
+    ) -> LedgerOrder:
+        """``POST /orders`` (scope ``write:orders``): the ledger row the server recorded.
+
+        A repeat of ``client_order_id`` returns the first row (ADR 0019 decision 3). A refusal
+        is an :class:`~honba.client.ApiError` (``risk_*``, ``order_rejected`` ...); an answer
+        that is not an order row (the approval queue's ``queued`` reply) is an
+        :class:`~honba.client.InvalidResponseError`.
+        """
+        request = rq.place_order(
+            instrument_id,
+            side,
+            qty,
+            order_type=order_type,
+            price=price,
+            tif=tif,
+            client_order_id=client_order_id,
+        )
+        return self._call(request, LedgerOrder)
+
+    def cancel_order(self, order_id: str) -> None:
+        """``DELETE /orders/{id}`` (scope ``write:orders``). The server answers 200 whether the
+        order was working, already terminal or unknown; read :meth:`orders` for the outcome."""
+        self._data(rq.cancel_order(order_id))
+
     def verify_strategy(self, manifest: Any) -> dict[str, Any]:
         """``POST /strategies/verify``: the verified IR (a JSON-shaped record).
 

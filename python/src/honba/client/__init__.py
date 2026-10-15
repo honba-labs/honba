@@ -27,7 +27,8 @@ Failures are typed (:class:`ApiError` and subclasses, built from the ``ErrorDeta
 Served today: ``health``, ``capabilities``, ``schema``, ``instruments``, ``instrument``, ``bars``,
 ``quotes``, ``depth``, ``verify_strategy``, ``strategies``, ``compile_strategy`` and
 ``screener_scan``, plus the run routes (ADR 0017): ``submit_backtest``, ``backtest``,
-``backtest_journal``, ``wait`` and ``run_backtest``. A run needs a journals root: pass
+``backtest_journal``, ``wait`` and ``run_backtest``, plus the order routes ``orders``,
+``place_order`` and ``cancel_order`` (scope ``write:orders``; the ledger row is status-only). A run needs a journals root: pass
 ``journals_dir=`` to :meth:`Client.inproc` (or serve with ``--journals-dir``). A failed run is a
 normal result with a typed ``error``; ``result.assumptions.not_modelled`` lists what the Rust
 executor does not model. Every other route answers 501 (``NotImplementedApiError``) and has no
