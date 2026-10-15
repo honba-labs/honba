@@ -13,6 +13,7 @@ pub mod domain;
 pub mod l2;
 pub mod manifest;
 pub mod next_open;
+pub mod python_gateway;
 pub mod risk;
 pub mod run;
 pub mod strategy;

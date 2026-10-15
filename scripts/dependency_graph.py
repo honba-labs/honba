@@ -99,6 +99,8 @@ ALLOWED_PROD = {
         "honba-api-rest",
         "honba-risk",   # bindings (ADR 0018 decision 10)
         "honba-async",  # operator Command binding (E2-S1 rest)
+        # PythonGateway: a Python broker adapter as a honba_ports::ExecutionGateway (E3-S7, ADR 0030).
+        "honba-ports",
     },
     "honba-cli": {
         "honba-messages",

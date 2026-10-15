@@ -5,6 +5,7 @@ mod async_shell;
 mod codegen;
 mod manifest;
 mod next_open;
+mod python_gateway;
 mod risk;
 mod run;
 mod runtime;
