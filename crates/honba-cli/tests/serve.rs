@@ -453,3 +453,119 @@ fn an_invalid_risk_config_fails_before_listening_and_names_the_field() {
     let err = String::from_utf8_lossy(&out.stderr);
     assert!(err.contains("price_collar_bps"), "{err}");
 }
+
+/// Writes a `--ticks` file (format v1, ADR 0030) beside the bars: quotes bracketing both bars.
+fn ticks_file(name: &str, body: &str) -> PathBuf {
+    let path = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+        .join("honba-cli-serve")
+        .join(format!("{name}.ticks.ndjson"));
+    std::fs::write(&path, body).unwrap();
+    path
+}
+
+const TICKS_OK: &str = "{\"honba_ticks\":1}\n\
+{\"kind\":\"quote\",\"symbol\":\"TCS\",\"exchange\":\"NSE\",\"ts_event\":60000000000,\"bid_price\":9.9,\"ask_price\":10.1,\"bid_size\":1000000,\"ask_size\":1000000}\n\
+{\"kind\":\"quote\",\"symbol\":\"TCS\",\"exchange\":\"NSE\",\"ts_event\":120000000000,\"bid_price\":10.9,\"ask_price\":11.1,\"bid_size\":1000000,\"ask_size\":1000000}\n\
+{\"kind\":\"trade\",\"symbol\":\"TCS\",\"exchange\":\"NSE\",\"ts_event\":121000000000,\"price\":11.0,\"size\":100,\"aggressor\":\"buyer\",\"trade_id\":\"T-1\"}\n";
+
+const BACKTEST: &str = r#"{"strategy":"buy_and_hold","universe":"TCS.NSE","start":"1970-01-01","end":"1970-01-02","bar_spec":"1m","seed":1}"#;
+
+fn finished_run(addr: SocketAddr, id: &str) -> Value {
+    for _ in 0..500 {
+        let (_, body) = get(addr, &format!("/backtests/{id}"));
+        if matches!(
+            body["data"]["status"].as_str(),
+            Some("completed" | "failed")
+        ) {
+            return body;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    panic!("run {id} never finished");
+}
+
+#[test]
+fn fill_model_l2_with_ticks_runs_a_backtest_end_to_end() {
+    let dir = data_dir("l2-ticks");
+    let ticks = ticks_file("l2-ticks", TICKS_OK);
+    let journals = dir.join("journals");
+    let (child, addr) = start(&[
+        "--data-dir",
+        dir.to_str().unwrap(),
+        "--addr",
+        "127.0.0.1:0",
+        "--journals-dir",
+        journals.to_str().unwrap(),
+        "--fill-model",
+        "l2",
+        "--ticks",
+        ticks.to_str().unwrap(),
+    ]);
+    let (status, body) = post(addr, "/backtests", BACKTEST);
+    assert_eq!(status, 200, "{body}");
+    let id = body["data"]["run_id"].as_str().unwrap().to_owned();
+    let done = finished_run(addr, &id);
+    stop(child);
+    assert_eq!(done["data"]["status"], "completed", "{done}");
+}
+
+#[test]
+fn fill_model_l2_without_ticks_fails_at_startup() {
+    let dir = data_dir("l2-no-ticks");
+    let output = Command::new(env!("CARGO_BIN_EXE_honba"))
+        .args([
+            "serve",
+            "--data-dir",
+            dir.to_str().unwrap(),
+            "--fill-model",
+            "l2",
+        ])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty(), "must not listen");
+    let err = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        err.contains("--fill-model l2") && err.contains("--ticks"),
+        "{err}"
+    );
+}
+
+#[test]
+fn a_bad_ticks_file_fails_at_startup_naming_the_line() {
+    let dir = data_dir("bad-ticks");
+    let ticks = ticks_file("bad-ticks", &format!("{TICKS_OK}not json\n"));
+    let output = Command::new(env!("CARGO_BIN_EXE_honba"))
+        .args([
+            "serve",
+            "--data-dir",
+            dir.to_str().unwrap(),
+            "--fill-model",
+            "l2",
+            "--ticks",
+            ticks.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty(), "must not listen");
+    let err = String::from_utf8_lossy(&output.stderr);
+    assert!(err.contains("--ticks") && err.contains("line 5"), "{err}");
+}
+
+#[test]
+fn an_unknown_fill_model_is_refused_by_the_parser() {
+    let dir = data_dir("bad-fill-model");
+    let output = Command::new(env!("CARGO_BIN_EXE_honba"))
+        .args([
+            "serve",
+            "--data-dir",
+            dir.to_str().unwrap(),
+            "--fill-model",
+            "none",
+        ])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("bar_fill_through"));
+}

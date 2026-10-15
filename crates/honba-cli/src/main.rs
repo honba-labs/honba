@@ -5,6 +5,7 @@ mod schema;
 mod serve;
 #[cfg(test)]
 mod tests;
+mod ticks_file;
 mod trading_state;
 mod verify;
 
@@ -81,6 +82,8 @@ enum Commands {
         ingest: serve::IngestArgs,
         #[command(flatten)]
         risk: serve::RiskArgs,
+        #[command(flatten)]
+        fill: serve::FillArgs,
     },
     /// Manage trading state (ADR 0018, E2-S1 rest)
     TradingState {
@@ -185,6 +188,7 @@ fn main() -> Result<()> {
             auth,
             ingest,
             risk,
+            fill,
         } => serve::run(
             &data_dir,
             addr,
@@ -194,6 +198,7 @@ fn main() -> Result<()> {
             &auth,
             &ingest,
             &risk,
+            &fill,
         ),
         Commands::TradingState { command } => trading_state::run(command),
         Commands::Verify { manifest } => verify::run(&manifest),

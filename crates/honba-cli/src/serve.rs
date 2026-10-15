@@ -9,6 +9,9 @@
 //! With `--bar-ingest`, `POST /bars` feeds a bounded queue drained by the bar pump (fills and
 //! quotes follow). Shutdown drops the sender, waits for the pump to drain, and reports its
 //! counts on stderr.
+//!
+//! With `--fill-model l2 --ticks <FILE>`, REST backtests match against the quote/trade ticks in
+//! the file (format: ADR 0030, parsed in `ticks_file.rs`) instead of bars alone.
 
 use anyhow::{Context, Result};
 use std::io::Write;
@@ -18,6 +21,8 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use honba_api_rest::{ApiConfig, AppState, RetentionPolicy, RunServiceConfig};
+use honba_config::{ExecutionConfig, FillModel};
+use honba_feed::InMemoryTickReader;
 use honba_messages::TradingState;
 
 /// Parses the `--trading-state` value; the spellings are the wire form (ADR 0018 decision 2).
@@ -101,6 +106,55 @@ pub(crate) struct RiskArgs {
     pub risk_config: Option<PathBuf>,
 }
 
+/// How REST backtests are filled and the tick source `fill_model = l2` needs (ADR 0030).
+#[derive(clap::Args, Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FillArgs {
+    /// Fill model for REST backtests: bar_fill, bar_fill_through or l2. Default: bar_fill.
+    /// `l2` needs --ticks (refused at start-up otherwise)
+    #[arg(long, value_parser = parse_fill_model)]
+    pub fill_model: Option<FillModel>,
+    /// NDJSON file of quote/trade ticks (format v1, see ADR 0030) that `--fill-model l2` matches
+    /// against. Validated at start-up; a bad line is reported with its line number
+    #[arg(long)]
+    pub ticks: Option<PathBuf>,
+}
+
+/// Parses the `--fill-model` value; the spellings are the wire form.
+pub(crate) fn parse_fill_model(raw: &str) -> Result<FillModel, String> {
+    match raw {
+        "bar_fill" => Ok(FillModel::BarFill),
+        "bar_fill_through" => Ok(FillModel::BarFillThrough),
+        "l2" => Ok(FillModel::L2),
+        other => Err(format!(
+            "unknown fill model {other:?}; expected bar_fill, bar_fill_through or l2"
+        )),
+    }
+}
+
+impl FillArgs {
+    /// The execution config and the loaded tick source these flags spell. `l2` without
+    /// `--ticks` is a start-up error, so the runtime `l2_requires_ticks` refusal is never the
+    /// first the operator hears of it.
+    pub(crate) fn resolve(&self) -> Result<(ExecutionConfig, Option<InMemoryTickReader>)> {
+        let fill_model = self.fill_model.unwrap_or_default();
+        if fill_model == FillModel::L2 && self.ticks.is_none() {
+            anyhow::bail!(
+                "--fill-model l2 needs --ticks <FILE> (NDJSON quote/trade ticks, see ADR 0030)"
+            );
+        }
+        let ticks = self
+            .ticks
+            .as_deref()
+            .map(crate::ticks_file::load)
+            .transpose()?;
+        let execution = ExecutionConfig {
+            fill_model,
+            ..ExecutionConfig::default()
+        };
+        Ok((execution, ticks))
+    }
+}
+
 /// The file shape behind `--risk-config`: the `[risk]` table of `BacktestRunConfig`.
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -153,7 +207,9 @@ pub fn run(
     auth: &AuthArgs,
     ingest: &IngestArgs,
     risk: &RiskArgs,
+    fill: &FillArgs,
 ) -> Result<()> {
+    let (execution, ticks) = fill.resolve()?;
     let risk_limits = match &risk.risk_config {
         Some(path) => load_risk_limits(path)?,
         None => honba_risk::RiskLimits::default(),
@@ -173,10 +229,16 @@ pub fn run(
         }
     }
 
-    let state = AppState::from_parquet_dir(data_dir)
+    let mut state = AppState::from_parquet_dir(data_dir)
         .with_context(|| format!("loading data directory {}", data_dir.display()))?
         .with_trading_state(trading_state)
         .with_risk_limits(risk_limits)
+        .with_execution(execution);
+    if let Some(ticks) = ticks {
+        state = state.with_tick_reader(std::sync::Arc::new(ticks));
+    }
+    // Execution and ticks are set before the run service, which captures them.
+    let state = state
         .with_journals_dir(&runs.journals_dir, runs.service_config())
         .map_err(|e| anyhow::anyhow!("{}", e.message))
         .with_context(|| format!("opening journals directory {}", runs.journals_dir.display()))?;
