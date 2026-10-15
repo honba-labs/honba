@@ -6,4 +6,5 @@ mod connector;
 mod error;
 mod ports;
 mod snapshot;
+mod ticks;
 mod watchdog;

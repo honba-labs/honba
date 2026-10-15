@@ -18,6 +18,7 @@
 //! | [`MarketDataConnector`] | a live feed that reconnects and marks gaps |
 //! | [`ExecutionGateway`] | route an order, cancel, modify, next fill |
 //! | [`BarReader`] | the stored bars of one instrument over a range |
+//! | [`TickReader`] | the stored quote/trade ticks of one instrument over a range |
 //! | [`InstrumentMaster`] | what is this instrument, and what else is there |
 //! | [`QuoteReader`] | the latest top-of-book quote of one instrument |
 //! | [`DepthReader`] | the order book of one instrument, to N levels |
@@ -61,6 +62,7 @@ pub mod master;
 pub mod secret;
 pub mod sink;
 pub mod snapshot;
+pub mod ticks;
 pub mod watchdog;
 
 pub use backoff::ExponentialBackoff;
@@ -76,6 +78,7 @@ pub use master::{DatedInstrument, InstrumentMaster};
 pub use secret::SecretStore;
 pub use sink::Sink;
 pub use snapshot::{DepthLevel, DepthReader, DepthSnapshot, QuoteReader};
+pub use ticks::{TickReader, TickRequest};
 pub use watchdog::FeedWatchdog;
 
 #[cfg(test)]
