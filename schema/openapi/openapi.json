@@ -1342,6 +1342,17 @@
                 "description": "A cancel was asked for and not yet answered (ADR 0019); only valid while the order is working.",
                 "type": "boolean"
               },
+              "filled_at": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/UnixNanos"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Event time of the latest fill the row has seen; `None` until a fill. Additive: lets a reader order fills across rows by fill time rather than by row order."
+              },
               "filled_qty": {
                 "description": "Cumulative filled quantity (`0` until a fill; omitted from the wire while `0`). Additive field: a reader without it decodes as `0` (ADR 0012 rule 1).",
                 "format": "double",
@@ -2415,6 +2426,17 @@
           "cancel_requested": {
             "description": "A cancel was asked for and not yet answered (ADR 0019); only valid while the order is working.",
             "type": "boolean"
+          },
+          "filled_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UnixNanos"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Event time of the latest fill the row has seen; `None` until a fill. Additive: lets a reader order fills across rows by fill time rather than by row order."
           },
           "filled_qty": {
             "description": "Cumulative filled quantity (`0` until a fill; omitted from the wire while `0`). Additive field: a reader without it decodes as `0` (ADR 0012 rule 1).",

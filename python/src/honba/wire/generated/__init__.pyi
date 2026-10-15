@@ -180,6 +180,7 @@ class EventBar(TypedDict):
 class EventOrder(TypedDict):
     avg_fill_price: NotRequired[float | None]
     cancel_requested: NotRequired[bool]
+    filled_at: NotRequired[UnixNanos | None]
     filled_qty: NotRequired[float]
     instrument_id: InstrumentId
     order_id: OrderId
@@ -333,6 +334,7 @@ class MonteCarloResult:
 class Order:
     avg_fill_price: float | None = None
     cancel_requested: bool | None = None
+    filled_at: UnixNanos | None = None
     filled_qty: float | None = None
     instrument_id: InstrumentId
     order_id: OrderId
