@@ -6,9 +6,15 @@
 
 - `BacktestRunConfig.execution.fill_model` accepts `l2` (`bar_fill`, `bar_fill_through`, `l2`,
   `none`). Schema, OpenAPI, MCP tool schemas, the Python `.pyi` and the frontend TypeScript are
-  regenerated. The REST backtest executor reads bars only, so `fill_model=l2` is refused with
-  `unsupported` and `context.reason = "l2_requires_ticks"` rather than falling back to bar fills;
-  running `L2Sim` from a wire config needs a tick source and is not wired yet.
+  regenerated. `fill_model=l2` never falls back to bar fills: without a tick source the REST
+  executor refuses it with `unsupported` and `context.reason = "l2_requires_ticks"`.
+- New `honba_ports::TickReader` / `TickRequest` (stored quote/trade ticks over `[from, to)`) and
+  `honba_feed::InMemoryTickReader`. `BacktestExecutor::with_tick_reader` and
+  `AppState::with_tick_reader` / `with_execution` wire it: an `l2` run merges the ticks with the
+  bars by `ts_event` (ties: ticks first, quotes before trades) and drives `L2Sim`. Ticks are
+  replay input and are not written to the run journal; `l2` runs bypass the result cache (its key
+  does not cover the ticks). A source with no ticks in the window keeps `l2_requires_ticks`. No
+  wire or schema change.
 
 ### Operator auth scope (ADR 0023)
 

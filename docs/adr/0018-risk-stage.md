@@ -619,7 +619,7 @@ E3-S1b/S1d shipped (ADR 0030), so top-of-book prices exist. Decision, kept small
   native `RiskStage.check` accepts the key. `fill="l2"` selects `L2Execution` in a session.
   Parity: `schema/conformance/risk_decisions.json` carries the collar vectors (Rust stage, Python
   stage and Python runner replay).
-- Wire `BacktestRunConfig.execution.fill_model` now has an `l2` variant (2026-10-15, ADR 0030). The REST executor has no tick source, so such a run is refused with `unsupported` / reason `l2_requires_ticks`; running `L2Sim` from a wire config is still open until a tick reader exists.
+- Wire `BacktestRunConfig.execution.fill_model` now has an `l2` variant (2026-10-15, ADR 0030). Without a configured `TickReader` such a run is refused with `unsupported` / reason `l2_requires_ticks`; with one the REST executor runs `L2Sim` (ADR 0030).
 
 ## Decision log
 
