@@ -9,6 +9,9 @@
 //! an [`ExecutionEvent`] onto a shared queue that [`ExecutionEngine::drain_events`] empties.
 //! The lock is held for a channel send or a queue swap only, never across an await.
 //!
+//! A refusal's `reason` is `<stable ErrorCode>: <the broker's own text>` (bounded to 256 chars):
+//! the ledger keeps the code and puts the text in `reject_reason.message`.
+//!
 //! Ids: the ledger is keyed by the client order id, the gateway answers with its own venue id.
 //! The task keeps `venue id -> client order` and rewrites every fill and event back to the client
 //! id (a fill already carrying a client id is accepted as is). Fills are tracked per order to
@@ -183,12 +186,42 @@ async fn submit<G: ExecutionGateway>(
                 instrument_id: order.instrument_id().clone(),
                 side: order.side(),
                 quantity: order.quantity(),
-                reason: code.as_str().to_owned(),
+                reason: format!("{}: {}", code.as_str(), error_text(&error)),
                 venue_order_id: None,
                 ts: order.ts_event(),
             });
         }
     }
+}
+
+/// The most characters of a broker's own text kept in a rejection reason.
+const MAX_TEXT_CHARS: usize = 256;
+
+/// The broker's own words for `error`, bounded to [`MAX_TEXT_CHARS`] characters (cut on a char
+/// boundary, ending in `…`). A venue refusal reads `<code>: <message>`; other errors carry
+/// their inner text.
+fn error_text(error: &PortError) -> String {
+    let text = match error {
+        PortError::Rejected { code, message } if message.is_empty() || message == code => {
+            code.clone()
+        }
+        PortError::Rejected { code, message } => format!("{code}: {message}"),
+        PortError::Unavailable(t)
+        | PortError::Transport(t)
+        | PortError::Retriable(t)
+        | PortError::Terminal(t)
+        | PortError::Unrecoverable(t)
+        | PortError::InvalidRequest(t)
+        | PortError::Unsupported(t)
+        | PortError::Internal(t) => t.clone(),
+        other => other.to_string(),
+    };
+    if text.chars().count() <= MAX_TEXT_CHARS {
+        return text;
+    }
+    let mut cut: String = text.chars().take(MAX_TEXT_CHARS - 1).collect();
+    cut.push('…');
+    cut
 }
 
 async fn cancel<G: ExecutionGateway>(

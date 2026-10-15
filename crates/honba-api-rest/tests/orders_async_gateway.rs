@@ -114,6 +114,8 @@ async fn gateway_refusal_rejects_the_ledger_row() {
     until(&st, "o2", "rejected").await;
     let row = serde_json::to_value(st.orders.get("o2").unwrap()).unwrap();
     assert_eq!(row["reject_reason"]["code"], "order_rejected");
+    // The broker's own text rides along; the stable code is unchanged.
+    assert_eq!(row["reject_reason"]["message"], "RMS: margin");
     drain.abort();
 }
 

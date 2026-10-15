@@ -111,23 +111,38 @@ fn reason_of(event: &ExecutionEvent) -> (&str, &str, f64, u64) {
 #[tokio::test]
 async fn submit_failures_become_rejections_with_stable_error_code_reasons() {
     use honba_ports::PortError as E;
+    // The reason is `<stable code>: <the broker's own text>`; the code is what the ledger keys on.
     let cases = [
         (
             E::Rejected {
                 code: "RMS".into(),
                 message: "margin".into(),
             },
-            "order_rejected",
+            "order_rejected: RMS: margin",
         ),
-        (E::InvalidRequest("x".into()), "validation_invalid_request"),
-        (E::Unsupported("x".into()), "unsupported"),
-        (E::Unavailable("x".into()), "order_execution_unavailable"),
-        (E::Retriable("x".into()), "order_execution_unavailable"),
-        (E::Terminal("x".into()), "order_execution_unavailable"),
-        (E::Unrecoverable("x".into()), "order_execution_unavailable"),
-        (E::Timeout, "timeout"),
-        (E::Transport("x".into()), "transport_error"),
-        (E::Internal("x".into()), "internal_error"),
+        // The Python gateway shim reports the broker's text as both code and message.
+        (
+            E::Rejected {
+                code: "RMS: margin".into(),
+                message: "RMS: margin".into(),
+            },
+            "order_rejected: RMS: margin",
+        ),
+        (
+            E::InvalidRequest("x".into()),
+            "validation_invalid_request: x",
+        ),
+        (E::Unsupported("x".into()), "unsupported: x"),
+        (E::Unavailable("x".into()), "order_execution_unavailable: x"),
+        (E::Retriable("x".into()), "order_execution_unavailable: x"),
+        (E::Terminal("x".into()), "order_execution_unavailable: x"),
+        (
+            E::Unrecoverable("x".into()),
+            "order_execution_unavailable: x",
+        ),
+        (E::Timeout, "timeout: operation timed out"),
+        (E::Transport("x".into()), "transport_error: x"),
+        (E::Internal("x".into()), "internal_error: x"),
     ];
     for (error, want) in cases {
         let gw = ScriptedGateway::new();
@@ -139,6 +154,29 @@ async fn submit_failures_become_rejections_with_stable_error_code_reasons() {
         assert_eq!(reason_of(&evs[0]), ("C-9", want, 7.0, 10), "{error:?}");
         assert!(gw.venue_ids().is_empty());
     }
+}
+
+#[tokio::test]
+async fn a_long_broker_text_is_truncated_on_a_char_boundary() {
+    let gw = ScriptedGateway::new();
+    let mut venue = GatewayVenue::spawn_with_poll(gw.clone(), POLL);
+    gw.fail_next_submit(honba_ports::PortError::Rejected {
+        code: "RMS".into(),
+        message: "é".repeat(5000),
+    });
+    venue.submit(order("C-8", 7.0)).unwrap();
+    let evs = events(&mut venue, 1).await;
+    let (_, reason, _, _) = reason_of(&evs[0]);
+    let text = reason
+        .strip_prefix("order_rejected: ")
+        .expect("code prefix");
+    assert!(text.starts_with("RMS: é"));
+    assert!(
+        text.chars().count() <= 256,
+        "{} chars",
+        text.chars().count()
+    );
+    assert!(text.ends_with('…'));
 }
 
 #[tokio::test]

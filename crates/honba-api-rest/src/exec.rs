@@ -124,14 +124,22 @@ impl ExecGateway {
 
 /// The ledger's [`RejectReason`] for a venue's free-form rejection `reason`.
 ///
-/// A reason that is already an `ErrorCode` wire string (the [`GatewayVenue`](crate::GatewayVenue)
-/// and pre-gate refusals) keeps that code with its stock description; anything else (a simulator
-/// text such as `no_position`) is an `order_rejected` carrying the text as the message.
+/// A reason that is an `ErrorCode` wire string (the pre-gate refusals) keeps that code with a
+/// stock description. `<code>: <text>` (the [`GatewayVenue`](crate::GatewayVenue), which carries
+/// the broker's own words) keeps the code and puts the text in the message. Anything else (a
+/// simulator text such as `no_position`) is an `order_rejected` carrying the text as the message.
 fn reject_reason(reason: &str) -> RejectReason {
-    match serde_json::from_value::<ErrorCode>(serde_json::Value::String(reason.to_owned())) {
-        Ok(code) => RejectReason::new(code, format!("venue refused the order ({code})")),
-        Err(_) => RejectReason::new(ErrorCode::OrderRejected, reason),
+    let code_of =
+        |s: &str| serde_json::from_value::<ErrorCode>(serde_json::Value::String(s.to_owned())).ok();
+    if let Some(code) = code_of(reason) {
+        return RejectReason::new(code, format!("venue refused the order ({code})"));
     }
+    if let Some((head, text)) = reason.split_once(": ") {
+        if let Some(code) = code_of(head) {
+            return RejectReason::new(code, text);
+        }
+    }
+    RejectReason::new(ErrorCode::OrderRejected, reason)
 }
 
 /// Drains the venue's events into ledger status changes.

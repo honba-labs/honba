@@ -192,7 +192,8 @@ def test_a_broker_refusal_rejects_the_row(
     client.post("/orders", json=buy("o3"))
     row = until(client, "o3", "rejected")
     assert row["reject_reason"]["code"] == "order_rejected"
-    assert row["reject_reason"]["message"]
+    # The broker's own text survives the Python exception -> PortError -> ledger path.
+    assert row["reject_reason"]["message"] == "RMS: margin"
     assert "filled_qty" not in row
 
 
