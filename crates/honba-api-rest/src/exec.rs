@@ -14,12 +14,13 @@
 //! cancels the ledger needs, and the sync handlers here hold a std mutex across the call. The
 //! sync `honba_engine::ExecutionEngine` already speaks `ExecutionEvent` and `NextOpenSim`
 //! implements it, so [`ExecutionVenue`] only extends it with the market hook. A venue backed
-//! by the async port is bridged by implementing `ExecutionEngine` over it (not done yet).
+//! by the async port is bridged by [`GatewayVenue`](crate::GatewayVenue): a task owns the gateway,
+//! the sync calls only enqueue commands, and its answers come back as events (ADR 0030).
 //!
 //! Scope: the default simulator handles market orders only. A limit order is refused by it
 //! (`unsupported_order_type`) and its ledger row becomes `Rejected`; the reason is logged
 //! because `Order` carries no reason field. The simulator is long-only, so a sell with no
-//! simulated position is `Rejected` (`no_position`). No real venue gateway is wired (E3-S7).
+//! simulated position is `Rejected` (`no_position`). No real broker gateway is wired into `honba serve` (E3-S7).
 
 use std::sync::{Arc, Mutex};
 

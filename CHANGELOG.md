@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Async execution gateway bridge (ADR 0030)
+
+- `honba_api_rest::GatewayVenue` runs any `honba_ports::ExecutionGateway` behind `/orders`: sync
+  `submit`/`cancel` enqueue commands to a task that owns the gateway (never blocking, no lock held
+  across an await); fills, refusals and cancels return as events into the order ledger. Gateway
+  failures map to existing error codes (`order_rejected`, `order_execution_unavailable`, ...); no
+  wire change. `AppState::spawn_venue_drain` drains on a timer. New test double
+  `honba_testing::ScriptedGateway`. Not wired into `honba serve`.
+
 ### Packaging
 
 - New optional extra `fundamentals` (`duckdb>=1.0`), required by `honba.data.loaders.fundamentals`
