@@ -11,6 +11,16 @@
   wire change. `AppState::spawn_venue_drain` drains on a timer. New test double
   `honba_testing::ScriptedGateway`. Not wired into `honba serve`.
 
+### REST execution adapter (ADR 0030)
+
+- New `honba.adapters.rest.RestExecutionAdapter`: an `ExecutionAdapter` whose venue is a running
+  `honba serve` over HTTP (bearer token, timeouts, bounded retries that never resend a `POST`
+  without a `client_order_id`). `Client` gains `place_order` and `cancel_order`. Risk and order
+  refusals come back as `REJECTED` reports, `unauthorized`/`forbidden` as a fatal `RestAuthError`,
+  other server failures as a recoverable `RestApiError`. The order ledger is status-only (no fill
+  price, filled quantity or reject reason), so `trades()` is unsupported and a fill report needs
+  `fill_price=`; `ledger()` returns the raw rows. No wire change.
+
 ### Python adapter behind /orders (ADR 0030)
 
 - New `honba._honba.GatewayServer(data_dir, gateway, ...)`: serves the REST app with a Python
