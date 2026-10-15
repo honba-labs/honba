@@ -108,3 +108,57 @@ fn put_leaves_one_file_and_no_temp_files() {
         .collect();
     assert_eq!(names, vec!["alice.json".to_string()]);
 }
+
+#[test]
+fn alerts_default_when_absent_from_old_json() {
+    let old = r#"{"revision": 3, "shortlist": ["A"]}"#;
+    let profile: Profile = serde_json::from_str(old).unwrap();
+    assert_eq!(profile.revision, 3);
+    assert_eq!(profile.alerts, serde_json::Value::Null);
+}
+
+#[test]
+fn alerts_round_trip_through_the_store() {
+    let (_tmp, store) = store();
+    let p = Profile {
+        alerts: json!({"rules": [{"id": "r1"}]}),
+        ..Profile::default()
+    };
+    store.put("alice", 0, p).unwrap();
+    assert_eq!(
+        store.get("alice").unwrap().alerts,
+        json!({"rules": [{"id": "r1"}]})
+    );
+}
+
+#[test]
+fn update_bumps_the_revision_once_and_persists() {
+    let (_tmp, store) = store();
+    let after = store
+        .update("alice", |p| {
+            p.shortlist.push("A".into());
+            p.shortlist.push("B".into());
+            true
+        })
+        .unwrap();
+    assert_eq!(after.revision, 1);
+    assert_eq!(store.get("alice").unwrap(), after);
+}
+
+#[test]
+fn update_that_changes_nothing_writes_nothing() {
+    let (tmp, store) = store();
+    let after = store.update("alice", |_| false).unwrap();
+    assert_eq!(after.revision, 0);
+    assert!(!tmp.path().join("profiles").exists());
+}
+
+#[test]
+fn update_rejects_a_hostile_user_id() {
+    let (tmp, store) = store();
+    assert!(matches!(
+        store.update("../x", |_| true),
+        Err(ProfileError::InvalidUserId)
+    ));
+    assert!(!tmp.path().join("profiles").exists());
+}

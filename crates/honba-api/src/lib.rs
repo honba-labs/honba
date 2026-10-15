@@ -17,6 +17,7 @@ pub mod cache;
 pub mod capabilities;
 pub mod ingest;
 pub mod market;
+pub mod profile;
 pub mod requests;
 pub mod responses;
 pub mod run_id;
@@ -38,6 +39,7 @@ pub use market::{
     instrument_json, parse_instrument_id, parse_timeframe, ResolvedBarsQuery, ResolvedQuotesQuery,
     DEFAULT_DEPTH_LEVELS, DEFAULT_TIMEFRAME, MAX_DEPTH_LEVELS,
 };
+pub use profile::{LayoutsResponse, Module, ModulesResponse, Profile, ProfileRevision, Source};
 pub use requests::{
     BacktestEventsQuery, BacktestRequest, BarsIngestRequest, BarsQuery, DepthQuery,
     InstrumentsQuery, OrdersQuery, OrdersRequest, QuotesQuery, ScreenerQuery, StrategiesRequest,

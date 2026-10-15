@@ -5,62 +5,18 @@
 //! tabs of the same user cannot silently overwrite each other. User ids come from bearer
 //! `token_id`s and are therefore untrusted: they are validated before they touch a path.
 
-use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+pub use honba_api::{Module, Profile, Source};
 
 /// The user id used when authentication is off.
 pub const DEFAULT_USER_ID: &str = "default";
 
 /// Longest accepted user id, in bytes.
 const MAX_USER_ID_LEN: usize = 64;
-
-/// A source feeding a [`Module`], for example a broker adapter or a symbol list.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub struct Source {
-    /// Source kind, for example `broker`, `symbols` or `parquet`.
-    pub kind: String,
-    /// Kind-specific reference (an adapter name, a list name, a directory).
-    pub reference: String,
-}
-
-/// A named collection of sources.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub struct Module {
-    /// Stable module id.
-    pub id: String,
-    /// Display name.
-    pub name: String,
-    /// The sources the module groups.
-    pub sources: Vec<Source>,
-    /// Whether the module is active.
-    pub enabled: bool,
-}
-
-/// Everything stored for one user.
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Profile {
-    /// Monotonic revision, bumped by every successful [`ProfileStore::put`].
-    pub revision: u64,
-    /// Named workbench layouts (opaque to the server).
-    pub layouts: BTreeMap<String, Value>,
-    /// Modules by id.
-    pub modules: BTreeMap<String, Module>,
-    /// Named watchlists of symbols.
-    pub watchlists: BTreeMap<String, Vec<String>>,
-    /// Shortlisted symbols.
-    pub shortlist: Vec<String>,
-    /// Preferences and theme (opaque to the server).
-    pub preferences: Value,
-    /// Workbench grid and the symbol in each pane (opaque to the server).
-    pub workbench: Value,
-}
 
 /// Why a profile operation failed.
 #[derive(Debug, thiserror::Error)]
@@ -134,6 +90,29 @@ impl ProfileStore {
         fs::create_dir_all(&self.dir)?;
         write_atomic(&path, &serde_json::to_vec_pretty(&new_profile)?)?;
         Ok(new_profile)
+    }
+
+    /// Read-modify-write the user's profile under the store lock. `change` returns whether it
+    /// altered the profile; if so the revision is bumped once and the file rewritten atomically,
+    /// otherwise nothing is written. Returns the profile as stored afterwards.
+    pub fn update(
+        &self,
+        user_id: &str,
+        change: impl FnOnce(&mut Profile) -> bool,
+    ) -> Result<Profile> {
+        let path = self.path_for(user_id)?;
+        let _guard = self
+            .write_lock
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut profile = read_profile(&path)?;
+        if !change(&mut profile) {
+            return Ok(profile);
+        }
+        profile.revision += 1;
+        fs::create_dir_all(&self.dir)?;
+        write_atomic(&path, &serde_json::to_vec_pretty(&profile)?)?;
+        Ok(profile)
     }
 
     fn path_for(&self, user_id: &str) -> Result<PathBuf> {
