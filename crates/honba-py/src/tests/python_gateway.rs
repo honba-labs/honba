@@ -104,3 +104,14 @@ fn builtin_exceptions_map_by_family() {
         PortError::Internal(_)
     ));
 }
+
+/// The Trade JSON `honba.adapters.gateway` emits must decode here (timestamps as {"iso", "unix_nanos"}).
+#[test]
+fn the_python_bridge_fill_shape_decodes_to_a_trade() {
+    let json = r#"{"order_id":"V-1","instrument_id":{"symbol":"X","exchange":"NSE"},
+        "side":"buy","quantity":10.0,"price":100.0,"costs":{"amount":0,"currency":"INR"},
+        "ts_event":{"iso":"1970-01-01T00:00:00.000000005Z","unix_nanos":"5"},"ts_init":{"iso":"1970-01-01T00:00:00.000000005Z","unix_nanos":"5"}}"#;
+    let trade: honba_entities::Trade = serde_json::from_str(json).expect("bridge shape decodes");
+    assert_eq!(trade.order_id().as_str(), "V-1");
+    assert_eq!(trade.quantity(), 10.0);
+}
