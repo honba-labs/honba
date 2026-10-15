@@ -11,6 +11,16 @@
   wire change. `AppState::spawn_venue_drain` drains on a timer. New test double
   `honba_testing::ScriptedGateway`. Not wired into `honba serve`.
 
+### Python adapter behind /orders (ADR 0030)
+
+- New `honba._honba.GatewayServer(data_dir, gateway, ...)`: serves the REST app with a Python
+  broker or paper adapter as the execution venue (`start()` returns the port, `stop()`, context
+  manager). New `honba.adapters.gateway.ExecutionAdapterGateway` adapts any `ExecutionAdapter`
+  to the gateway protocol and `GatewayRejected` carries a broker refusal. Python coroutines run on
+  a dedicated asyncio loop; the HTTP server is never blocked and the GIL is never held across an
+  await. Python exceptions map onto the existing `PortError`/error-code table; no wire change.
+  `honba-py` gains the allowed dependency edge `honba-ports`.
+
 ### Packaging
 
 - New optional extra `fundamentals` (`duckdb>=1.0`), required by `honba.data.loaders.fundamentals`
