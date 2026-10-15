@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### Order ledger follow-ups (ADR 0030)
+
+- A risk refusal that carries a `client_order_id` is still the 422 envelope, and is now also
+  recorded as a `rejected` ledger row whose `reject_reason` is the refusal's code and message, so
+  `GET /orders` shows it. A repeat of that id answers with the same 422 (context included) and adds
+  no row. A refusal without a `client_order_id`, and `POST /positions/close`, record nothing.
+- `Order` gains the optional, additive `filled_at` (event time of the latest fill, omitted until a
+  fill); regenerated `schema/domain`, `schema/openapi`, the Python `.pyi`, and `domain.ts` in the
+  sibling honba-frontend repo (`client.ts` and the honba-docs api-reference had no drift). The
+  Python `honba.wire.wire.Order` (and `LedgerOrder`) now carry `filled_qty`, `avg_fill_price`,
+  `reject_reason` and `filled_at`; `schema/golden/order.json` gains cases for them.
+- `GatewayVenue` rejections carry the broker's own text (for example `RMS: margin`, bounded to 256
+  characters) into `reject_reason.message`; the stable `code` is unchanged.
+- `RestExecutionAdapter.positions()` applies rows in `filled_at` order when every filled row has
+  one (ledger order against an older server).
+- `OrderLedger::position()` (risk exposure and `POST /positions/close`) now counts the filled part
+  of a cancelled, expired or rejected partial, and only the filled part of a partial whose
+  remainder the venue refused; working rows still count in full.
+- A fill that completes a row (`filled`) clears a `reject_reason` recorded for its remainder; the
+  average fill price follows the venue's `cum_qty` increases, so it no longer drifts when `cum_qty`
+  disagrees with the fill sizes, and a replayed or stale fill report changes nothing.
+
 ### Order ledger reports fills and rejections (ADR 0030)
 
 - `Order` (the `/orders` row) gains optional, additive `filled_qty` (cumulative, omitted at 0),

@@ -653,3 +653,11 @@ E3-S1b/S1d shipped (ADR 0030), so top-of-book prices exist. Decision, kept small
   never becomes a ledger row, so the new `reject_reason` on `Order` is populated only from venue and
   simulator refusals; the refusal's code and message stay on the error envelope. No change to the
   risk stage or its error codes.
+- 2026-10-15: ledger exposure and recorded refusals (ADR 0030). `position` fed to the REST gate is
+  now each ledger row's filled part plus its still-working remainder: a cancelled or expired partial
+  keeps its filled quantity, and a part-filled row whose remainder the venue refused counts only what
+  filled (working rows still count in full). A risk refusal on `POST /orders` with a
+  `client_order_id` is still the 422 of decision 5 and never reaches the venue, but is now also a
+  `rejected` ledger row (`reject_reason` = the `risk_*` code and message), consistent with decision 6
+  where a refusal is a `Rejected` fact; a repeat of the id replays the same 422. A refusal without a
+  key, and `POST /positions/close`, record nothing. No change to the risk stage or its error codes.
