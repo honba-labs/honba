@@ -72,7 +72,8 @@ def find_free_port() -> int:
 
 class TestAuthIntegration:
     @pytest.fixture(scope="class")
-    def server_with_auth(self):
+    @classmethod
+    def server_with_auth(cls):
         """Start honba serve with auth enabled on a random port."""
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -126,9 +127,13 @@ class TestAuthIntegration:
             yield base_url
             proc.terminate()
             proc.wait(timeout=5)
+            for pipe in (proc.stdout, proc.stderr):
+                if pipe is not None:
+                    pipe.close()
 
     @pytest.fixture(scope="class")
-    def server_without_auth(self):
+    @classmethod
+    def server_without_auth(cls):
         """Start honba serve WITHOUT auth on a random port."""
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -175,6 +180,9 @@ class TestAuthIntegration:
             yield base_url
             proc.terminate()
             proc.wait(timeout=5)
+            for pipe in (proc.stdout, proc.stderr):
+                if pipe is not None:
+                    pipe.close()
 
     def test_public_routes_work_without_token(self, server_with_auth: str) -> None:
         """Public metadata routes work even with auth enabled."""

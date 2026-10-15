@@ -67,7 +67,7 @@ class HoldingPort(BaseExecutionPort):
         out, self.rejections = self.rejections, []
         return out
 
-    def cancel(self, order_id: str) -> None:
+    def cancel(self, order_id: str, now: int) -> None:
         intent = self.orders.pop(order_id, None)
         if intent is not None:
             self.rejections.append(OrderRejection(order_id, intent, "cancelled", cancelled=True))

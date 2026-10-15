@@ -59,6 +59,7 @@ def configure_audit_log(path: str | Path) -> None:
     log = audit_log()
     for handler in log.handlers[:]:
         log.removeHandler(handler)
+        handler.close()
     handler = logging.FileHandler(path, encoding="utf-8")
     handler.setFormatter(logging.Formatter("%(message)s"))
     log.addHandler(handler)

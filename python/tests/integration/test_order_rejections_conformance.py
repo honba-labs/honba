@@ -88,12 +88,12 @@ class Venue(BaseExecutionPort):
         out, self.rejections = self.rejections, []
         return out
 
-    def cancel(self, order_id: str) -> None:
+    def cancel(self, order_id: str, now: int) -> None:
         held = self.working.pop(order_id, None)
         if held is not None:
             intent, _ = held
             self.rejections.append(
-                OrderRejection(order_id, intent, "cancelled", self.now, cancelled=True)
+                OrderRejection(order_id, intent, "cancelled", now, cancelled=True)
             )
 
 
