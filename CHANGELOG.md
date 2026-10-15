@@ -9,7 +9,7 @@
   while unset so old clients still parse. The REST execution venue fills them from `NextOpenSim`,
   `L2Sim` and `GatewayVenue` events (partial fills update both incrementally) and from
   simulator/venue rejections. Risk refusals stay a 422 and are not rows. Regenerated
-  `schema/domain`, `schema/openapi`, the Python `.pyi` and the frontend `domain.ts`.
+  `schema/domain`, `schema/openapi`, the Python `.pyi` (and `domain.ts` in the sibling honba-frontend repo).
 - `RestExecutionAdapter` reports the real filled quantity, average price and reject code, and
   derives `positions()` with the real average price; `LedgerLimitationError` now only signals an
   older server without the fields. `trades()` stays a `CapabilityError` (no per-fill history).

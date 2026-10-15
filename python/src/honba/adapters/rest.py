@@ -460,7 +460,7 @@ class RestExecutionAdapter(Adapter):
             position = book.setdefault(key, Position(InstrumentId(*key)))
             side = PositionSide.LONG if row.side == "buy" else PositionSide.SHORT
             position.apply_fill(side, min(row.filled_qty, row.quantity), row.avg_fill_price)
-        return [p for p in book.values() if not p.is_flat]
+        return [p for p in book.values() if p.quantity > 1e-9]
 
     @staticmethod
     def _legacy_positions(rows: list[LedgerOrder]) -> list[Position]:

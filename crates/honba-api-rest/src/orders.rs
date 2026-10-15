@@ -116,6 +116,13 @@ impl OrderLedger {
         if is_terminal(row.status()) {
             return true;
         }
+        // A venue sending a non-finite or non-positive price/quantity must not poison the row
+        // (it would fail validation or serialization of `GET /orders`): drop such a fill.
+        if !(fill_price.is_finite() && fill_price > 0.0 && fill_qty.is_finite() && fill_qty > 0.0)
+            || !cum_qty.is_finite()
+        {
+            return true;
+        }
         let prev_qty = row.filled_qty();
         let prev_avg = row.avg_fill_price().unwrap_or(fill_price);
         let seen = prev_qty + fill_qty;
