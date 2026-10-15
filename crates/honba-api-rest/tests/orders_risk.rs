@@ -720,3 +720,32 @@ async fn a_refused_row_adds_no_exposure() {
     call(app, Method::POST, "/orders", Some(refused)).await;
     assert_eq!(st.orders.position(&instrument_id()), 0.0);
 }
+
+/// `POST /positions/close` closes what a cancelled partial actually filled (it was exposure
+/// the old full-quantity rule excluded once the row was cancelled).
+#[tokio::test]
+async fn close_covers_the_filled_part_of_a_cancelled_partial() {
+    let st = state();
+    seed(&st, "seed-1", honba_messages::OrderSide::Buy, 75.0);
+    assert!(st.orders.apply_fill(
+        "seed-1",
+        25.0,
+        100.0,
+        25.0,
+        honba_messages::OrderStatus::PartiallyFilled
+    ));
+    st.orders.cancel("seed-1");
+    assert_eq!(st.orders.position(&instrument_id()), 25.0);
+    let (status, body) = call(
+        api_router_with(st.clone()),
+        Method::POST,
+        "/positions/close",
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let rows = close_orders(&st);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].side(), honba_messages::OrderSide::Sell);
+    assert_eq!(rows[0].quantity(), 25.0);
+}

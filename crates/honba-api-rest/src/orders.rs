@@ -60,6 +60,24 @@ fn is_terminal(status: OrderStatus) -> bool {
     )
 }
 
+/// The unsigned quantity row `order` can contribute to the position: the part already filled
+/// plus the part that may still fill (see [`OrderLedger::position`]).
+fn exposure(order: &Order) -> f64 {
+    let filled = order.filled_qty();
+    let remaining = (order.quantity() - filled).max(0.0);
+    match order.status() {
+        OrderStatus::Filled => order.quantity().max(filled),
+        OrderStatus::Submitted | OrderStatus::Accepted => filled + remaining,
+        OrderStatus::PartiallyFilled if order.reject_reason().is_none() => filled + remaining,
+        // A refused remainder, a cancelled/expired/rejected row: only what filled.
+        OrderStatus::PartiallyFilled
+        | OrderStatus::Cancelled
+        | OrderStatus::Expired
+        | OrderStatus::Rejected => filled,
+        _ => 0.0,
+    }
+}
+
 /// The in-memory order store behind the write ledger (ADR 0019 decision 3).
 ///
 /// One row per client order id, in insertion order. The store starts empty and
@@ -231,13 +249,16 @@ impl OrderLedger {
     }
 
     /// Signed position of `instrument_id` implied by the ledger: buys positive, sells
-    /// negative, summed over rows that still count as exposure (`Submitted`, `Accepted`,
-    /// `PartiallyFilled`, `Filled`). Cancelled, rejected, expired and not-yet-submitted
-    /// rows are excluded.
+    /// negative, summed over each row's exposure ([`exposure`]).
     ///
-    /// A working or partly filled row still counts at its full quantity (not
-    /// `filled_qty`): a conservative upper bound on exposure, which is the safe side for
-    /// risk rules.
+    /// A row's exposure is what it has filled plus what may still fill: a working row
+    /// (`Submitted`, `Accepted`, `PartiallyFilled`) counts at its full quantity, the filled
+    /// part plus the remainder, a conservative upper bound which is the safe side for risk
+    /// rules. A `PartiallyFilled` row whose remainder the venue refused (it carries a
+    /// `reject_reason`) counts only what filled, as does a row that stopped working after a
+    /// partial fill (`Cancelled`, `Expired`, `Rejected`). A `Filled` row counts at its
+    /// quantity; a row that never filled and no longer works, and an `Initialized` row, add
+    /// nothing.
     pub fn position(&self, instrument_id: &InstrumentId) -> f64 {
         let guard = self
             .inner
@@ -246,19 +267,13 @@ impl OrderLedger {
         guard
             .values()
             .filter(|o| o.instrument_id() == instrument_id)
-            .filter(|o| {
-                matches!(
-                    o.status(),
-                    OrderStatus::Submitted
-                        | OrderStatus::Accepted
-                        | OrderStatus::PartiallyFilled
-                        | OrderStatus::Filled
-                )
-            })
-            .map(|o| match o.side() {
-                OrderSide::Buy => o.quantity(),
-                OrderSide::Sell => -o.quantity(),
-                _ => 0.0,
+            .map(|o| {
+                let qty = exposure(o);
+                match o.side() {
+                    OrderSide::Buy => qty,
+                    OrderSide::Sell => -qty,
+                    _ => 0.0,
+                }
             })
             .sum()
     }
