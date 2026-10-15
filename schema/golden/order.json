@@ -172,9 +172,29 @@
           "unix_nanos": "1700000060000000000"
         }
       }
+    },
+    {
+      "name": "limit_sell_partially_filled_remainder_refused",
+      "value": {"order_id": "O-8", "instrument_id": {"symbol": "NIFTY50", "exchange": "NSE"}, "side": "sell", "order_type": "limit", "quantity": 75.0, "price": 22010.0, "trigger_price": null, "time_in_force": "gtc", "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}, "ts_init": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}, "status": "partially_filled", "filled_qty": 25.0, "avg_fill_price": 22005.5, "filled_at": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}, "reject_reason": {"code": "order_rejected", "message": "RMS: margin"}}
+    },
+    {
+      "name": "limit_sell_filled",
+      "value": {"order_id": "O-9", "instrument_id": {"symbol": "NIFTY50", "exchange": "NSE"}, "side": "sell", "order_type": "limit", "quantity": 75.0, "price": 22010.0, "trigger_price": null, "time_in_force": "gtc", "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}, "ts_init": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}, "status": "filled", "filled_qty": 75.0, "avg_fill_price": 22010.0, "filled_at": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}}
+    },
+    {
+      "name": "market_buy_rejected_by_risk",
+      "value": {"order_id": "O-10", "instrument_id": {"symbol": "NIFTY50", "exchange": "NSE"}, "side": "buy", "order_type": "market", "quantity": 30.0, "price": null, "trigger_price": null, "time_in_force": "day", "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}, "ts_init": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}, "status": "rejected", "reject_reason": {"code": "risk_lot_multiple_violation", "message": "order refused by risk: lot_multiple"}}
     }
   ],
   "invalid": [
+    {
+      "name": "overfilled",
+      "value": {"order_id": "O-1", "instrument_id": {"symbol": "NIFTY50", "exchange": "NSE"}, "side": "sell", "order_type": "limit", "quantity": 75.0, "price": 22010.0, "trigger_price": null, "time_in_force": "gtc", "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}, "ts_init": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}, "status": "partially_filled", "filled_qty": 80.0, "avg_fill_price": 22010.0}
+    },
+    {
+      "name": "non_positive_avg_fill_price",
+      "value": {"order_id": "O-1", "instrument_id": {"symbol": "NIFTY50", "exchange": "NSE"}, "side": "sell", "order_type": "limit", "quantity": 75.0, "price": 22010.0, "trigger_price": null, "time_in_force": "gtc", "ts_event": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}, "ts_init": {"iso": "2023-11-14T22:14:20.000000000Z", "unix_nanos": "1700000060000000000"}, "status": "partially_filled", "filled_qty": 10.0, "avg_fill_price": 0.0}
+    },
     {
       "name": "negative_quantity",
       "value": {

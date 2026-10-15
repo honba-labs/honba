@@ -247,8 +247,24 @@ _WORKING_STATUSES: Final = frozenset(
 )
 
 
+class RejectReason(_Wire):
+    """Why an order (or its unfilled remainder) was refused: the stable ``ErrorCode`` string
+    (``order_rejected``, ``risk_lot_multiple_violation``, ...) and a short message."""
+
+    code: Str
+    message: Str
+
+
+_FILL_EPS: Final = 1e-9
+
+
 class Order(_Wire):
-    """A client order record; ``quantity > 0`` (``side`` may be ``no_order_side``)."""
+    """A client order record; ``quantity > 0`` (``side`` may be ``no_order_side``).
+
+    ``filled_qty``, ``avg_fill_price``, ``reject_reason`` and ``filled_at`` are additive
+    (ADR 0030): omitted from the wire while unset, so a row from an older producer parses
+    with their defaults (``0.0`` / ``None``) and they are omitted again on dump.
+    """
 
     order_id: Str
     instrument_id: InstrumentId
@@ -264,12 +280,26 @@ class Order(_Wire):
     cancel_requested: bool = False
     trail_amount: Float | None = None
     trail_percent: Float | None = None
+    filled_qty: NonNegativeFloat = 0.0
+    """Cumulative filled quantity (``0.0`` until a fill)."""
+    avg_fill_price: PositiveFloat | None = None
+    """Quantity-weighted average fill price; ``None`` until a fill."""
+    reject_reason: RejectReason | None = None
+    """Set on a rejected row, and on a part-filled row whose remainder was refused."""
+    filled_at: UnixNanos | None = None
+    """Event time of the latest fill; ``None`` until a fill."""
 
     @model_validator(mode="after")
     def _check_cancel_requested(self) -> Order:
         # A cancel can be pending only while the order is working (ADR 0019).
         if self.cancel_requested and self.status not in _WORKING_STATUSES:
             raise ValueError("cancel_requested is only allowed on a working order")
+        return self
+
+    @model_validator(mode="after")
+    def _check_fill(self) -> Order:
+        if self.filled_qty > self.quantity + _FILL_EPS:
+            raise ValueError("filled_qty must not exceed quantity")
         return self
 
     @model_serializer(mode="wrap")
@@ -282,6 +312,11 @@ class Order(_Wire):
                 data.pop("trail_amount", None)
             if data.get("trail_percent") is None:
                 data.pop("trail_percent", None)
+            if not data.get("filled_qty"):
+                data.pop("filled_qty", None)
+            for key in ("avg_fill_price", "reject_reason", "filled_at"):
+                if data.get(key) is None:
+                    data.pop(key, None)
         return data
 
 

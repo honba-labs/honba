@@ -313,6 +313,40 @@ fn order_golden() {
                     Gtd,
                 ),
             ),
+            (
+                "limit_sell_partially_filled_remainder_refused",
+                order(
+                    "O-8",
+                    Sell,
+                    Limit,
+                    75.0,
+                    Some(22_010.0),
+                    None,
+                    PartiallyFilled,
+                    Gtc,
+                )
+                .with_fill(25.0, 22_005.5)
+                .with_filled_at(ts(TS))
+                .with_reject_reason(honba_messages::RejectReason::new(
+                    honba_messages::ErrorCode::OrderRejected,
+                    "RMS: margin",
+                )),
+            ),
+            (
+                "limit_sell_filled",
+                order("O-9", Sell, Limit, 75.0, Some(22_010.0), None, Filled, Gtc)
+                    .with_fill(75.0, 22_010.0)
+                    .with_filled_at(ts(TS)),
+            ),
+            (
+                "market_buy_rejected_by_risk",
+                order("O-10", Buy, Market, 30.0, None, None, Rejected, Day).with_reject_reason(
+                    honba_messages::RejectReason::new(
+                        honba_messages::ErrorCode::RiskLotMultipleViolation,
+                        "order refused by risk: lot_multiple",
+                    ),
+                ),
+            ),
         ],
     );
 }
