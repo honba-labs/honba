@@ -115,6 +115,7 @@ ALLOWED_PROD = {
         "honba-api-rest",
         "honba-risk",   # CLI backtest assembler
         "honba-async",  # operator Command::State in `trading-state set`
+        "honba-config",  # FillModel/ExecutionConfig for `serve --fill-model` (ADR 0030)
     },
     "honba-api-rest": {
         "honba-api",
@@ -172,7 +173,7 @@ ALLOWED_DEV = {
     "honba-config": set(),
     "honba-api": set(),
     "honba-py": set(),
-    "honba-cli": set(),
+    "honba-cli": {"honba-ports"},  # TickReader in the `--ticks` loader tests
     "honba-async": {"honba-testing", "honba-sim"},
     "honba-sweep": {"honba-testing"},
     "honba-api-rest": {"honba-testing"},
