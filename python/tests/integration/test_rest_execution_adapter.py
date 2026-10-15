@@ -155,6 +155,8 @@ async def test_a_fill_reports_its_quantity_and_price_and_derives_the_position(
         report = await rest.order_status("it-3")
         assert (report.status, report.filled_quantity) == (OrderStatus.FILLED, 10.0)
         assert 99.0 <= report.average_price <= 103.0  # the simulator's next-open fill
+        [row] = [r for r in await rest.ledger() if r.order_id == "it-3"]
+        assert row.filled_at is not None and row.filled_at.to_ns() > 0
         with pytest.raises(CapabilityError):  # trades() stays a capability error: no per-fill log
             await rest.trades()
         [position] = await rest.positions()
@@ -201,7 +203,17 @@ async def test_a_risk_refusal_is_a_rejected_report_with_the_stable_code(base_url
         assert report.status is OrderStatus.REJECTED
         assert report.reject_reason is not None
         assert report.reject_reason.startswith("risk_instrument_unknown")
-        assert await rest.orders() == []  # a refusal never reaches the ledger
+        # The refusal is still a 422 (above) and, with a client id, also a rejected ledger row.
+        [row] = await rest.orders()
+        assert (row.order_id, row.status) == ("it-5", OrderStatus.REJECTED)
+        assert row.reject_reason is not None
+        assert row.reject_reason.startswith("risk_instrument_unknown")
+        # A repeat of the refused id answers with the same refusal and adds no row.
+        again = await rest.place_order(
+            OrderIntent.market_buy(unknown, 1.0), product=Product.INTRADAY, client_order_id="it-5"
+        )
+        assert (again.status, again.reject_reason) == (report.status, report.reject_reason)
+        assert len(await rest.orders()) == 1
     finally:
         await rest.disconnect()
 

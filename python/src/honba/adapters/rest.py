@@ -15,23 +15,28 @@ What the server's order ledger says (the adapter reports exactly this, it invent
 
 * A row carries identity, side, type, quantity, optional limit price and a *status*
   (``submitted``, ``partially_filled``, ``filled``, ``cancelled``, ``rejected``), plus, since
-  ADR 0030's widening, three additive fields: ``filled_qty`` (cumulative), ``avg_fill_price``
-  (quantity-weighted over the fills seen) and ``reject_reason`` (the stable ``ErrorCode`` string
-  and a short message, from a simulator or venue refusal). The server omits each while unset.
-  There is still no venue order id, no timestamps (always 0), no ``GET /trades`` and no
-  ``GET /positions`` route.
+  ADR 0030's widening, four additive fields: ``filled_qty`` (cumulative), ``avg_fill_price``
+  (quantity-weighted over the fills seen), ``reject_reason`` (the stable ``ErrorCode`` string
+  and a short message, from a venue refusal or a keyed risk refusal) and ``filled_at`` (event
+  time of the latest fill). The server omits each while unset. There is still no venue order
+  id, no ``GET /trades`` and no ``GET /positions`` route.
 * :meth:`RestExecutionAdapter.trades` therefore stays unsupported (``CapabilityError``): the row
   holds a running average, not a per-fill history, so a trade list cannot be built honestly.
 * An :class:`~honba.adapters.models.OrderReport` carries the row's real ``filled_quantity`` and
   ``average_price`` (also for a ``cancelled`` row that part-filled first), and a ``rejected`` one
   ``"<code>: <message>"``. A refusal at POST time (``risk_*``, ``order_rejected``, including
-  ``risk_trading_halted``) is a 422 and never becomes a row; it carries the same
-  ``"<code>: <message>"`` from the envelope.
-* ``positions()`` is derived from the ledger, in row order, by applying each row's
-  ``filled_qty`` at its ``avg_fill_price`` (partially filled and part-filled-then-cancelled
-  rows included): net signed quantity and the real average price per instrument, currency INR
-  (the account currency is not exposed). Row order is insertion, not fill time, so across
-  interleaved buys and sells the average is an approximation; a row's own average is exact.
+  ``risk_trading_halted``) is a 422; it carries ``"<code>: <message>"`` from the envelope. With a
+  ``client_order_id`` the server also records it as a ``rejected`` row (same code and message)
+  and answers a repeat of the id with the same refusal; without one nothing is recorded.
+* ``positions()`` is derived from the ledger by applying each row's ``filled_qty`` at its
+  ``avg_fill_price`` (partially filled and part-filled-then-cancelled rows included): net
+  signed quantity and the real average price per instrument, currency INR (the account
+  currency is not exposed). Rows are applied in ``filled_at`` order (stable, ledger order for
+  ties) when every filled row has one; otherwise (an older server) in ledger order, which is
+  insertion, not fill time, so across interleaved buys and sells the average is an
+  approximation. A row is one point in time (its last fill) however many partial fills it
+  merges, so a row filled across a later row's fill is still approximated; a row's own average
+  is exact.
 * Talking to an *older server* (rows without the fields, so a ``filled``/``partially_filled``
   row has ``filled_qty == 0``) the adapter falls back to the old rules: a ``filled`` row
   reports ``filled_quantity == quantity`` but its price is unknown (the limit price is *not*
@@ -453,13 +458,19 @@ class RestExecutionAdapter(Adapter):
         if legacy:
             return self._legacy_positions(rows)
         book: dict[tuple[str, str], Position] = {}
-        for row in rows:
-            if row.filled_qty <= 0 or not row.avg_fill_price or row.avg_fill_price <= 0:
-                continue
+        filled = [
+            (row, row.avg_fill_price)
+            for row in rows
+            if row.filled_qty > 0 and row.avg_fill_price and row.avg_fill_price > 0
+        ]
+        if all(row.filled_at is not None for row, _ in filled):
+            # Apply in fill time (the sort is stable: equal times keep ledger order).
+            filled.sort(key=lambda item: item[0].filled_at.to_ns() if item[0].filled_at else 0)
+        for row, price in filled:
             key = (row.instrument_id.symbol, row.instrument_id.exchange)
             position = book.setdefault(key, Position(InstrumentId(*key)))
             side = PositionSide.LONG if row.side == "buy" else PositionSide.SHORT
-            position.apply_fill(side, min(row.filled_qty, row.quantity), row.avg_fill_price)
+            position.apply_fill(side, min(row.filled_qty, row.quantity), price)
         return [p for p in book.values() if p.quantity > 1e-9]
 
     @staticmethod

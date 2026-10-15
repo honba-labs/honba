@@ -11,7 +11,14 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from honba.wire.base import Str, _Wire
-from honba.wire.wire import Currency, Float, InstrumentId, NonNegativeFloat, UnixNanos
+from honba.wire.wire import (
+    Currency,
+    Float,
+    InstrumentId,
+    NonNegativeFloat,
+    RejectReason,
+    UnixNanos,
+)
 
 __all__ = [
     "TERMINAL_STATUSES",
@@ -94,20 +101,13 @@ class ScreenerResultRow(_Wire):
     """Latest value of every metric the filter reads, by key as written; ``None`` while warming up."""
 
 
-class RejectReason(_Wire):
-    """Why the venue refused an order (or an unfilled remainder): the stable ``ErrorCode``
-    string (``order_rejected``, ``order_execution_unavailable``, ...) and a short message."""
-
-    code: Str
-    message: Str
-
-
 class LedgerOrder(_Wire):
     """One row of the write ledger (``GET /orders``): the orders the risk stage approved,
     in insertion order (E11-S7, ADR 0019 decision 3).
 
-    ``filled_qty``, ``avg_fill_price`` and ``reject_reason`` are additive (ADR 0030): a server
-    without them omits the keys, which decode as ``0.0`` / ``None`` / ``None``. The server also
+    ``filled_qty``, ``avg_fill_price``, ``reject_reason`` and ``filled_at`` are additive
+    (ADR 0030): a server without them omits the keys, which decode as ``0.0`` / ``None`` /
+    ``None`` / ``None``. The server also
     omits them while unset, so ``filled_qty == 0`` means "nothing filled" on a current server
     and "unknown" on an older one."""
 
@@ -127,6 +127,8 @@ class LedgerOrder(_Wire):
     """Quantity-weighted average fill price; ``None`` until a fill."""
     reject_reason: RejectReason | None = None
     """Set on a ``rejected`` row, and on a ``partially_filled`` row whose remainder was refused."""
+    filled_at: UnixNanos | None = None
+    """Event time of the latest fill; ``None`` until a fill, or on a server without the field."""
 
 
 RunStatus = Literal["pending", "running", "completed", "failed", "cancelled"]

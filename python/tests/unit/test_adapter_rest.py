@@ -406,6 +406,36 @@ async def test_positions_net_the_fills_per_instrument_with_the_real_average_pric
     assert position.avg_price == pytest.approx((16 * 105.0 + 3 * 120.0) / 19.0, abs=0.01)
 
 
+def at(ns: int) -> dict[str, str]:
+    return {"unix_nanos": str(ns), "iso": "1970-01-01T00:00:00.000000000Z"}
+
+
+async def test_positions_apply_fills_in_fill_time_not_ledger_order() -> None:
+    # Ledger order: buy 10 @ 100, buy 10 @ 200, sell 10 @ 150. By fill time the sale happened
+    # between the buys: flat after it, so the position is the later buy alone.
+    rows = [
+        fill("a", "buy", 10.0, 100.0, filled_at=at(10)),
+        fill("c", "buy", 10.0, 200.0, filled_at=at(30)),
+        fill("b", "sell", 10.0, 150.0, filled_at=at(20)),
+    ]
+    rest, _ = adapter(ok({"orders": rows}))
+    [position] = await rest.positions()
+    assert (position.signed_quantity, position.avg_price) == (10.0, 200.0)
+
+
+async def test_positions_keep_ledger_order_when_a_filled_row_has_no_fill_time() -> None:
+    # An older server, or a row without `filled_at`: no honest time order, so ledger order.
+    for stamped in (False, True):
+        rows = [
+            fill("a", "buy", 10.0, 100.0),
+            fill("c", "buy", 10.0, 200.0, **({"filled_at": at(30)} if stamped else {})),
+            fill("b", "sell", 10.0, 150.0, **({"filled_at": at(20)} if stamped else {})),
+        ]
+        rest, _ = adapter(ok({"orders": rows}))
+        [position] = await rest.positions()
+        assert (position.signed_quantity, position.avg_price) == (10.0, 150.0)
+
+
 async def test_positions_flip_to_a_short_priced_at_the_flipping_fill() -> None:
     rows = [fill("a", "buy", 5.0, 100.0), fill("b", "sell", 8.0, 90.0)]
     rest, _ = adapter(ok({"orders": rows}))
