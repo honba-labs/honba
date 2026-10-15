@@ -63,6 +63,11 @@ pub struct AppState {
     pub(crate) exec: crate::exec::ExecGateway,
     /// The writable store behind `quotes`, when the state was built by `from_reader`.
     live: Option<Arc<LiveQuoteStore>>,
+    /// The quote/trade tick source `fill_model = l2` runs match against (ADR 0030); `None`
+    /// refuses such runs with `l2_requires_ticks`.
+    ticks: Option<Arc<dyn honba_ports::TickReader>>,
+    /// Execution config the run service's executor is built with (default: bar fills).
+    execution: honba_config::ExecutionConfig,
     /// The sending side of the bar ingest channel behind `POST /bars`; `None` until
     /// [`AppState::start_bar_ingest`] (or [`AppState::attach_bar_ingest`]) and again after
     /// [`AppState::stop_bar_ingest`]. Shared by every clone of the state.
@@ -91,6 +96,8 @@ impl AppState {
             orders: OrderLedger::default(),
             exec: crate::exec::ExecGateway::default_sim(),
             live: None,
+            ticks: None,
+            execution: honba_config::ExecutionConfig::default(),
             bar_ingest: Arc::default(),
         }
     }
@@ -169,6 +176,21 @@ impl AppState {
         self
     }
 
+    /// Sets the tick source L2 backtests read (call before [`AppState::with_journals_dir`]).
+    #[must_use]
+    pub fn with_tick_reader(mut self, ticks: Arc<dyn honba_ports::TickReader>) -> Self {
+        self.ticks = Some(ticks);
+        self
+    }
+
+    /// Sets the execution config (fill model) the backtest executor runs with (call before
+    /// [`AppState::with_journals_dir`]). `fill_model = l2` needs [`AppState::with_tick_reader`].
+    #[must_use]
+    pub fn with_execution(mut self, execution: honba_config::ExecutionConfig) -> Self {
+        self.execution = execution;
+        self
+    }
+
     /// Serves runs from `service` (tests inject a deterministic executor this way).
     pub fn with_run_service(mut self, service: RunService) -> Self {
         self.runs = Some(Arc::new(service));
@@ -186,7 +208,11 @@ impl AppState {
         config: RunServiceConfig,
     ) -> Result<Self, ErrorDetail> {
         let registry = StrategyRegistry::builtin();
-        let executor = BacktestExecutor::new(self.bars.clone(), registry.clone());
+        let mut executor = BacktestExecutor::new(self.bars.clone(), registry.clone())
+            .with_execution(self.execution.clone());
+        if let Some(ticks) = &self.ticks {
+            executor = executor.with_tick_reader(ticks.clone());
+        }
         self.account_currency = executor.account_currency()?;
         let service = RunService::start(
             Arc::new(RunStore::system(dir.to_path_buf())),
