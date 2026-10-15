@@ -163,3 +163,10 @@ fn the_error_display_names_the_problem() {
         "seed must be non-zero"
     );
 }
+
+#[test]
+fn fill_model_l2_is_a_wire_variant() {
+    let model: FillModel = serde_json::from_str("\"l2\"").expect("l2 parses");
+    assert_eq!(model, FillModel::L2);
+    assert_eq!(serde_json::to_string(&FillModel::L2).unwrap(), "\"l2\"");
+}

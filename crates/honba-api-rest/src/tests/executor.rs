@@ -320,3 +320,27 @@ fn a_buy_and_hold_run_has_one_unpaired_fill_and_no_round_trips() {
         .count();
     assert_eq!(fills, 1);
 }
+
+#[test]
+fn fill_model_l2_without_ticks_is_refused_with_a_stable_reason() {
+    use honba_config::{ExecutionConfig, FillModel};
+    let exec = executor().with_execution(ExecutionConfig {
+        fill_model: FillModel::L2,
+        ..ExecutionConfig::default()
+    });
+    let err = exec.execute(job(42), &mut Memory::default()).unwrap_err();
+    assert_eq!(err.code, ErrorCode::Unsupported);
+    assert_eq!(err.context.unwrap()["reason"], "l2_requires_ticks");
+}
+
+#[test]
+fn other_non_bar_fill_models_stay_unsupported_without_the_l2_reason() {
+    use honba_config::{ExecutionConfig, FillModel};
+    let exec = executor().with_execution(ExecutionConfig {
+        fill_model: FillModel::None,
+        ..ExecutionConfig::default()
+    });
+    let err = exec.execute(job(42), &mut Memory::default()).unwrap_err();
+    assert_eq!(err.code, ErrorCode::Unsupported);
+    assert!(err.context.is_none());
+}

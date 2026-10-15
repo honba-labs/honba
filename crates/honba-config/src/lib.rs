@@ -111,6 +111,9 @@ pub enum FillModel {
     BarFill,
     /// Fill only when the bar trades through the order price.
     BarFillThrough,
+    /// Top-of-book matching against quote/trade ticks (ADR 0030). The run needs a tick source;
+    /// a run whose data source supplies bars only is refused with `l2_requires_ticks`.
+    L2,
     /// No fills; used to test the strategy's signal path alone.
     None,
 }

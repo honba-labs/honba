@@ -153,6 +153,13 @@ impl BacktestExecutor {
         self
     }
 
+    /// Overrides the execution config (fill model).
+    #[must_use]
+    pub fn with_execution(mut self, execution: ExecutionConfig) -> Self {
+        self.execution = execution;
+        self
+    }
+
     /// Attaches a result cache to this executor (ADR 0020, E4-S1).
     #[must_use]
     pub fn with_cache(mut self, cache: ResultCache) -> Self {
@@ -570,6 +577,15 @@ impl BacktestExecutor {
                     assumptions: cached.assumptions,
                 });
             }
+        }
+        if matches!(self.execution.fill_model, FillModel::L2) {
+            // The L2 simulator matches against quote/trade ticks (ADR 0030) and this executor
+            // reads bars only: refuse with a stable reason, never fall back to bar fills.
+            return Err(ErrorDetail::new(
+                ErrorCode::Unsupported,
+                "fill_model l2 requires quote/trade ticks; this run's data source supplies bars only",
+            )
+            .with_context(json!({"reason": "l2_requires_ticks", "fill_model": "l2"})));
         }
         if !matches!(self.execution.fill_model, FillModel::BarFill) {
             return Err(ErrorDetail::new(
