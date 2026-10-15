@@ -125,7 +125,15 @@ async def test_a_row_the_venue_rejected_synchronously_is_rejected_with_a_placeho
     report = await rest.place_order(BUY, product=Product.INTRADAY, client_order_id="c-4")
     assert report.status is OrderStatus.REJECTED
     assert report.reject_reason is not None
-    assert "ledger" in report.reject_reason  # says why there is no real reason
+    assert "ledger" in report.reject_reason  # an older server: says why there is no real reason
+
+
+async def test_a_rejected_row_reports_the_ledger_code_and_message() -> None:
+    reason = {"code": "order_rejected", "message": "no_position"}
+    rest, _ = adapter(ok(row("c-4", "rejected", reject_reason=reason)))
+    report = await rest.place_order(BUY, product=Product.INTRADAY, client_order_id="c-4")
+    assert report.status is OrderStatus.REJECTED
+    assert report.reject_reason == "order_rejected: no_position"
 
 
 @pytest.mark.parametrize("code", ["unauthorized", "forbidden"])
@@ -272,15 +280,48 @@ async def test_order_status_of_an_unknown_id_is_an_adapter_error() -> None:
         await rest.order_status("nope")
 
 
-async def test_a_filled_row_has_no_price_so_the_report_says_so() -> None:
+async def test_a_filled_row_reports_the_real_quantity_and_average_price() -> None:
+    filled = row("f", "filled", filled_qty=10.0, avg_fill_price=101.25)
+    rest, _ = adapter(ok({"orders": [filled]}))  # no fill_price= needed
+    [report] = await rest.orders()
+    assert (report.status, report.filled_quantity, report.average_price) == (
+        OrderStatus.FILLED,
+        10.0,
+        101.25,
+    )
+
+
+async def test_a_partial_fill_reports_its_real_quantity_and_average_price() -> None:
+    partial = row("p", "partially_filled", filled_qty=4.0, avg_fill_price=99.5)
+    rest, _ = adapter(ok({"orders": [partial]}))
+    [report] = await rest.orders()
+    assert (report.status, report.filled_quantity, report.average_price) == (
+        OrderStatus.PARTIALLY_FILLED,
+        4.0,
+        99.5,
+    )
+
+
+async def test_a_cancelled_row_keeps_what_filled_before_the_cancel() -> None:
+    cancelled = row("c", "cancelled", filled_qty=3.0, avg_fill_price=100.0)
+    rest, _ = adapter(ok({"orders": [cancelled]}))
+    [report] = await rest.orders()
+    assert (report.status, report.filled_quantity, report.average_price) == (
+        OrderStatus.CANCELLED,
+        3.0,
+        100.0,
+    )
+
+
+async def test_an_older_server_filled_row_has_no_price_so_the_report_says_so() -> None:
     rest, _ = adapter(ok({"orders": [row("f", "filled")]}), ok({"orders": [row("f", "filled")]}))
-    with pytest.raises(LedgerLimitationError):
+    with pytest.raises(LedgerLimitationError, match="older server"):
         await rest.order_status("f")
     ledger = await rest.ledger()  # the status-only view still works
     assert [(r.order_id, r.status) for r in ledger] == [("f", "filled")]
 
 
-async def test_a_filled_row_reports_with_a_caller_supplied_fill_price() -> None:
+async def test_an_older_server_filled_row_reports_with_a_caller_supplied_fill_price() -> None:
     rest, _ = adapter(ok({"orders": [row("f", "filled")]}), fill_price=lambda _row: 101.5)
     [report] = await rest.orders()
     assert (report.status, report.filled_quantity, report.average_price) == (
@@ -290,9 +331,9 @@ async def test_a_filled_row_reports_with_a_caller_supplied_fill_price() -> None:
     )
 
 
-async def test_a_partial_fill_cannot_be_reported() -> None:
+async def test_an_older_server_partial_fill_cannot_be_reported() -> None:
     rest, _ = adapter(ok({"orders": [row("p", "partially_filled")]}), fill_price=lambda _r: 1.0)
-    with pytest.raises(LedgerLimitationError):
+    with pytest.raises(LedgerLimitationError, match="older server"):
         await rest.orders()
 
 
@@ -332,25 +373,58 @@ async def test_cancel_all_cancels_only_working_orders_of_the_instrument() -> Non
 # -- positions and the unsupported surface ---------------------------------------------------------
 
 
-async def test_positions_net_the_filled_rows_per_instrument() -> None:
+def fill(order_id: str, side: str, qty: float, px: float, **over: Any) -> dict[str, Any]:
+    return row(
+        order_id,
+        over.pop("status", "filled"),
+        side=side,
+        quantity=over.pop("quantity", qty),
+        filled_qty=qty,
+        avg_fill_price=px,
+        **over,
+    )
+
+
+async def test_positions_net_the_fills_per_instrument_with_the_real_average_price() -> None:
     infy = {"symbol": "INFY", "exchange": "NSE"}
     rows = [
-        row("a", "filled", quantity=10.0),
-        row("b", "filled", side="sell", quantity=4.0),
-        row("c", "filled", side="sell", quantity=5.0, instrument_id=infy),
-        row("d", "filled", side="buy", quantity=5.0, instrument_id=infy),
+        fill("a", "buy", 10.0, 100.0),
+        fill("a2", "buy", 10.0, 110.0),
+        fill("b", "sell", 4.0, 130.0),
+        fill("c", "sell", 5.0, 50.0, instrument_id=infy),
+        fill("d", "buy", 5.0, 50.0, instrument_id=infy),
         row("e", "submitted", quantity=99.0),
         row("f", "cancelled", quantity=99.0),
+        fill("g", "buy", 2.0, 120.0, status="partially_filled", quantity=8.0),
+        fill("h", "buy", 1.0, 120.0, status="cancelled", quantity=8.0),
     ]
     rest, _ = adapter(ok({"orders": rows}))
     [position] = await rest.positions()
     assert position.instrument_id == TCS
+    # 20 @ 105 average, a 4-lot sale leaves the average alone, then 3 more @ 120.
+    assert position.signed_quantity == 19.0
+    assert position.avg_price == pytest.approx((16 * 105.0 + 3 * 120.0) / 19.0, abs=0.01)
+
+
+async def test_positions_flip_to_a_short_priced_at_the_flipping_fill() -> None:
+    rows = [fill("a", "buy", 5.0, 100.0), fill("b", "sell", 8.0, 90.0)]
+    rest, _ = adapter(ok({"orders": rows}))
+    [position] = await rest.positions()
+    assert (position.signed_quantity, position.avg_price) == (-3.0, 90.0)
+
+
+async def test_older_server_positions_keep_filled_rows_with_an_unknown_average() -> None:
+    rows = [row("a", "filled", quantity=10.0), row("b", "filled", side="sell", quantity=4.0)]
+    rest, _ = adapter(ok({"orders": rows}))
+    [position] = await rest.positions()
     assert (position.signed_quantity, position.avg_price) == (6.0, 0.0)
 
 
-async def test_positions_refuse_when_a_partial_fill_makes_the_quantity_unknown() -> None:
+async def test_older_server_positions_refuse_when_a_partial_fill_makes_the_quantity_unknown() -> (
+    None
+):
     rest, _ = adapter(ok({"orders": [row("p", "partially_filled")]}))
-    with pytest.raises(LedgerLimitationError):
+    with pytest.raises(LedgerLimitationError, match="older server"):
         await rest.positions()
 
 

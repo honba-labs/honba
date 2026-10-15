@@ -26,6 +26,7 @@ __all__ = [
     "Health",
     "InstrumentInfo",
     "LedgerOrder",
+    "RejectReason",
     "RunStatus",
     "ScreenerResultRow",
 ]
@@ -93,9 +94,22 @@ class ScreenerResultRow(_Wire):
     """Latest value of every metric the filter reads, by key as written; ``None`` while warming up."""
 
 
+class RejectReason(_Wire):
+    """Why the venue refused an order (or an unfilled remainder): the stable ``ErrorCode``
+    string (``order_rejected``, ``order_execution_unavailable``, ...) and a short message."""
+
+    code: Str
+    message: Str
+
+
 class LedgerOrder(_Wire):
     """One row of the write ledger (``GET /orders``): the orders the risk stage approved,
-    in insertion order (E11-S7, ADR 0019 decision 3)."""
+    in insertion order (E11-S7, ADR 0019 decision 3).
+
+    ``filled_qty``, ``avg_fill_price`` and ``reject_reason`` are additive (ADR 0030): a server
+    without them omits the keys, which decode as ``0.0`` / ``None`` / ``None``. The server also
+    omits them while unset, so ``filled_qty == 0`` means "nothing filled" on a current server
+    and "unknown" on an older one."""
 
     order_id: Str
     instrument_id: InstrumentId
@@ -107,6 +121,12 @@ class LedgerOrder(_Wire):
     time_in_force: Str = "day"
     ts_event: UnixNanos
     ts_init: UnixNanos
+    filled_qty: Float = 0.0
+    """Cumulative filled quantity (``0.0`` until a fill, or on a server without the field)."""
+    avg_fill_price: Float | None = None
+    """Quantity-weighted average fill price; ``None`` until a fill."""
+    reject_reason: RejectReason | None = None
+    """Set on a ``rejected`` row, and on a ``partially_filled`` row whose remainder was refused."""
 
 
 RunStatus = Literal["pending", "running", "completed", "failed", "cancelled"]

@@ -3,9 +3,10 @@
 The fake adapter is pure Python. Orders go in over real HTTP, fills come out of the adapter's
 ``trades()``, and the order ledger is read back with ``GET /orders`` (ADR 0030, E3-S7).
 
-The ledger row keeps the status only, not the rejection code, so the exception-to-code table is
-covered where the code is visible: ``crates/honba-py/src/tests/python_gateway.rs`` (Python
-exception to ``PortError``) and ``gateway_venue.rs`` (``PortError`` to ``ErrorCode``).
+The ledger row carries ``filled_qty`` / ``avg_fill_price`` and ``reject_reason`` (the stable
+``ErrorCode`` string plus a message), so fills and refusals are asserted end to end here. The
+full exception-to-code table is also covered in ``crates/honba-py/src/tests/python_gateway.rs``
+(Python exception to ``PortError``) and ``gateway_venue.rs`` (``PortError`` to ``ErrorCode``).
 """
 
 from __future__ import annotations
@@ -72,8 +73,8 @@ class FakeBroker:
     async def trades(self) -> list[Trade]:
         return list(self.fills)
 
-    def fill(self, venue_id: str, quantity: float) -> None:
-        self.fills.append(Trade(TCS, OrderSide.BUY, quantity, 100.0, ts=T0, order_id=venue_id))
+    def fill(self, venue_id: str, quantity: float, price: float = 100.0) -> None:
+        self.fills.append(Trade(TCS, OrderSide.BUY, quantity, price, ts=T0, order_id=venue_id))
 
 
 @pytest.fixture
@@ -156,9 +157,13 @@ def test_submit_then_partial_then_full_fill_reach_the_ledger(
     assert broker.placed == ["o1"]
 
     broker.fill("B-1", 10.0)
-    until(client, "o1", "partially_filled")
-    broker.fill("B-1", 15.0)
-    until(client, "o1", "filled")
+    row = until(client, "o1", "partially_filled")
+    assert (row["filled_qty"], row["avg_fill_price"]) == (10.0, 100.0)
+    assert "reject_reason" not in row
+    broker.fill("B-1", 15.0, price=102.0)
+    row = until(client, "o1", "filled")
+    assert row["filled_qty"] == 25.0
+    assert row["avg_fill_price"] == pytest.approx((10 * 100.0 + 15 * 102.0) / 25.0)
 
 
 def test_delete_cancels_on_the_broker_by_its_order_id(
@@ -185,7 +190,10 @@ def test_a_broker_refusal_rejects_the_row(
     broker.reject = "RMS: margin"
     client = serve(broker)
     client.post("/orders", json=buy("o3"))
-    until(client, "o3", "rejected")
+    row = until(client, "o3", "rejected")
+    assert row["reject_reason"]["code"] == "order_rejected"
+    assert row["reject_reason"]["message"]
+    assert "filled_qty" not in row
 
 
 def test_a_raising_adapter_rejects_the_row(
@@ -195,7 +203,8 @@ def test_a_raising_adapter_rejects_the_row(
     broker.fail = AdapterFatalError("account suspended")
     client = serve(broker)
     client.post("/orders", json=buy("o4"))
-    until(client, "o4", "rejected")
+    row = until(client, "o4", "rejected")
+    assert row["reject_reason"]["code"] == "order_execution_unavailable"
 
 
 def test_a_slow_coroutine_does_not_stall_other_requests(
@@ -263,7 +272,8 @@ def test_a_plain_function_gateway_works_without_coroutines(
             }
         )
     )
-    until(client, "p1", "filled")
+    row = until(client, "p1", "filled")
+    assert (row["filled_qty"], row["avg_fill_price"]) == (25.0, 100.0)
 
 
 def test_a_call_that_outlives_the_timeout_rejects_the_order(
@@ -273,4 +283,5 @@ def test_a_call_that_outlives_the_timeout_rejects_the_order(
     broker.delay = 3.0
     client = serve(broker, call_timeout_s=0.2)
     client.post("/orders", json=buy("t1"))
-    until(client, "t1", "rejected")
+    row = until(client, "t1", "rejected")
+    assert row["reject_reason"]["code"] == "timeout"

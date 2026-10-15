@@ -11,29 +11,34 @@ need the ``write:orders`` scope (the ``read:account`` scope is reserved and no s
 takes it). ``GET /health`` is public. The adapter never calls the operator routes, so a token
 without ``operator`` is enough; a halted server surfaces as a refusal (below).
 
-What the server's order ledger can and cannot say (the adapter reports exactly this, it invents
-nothing):
+What the server's order ledger says (the adapter reports exactly this, it invents nothing):
 
 * A row carries identity, side, type, quantity, optional limit price and a *status*
-  (``submitted``, ``partially_filled``, ``filled``, ``cancelled``, ``rejected``). It has no
-  filled quantity, no average fill price, no venue order id, no timestamps (always 0) and no
-  reject reason. There is no ``GET /trades`` or ``GET /positions`` route.
-* So :meth:`RestExecutionAdapter.trades` is unsupported (``CapabilityError``), a fill is visible
-  only as the row reaching ``filled`` (or ``partially_filled``), and an
-  :class:`~honba.adapters.models.OrderReport` for a fill cannot be built honestly:
-  ``filled_quantity`` of a partial and ``average_price`` of any fill are unknown. A ``filled``
-  row reports ``filled_quantity == quantity`` (true by the ledger's semantics) and needs an
-  average price: the row's limit price is *not* used (a limit can fill better). Pass
-  ``fill_price=`` (a callable on the :class:`~honba.client.models.LedgerOrder`) to supply one
-  from your own source; without it the report raises :class:`LedgerLimitationError`, and
-  :meth:`RestExecutionAdapter.ledger` still returns the status-only rows.
-* A venue rejection that happens after the POST (a limit order the simulator refuses, a broker
-  refusal behind a gateway) is a ``rejected`` row without a reason; its report carries a
-  placeholder reason saying so. A refusal at POST time (``risk_*``, ``order_rejected``,
-  including ``risk_trading_halted``) carries the server's stable code and message.
-* ``positions()`` is derived from the ledger: the net signed quantity of ``filled`` rows per
-  instrument, ``avg_price`` 0.0 (unknown), currency INR (the account currency is not exposed).
-  A ``partially_filled`` row makes it raise, because its filled quantity is unknown.
+  (``submitted``, ``partially_filled``, ``filled``, ``cancelled``, ``rejected``), plus, since
+  ADR 0030's widening, three additive fields: ``filled_qty`` (cumulative), ``avg_fill_price``
+  (quantity-weighted over the fills seen) and ``reject_reason`` (the stable ``ErrorCode`` string
+  and a short message, from a simulator or venue refusal). The server omits each while unset.
+  There is still no venue order id, no timestamps (always 0), no ``GET /trades`` and no
+  ``GET /positions`` route.
+* :meth:`RestExecutionAdapter.trades` therefore stays unsupported (``CapabilityError``): the row
+  holds a running average, not a per-fill history, so a trade list cannot be built honestly.
+* An :class:`~honba.adapters.models.OrderReport` carries the row's real ``filled_quantity`` and
+  ``average_price`` (also for a ``cancelled`` row that part-filled first), and a ``rejected`` one
+  ``"<code>: <message>"``. A refusal at POST time (``risk_*``, ``order_rejected``, including
+  ``risk_trading_halted``) is a 422 and never becomes a row; it carries the same
+  ``"<code>: <message>"`` from the envelope.
+* ``positions()`` is derived from the ledger, in row order, by applying each row's
+  ``filled_qty`` at its ``avg_fill_price`` (partially filled and part-filled-then-cancelled
+  rows included): net signed quantity and the real average price per instrument, currency INR
+  (the account currency is not exposed). Row order is insertion, not fill time, so across
+  interleaved buys and sells the average is an approximation; a row's own average is exact.
+* Talking to an *older server* (rows without the fields, so a ``filled``/``partially_filled``
+  row has ``filled_qty == 0``) the adapter falls back to the old rules: a ``filled`` row
+  reports ``filled_quantity == quantity`` but its price is unknown (the limit price is *not*
+  used: a limit can fill better), so :class:`LedgerLimitationError` unless ``fill_price=`` (a
+  callable on the :class:`~honba.client.models.LedgerOrder`) supplies one; a
+  ``partially_filled`` row always raises; a ``rejected`` row carries a placeholder reason; and
+  ``positions()`` has ``avg_price`` 0.0 for filled rows and raises on a partial.
 * ``time_in_force`` is always ``day`` on the row and ``product`` is not sent: the adapter
   supports ``DAY`` only and remembers nothing about products.
 
@@ -92,6 +97,8 @@ _T = TypeVar("_T")
 
 _NO_REASON = "rejected by the venue; the order ledger (GET /orders) does not carry the reason"
 
+_OLDER_SERVER = "older server: no ledger fill fields (ADR 0030); upgrade it"
+
 _DEFAULT_RETRY = (0.2, 0.5, 1.0)
 
 _WORKING = frozenset({"submitted", "accepted", "partially_filled"})
@@ -128,8 +135,9 @@ class RestAuthError(AdapterFatalError):
 
 
 class LedgerLimitationError(AdapterError):
-    """The order ledger cannot answer: a fill's average price or a partial fill's quantity is
-    not on the row (see the module docstring). Permanent for that row; not fatal to the run."""
+    """The order ledger cannot answer: the server is older than the ledger fill fields
+    (ADR 0030), so a fill's average price or a partial fill's quantity is not on the row (see
+    the module docstring). Permanent for that row; not fatal to the run."""
 
     code: ClassVar[str] = "adapter.rest_ledger_limitation"
 
@@ -263,25 +271,40 @@ class RestExecutionAdapter(Adapter):
 
     # -- orders ----------------------------------------------------------------
 
-    def _report(self, row: LedgerOrder) -> OrderReport:
+    def _fills(self, row: LedgerOrder) -> tuple[float, float]:
+        """``(filled_quantity, average_price)`` of a row; ``(0.0, 0.0)`` when nothing filled.
+
+        A row from a server without the fill fields that is nevertheless ``filled`` or
+        ``partially_filled`` is the older-server case (module docstring)."""
         status = OrderStatus(row.status)
-        filled = 0.0
-        average = 0.0
-        reason = None
-        if status is OrderStatus.REJECTED:
-            reason = _NO_REASON
-        elif status is OrderStatus.PARTIALLY_FILLED:
+        if row.filled_qty > 0 and row.avg_fill_price is not None and row.avg_fill_price > 0:
+            filled = min(row.filled_qty, row.quantity)
+            if status is OrderStatus.FILLED:
+                filled = row.quantity  # the sum of the fills can differ by float noise
+            return filled, row.avg_fill_price
+        if status is OrderStatus.PARTIALLY_FILLED:
             raise LedgerLimitationError(
-                f"order {row.order_id} is partially filled; the ledger row has no filled quantity"
+                f"order {row.order_id} is partially filled; the ledger row has no filled "
+                f"quantity ({_OLDER_SERVER})"
             )
-        elif status is OrderStatus.FILLED:
+        if status is OrderStatus.FILLED:
             if self._fill_price is None:
                 raise LedgerLimitationError(
                     f"order {row.order_id} is filled; the ledger row has no fill price "
-                    "(pass fill_price= to RestExecutionAdapter, or read ledger())"
+                    f"({_OLDER_SERVER}, or pass fill_price= to RestExecutionAdapter, or read "
+                    "ledger())"
                 )
-            filled = row.quantity
-            average = self._fill_price(row)
+            return row.quantity, self._fill_price(row)
+        return 0.0, 0.0
+
+    def _report(self, row: LedgerOrder) -> OrderReport:
+        status = OrderStatus(row.status)
+        filled, average = self._fills(row)
+        reason = None
+        if row.reject_reason is not None:
+            reason = f"{row.reject_reason.code}: {row.reject_reason.message}"
+        elif status is OrderStatus.REJECTED:
+            reason = _NO_REASON
         return OrderReport(
             order_id=row.order_id,
             instrument_id=InstrumentId(row.instrument_id.symbol, row.instrument_id.exchange),
@@ -415,12 +438,33 @@ class RestExecutionAdapter(Adapter):
         raise AssertionError("unreachable")  # pragma: no cover
 
     async def positions(self) -> list[Position]:
-        """Net ``filled`` quantity per instrument, derived from the ledger (module docstring)."""
+        """Net position per instrument, derived from the ledger's fills (module docstring)."""
         rows = await self.ledger()
-        if any(row.status == "partially_filled" for row in rows):
-            raise LedgerLimitationError(
-                "a partially filled order has no filled quantity on the ledger row"
-            )
+        legacy = False
+        for row in rows:
+            if row.filled_qty > 0 or row.status not in ("filled", "partially_filled"):
+                continue
+            if row.status == "partially_filled":
+                raise LedgerLimitationError(
+                    "a partially filled order has no filled quantity on the ledger row "
+                    f"({_OLDER_SERVER})"
+                )
+            legacy = True  # an older server's filled row: quantity known, price not
+        if legacy:
+            return self._legacy_positions(rows)
+        book: dict[tuple[str, str], Position] = {}
+        for row in rows:
+            if row.filled_qty <= 0 or not row.avg_fill_price or row.avg_fill_price <= 0:
+                continue
+            key = (row.instrument_id.symbol, row.instrument_id.exchange)
+            position = book.setdefault(key, Position(InstrumentId(*key)))
+            side = PositionSide.LONG if row.side == "buy" else PositionSide.SHORT
+            position.apply_fill(side, min(row.filled_qty, row.quantity), row.avg_fill_price)
+        return [p for p in book.values() if not p.is_flat]
+
+    @staticmethod
+    def _legacy_positions(rows: list[LedgerOrder]) -> list[Position]:
+        """Older server: the net quantity of ``filled`` rows, ``avg_price`` unknown (0.0)."""
         net: dict[tuple[str, str], float] = {}
         for row in rows:
             if row.status != "filled":

@@ -1,9 +1,9 @@
 """``RestExecutionAdapter`` against a real ``honba serve`` (ADR 0030, E3-S7).
 
 Every server is a child process killed in ``finally`` by ``_runs_support.serve``; scratch
-directories live under ``target/tmp`` and are removed. The ledger is status-only, so a fill is
-proved by the row reaching ``filled`` and by what the adapter refuses to invent (see
-:mod:`honba.adapters.rest`).
+directories live under ``target/tmp`` and are removed. The ledger row carries the filled quantity,
+the average fill price and the reject reason (ADR 0030), so fills and refusals are asserted with
+their quantities, prices and stable codes (see :mod:`honba.adapters.rest`).
 """
 
 from __future__ import annotations
@@ -23,7 +23,6 @@ from _runs_support import MINUTE, T0, honba_binary, scratch, serve, walk, write_
 from honba.adapters.errors import AdapterError, CapabilityError, SessionError
 from honba.adapters.models import OrderStatus, Product
 from honba.adapters.rest import (
-    LedgerLimitationError,
     RestApiError,
     RestAuthError,
     RestExecutionAdapter,
@@ -134,17 +133,18 @@ async def test_cancel_a_working_order_then_again_is_harmless(base_url: str) -> N
         await rest.disconnect()
 
 
-async def test_a_fill_shows_as_the_row_status_and_no_price_is_invented(base_url: str) -> None:
-    rest = RestExecutionAdapter(base_url, retry=(), fill_price=lambda _row: 100.0)
-    bare = RestExecutionAdapter(base_url, retry=())
+async def test_a_fill_reports_its_quantity_and_price_and_derives_the_position(
+    base_url: str,
+) -> None:
+    rest = RestExecutionAdapter(base_url, retry=())  # no fill_price= needed
     await rest.connect()
-    await bare.connect()
     try:
         await rest.place_order(
             OrderIntent.market_buy(TCS, 10.0), product=Product.INTRADAY, client_order_id="it-3"
         )
+        assert (await rest.order_status("it-3")).filled_quantity == 0.0
         # The simulator fills when the market advances: feed bars after the order.
-        bars = [bar(T0 + (10 + i) * MINUTE) for i in range(3)]
+        bars = [bar(T0 + (10 + i) * MINUTE, close=100.0 + i) for i in range(3)]
         sent = rest._client.transport.request("POST", "/bars", body={"bars": bars})
         assert sent.status == 200, sent.json
 
@@ -153,35 +153,39 @@ async def test_a_fill_shows_as_the_row_status_and_no_price_is_invented(base_url:
 
         await until(filled, "the row to reach filled")
         report = await rest.order_status("it-3")
-        assert (report.status, report.filled_quantity, report.average_price) == (
-            OrderStatus.FILLED,
-            10.0,
-            100.0,
-        )
-        with pytest.raises(LedgerLimitationError):
-            await bare.order_status("it-3")  # the ledger has no fill price
-        with pytest.raises(CapabilityError):  # trades() is a capability error
+        assert (report.status, report.filled_quantity) == (OrderStatus.FILLED, 10.0)
+        assert 99.0 <= report.average_price <= 103.0  # the simulator's next-open fill
+        with pytest.raises(CapabilityError):  # trades() stays a capability error: no per-fill log
             await rest.trades()
         [position] = await rest.positions()
         assert (position.instrument_id, position.signed_quantity) == (TCS, 10.0)
+        assert position.avg_price == pytest.approx(report.average_price, abs=0.01)
         # a filled order cannot be cancelled: reported, no error
         await rest.cancel_order("it-3")
     finally:
         await rest.disconnect()
-        await bare.disconnect()
 
 
-async def test_a_venue_rejection_is_a_rejected_report(base_url: str) -> None:
+async def test_a_venue_rejection_is_a_rejected_report_with_the_stable_code(
+    base_url: str,
+) -> None:
     rest = RestExecutionAdapter(base_url, retry=())
     await rest.connect()
     try:
-        report = await rest.place_order(
+        placed = await rest.place_order(
             OrderIntent.limit_buy(TCS, 1.0, 99.0),
             product=Product.INTRADAY,
             client_order_id="it-4",
         )
+        assert placed.status is OrderStatus.REJECTED
+        assert placed.reject_reason is not None
+        assert placed.reject_reason.startswith("order_rejected:")
+        report = await rest.order_status("it-4")  # the ledger row says the same
         assert report.status is OrderStatus.REJECTED
-        assert report.reject_reason
+        assert report.reject_reason is not None
+        assert report.reject_reason.startswith("order_rejected:")
+        assert "unsupported_order_type" in report.reject_reason
+        assert report.filled_quantity == 0.0
     finally:
         await rest.disconnect()
 

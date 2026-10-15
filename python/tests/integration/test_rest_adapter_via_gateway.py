@@ -1,7 +1,7 @@
 """``RestExecutionAdapter`` in front of a ``GatewayServer`` with a Python broker behind it:
 both directions of ADR 0030 in one process. Orders go REST -> Rust venue bridge -> Python
-broker; the broker's fills and refusals come back as ledger statuses (the ledger carries no
-fill quantity, price or reject reason, so only statuses are asserted)."""
+broker; the broker's fills and refusals come back on the ledger row: statuses, cumulative filled quantity,
+average fill price and the stable reject code (ADR 0030)."""
 
 from __future__ import annotations
 
@@ -100,7 +100,7 @@ async def test_broker_fills_reach_the_rest_adapter_as_ledger_statuses(
     venue: tuple[str, Broker],
 ) -> None:
     url, broker = venue
-    rest = RestExecutionAdapter(url, retry=(), fill_price=lambda _row: 100.0)
+    rest = RestExecutionAdapter(url, retry=())
     await rest.connect()
     try:
         await rest.place_order(
@@ -112,10 +112,18 @@ async def test_broker_fills_reach_the_rest_adapter_as_ledger_statuses(
         assert broker.placed == ["g-1"]
         broker.fills.append(Trade(TCS, OrderSide.BUY, 10.0, 100.0, ts=T0, order_id="B-1"))
         await status_of(rest, "g-1", "partially_filled")
-        broker.fills.append(Trade(TCS, OrderSide.BUY, 15.0, 100.0, ts=T0, order_id="B-1"))
+        partial = await rest.order_status("g-1")
+        assert (partial.filled_quantity, partial.average_price) == (10.0, 100.0)
+        [position] = await rest.positions()  # a partial fill is a position now
+        assert (position.signed_quantity, position.avg_price) == (10.0, 100.0)
+        broker.fills.append(Trade(TCS, OrderSide.BUY, 15.0, 102.0, ts=T0, order_id="B-1"))
         await status_of(rest, "g-1", "filled")
+        done = await rest.order_status("g-1")
+        assert (done.status, done.filled_quantity) == (OrderStatus.FILLED, 25.0)
+        assert done.average_price == pytest.approx((10 * 100.0 + 15 * 102.0) / 25.0)
         [position] = await rest.positions()
         assert position.signed_quantity == 25.0
+        assert position.avg_price == pytest.approx(done.average_price, abs=0.01)
     finally:
         await rest.disconnect()
 
@@ -142,6 +150,7 @@ async def test_cancel_and_broker_refusal_flow_through_the_bridge(
         await status_of(rest, "g-3", "rejected")
         report = await rest.order_status("g-3")
         assert report.status is OrderStatus.REJECTED
-        assert report.reject_reason  # the placeholder: the ledger drops the broker's reason
+        assert report.reject_reason is not None
+        assert report.reject_reason.startswith("order_rejected:")  # the stable code
     finally:
         await rest.disconnect()
