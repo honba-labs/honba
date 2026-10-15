@@ -332,3 +332,25 @@ fn filled_at_is_the_latest_fill_time_and_ignores_stale_reports() {
         Some(UnixNanos::new(70))
     );
 }
+
+#[test]
+fn replacing_a_refused_row_drops_its_replayable_refusal() {
+    let ledger = OrderLedger::new();
+    let detail =
+        honba_messages::ErrorDetail::new(honba_messages::ErrorCode::RiskTradingHalted, "x");
+    let refused = Order::new(
+        honba_messages::OrderId::new("k"),
+        iid(),
+        OrderSide::Buy,
+        OrderType::Market,
+        10.0,
+        None,
+        TimeInForce::Day,
+        UnixNanos::new(0),
+        UnixNanos::new(0),
+    );
+    ledger.record_refusal(refused, detail.clone());
+    assert_eq!(ledger.refusal("k"), Some(detail));
+    working(&ledger, "k", OrderSide::Buy, 10.0);
+    assert_eq!(ledger.refusal("k"), None);
+}

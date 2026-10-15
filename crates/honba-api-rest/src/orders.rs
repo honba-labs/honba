@@ -204,6 +204,11 @@ impl OrderLedger {
             .inner
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
+        // A replaced row is no longer a recorded refusal.
+        self.refusals
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .remove(order.order_id().as_str());
         guard.insert(order.order_id().as_str().to_owned(), order);
     }
 
@@ -216,20 +221,21 @@ impl OrderLedger {
         let row = order
             .with_status(OrderStatus::Rejected)
             .with_reject_reason(RejectReason::new(detail.code, detail.message.clone()));
-        {
-            let mut guard = self
-                .inner
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            if guard.contains_key(&id) {
-                return;
-            }
-            guard.insert(id.clone(), row);
-        }
-        self.refusals
+        // Both maps change under both locks (always `inner` then `refusals`), so a concurrent
+        // repeat never sees the row without its refusal.
+        let mut guard = self
+            .inner
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .insert(id, detail);
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if guard.contains_key(&id) {
+            return;
+        }
+        let mut refusals = self
+            .refusals
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        refusals.insert(id.clone(), detail);
+        guard.insert(id, row);
     }
 
     /// The error envelope of the risk refusal recorded under `order_id`, if that row is one.
