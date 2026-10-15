@@ -13,6 +13,7 @@ pub mod import;
 pub mod instruments;
 pub mod live_quotes;
 pub mod reader;
+pub mod ticks;
 
 pub use dataset::{
     ColumnarSlice, ColumnarSliceBuilder, Dataset, DatasetBuildError, DatasetChunk, DatasetFeed,
@@ -25,6 +26,7 @@ pub use import::parquet_source::{ParquetBarSource, ParquetError};
 pub use instruments::{snapshot_schema, CatalogError, CatalogInstrumentMaster};
 pub use live_quotes::LiveQuoteStore;
 pub use reader::{DatasetReader, ReaderError};
+pub use ticks::InMemoryTickReader;
 
 #[cfg(test)]
 mod tests;
