@@ -304,7 +304,7 @@ R6 and R7 can run in parallel with R4 once R2 exits. R5 needs R1 for write tools
 E3-S1b/S1d, shipped per ADR 0030); E10-S8 shipped the bhavcopy Rust connector. R7 (Frontend) is **complete**
 (E9-S1..S7 shipped: core graph/code/verify/assistant in `4e15416`, React Flow canvas and views in frontend `7050c49`).
 R8 (Optional) stays unscheduled.
-Follow-up (2026-10-15): the ADR 0018 price collar now sees the quote touch in the Rust `Engine` and `StrategyRunner`. Still open: quote/trade data source for the Python `BacktestSession`, `risk=` and `fill="l2"` in `BacktestSession` / `BacktestRunConfig` (schema change), and Python-runner `expected_price`.
+Follow-up (2026-10-15): the ADR 0018 price collar now sees the quote touch in the Rust `Engine` and `StrategyRunner`. Since then: `BacktestSession` replays ticks with `fill="l2"`, and the wire `execution.fill_model` has an `l2` variant (schema regenerated). Still open: a tick source for the REST `BacktestExecutor` (a wire run with `fill_model=l2` is refused with reason `l2_requires_ticks` until then).
 
 **Critical path:** E2-S2 -> E11-S7 (write endpoints) and E5-S4 (all DONE); ADR-Run -> E4-S3 -> `POST /backtests` -> E4-S5 -> E11-S4 -> E9-S7
 (all DONE in `honba`, E9-S7 in `honba-frontend`); E3-S1a (next-open Rust) -> E3-S2 -> E3-S7 (all DONE; E3-S1b/S1d DONE per ADR 0030);

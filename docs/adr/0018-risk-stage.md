@@ -619,10 +619,7 @@ E3-S1b/S1d shipped (ADR 0030), so top-of-book prices exist. Decision, kept small
   native `RiskStage.check` accepts the key. `fill="l2"` selects `L2Execution` in a session.
   Parity: `schema/conformance/risk_decisions.json` carries the collar vectors (Rust stage, Python
   stage and Python runner replay).
-- Still open: the wire `BacktestRunConfig.execution.fill_model` enum (`bar_fill`,
-  `bar_fill_through`, `none`) has no `l2` variant and no Rust engine path, so a wire/REST run
-  cannot select the L2 simulator yet; that is a schema change (regenerate artifacts, then flag
-  the sibling repos).
+- Wire `BacktestRunConfig.execution.fill_model` now has an `l2` variant (2026-10-15, ADR 0030). The REST executor has no tick source, so such a run is refused with `unsupported` / reason `l2_requires_ticks`; running `L2Sim` from a wire config is still open until a tick reader exists.
 
 ## Decision log
 

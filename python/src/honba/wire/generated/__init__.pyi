@@ -247,7 +247,7 @@ class ExecutionConfig:
     fill_model: FillModel
     slippage_multiplier: float | None = None
 
-FillModel = Literal["bar_fill", "bar_fill_through", "none"]
+FillModel = Literal["bar_fill", "bar_fill_through", "l2", "none"]
 
 FilterOp = Literal["eq", "neq", "gt", "gte", "lt", "lte", "between", "in", "not_in", "like", "has", "crosses_above", "crosses_below"]
 

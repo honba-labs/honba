@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Wire `fill_model` gains `l2` (ADR 0030)
+
+- `BacktestRunConfig.execution.fill_model` accepts `l2` (`bar_fill`, `bar_fill_through`, `l2`,
+  `none`). Schema, OpenAPI, MCP tool schemas, the Python `.pyi` and the frontend TypeScript are
+  regenerated. The REST backtest executor reads bars only, so `fill_model=l2` is refused with
+  `unsupported` and `context.reason = "l2_requires_ticks"` rather than falling back to bar fills;
+  running `L2Sim` from a wire config needs a tick source and is not wired yet.
+
 ### Operator auth scope (ADR 0023)
 
 - New fifth scope `operator`. `GET` and `PUT /trading-state` now require `operator` instead of

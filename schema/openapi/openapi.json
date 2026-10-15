@@ -1760,6 +1760,13 @@
             "type": "string"
           },
           {
+            "description": "Top-of-book matching against quote/trade ticks (ADR 0030). The run needs a tick source; a run whose data source supplies bars only is refused with `l2_requires_ticks`.",
+            "enum": [
+              "l2"
+            ],
+            "type": "string"
+          },
+          {
             "description": "No fills; used to test the strategy's signal path alone.",
             "enum": [
               "none"
