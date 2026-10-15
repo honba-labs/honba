@@ -344,3 +344,164 @@ fn other_non_bar_fill_models_stay_unsupported_without_the_l2_reason() {
     assert_eq!(err.code, ErrorCode::Unsupported);
     assert!(err.context.is_none());
 }
+
+// ---- fill_model l2 over a tick source (ADR 0030) ----
+
+mod l2 {
+    use super::*;
+    use honba_config::{ExecutionConfig, FillModel};
+    use honba_feed::InMemoryTickReader;
+    use honba_messages::{AggressorSide, QuoteTick, TradeId, TradeTick};
+
+    fn l2_exec(ticks: InMemoryTickReader) -> BacktestExecutor {
+        executor()
+            .with_execution(ExecutionConfig {
+                fill_model: FillModel::L2,
+                ..ExecutionConfig::default()
+            })
+            .with_tick_reader(Arc::new(ticks))
+    }
+
+    fn quote(t: u64, bid: f64, ask: f64) -> QuoteTick {
+        let t = UnixNanos::from_u64(t);
+        QuoteTick::new(tcs(), bid, ask, 1_000.0, 1_000.0, t, t)
+    }
+
+    fn fill_prices(journal: &Memory) -> Vec<f64> {
+        journal
+            .records
+            .iter()
+            .filter_map(|m| {
+                let v = serde_json::to_value(m).unwrap();
+                (v["event"]["type"] == "order_filled")
+                    .then(|| v["event"]["last_px"].as_f64().unwrap())
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_market_order_fills_at_the_quote_ask_not_the_bar_close() {
+        // Quote stamped exactly at the first bar: ticks come first on a tie.
+        let ticks = InMemoryTickReader::new()
+            .with_quotes(vec![quote(T0, 99.0, 100.5), quote(T0 + 1, 150.0, 151.0)]);
+        let job = job_with("buy_and_hold", "TCS.NSE", "1d", 5);
+        let mut journal = Memory::default();
+        l2_exec(ticks).execute(job, &mut journal).unwrap();
+        assert_eq!(fill_prices(&journal), [100.5]);
+    }
+
+    #[test]
+    fn ticks_are_not_journaled() {
+        let ticks = InMemoryTickReader::new().with_quotes(vec![quote(T0, 99.0, 100.5)]);
+        let job = job_with("buy_and_hold", "TCS.NSE", "1d", 5);
+        let mut journal = Memory::default();
+        l2_exec(ticks).execute(job, &mut journal).unwrap();
+        let kinds = kinds(&journal);
+        assert!(
+            !kinds.iter().any(|k| k == "quote" || k == "trade"),
+            "{kinds:?}"
+        );
+        assert!(kinds.iter().any(|k| k == "bar"));
+    }
+
+    #[test]
+    fn a_resting_order_with_no_book_fills_on_a_later_quote() {
+        // The first quote comes after the first bar: the order rests, then fills at that ask.
+        let ticks = InMemoryTickReader::new().with_quotes(vec![quote(T0 + 1, 99.0, 120.0)]);
+        let job = job_with("buy_and_hold", "TCS.NSE", "1d", 5);
+        let mut journal = Memory::default();
+        l2_exec(ticks).execute(job, &mut journal).unwrap();
+        assert_eq!(fill_prices(&journal), [120.0]);
+    }
+
+    #[test]
+    fn merge_puts_ticks_before_a_bar_at_the_same_instant_and_keeps_order() {
+        use crate::executor::merge_events;
+        let bar = |t: u64| {
+            let ts = UnixNanos::from_u64(t);
+            honba_messages::Bar::new(
+                honba_messages::BarType::new(tcs(), day_spec()),
+                1.0,
+                2.0,
+                0.5,
+                1.5,
+                1.0,
+                ts,
+                ts,
+            )
+        };
+        let label = |e: &Event| match e {
+            Event::Bar(b) => format!("bar{}", b.ts_event().as_u64()),
+            Event::Quote(q) => format!("q{}", q.ts_event().as_u64()),
+            Event::Trade(t) => format!("t{}", t.ts_event().as_u64()),
+            _ => "?".into(),
+        };
+        let t = |n: u64| {
+            let ts = UnixNanos::from_u64(n);
+            Event::Trade(TradeTick::new(
+                tcs(),
+                1.0,
+                1.0,
+                AggressorSide::Buyer,
+                TradeId::new("x"),
+                ts,
+                ts,
+            ))
+        };
+        let merged = merge_events(
+            vec![bar(10), bar(20)],
+            vec![
+                Event::Quote(quote(5, 1.0, 2.0)),
+                Event::Quote(quote(10, 1.0, 2.0)),
+                t(10),
+                t(25),
+            ],
+        );
+        let got: Vec<String> = merged.iter().map(label).collect();
+        assert_eq!(got, ["q5", "q10", "t10", "bar10", "bar20", "t25"]);
+    }
+
+    #[test]
+    fn trades_alone_do_not_break_the_run() {
+        let t = UnixNanos::from_u64(T0);
+        let ticks = InMemoryTickReader::new().with_trades(vec![TradeTick::new(
+            tcs(),
+            100.0,
+            5.0,
+            AggressorSide::Buyer,
+            TradeId::new("T1"),
+            t,
+            t,
+        )]);
+        let job = job_with("buy_and_hold", "TCS.NSE", "1d", 5);
+        l2_exec(ticks).execute(job, &mut Memory::default()).unwrap();
+    }
+
+    #[test]
+    fn a_store_with_no_ticks_for_the_window_keeps_the_stable_refusal() {
+        for ticks in [
+            InMemoryTickReader::new(),
+            InMemoryTickReader::new().with_quotes(vec![quote(T0 + 365 * DAY_NS, 1.0, 2.0)]),
+        ] {
+            let err = l2_exec(ticks)
+                .execute(job(42), &mut Memory::default())
+                .unwrap_err();
+            assert_eq!(err.code, ErrorCode::Unsupported);
+            assert_eq!(err.context.unwrap()["reason"], "l2_requires_ticks");
+        }
+    }
+
+    #[test]
+    fn bar_fill_runs_ignore_a_configured_tick_source() {
+        let ticks = InMemoryTickReader::new().with_quotes(vec![quote(T0, 99.0, 100.5)]);
+        let with = executor().with_tick_reader(Arc::new(ticks));
+        let a = lines_of(with.execute(job(42), &mut Memory::default()));
+        let b = lines_of(executor().execute(job(42), &mut Memory::default()));
+        assert_eq!(a, b);
+    }
+
+    fn lines_of(r: Result<RunOutcome, ErrorDetail>) -> String {
+        let (m, _) = metrics_of(r.unwrap());
+        format!("{m:?}")
+    }
+}

@@ -14,8 +14,8 @@ use honba_entities::{Currency, ExecutionEvent, Money, Trade};
 use honba_messages::{
     ErrorCode, ErrorDetail, Event, InstrumentId, Message, Order, OrderStatus, UnixNanos,
 };
-use honba_ports::{BarReader, BarRequest, PortError};
-use honba_sim::BarFillEngine;
+use honba_ports::{BarReader, BarRequest, PortError, TickReader, TickRequest};
+use honba_sim::{BarFillEngine, L2Sim};
 use honba_strategy::{DynStrategy, LedgerContext, StrategyRunner};
 use serde_json::{json, Value};
 
@@ -131,6 +131,7 @@ pub struct BacktestExecutor {
     account: AccountConfig,
     execution: ExecutionConfig,
     cache: Option<ResultCache>,
+    ticks: Option<Arc<dyn TickReader>>,
 }
 
 impl BacktestExecutor {
@@ -143,6 +144,7 @@ impl BacktestExecutor {
             account: AccountConfig::default(),
             execution: ExecutionConfig::default(),
             cache: None,
+            ticks: None,
         }
     }
 
@@ -157,6 +159,16 @@ impl BacktestExecutor {
     #[must_use]
     pub fn with_execution(mut self, execution: ExecutionConfig) -> Self {
         self.execution = execution;
+        self
+    }
+
+    /// Attaches the quote/trade tick source `fill_model = l2` runs match against (ADR 0030).
+    ///
+    /// Without one, an `l2` run is refused with `reason = "l2_requires_ticks"`. A `bar_fill` run
+    /// never reads it.
+    #[must_use]
+    pub fn with_tick_reader(mut self, ticks: Arc<dyn TickReader>) -> Self {
+        self.ticks = Some(ticks);
         self
     }
 
@@ -233,16 +245,84 @@ impl Handler for Recorder {
     fn on_event(&mut self, event: &Event, ts_init: UnixNanos) -> EngineResult<EngineOutput> {
         let mut tape = lock(&self.0);
         tape.now = event.ts_event();
-        tape.records.push(Message::new(event.clone(), ts_init));
+        // Ticks are replay input read from the tick store, not decisions or outcomes: they
+        // advance the clock but stay out of the journal.
+        if !matches!(event, Event::Quote(_) | Event::Trade(_)) {
+            tape.records.push(Message::new(event.clone(), ts_init));
+        }
         Ok(EngineOutput::None)
     }
 }
 
-/// The paper sink: a [`BarFillEngine`] that tees what the runner submits and what comes
+/// The simulator behind the sink: bar fills, or the L2 matcher over ticks (ADR 0030).
+#[derive(Clone)]
+enum Venue {
+    Bar(BarFillEngine),
+    L2(Arc<Mutex<L2Sim>>),
+}
+
+impl Handler for Venue {
+    fn on_start(&mut self) -> EngineResult<()> {
+        match self {
+            Self::Bar(e) => e.on_start(),
+            Self::L2(e) => lock(e).on_start(),
+        }
+    }
+
+    fn on_event(&mut self, event: &Event, ts_init: UnixNanos) -> EngineResult<EngineOutput> {
+        match self {
+            Self::Bar(e) => e.on_event(event, ts_init),
+            Self::L2(e) => lock(e).on_event(event, ts_init),
+        }
+    }
+
+    fn on_stop(&mut self) -> EngineResult<()> {
+        match self {
+            Self::Bar(e) => e.on_stop(),
+            Self::L2(e) => lock(e).on_stop(),
+        }
+    }
+}
+
+impl ExecutionEngine for Venue {
+    fn submit(&mut self, order: Order) -> EngineResult<()> {
+        match self {
+            Self::Bar(e) => e.submit(order),
+            Self::L2(e) => lock(e).submit(order),
+        }
+    }
+
+    fn cancel(&mut self, order_id: &str, now: UnixNanos) -> EngineResult<()> {
+        match self {
+            Self::Bar(e) => e.cancel(order_id, now),
+            Self::L2(e) => lock(e).cancel(order_id, now),
+        }
+    }
+
+    fn drain_events(&mut self) -> EngineResult<Vec<ExecutionEvent>> {
+        match self {
+            Self::Bar(e) => e.drain_events(),
+            Self::L2(e) => lock(e).drain_events(),
+        }
+    }
+
+    fn native_events(&self) -> bool {
+        true
+    }
+
+    fn drain_fills(&mut self) -> EngineResult<Vec<Trade>> {
+        match self {
+            Self::Bar(e) => e.drain_fills(),
+            Self::L2(e) => lock(e).drain_fills(),
+        }
+    }
+}
+
+/// The paper sink: a [`Venue`] that tees what the runner submits and what comes
 /// back (as ADR 0019 wire events) onto the tape, and the fills onto the fill list.
 #[derive(Clone)]
 struct JournalSink {
-    inner: BarFillEngine,
+    inner: Venue,
     tape: SharedTape,
     fills: Arc<Mutex<Vec<Trade>>>,
 }
@@ -441,6 +521,24 @@ fn assumptions() -> Value {
 // The run.
 // ---------------------------------------------------------------------------------------
 
+/// Bars and ticks in `ts_event` order: stable, and at equal time the ticks come first (the
+/// Python `BacktestSession` rule, ADR 0030). `ticks` must be time-sorted.
+pub(crate) fn merge_events(bars: Vec<honba_messages::Bar>, ticks: Vec<Event>) -> Vec<Event> {
+    if ticks.is_empty() {
+        return bars.into_iter().map(Event::Bar).collect();
+    }
+    let mut out = Vec::with_capacity(bars.len() + ticks.len());
+    let mut ticks = ticks.into_iter().peekable();
+    for bar in bars {
+        while let Some(tick) = ticks.next_if(|t| t.ts_event() <= bar.ts_event()) {
+            out.push(tick);
+        }
+        out.push(Event::Bar(bar));
+    }
+    out.extend(ticks);
+    out
+}
+
 fn drain_tape(
     tape: &SharedTape,
     journal: &mut dyn JournalWriter,
@@ -546,6 +644,55 @@ impl BacktestExecutor {
         Ok(bars)
     }
 
+    /// Quote and trade ticks of the window as replay events, quotes before trades at one
+    /// instant. `l2_requires_ticks` when there is no source or nothing in the window.
+    fn read_ticks(
+        &self,
+        instrument: &InstrumentId,
+        spec: &ResolvedBacktest,
+    ) -> Result<Vec<Event>, ErrorDetail> {
+        let refused = |why: &str| {
+            ErrorDetail::new(
+                ErrorCode::Unsupported,
+                format!("fill_model l2 requires quote/trade ticks; {why}"),
+            )
+            .with_context(json!({"reason": "l2_requires_ticks", "fill_model": "l2"}))
+        };
+        let Some(reader) = &self.ticks else {
+            return Err(refused("this run's data source supplies bars only"));
+        };
+        let request = TickRequest::new(instrument.clone(), Some(spec.start), Some(spec.end))
+            .map_err(|e| port_error(&e))?;
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .map_err(|e| internal("runtime", format!("cannot start a reader runtime: {e}")))?;
+        let tick_err = |e: PortError| match e {
+            PortError::Unsupported(_) => refused("the tick source holds no tick data"),
+            other => ErrorDetail::new(
+                port_error(&other).code,
+                format!("tick read failed: {other}"),
+            )
+            .with_context(json!({"reason": "tick_read"})),
+        };
+        let quotes = runtime
+            .block_on(reader.read_quotes(&request))
+            .map_err(tick_err)?;
+        let trades = runtime
+            .block_on(reader.read_trades(&request))
+            .map_err(tick_err)?;
+        if quotes.is_empty() && trades.is_empty() {
+            return Err(refused("the tick source has none in this run's window"));
+        }
+        let mut ticks: Vec<Event> = quotes
+            .into_iter()
+            .map(Event::Quote)
+            .chain(trades.into_iter().map(Event::Trade))
+            .collect();
+        // Stable: at one instant the quotes (the book) stay ahead of the trades (the prints).
+        ticks.sort_by_key(Event::ts_event);
+        Ok(ticks)
+    }
+
     fn backtest(
         &self,
         job: &RunJob,
@@ -570,7 +717,11 @@ impl BacktestExecutor {
         let cache_key =
             CacheKey::compute(&job.strategy_id, &params, &dataset_id, cost_model_version);
 
-        if let Some(ref cache) = self.cache {
+        let is_l2 = matches!(self.execution.fill_model, FillModel::L2);
+        // The key names bars and a bar-fill model only; an l2 run also depends on its ticks,
+        // so it neither reads nor writes the cache.
+        let cache = if is_l2 { None } else { self.cache.as_ref() };
+        if let Some(cache) = cache {
             if let Some(cached) = cache.get(&cache_key) {
                 return Ok(RunOutcome::Backtest {
                     metrics: cached.metrics,
@@ -578,16 +729,7 @@ impl BacktestExecutor {
                 });
             }
         }
-        if matches!(self.execution.fill_model, FillModel::L2) {
-            // The L2 simulator matches against quote/trade ticks (ADR 0030) and this executor
-            // reads bars only: refuse with a stable reason, never fall back to bar fills.
-            return Err(ErrorDetail::new(
-                ErrorCode::Unsupported,
-                "fill_model l2 requires quote/trade ticks; this run's data source supplies bars only",
-            )
-            .with_context(json!({"reason": "l2_requires_ticks", "fill_model": "l2"})));
-        }
-        if !matches!(self.execution.fill_model, FillModel::BarFill) {
+        if !is_l2 && !matches!(self.execution.fill_model, FillModel::BarFill) {
             return Err(ErrorDetail::new(
                 ErrorCode::Unsupported,
                 "only the bar_fill model is available",
@@ -596,6 +738,11 @@ impl BacktestExecutor {
         let currency = self.account_currency()?;
         let name = self.registered_name(job)?;
         let instrument = parse_universe(&spec.universe)?;
+        let ticks = if is_l2 {
+            self.read_ticks(&instrument, spec)?
+        } else {
+            Vec::new()
+        };
         let bars = self.read_bars(&instrument, spec)?;
         let strategy = self
             .registry
@@ -605,8 +752,14 @@ impl BacktestExecutor {
             .map_err(|e| invalid("initial_capital", "not_representable", e.to_string()))?;
 
         let tape: SharedTape = Arc::default();
+        let venue = if is_l2 {
+            let sim = L2Sim::new(cash).map_err(|e| engine_error(&e))?;
+            Venue::L2(Arc::new(Mutex::new(sim)))
+        } else {
+            Venue::Bar(BarFillEngine::new().with_currency(currency))
+        };
         let sink = JournalSink {
-            inner: BarFillEngine::new().with_currency(currency),
+            inner: venue,
             tape: Arc::clone(&tape),
             fills: Arc::default(),
         };
@@ -626,8 +779,8 @@ impl BacktestExecutor {
         let ts_init = bars[0].ts_event();
         let mut unflushed = 0;
         engine.start().map_err(|e| engine_error(&e))?;
-        for bar in bars {
-            engine.inject(Message::new(Event::Bar(bar), ts_init));
+        for event in merge_events(bars, ticks) {
+            engine.inject(Message::new(event, ts_init));
             while engine.pump().map_err(|e| engine_error(&e))? {}
             drain_tape(&tape, journal, &mut unflushed)?;
         }
@@ -640,7 +793,7 @@ impl BacktestExecutor {
             metrics: metrics(&fills, spec.initial_capital)?,
             assumptions: assumptions(),
         };
-        if let Some(ref cache) = self.cache {
+        if let Some(cache) = cache {
             if let RunOutcome::Backtest {
                 ref metrics,
                 ref assumptions,
