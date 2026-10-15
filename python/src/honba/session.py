@@ -42,7 +42,7 @@ Python::
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
@@ -54,6 +54,7 @@ from typing import Protocol, TypeGuard, cast
 # depend on Session (no circular imports).
 # ---------------------------------------------------------------------------
 from honba.backtest.impact import MarketImpact
+from honba.backtest.l2_sim import L2Execution
 from honba.backtest.opening_auction import OpeningAuction
 from honba.backtest.simulated import (
     FillCostFn,
@@ -67,6 +68,7 @@ from honba.domain.money import Currency, Money
 from honba.entities.bar import Bar
 from honba.entities.instrument import Instrument, InstrumentId
 from honba.entities.order import OrderSide
+from honba.entities.tick import QuoteTick, TradeTick
 from honba.entities.trade import Trade
 from honba.strategies.base import Strategy
 from honba.strategies.context import LedgerContext, StrategyContext
@@ -275,8 +277,12 @@ class BacktestSession:
         settlement_from_data: bool = False,
         # Optional hook: (bar_index, bar) -> None for progress / research
         on_bar: Callable[[int, Bar], None] | None = None,
+        # Quote / trade ticks merged with the bars by timestamp (ties: ticks first). They reach
+        # the simulator's ``on_event`` and the strategy; None asks ``data.ticks(...)`` if it has one.
+        ticks: Sequence[QuoteTick | TradeTick] | None = None,
     ) -> None:
         self.strategy = strategy
+        self.ticks = ticks
         self.config = config
         self.data = data
         self.execution = execution
@@ -337,7 +343,7 @@ class BacktestSession:
                 notes=["no bars returned for the requested range"],
             )
 
-        if isinstance(self.execution, NextOpenExecution):
+        if isinstance(self.execution, (NextOpenExecution, L2Execution)):
             self.execution.set_lot_size(instrument_id, instrument.lot_size)
         if self._settlement_from_data and isinstance(self.execution, NextOpenExecution):
             from honba.markets.india.settlement import settlement_days_for
@@ -351,14 +357,18 @@ class BacktestSession:
         # with on_event sees each one before the strategy.
         runner = self.runner
         observe = getattr(self.execution, "on_event", None)
+        ticks = self._load_ticks(instrument_id, start_dt, end_dt)
         runner.start()
-        for index, bar in enumerate(bars):
-            ts = _bar_ts(bar)
+        bar_index = 0
+        for event in _merge_events(bars, ticks):
+            ts = _bar_ts(event) if isinstance(event, Bar) else event.ts
             if observe is not None:
-                observe(bar, ts)
-            runner.on_event(bar, ts)
-            if self.on_bar is not None:
-                self.on_bar(index, bar)
+                observe(event, ts)
+            runner.on_event(event, ts)
+            if isinstance(event, Bar):
+                if self.on_bar is not None:
+                    self.on_bar(bar_index, event)
+                bar_index += 1
         # End of data: cancel what is still working so the ledger releases it.
         for submitted in list(runner.intents):
             runner.cancel(submitted.order_id)
@@ -386,6 +396,16 @@ class BacktestSession:
             metrics=metrics,
             equity_curve=equity_curve,
         )
+
+    def _load_ticks(
+        self, instrument_id: InstrumentId, start: datetime, end: datetime
+    ) -> Sequence[QuoteTick | TradeTick]:
+        if self.ticks is not None:
+            return self.ticks
+        provider = getattr(self.data, "ticks", None)
+        if provider is None:
+            return ()
+        return list(provider(instrument_id, start=start, end=end))
 
     def _seed_context(self, instrument: Instrument) -> None:
         """Register instrument metadata on the ledger (starting cash is set at construction)."""
@@ -427,6 +447,7 @@ class Honba:
         settlement_days: int | None = None,
         impact: MarketImpact | None = None,
         auction: OpeningAuction | None = None,
+        ticks: Sequence[QuoteTick | TradeTick] | None = None,
     ) -> BacktestSession:
         """Build a BacktestSession ready for .run().
 
@@ -451,7 +472,8 @@ class Honba:
           function ``(side, quantity, price) -> Money``, or a CostModel whose
           ``apply`` costs are charged by the simulator (see ``fill_costs_from_model``).
         fill:
-          "next_open" (default) or "bar_close" — selects the simulated execution
+          "next_open" (default), "l2" (top-of-book matching against ``ticks``, ADR 0030) or
+          "bar_close" — selects the simulated execution
           port when ``execution`` is not passed explicitly.
         warmup_bars:
           Driving bars before orders are allowed; None uses the strategy's.
@@ -471,6 +493,11 @@ class Honba:
           extra driving bars (intraday ``timeframe`` only) so entries skip the opening
           turbulence. None (default) fills at the printed open. Forces the Python
           simulator backend.
+        ticks:
+          Quote / trade ticks replayed with the bars in timestamp order (ties: ticks first).
+          The simulator and the strategy (``on_quote`` / ``on_trade``) both see them; with
+          ``fill="l2"`` they are what orders match against. None uses ``data.ticks(instrument_id,
+          start=, end=)`` when the provider has it, else no ticks.
         data / execution:
           Optional overrides for tests or custom infrastructure.
         """
@@ -507,6 +534,7 @@ class Honba:
             # CostModel was wired into the simulator by _default_execution.
             settlement_from_data=execution is None and settlement_days is None,
             on_bar=on_bar,
+            ticks=ticks,
         )
 
     # Future: paper / live factories share the same Strategy + different ports.
@@ -597,6 +625,24 @@ def _default_execution(config: BacktestConfig, cost_model: CostModel | None) -> 
         impact=config.impact,
         auction=config.auction,
     )
+
+
+def _merge_events(
+    bars: Sequence[Bar], ticks: Sequence[QuoteTick | TradeTick]
+) -> Iterator[Bar | QuoteTick | TradeTick]:
+    """Bars and ticks in timestamp order; stable, and at equal ts the ticks come first."""
+    if not ticks:
+        yield from bars
+        return
+    ordered_ticks = sorted(ticks, key=lambda t: t.ts)
+    i = 0
+    for bar in bars:
+        ts = _bar_ts(bar)
+        while i < len(ordered_ticks) and ordered_ticks[i].ts <= ts:
+            yield ordered_ticks[i]
+            i += 1
+        yield bar
+    yield from ordered_ticks[i:]
 
 
 def _parse_time(value: str | date | datetime) -> datetime:
