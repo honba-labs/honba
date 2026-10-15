@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import datetime
+from typing import TYPE_CHECKING
 
-from honba._honba import FnoContract as NativeFnoContract
-from honba._honba import parse_fno_symbol as _native_parse_fno_symbol
+from honba._native import native_attr
 from honba.domain.instrument import Instrument, InstrumentId, InstrumentKind, OptionType
+
+if TYPE_CHECKING:
+    from honba._honba import FnoContract as NativeFnoContract
 
 
 def parse_fno_symbol(symbol: str) -> NativeFnoContract:
     """Parse an Indian F&O contract ticker symbol into structured contract metadata."""
-    return _native_parse_fno_symbol(symbol)
+    return native_attr("parse_fno_symbol")(symbol)
 
 
 def resolve_fno_instrument(symbol: str, exchange: str = "NSE") -> Instrument:
