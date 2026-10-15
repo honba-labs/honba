@@ -29,6 +29,7 @@ def test_the_extension_offers_every_artifact() -> None:
         "client",
         "pyi",
         "mcp",
+        "docs",
     ]
 
 
