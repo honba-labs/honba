@@ -5,6 +5,10 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+import pytest
+
+pytest.importorskip("duckdb")
+
 from honba.data.loaders.fundamentals import (
     DuckDbFundamentalsStore,
 )

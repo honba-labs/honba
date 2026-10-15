@@ -16,8 +16,9 @@ from __future__ import annotations
 
 import math
 
-import duckdb
 import pytest
+
+duckdb = pytest.importorskip("duckdb")
 
 from honba.screener.store import find_data_root
 
