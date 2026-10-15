@@ -732,6 +732,7 @@ async fn close_covers_the_filled_part_of_a_cancelled_partial() {
         25.0,
         100.0,
         25.0,
+        UnixNanos::new(1),
         honba_messages::OrderStatus::PartiallyFilled
     ));
     st.orders.cancel("seed-1");

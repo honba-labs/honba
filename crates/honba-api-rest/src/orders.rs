@@ -118,7 +118,8 @@ impl OrderLedger {
     /// Books one fill on row `order_id`: `filled_qty` becomes the venue's cumulative `cum_qty`
     /// (capped at the order quantity, never decreasing), `avg_fill_price` is the running
     /// quantity-weighted average where each `cum_qty` increase is priced at the fill that
-    /// reported it, and the status becomes `status`. A fill that completes the row
+    /// reported it, `filled_at` becomes that fill's event time `ts`, and the status becomes
+    /// `status`. A fill that completes the row
     /// (`Filled`) clears any `reject_reason` recorded for a refused remainder.
     ///
     /// A terminal row is left untouched (as in [`OrderLedger::set_status`]); an unknown id
@@ -129,6 +130,7 @@ impl OrderLedger {
         fill_qty: f64,
         fill_price: f64,
         cum_qty: f64,
+        ts: UnixNanos,
         status: OrderStatus,
     ) -> bool {
         let mut guard = self
@@ -160,7 +162,7 @@ impl OrderLedger {
         if delta > 0.0 {
             let prev_avg = row.avg_fill_price().unwrap_or(fill_price);
             let avg = (prev_qty * prev_avg + delta * fill_price) / filled;
-            next = next.with_fill(filled, avg);
+            next = next.with_fill(filled, avg).with_filled_at(ts);
         }
         // A completed order was not refused: drop the reason recorded for a remainder that the
         // venue then filled after all.

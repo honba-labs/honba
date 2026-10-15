@@ -233,6 +233,10 @@ pub struct Order {
     /// Why the order (or its unfilled remainder) was refused; `None` otherwise. Additive.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) reject_reason: Option<RejectReason>,
+    /// Event time of the latest fill the row has seen; `None` until a fill. Additive: lets a
+    /// reader order fills across rows by fill time rather than by row order.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) filled_at: Option<UnixNanos>,
 }
 
 fn is_zero(v: &f64) -> bool {
@@ -271,6 +275,8 @@ struct OrderRepr {
     avg_fill_price: Option<f64>,
     #[serde(default)]
     reject_reason: Option<RejectReason>,
+    #[serde(default)]
+    filled_at: Option<UnixNanos>,
 }
 
 impl TryFrom<OrderRepr> for Order {
@@ -296,6 +302,7 @@ impl TryFrom<OrderRepr> for Order {
             filled_qty: r.filled_qty,
             avg_fill_price: r.avg_fill_price,
             reject_reason: r.reject_reason,
+            filled_at: r.filled_at,
         };
         order.validate()?;
         Ok(order)
@@ -335,6 +342,7 @@ impl Order {
             filled_qty: 0.0,
             avg_fill_price: None,
             reject_reason: None,
+            filled_at: None,
         };
         debug_assert!(
             order.validate().is_ok(),
@@ -532,6 +540,17 @@ impl Order {
     /// Why the order (or its remainder) was refused, if it was.
     pub fn reject_reason(&self) -> Option<&RejectReason> {
         self.reject_reason.as_ref()
+    }
+
+    /// Event time of the latest fill, if anything has filled.
+    pub fn filled_at(&self) -> Option<UnixNanos> {
+        self.filled_at
+    }
+
+    /// Sets the time of the latest fill, returning `self` for chaining.
+    pub fn with_filled_at(mut self, filled_at: UnixNanos) -> Self {
+        self.filled_at = Some(filled_at);
+        self
     }
 
     /// Sets the cumulative filled quantity and its average price, returning `self` for chaining.

@@ -209,6 +209,7 @@ async fn a_filled_market_order_reports_filled_qty_and_the_fill_price() {
     // Unfilled rows carry neither field (additive wire).
     let before = row(&st, "o1");
     assert!(before.get("filled_qty").is_none() && before.get("avg_fill_price").is_none());
+    assert!(before.get("filled_at").is_none());
 
     st.advance_market(&[bar(1_000, 101.0)]).unwrap();
     let after = row(&st, "o1");
@@ -216,6 +217,11 @@ async fn a_filled_market_order_reports_filled_qty_and_the_fill_price() {
     assert_eq!(after["filled_qty"], 25.0);
     assert!((after["avg_fill_price"].as_f64().unwrap() - 101.0).abs() < 0.5);
     assert!(after.get("reject_reason").is_none());
+    // `filled_at` is the fill's event time: the bar the simulator filled on.
+    assert_eq!(
+        after["filled_at"],
+        serde_json::to_value(UnixNanos::from_u64(1_000)).unwrap()
+    );
 
     // GET /orders serves the same fields.
     let (_, body) = call(api_router_with(st.clone()), Method::GET, "/orders", None).await;

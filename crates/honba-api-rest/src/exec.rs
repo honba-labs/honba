@@ -163,6 +163,7 @@ fn apply(sim: &mut dyn ExecutionVenue, ledger: &OrderLedger) {
                     trade.quantity(),
                     trade.price(),
                     cum_qty,
+                    trade.ts_event(),
                     status,
                 );
             }

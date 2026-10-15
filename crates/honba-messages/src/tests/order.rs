@@ -258,3 +258,27 @@ fn without_reject_reason_clears_the_reason() {
         .get("reject_reason")
         .is_none());
 }
+
+#[test]
+fn filled_at_is_omitted_until_a_fill_and_round_trips() {
+    let o = order();
+    assert_eq!(o.filled_at(), None);
+    assert!(serde_json::to_value(&o).unwrap().get("filled_at").is_none());
+
+    let o = o
+        .with_status(OrderStatus::PartiallyFilled)
+        .with_fill(2.0, 10.5)
+        .with_filled_at(42.into());
+    assert_eq!(o.filled_at(), Some(42.into()));
+    let json = serde_json::to_value(&o).unwrap();
+    assert!(json.get("filled_at").is_some());
+    assert_eq!(serde_json::from_value::<Order>(json).unwrap(), o);
+
+    // A row from an older server has no `filled_at`.
+    let mut old = serde_json::to_value(order()).unwrap();
+    old.as_object_mut().unwrap().remove("filled_at");
+    assert_eq!(
+        serde_json::from_value::<Order>(old).unwrap().filled_at(),
+        None
+    );
+}

@@ -46,7 +46,14 @@ fn a_fill_with_a_non_finite_or_non_positive_price_or_quantity_is_dropped() {
         (5.0, 100.0, f64::NAN),
         (5.0, 100.0, f64::INFINITY),
     ] {
-        assert!(ledger.apply_fill("o1", qty, px, cum, OrderStatus::PartiallyFilled));
+        assert!(ledger.apply_fill(
+            "o1",
+            qty,
+            px,
+            cum,
+            UnixNanos::new(1),
+            OrderStatus::PartiallyFilled
+        ));
         let row = ledger.get("o1").unwrap();
         assert_eq!(row.status(), OrderStatus::Submitted, "{qty} {px} {cum}");
         assert_eq!(row.filled_qty(), 0.0, "{qty} {px} {cum}");
@@ -66,14 +73,28 @@ fn refusal() -> honba_messages::RejectReason {
 fn completing_a_part_filled_row_clears_the_reject_reason_of_its_remainder() {
     let ledger = OrderLedger::new();
     working(&ledger, "o1", OrderSide::Buy, 10.0);
-    assert!(ledger.apply_fill("o1", 4.0, 100.0, 4.0, OrderStatus::PartiallyFilled));
+    assert!(ledger.apply_fill(
+        "o1",
+        4.0,
+        100.0,
+        4.0,
+        UnixNanos::new(1),
+        OrderStatus::PartiallyFilled
+    ));
     assert!(ledger.reject("o1", refusal()));
     let row = ledger.get("o1").unwrap();
     assert_eq!(row.status(), OrderStatus::PartiallyFilled);
     assert!(row.reject_reason().is_some());
 
     // The venue then fills the rest: a completed order was not refused.
-    assert!(ledger.apply_fill("o1", 6.0, 101.0, 10.0, OrderStatus::Filled));
+    assert!(ledger.apply_fill(
+        "o1",
+        6.0,
+        101.0,
+        10.0,
+        UnixNanos::new(1),
+        OrderStatus::Filled
+    ));
     let row = ledger.get("o1").unwrap();
     assert_eq!(row.status(), OrderStatus::Filled);
     assert_eq!(row.reject_reason(), None);
@@ -84,7 +105,14 @@ fn completing_a_part_filled_row_clears_the_reject_reason_of_its_remainder() {
 fn a_reject_reason_survives_a_partial_that_is_then_cancelled() {
     let ledger = OrderLedger::new();
     working(&ledger, "o1", OrderSide::Buy, 10.0);
-    ledger.apply_fill("o1", 4.0, 100.0, 4.0, OrderStatus::PartiallyFilled);
+    ledger.apply_fill(
+        "o1",
+        4.0,
+        100.0,
+        4.0,
+        UnixNanos::new(1),
+        OrderStatus::PartiallyFilled,
+    );
     ledger.reject("o1", refusal());
     ledger.set_status("o1", OrderStatus::Cancelled);
     let row = ledger.get("o1").unwrap();
@@ -99,8 +127,22 @@ fn the_average_follows_cum_qty_deltas_when_the_venue_disagrees_with_fill_sizes()
     // (10 - 4) are priced at the latest fill price, so the average is (4*100 + 6*110) / 10.
     let ledger = OrderLedger::new();
     working(&ledger, "o1", OrderSide::Buy, 10.0);
-    ledger.apply_fill("o1", 4.0, 100.0, 4.0, OrderStatus::PartiallyFilled);
-    ledger.apply_fill("o1", 2.0, 110.0, 10.0, OrderStatus::Filled);
+    ledger.apply_fill(
+        "o1",
+        4.0,
+        100.0,
+        4.0,
+        UnixNanos::new(1),
+        OrderStatus::PartiallyFilled,
+    );
+    ledger.apply_fill(
+        "o1",
+        2.0,
+        110.0,
+        10.0,
+        UnixNanos::new(1),
+        OrderStatus::Filled,
+    );
     let row = ledger.get("o1").unwrap();
     assert_eq!(row.filled_qty(), 10.0);
     assert!((row.avg_fill_price().unwrap() - 106.0).abs() < 1e-9);
@@ -110,10 +152,31 @@ fn the_average_follows_cum_qty_deltas_when_the_venue_disagrees_with_fill_sizes()
 fn a_replayed_or_stale_fill_does_not_move_the_average() {
     let ledger = OrderLedger::new();
     working(&ledger, "o1", OrderSide::Buy, 10.0);
-    ledger.apply_fill("o1", 4.0, 100.0, 4.0, OrderStatus::PartiallyFilled);
+    ledger.apply_fill(
+        "o1",
+        4.0,
+        100.0,
+        4.0,
+        UnixNanos::new(1),
+        OrderStatus::PartiallyFilled,
+    );
     // The same report again, and an older one (lower cumulative quantity).
-    ledger.apply_fill("o1", 4.0, 100.0, 4.0, OrderStatus::PartiallyFilled);
-    ledger.apply_fill("o1", 1.0, 500.0, 2.0, OrderStatus::PartiallyFilled);
+    ledger.apply_fill(
+        "o1",
+        4.0,
+        100.0,
+        4.0,
+        UnixNanos::new(1),
+        OrderStatus::PartiallyFilled,
+    );
+    ledger.apply_fill(
+        "o1",
+        1.0,
+        500.0,
+        2.0,
+        UnixNanos::new(1),
+        OrderStatus::PartiallyFilled,
+    );
     let row = ledger.get("o1").unwrap();
     assert_eq!(row.filled_qty(), 4.0);
     assert_eq!(row.avg_fill_price(), Some(100.0));
@@ -125,7 +188,14 @@ fn a_first_report_larger_than_its_fill_prices_the_unseen_quantity_at_that_fill()
     // booked at the only price known.
     let ledger = OrderLedger::new();
     working(&ledger, "o1", OrderSide::Buy, 10.0);
-    ledger.apply_fill("o1", 2.0, 100.0, 5.0, OrderStatus::PartiallyFilled);
+    ledger.apply_fill(
+        "o1",
+        2.0,
+        100.0,
+        5.0,
+        UnixNanos::new(1),
+        OrderStatus::PartiallyFilled,
+    );
     let row = ledger.get("o1").unwrap();
     assert_eq!(row.filled_qty(), 5.0);
     assert_eq!(row.avg_fill_price(), Some(100.0));
@@ -142,7 +212,14 @@ fn exposure_is_the_filled_part_plus_whatever_is_still_working() {
     working(&ledger, "w", OrderSide::Buy, 10.0);
     assert_eq!(position(&ledger), 10.0);
     // Partly filled and still working: filled 4 + 6 working = 10, not double counted.
-    ledger.apply_fill("w", 4.0, 100.0, 4.0, OrderStatus::PartiallyFilled);
+    ledger.apply_fill(
+        "w",
+        4.0,
+        100.0,
+        4.0,
+        UnixNanos::new(1),
+        OrderStatus::PartiallyFilled,
+    );
     assert_eq!(position(&ledger), 10.0);
     // Cancelled after the partial: only the 4 that filled remain.
     ledger.set_status("w", OrderStatus::Cancelled);
@@ -153,7 +230,14 @@ fn exposure_is_the_filled_part_plus_whatever_is_still_working() {
 fn a_part_filled_row_whose_remainder_was_refused_counts_only_what_filled() {
     let ledger = OrderLedger::new();
     working(&ledger, "w", OrderSide::Sell, 10.0);
-    ledger.apply_fill("w", 3.0, 100.0, 3.0, OrderStatus::PartiallyFilled);
+    ledger.apply_fill(
+        "w",
+        3.0,
+        100.0,
+        3.0,
+        UnixNanos::new(1),
+        OrderStatus::PartiallyFilled,
+    );
     ledger.reject("w", refusal());
     assert_eq!(position(&ledger), -3.0);
 }
@@ -177,7 +261,14 @@ fn a_row_that_never_filled_adds_nothing_once_it_is_not_working() {
 fn an_expired_partial_keeps_its_filled_part_and_a_filled_row_counts_in_full() {
     let ledger = OrderLedger::new();
     working(&ledger, "e", OrderSide::Buy, 10.0);
-    ledger.apply_fill("e", 2.0, 100.0, 2.0, OrderStatus::PartiallyFilled);
+    ledger.apply_fill(
+        "e",
+        2.0,
+        100.0,
+        2.0,
+        UnixNanos::new(1),
+        OrderStatus::PartiallyFilled,
+    );
     ledger.set_status("e", OrderStatus::Expired);
     // A seeded `Filled` row carries no fill fields yet still counts at its quantity.
     ledger.record(
@@ -196,4 +287,48 @@ fn an_expired_partial_keeps_its_filled_part_and_a_filled_row_counts_in_full() {
     );
     assert_eq!(position(&ledger), 2.0 - 5.0);
     assert_eq!(ledger.positions(), vec![(iid(), -3.0)]);
+}
+
+#[test]
+fn filled_at_is_the_latest_fill_time_and_ignores_stale_reports() {
+    let ledger = OrderLedger::new();
+    working(&ledger, "o1", OrderSide::Buy, 10.0);
+    assert_eq!(ledger.get("o1").unwrap().filled_at(), None);
+    ledger.apply_fill(
+        "o1",
+        4.0,
+        100.0,
+        4.0,
+        UnixNanos::new(50),
+        OrderStatus::PartiallyFilled,
+    );
+    assert_eq!(
+        ledger.get("o1").unwrap().filled_at(),
+        Some(UnixNanos::new(50))
+    );
+    // A replay (no growth in cum_qty) does not move it, even with a later timestamp.
+    ledger.apply_fill(
+        "o1",
+        4.0,
+        100.0,
+        4.0,
+        UnixNanos::new(60),
+        OrderStatus::PartiallyFilled,
+    );
+    assert_eq!(
+        ledger.get("o1").unwrap().filled_at(),
+        Some(UnixNanos::new(50))
+    );
+    ledger.apply_fill(
+        "o1",
+        6.0,
+        100.0,
+        10.0,
+        UnixNanos::new(70),
+        OrderStatus::Filled,
+    );
+    assert_eq!(
+        ledger.get("o1").unwrap().filled_at(),
+        Some(UnixNanos::new(70))
+    );
 }

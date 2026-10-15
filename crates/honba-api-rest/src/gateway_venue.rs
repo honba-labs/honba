@@ -41,7 +41,7 @@ const DEFAULT_POLL: Duration = Duration::from_millis(50);
 const QTY_EPS: f64 = 1e-9;
 
 enum Command {
-    Submit(Order),
+    Submit(Box<Order>),
     Cancel { order_id: String, now: UnixNanos },
 }
 
@@ -94,7 +94,7 @@ impl GatewayVenue {
 
 impl ExecutionEngine for GatewayVenue {
     fn submit(&mut self, order: Order) -> EngineResult<()> {
-        self.send(Command::Submit(order))
+        self.send(Command::Submit(Box::new(order)))
     }
 
     fn cancel(&mut self, order_id: &str, now: UnixNanos) -> EngineResult<()> {
@@ -144,7 +144,7 @@ async fn run<G: ExecutionGateway>(
         tokio::select! {
             command = rx.recv() => match command {
                 Some(Command::Submit(order)) => {
-                    submit(&mut gateway, &mut working, &events, order).await;
+                    submit(&mut gateway, &mut working, &events, *order).await;
                     poll_fills(&mut gateway, &mut working, &events).await;
                 }
                 Some(Command::Cancel { order_id, now }) => {
