@@ -11,6 +11,7 @@ mod health;
 mod journal;
 mod order_ledger;
 mod orders_risk;
+mod profile_store;
 mod registry;
 mod retention;
 mod run_routes;
