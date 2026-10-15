@@ -240,3 +240,71 @@ def test_require_live_limits_needs_both_limits() -> None:
     ):
         with pytest.raises(ValueError):
             runner.require_live_limits()
+
+
+# -- price collar: expected_price from the latest quote (ADR 0018 addendum) --------------------
+
+
+def q(ts: int, bid: float, ask: float) -> QuoteTick:
+    return QuoteTick(X, ts, bid, ask, 100.0, 100.0)
+
+
+def test_stage_accepts_expected_price_and_refuses_beyond_the_collar() -> None:
+    request = {
+        "order_id": "o",
+        "instrument_id": "X.NSE",
+        "side": "buy",
+        "quantity": 1.0,
+        "position": 0.0,
+        "trading_state": "active",
+        "ts": 1,
+        "reference_price": 100.0,
+        "expected_price": 110.0,
+    }
+    decision = stage(price_collar_bps=500).check(request)
+    assert decision.code == "risk_price_collar"
+    assert stage(price_collar_bps=1000).check(request).approved  # exactly at the collar passes
+
+
+def test_market_buy_beyond_the_collar_is_refused_on_the_ask() -> None:
+    port = Port()
+    runner = StrategyRunner(Script([], [buy(1)]), port, risk=stage(price_collar_bps=500))
+    # bar 1 sets the reference (100); the quote ask is 110 -> 1000 bps > 500
+    runner.run([(bar(1, 100.0), 1), (q(2, 109.0, 110.0), 2), (bar(3, 100.0), 3)])
+    assert port.orders == []
+    (refused, _) = runner.audit
+    assert refused.code == "risk_price_collar"
+    assert refused.context["expected_price"] == pytest.approx(110.0)
+    assert refused.context["reference_price"] == pytest.approx(100.0)
+
+
+def test_market_sell_is_judged_on_the_bid() -> None:
+    port = Port()
+    ctx = LedgerContext()
+    held(ctx, 5)
+    runner = StrategyRunner(Script([], [sell(1)]), port, ctx=ctx, risk=stage(price_collar_bps=500))
+    # ask is near the reference but the bid is 20% below it: only the bid matters for a sell
+    runner.run([(bar(1, 100.0), 1), (q(2, 80.0, 100.0), 2), (bar(3, 100.0), 3)])
+    (refused, _) = runner.audit
+    assert refused.context["expected_price"] == pytest.approx(80.0)
+
+
+def test_market_buy_within_the_collar_passes() -> None:
+    port = Port()
+    runner = StrategyRunner(Script([], [buy(1)]), port, risk=stage(price_collar_bps=500))
+    runner.run([(bar(1, 100.0), 1), (q(2, 100.0, 101.0), 2), (bar(3, 100.0), 3)])
+    assert len(port.orders) == 1
+
+
+def test_priced_orders_and_no_quote_skip_the_collar() -> None:
+    port = Port()
+    runner = StrategyRunner(
+        Script([], [buy(1, 100.0)], [buy(1)]), port, risk=stage(price_collar_bps=1)
+    )
+    # bar 3 submits a priced buy with a wild quote on file; bar 4 a market buy with a fresh run
+    runner.run([(bar(1, 100.0), 1), (q(2, 150.0, 160.0), 2), (bar(3, 100.0), 3)])
+    assert len(port.orders) == 1
+    port2 = Port()
+    runner2 = StrategyRunner(Script([], [buy(1)]), port2, risk=stage(price_collar_bps=1))
+    runner2.run([(bar(1, 100.0), 1), (bar(2, 100.0), 2)])  # no quote yet: skipped
+    assert len(port2.orders) == 1

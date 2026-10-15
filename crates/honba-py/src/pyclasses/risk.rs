@@ -26,7 +26,7 @@ use serde_json::{json, Map, Value};
 
 use super::run::parse_instrument;
 
-const REQUEST_KEYS: [&str; 11] = [
+const REQUEST_KEYS: [&str; 12] = [
     "order_id",
     "instrument_id",
     "side",
@@ -34,6 +34,7 @@ const REQUEST_KEYS: [&str; 11] = [
     "price",
     "trigger_price",
     "reference_price",
+    "expected_price",
     "adv",
     "position",
     "trading_state",
@@ -143,7 +144,7 @@ pub(crate) fn parse_request(v: &Value) -> Result<RiskRequest, String> {
         trading_state,
         ts: UnixNanos::new(ts),
         last_feed_ts: None,
-        expected_price: None,
+        expected_price: optional("expected_price")?,
     })
 }
 

@@ -1,7 +1,7 @@
 {
   "fixture_version": 1,
   "type": "RiskDecision",
-  "description": "Risk-stage golden vectors (ADR 0018 decision 11). Each case replays its requests in order on ONE fresh stage built from `limits` and the instrument rules below (the order-rate rule has memory). Optional request keys (price, trigger_price, reference_price) are omitted when absent. `ts` is event time in integer nanoseconds. Expected `code` is the ErrorCode wire spelling; `context` is compared whole (keys exact, integers exact, floats within 1e-9). Money is a major-unit float with a sibling `currency`. Order-rate `count` is the in-window approved count BEFORE the refused order. Instruments: X.NSE (lot 25, tick 0.05, min 25, freeze 100, band 90..110); N.NSE (lot 1, tick 0.05, no freeze, no band); Z.NSE is deliberately absent (unknown).",
+  "description": "Risk-stage golden vectors (ADR 0018 decision 11). Each case replays its requests in order on ONE fresh stage built from `limits` and the instrument rules below (the order-rate rule has memory). Optional request keys (price, trigger_price, reference_price, expected_price) are omitted when absent. `ts` is event time in integer nanoseconds. Expected `code` is the ErrorCode wire spelling; `context` is compared whole (keys exact, integers exact, floats within 1e-9). Money is a major-unit float with a sibling `currency`. Order-rate `count` is the in-window approved count BEFORE the refused order. Instruments: X.NSE (lot 25, tick 0.05, min 25, freeze 100, band 90..110); N.NSE (lot 1, tick 0.05, no freeze, no band); Z.NSE is deliberately absent (unknown).",
   "currency": "INR",
   "instruments": {
     "X.NSE": {"lot_size": 25.0, "tick_size": 0.05, "min_order_quantity": 25.0, "max_order_quantity": 100.0, "band": {"lower": 90.0, "upper": 110.0}},
@@ -858,6 +858,88 @@
         {"decision": "approved"},
         {"decision": "refused", "code": "risk_max_notional_exceeded", "context": {"rule": "max_notional", "notional": 2501.25, "limit": 2500.0, "currency": "INR"}},
         {"decision": "approved"}
+      ]
+    },
+    {
+      "name": "price_collar_buy_beyond_refused",
+      "limits": {"price_collar_bps": 500},
+      "requests": [
+        {"order_id": "A", "instrument_id": "X.NSE", "side": "buy", "quantity": 25.0, "reference_price": 100.0, "expected_price": 106.0, "position": 0.0, "trading_state": "active", "ts": 1}
+      ],
+      "expect": [
+        {"decision": "refused", "code": "risk_price_collar", "context": {"rule": "price_collar", "side": "buy", "expected_price": 106.0, "reference_price": 100.0, "deviation_bps": 600.0, "collar_bps": 500}}
+      ]
+    },
+    {
+      "name": "price_collar_sell_below_refused",
+      "limits": {"price_collar_bps": 500},
+      "requests": [
+        {"order_id": "A", "instrument_id": "X.NSE", "side": "sell", "quantity": 25.0, "reference_price": 100.0, "expected_price": 94.0, "position": 25.0, "trading_state": "active", "ts": 1}
+      ],
+      "expect": [
+        {"decision": "refused", "code": "risk_price_collar", "context": {"rule": "price_collar", "side": "sell", "expected_price": 94.0, "reference_price": 100.0, "deviation_bps": 600.0, "collar_bps": 500}}
+      ]
+    },
+    {
+      "name": "price_collar_boundary_inclusive_approved",
+      "limits": {"price_collar_bps": 500},
+      "requests": [
+        {"order_id": "A", "instrument_id": "X.NSE", "side": "buy", "quantity": 25.0, "reference_price": 100.0, "expected_price": 105.0, "position": 0.0, "trading_state": "active", "ts": 1},
+        {"order_id": "B", "instrument_id": "X.NSE", "side": "sell", "quantity": 25.0, "reference_price": 100.0, "expected_price": 95.0, "position": 25.0, "trading_state": "active", "ts": 2}
+      ],
+      "expect": [
+        {"decision": "approved"},
+        {"decision": "approved"}
+      ]
+    },
+    {
+      "name": "price_collar_skipped_for_priced_order",
+      "limits": {"price_collar_bps": 1},
+      "requests": [
+        {"order_id": "A", "instrument_id": "X.NSE", "side": "buy", "quantity": 25.0, "price": 100.0, "reference_price": 100.0, "expected_price": 150.0, "position": 0.0, "trading_state": "active", "ts": 1}
+      ],
+      "expect": [
+        {"decision": "approved"}
+      ]
+    },
+    {
+      "name": "price_collar_skipped_without_reference",
+      "limits": {"price_collar_bps": 1},
+      "requests": [
+        {"order_id": "A", "instrument_id": "X.NSE", "side": "buy", "quantity": 25.0, "expected_price": 150.0, "position": 0.0, "trading_state": "active", "ts": 1}
+      ],
+      "expect": [
+        {"decision": "approved"}
+      ]
+    },
+    {
+      "name": "price_collar_skipped_without_expected",
+      "limits": {"price_collar_bps": 1},
+      "requests": [
+        {"order_id": "A", "instrument_id": "X.NSE", "side": "buy", "quantity": 25.0, "reference_price": 100.0, "position": 0.0, "trading_state": "active", "ts": 1}
+      ],
+      "expect": [
+        {"decision": "approved"}
+      ]
+    },
+    {
+      "name": "price_collar_off_by_default",
+      "limits": {},
+      "requests": [
+        {"order_id": "A", "instrument_id": "X.NSE", "side": "buy", "quantity": 25.0, "reference_price": 100.0, "expected_price": 500.0, "position": 0.0, "trading_state": "active", "ts": 1}
+      ],
+      "expect": [
+        {"decision": "approved"}
+      ]
+    },
+    {
+      "name": "price_collar_precedes_max_notional",
+      "limits": {"price_collar_bps": 500, "max_notional": 1000.0},
+      "requests": [
+        {"order_id": "A", "instrument_id": "X.NSE", "side": "buy", "quantity": 25.0, "reference_price": 100.0, "expected_price": 110.0, "position": 0.0, "trading_state": "active", "ts": 1}
+      ],
+      "expect": [
+        {"decision": "refused", "code": "risk_price_collar", "context": {"rule": "price_collar", "side": "buy", "expected_price": 110.0, "reference_price": 100.0, "deviation_bps": 1000.0, "collar_bps": 500}}
       ]
     }
   ]

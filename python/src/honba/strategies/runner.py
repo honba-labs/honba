@@ -203,6 +203,8 @@ class StrategyRunner:
         self._audit: list[RiskRefused | OrderRejected] = []
         self._orders: dict[str, tuple[InstrumentId, OrderSide]] = {}
         self._last_px: dict[InstrumentId, float] = {}
+        # Latest (bid, ask) per instrument: the price collar's expected_price source.
+        self._last_quote: dict[InstrumentId, tuple[float, float]] = {}
         self._pre_gate: list[Rejected] = []
         self._port = adapt_port(execution)  # event stream + cancel(order_id, now), bound once
         self._now = 0
@@ -281,6 +283,8 @@ class StrategyRunner:
             self._last_px[event.instrument_id] = event.close
         elif isinstance(event, TradeTick):
             self._last_px[event.instrument_id] = event.price
+        elif isinstance(event, QuoteTick):
+            self._last_quote[event.instrument_id] = (event.bid_price, event.ask_price)
         if isinstance(event, Bar) and ts_init != self._last_bar_ts:
             self._bars_seen += 1
             self._last_bar_ts = ts_init
@@ -456,6 +460,11 @@ class StrategyRunner:
             request["trigger_price"] = intent.trigger_price
         if iid in self._last_px:
             request["reference_price"] = self._last_px[iid]
+        # The touch a market order crosses (ask for a buy, bid for a sell); priced orders and
+        # instruments with no quote yet carry none, so the collar skips (Rust expected_price).
+        if intent.price is None and iid in self._last_quote:
+            bid, ask = self._last_quote[iid]
+            request["expected_price"] = ask if intent.side is OrderSide.BUY else bid
         decision = self._risk.check(request)
         if decision.approved:
             return None

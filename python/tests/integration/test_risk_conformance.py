@@ -77,7 +77,7 @@ def _observed(decision: Any) -> dict[str, Any]:
 def test_fixture_is_the_expected_document() -> None:
     assert DOC["fixture_version"] == 1
     assert DOC["type"] == "RiskDecision"
-    assert len(DOC["cases"]) >= 79
+    assert len(DOC["cases"]) >= 87
 
 
 @pytest.mark.parametrize("case", DOC["cases"], ids=[c["name"] for c in DOC["cases"]])
@@ -219,6 +219,13 @@ def test_risk_conformance_through_the_python_runner(case: dict[str, Any]) -> Non
             # Python refuses the intent at construction (quantity <= 0): it never reaches the gate.
             assert expect["decision"] == "refused", where
             continue
+        if "expected_price" in request:
+            # The runner derives expected_price from the latest quote: ask for a buy, bid for a
+            # sell. A flat quote puts the touch on the request's value for either side.
+            iid, px = _instrument_id(request["instrument_id"]), request["expected_price"]
+            queued, strategy.next = strategy.next, None
+            runner.on_event(QuoteTick(iid, request["ts"], px, px, 1.0, 1.0), request["ts"])
+            strategy.next = queued
         ctx.target, ctx.side = request["position"], strategy.next.side
         runner.set_trading_state(getattr(states, request["trading_state"].upper()))
         before = len(port.submits)

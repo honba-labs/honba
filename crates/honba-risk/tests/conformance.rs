@@ -126,7 +126,7 @@ fn request(v: &Value) -> RiskRequest {
         trading_state: state(v["trading_state"].as_str().expect("trading_state")),
         ts: UnixNanos::new(v["ts"].as_u64().expect("ts is an integer of nanoseconds")),
         last_feed_ts: None,
-        expected_price: None,
+        expected_price: opt_f(v, "expected_price"),
     }
 }
 
