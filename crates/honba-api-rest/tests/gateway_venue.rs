@@ -214,3 +214,36 @@ async fn fill_stream_errors_and_unknown_fills_do_not_stop_the_bridge() {
         ExecutionEvent::Fill { complete: true, .. }
     ));
 }
+
+/// A gateway whose every call hangs: the sync side must still return at once, even on a
+/// single-threaded runtime where blocking would deadlock the task that owns the gateway.
+struct Hanging;
+
+#[async_trait::async_trait]
+impl honba_ports::ExecutionGateway for Hanging {
+    async fn submit_order(&mut self, _o: Order) -> honba_ports::PortResult<OrderId> {
+        std::future::pending().await
+    }
+    async fn cancel_order(&mut self, _id: OrderId) -> honba_ports::PortResult<()> {
+        std::future::pending().await
+    }
+    async fn modify_order(
+        &mut self,
+        _id: OrderId,
+        _q: f64,
+        _p: Option<f64>,
+    ) -> honba_ports::PortResult<()> {
+        std::future::pending().await
+    }
+    async fn next_fill(&mut self) -> honba_ports::PortResult<Option<honba_entities::Trade>> {
+        std::future::pending().await
+    }
+}
+
+#[tokio::test]
+async fn sync_calls_never_wait_on_a_hung_gateway() {
+    let mut venue = GatewayVenue::spawn_with_poll(Hanging, POLL);
+    venue.submit(order("C-1", 1.0)).unwrap();
+    venue.cancel("C-1", UnixNanos::from_u64(2)).unwrap();
+    assert!(venue.drain_events().unwrap().is_empty());
+}

@@ -15,7 +15,7 @@
 //! report `cum_qty` and `complete`, which the ledger maps to `PartiallyFilled` / `Filled`.
 //!
 //! Events surface when somebody drains: [`AppState::advance_market`] does (with or without bars),
-//! and `AppState::spawn_venue_drain` (planned) does it on a timer for a venue with no bar feed.
+//! and [`AppState::spawn_venue_drain`] does it on a timer for a venue with no bar feed.
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -290,5 +290,28 @@ async fn poll_fills<G: ExecutionGateway>(
         if complete {
             working.remove(&client);
         }
+    }
+}
+
+impl crate::AppState {
+    /// Spawns a task that drains the execution venue every `every` (at least 1 ms), so events a
+    /// venue produces on its own clock (a broker's fills, a [`GatewayVenue`]'s refusals) reach
+    /// the order ledger without waiting for a bar. It calls `advance_market` with no bars, so
+    /// it never moves simulated time; it runs until the handle is aborted.
+    ///
+    /// Must be called inside a tokio runtime.
+    pub fn spawn_venue_drain(&self, every: Duration) -> JoinHandle<()> {
+        let state = self.clone();
+        let every = every.max(Duration::from_millis(1));
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(every);
+            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            loop {
+                tick.tick().await;
+                if let Err(e) = state.advance_market(&[]) {
+                    tracing::warn!(error = %e.message, "venue drain failed");
+                }
+            }
+        })
     }
 }
