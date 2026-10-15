@@ -9,9 +9,9 @@ from typing import Any
 import pytest
 
 from honba.adapters.capabilities import Capability
-from honba.adapters.errors import AdapterError, AdapterFatalError, CapabilityError
+from honba.adapters.errors import AdapterError, AdapterFatalError, CapabilityError, SessionError
 from honba.adapters.models import OrderStatus, Product
-from honba.adapters.rest import RestApiError, RestExecutionAdapter
+from honba.adapters.rest import LedgerLimitationError, RestApiError, RestExecutionAdapter
 from honba.client import Client, Response
 from honba.client.errors import TransportApiError
 from honba.domain.instrument import InstrumentId
@@ -209,3 +209,166 @@ def test_the_capability_descriptor_claims_only_what_the_routes_serve() -> None:
     )
     assert caps.time_in_force == frozenset({TimeInForce.DAY})
     assert caps.order_types == frozenset({OrderType.MARKET, OrderType.LIMIT})
+
+
+# -- connect ----------------------------------------------------------------------------------
+
+
+async def test_connect_checks_health_and_the_write_scope() -> None:
+    script = Script(ok({"status": "ok"}), ok({"orders": []}))
+    rest = RestExecutionAdapter("http://unused", client=Client(script), sleep=no_sleep)
+    info = await rest.connect()
+    assert rest.is_connected()
+    assert info.user_id == "honba-rest"
+    assert [(m, p) for m, p, _ in script.calls] == [("GET", "/health"), ("GET", "/orders")]
+
+
+async def test_connect_with_a_bad_token_is_fatal_and_leaves_it_disconnected() -> None:
+    script = Script(ok({"status": "ok"}), failure(401, "unauthorized"))
+    rest = RestExecutionAdapter("http://unused", client=Client(script), sleep=no_sleep)
+    with pytest.raises(AdapterFatalError):
+        await rest.connect()
+    assert not rest.is_connected()
+
+
+async def test_connect_to_an_unreachable_server_is_a_recoverable_session_error() -> None:
+    down = TransportApiError("transport_error", "refused", retryable=True)
+    rest = RestExecutionAdapter(
+        "http://unused", client=Client(Script(down)), retry=(), sleep=no_sleep
+    )
+    with pytest.raises(SessionError):
+        await rest.connect()
+    assert not rest.is_connected()
+
+
+async def test_disconnect_is_safe_to_repeat() -> None:
+    rest, _ = adapter()
+    await rest.disconnect()
+    await rest.disconnect()
+    assert not rest.is_connected()
+
+
+# -- reading the ledger -------------------------------------------------------------------------
+
+
+async def test_orders_and_order_status_map_ledger_rows() -> None:
+    rows = [row("a", "submitted"), row("b", "cancelled"), row("c", "rejected")]
+    rest, script = adapter(ok({"orders": rows}), ok({"orders": rows}))
+    reports = await rest.orders()
+    assert [(r.order_id, r.status) for r in reports] == [
+        ("a", OrderStatus.SUBMITTED),
+        ("b", OrderStatus.CANCELLED),
+        ("c", OrderStatus.REJECTED),
+    ]
+    assert reports[2].reject_reason is not None
+    one = await rest.order_status("b")
+    assert one.status is OrderStatus.CANCELLED
+    assert [(m, p) for m, p, _ in script.calls] == [("GET", "/orders")] * 2
+
+
+async def test_order_status_of_an_unknown_id_is_an_adapter_error() -> None:
+    rest, _ = adapter(ok({"orders": [row("a")]}))
+    with pytest.raises(AdapterError):
+        await rest.order_status("nope")
+
+
+async def test_a_filled_row_has_no_price_so_the_report_says_so() -> None:
+    rest, _ = adapter(ok({"orders": [row("f", "filled")]}), ok({"orders": [row("f", "filled")]}))
+    with pytest.raises(LedgerLimitationError):
+        await rest.order_status("f")
+    ledger = await rest.ledger()  # the status-only view still works
+    assert [(r.order_id, r.status) for r in ledger] == [("f", "filled")]
+
+
+async def test_a_filled_row_reports_with_a_caller_supplied_fill_price() -> None:
+    rest, _ = adapter(ok({"orders": [row("f", "filled")]}), fill_price=lambda _row: 101.5)
+    [report] = await rest.orders()
+    assert (report.status, report.filled_quantity, report.average_price) == (
+        OrderStatus.FILLED,
+        10.0,
+        101.5,
+    )
+
+
+async def test_a_partial_fill_cannot_be_reported() -> None:
+    rest, _ = adapter(ok({"orders": [row("p", "partially_filled")]}), fill_price=lambda _r: 1.0)
+    with pytest.raises(LedgerLimitationError):
+        await rest.orders()
+
+
+# -- cancel -------------------------------------------------------------------------------------
+
+
+async def test_cancel_deletes_a_working_order() -> None:
+    rest, script = adapter(ok({"orders": [row("a")]}), ok({"status": "cancelled"}))
+    await rest.cancel_order("a")
+    assert [(m, p) for m, p, _ in script.calls] == [("GET", "/orders"), ("DELETE", "/orders/a")]
+
+
+async def test_cancel_of_a_terminal_order_is_reported_not_resent() -> None:
+    rest, script = adapter(ok({"orders": [row("a", "filled")]}))
+    await rest.cancel_order("a")
+    assert [m for m, _, _ in script.calls] == ["GET"]
+
+
+async def test_cancel_of_an_unknown_id_is_an_adapter_error_and_sends_no_delete() -> None:
+    rest, script = adapter(ok({"orders": []}))
+    with pytest.raises(AdapterError):
+        await rest.cancel_order("nope")
+    assert [m for m, _, _ in script.calls] == ["GET"]
+
+
+async def test_cancel_all_cancels_only_working_orders_of_the_instrument() -> None:
+    other = row("o", instrument_id={"symbol": "INFY", "exchange": "NSE"})
+    rows = [row("a"), row("b", "filled"), other, row("d", "partially_filled")]
+    rest, script = adapter(
+        ok({"orders": rows}), ok({"status": "cancelled"}), ok({"status": "cancelled"})
+    )
+    await rest.cancel_all(instrument_id=TCS)
+    deletes = [p for m, p, _ in script.calls if m == "DELETE"]
+    assert deletes == ["/orders/a", "/orders/d"]
+
+
+# -- positions and the unsupported surface ---------------------------------------------------------
+
+
+async def test_positions_net_the_filled_rows_per_instrument() -> None:
+    infy = {"symbol": "INFY", "exchange": "NSE"}
+    rows = [
+        row("a", "filled", quantity=10.0),
+        row("b", "filled", side="sell", quantity=4.0),
+        row("c", "filled", side="sell", quantity=5.0, instrument_id=infy),
+        row("d", "filled", side="buy", quantity=5.0, instrument_id=infy),
+        row("e", "submitted", quantity=99.0),
+        row("f", "cancelled", quantity=99.0),
+    ]
+    rest, _ = adapter(ok({"orders": rows}))
+    [position] = await rest.positions()
+    assert position.instrument_id == TCS
+    assert (position.signed_quantity, position.avg_price) == (6.0, 0.0)
+
+
+async def test_positions_refuse_when_a_partial_fill_makes_the_quantity_unknown() -> None:
+    rest, _ = adapter(ok({"orders": [row("p", "partially_filled")]}))
+    with pytest.raises(LedgerLimitationError):
+        await rest.positions()
+
+
+async def test_unsupported_methods_raise_capability_errors_without_a_request() -> None:
+    rest, script = adapter()
+    for call in (
+        rest.trades(),
+        rest.holdings(),
+        rest.funds(),
+        rest.margin(),
+        rest.modify_order("a", quantity=1.0),
+    ):
+        with pytest.raises(CapabilityError):
+            await call
+    assert script.calls == []
+
+
+def test_the_adapter_satisfies_the_execution_protocol() -> None:
+    from honba.adapters.base import ExecutionClient
+
+    assert isinstance(adapter()[0], ExecutionClient)

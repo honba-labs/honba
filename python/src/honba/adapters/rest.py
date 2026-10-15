@@ -57,8 +57,18 @@ from honba.adapters.errors import (
     AdapterError,
     AdapterFatalError,
     CapabilityError,
+    SessionError,
 )
-from honba.adapters.models import OrderReport, OrderStatus, Product, RunMode, SessionInfo
+from honba.adapters.models import (
+    Funds,
+    Holding,
+    MarginReport,
+    OrderReport,
+    OrderStatus,
+    Product,
+    RunMode,
+    SessionInfo,
+)
 from honba.client import (
     ApiError,
     AuthApiError,
@@ -73,6 +83,8 @@ from honba.client import (
 from honba.client.models import LedgerOrder
 from honba.domain.instrument import InstrumentId
 from honba.domain.order import OrderIntent, OrderSide, OrderType, TimeInForce
+from honba.domain.position import Position, PositionSide
+from honba.domain.trade import Trade
 
 __all__ = ["LedgerLimitationError", "RestApiError", "RestAuthError", "RestExecutionAdapter"]
 
@@ -81,6 +93,8 @@ _T = TypeVar("_T")
 _NO_REASON = "rejected by the venue; the order ledger (GET /orders) does not carry the reason"
 
 _DEFAULT_RETRY = (0.2, 0.5, 1.0)
+
+_WORKING = frozenset({"submitted", "accepted", "partially_filled"})
 
 
 class RestApiError(AdapterError):
@@ -193,6 +207,14 @@ class RestExecutionAdapter(Adapter):
         return self._capabilities
 
     async def connect(self) -> SessionInfo:
+        """Check the server answers (``GET /health``) and that the token reaches the order
+        routes (``GET /orders``). An unreachable server is a recoverable
+        :class:`SessionError`; a rejected token is a fatal :class:`RestAuthError`."""
+        try:
+            await self._call(self._client.health, idempotent=True)
+            await self._call(self._client.orders, idempotent=True)
+        except RestApiError as error:
+            raise SessionError(f"cannot reach the honba server: {error}") from error
         self._connected = True
         return await self.session()
 
@@ -323,3 +345,109 @@ class RestExecutionAdapter(Adapter):
             price=intent.price,
             reject_reason=f"{error.code}: {error.message}",
         )
+
+    async def ledger(self) -> list[LedgerOrder]:
+        """The server's write ledger as is (``GET /orders``), oldest first. Status-only: see the
+        module docstring. Unlike :meth:`orders` this never raises
+        :class:`LedgerLimitationError`."""
+        self.require_connected()
+        self._capabilities.require(Capability.ORDER_BOOK)
+        return await self._call(self._client.orders, idempotent=True)
+
+    async def orders(self) -> list[OrderReport]:
+        return [self._report(row) for row in await self.ledger()]
+
+    async def order_status(self, order_id: str) -> OrderReport:
+        for row in await self.ledger():
+            if row.order_id == order_id:
+                return self._report(row)
+        raise AdapterError(f"unknown order {order_id!r}")
+
+    async def modify_order(
+        self,
+        order_id: str,
+        *,
+        quantity: float | None = None,
+        price: float | None = None,
+        trigger_price: float | None = None,
+    ) -> None:
+        self.require_connected()
+        self._capabilities.require(Capability.MODIFY_ORDER)
+
+    async def cancel_order(self, order_id: str) -> None:
+        """``DELETE /orders/{id}`` for a working order. The server answers 200 for any id, so
+        the ledger is read first: an unknown id is an :class:`AdapterError`, a terminal order
+        is left alone (the status is what it is)."""
+        self.require_connected()
+        self._capabilities.require(Capability.CANCEL_ORDER)
+        for row in await self.ledger():
+            if row.order_id == order_id:
+                if row.status in _WORKING:
+                    await self._call(lambda: self._client.cancel_order(order_id), idempotent=True)
+                return
+        raise AdapterError(f"unknown order {order_id!r}")
+
+    async def cancel_all(
+        self,
+        *,
+        instrument_id: InstrumentId | None = None,
+        product: Product | None = None,
+    ) -> None:
+        """Cancel every working order, narrowed to ``instrument_id``. ``product`` is ignored:
+        the ledger has none."""
+        self.require_connected()
+        self._capabilities.require(Capability.CANCEL_ALL)
+        for row in await self.ledger():
+            if row.status not in _WORKING:
+                continue
+            if instrument_id is not None and (
+                row.instrument_id.symbol != instrument_id.symbol
+                or row.instrument_id.exchange != instrument_id.exchange
+            ):
+                continue
+            await self._call(
+                lambda order_id=row.order_id: self._client.cancel_order(order_id), idempotent=True
+            )
+
+    async def trades(self) -> list[Trade]:
+        self.require_connected()
+        self._capabilities.require(Capability.TRADE_BOOK)
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    async def positions(self) -> list[Position]:
+        """Net ``filled`` quantity per instrument, derived from the ledger (module docstring)."""
+        rows = await self.ledger()
+        if any(row.status == "partially_filled" for row in rows):
+            raise LedgerLimitationError(
+                "a partially filled order has no filled quantity on the ledger row"
+            )
+        net: dict[tuple[str, str], float] = {}
+        for row in rows:
+            if row.status != "filled":
+                continue
+            key = (row.instrument_id.symbol, row.instrument_id.exchange)
+            net[key] = net.get(key, 0.0) + (row.quantity if row.side == "buy" else -row.quantity)
+        return [
+            Position(
+                InstrumentId(symbol, exchange),
+                side=PositionSide.LONG if qty > 0 else PositionSide.SHORT,
+                quantity=abs(qty),
+            )
+            for (symbol, exchange), qty in net.items()
+            if abs(qty) > 1e-9
+        ]
+
+    async def holdings(self) -> list[Holding]:
+        self.require_connected()
+        self._capabilities.require(Capability.HOLDINGS)
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    async def funds(self) -> Funds:
+        self.require_connected()
+        self._capabilities.require(Capability.FUNDS)
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    async def margin(self, instrument_id: InstrumentId | None = None) -> MarginReport:
+        self.require_connected()
+        self._capabilities.require(Capability.MARGIN)
+        raise AssertionError("unreachable")  # pragma: no cover
