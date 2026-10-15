@@ -47,3 +47,4 @@ sha2 = "0.10"
 arrow.workspace = true
 parquet.workspace = true
 tempfile = "3"
+honba-testing.workspace = true
