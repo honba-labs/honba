@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Operator auth scope (ADR 0023)
+
+- New fifth scope `operator`. `GET` and `PUT /trading-state` now require `operator` instead of
+  `write:orders`: a token that can place orders can no longer halt trading, and an `operator`
+  token cannot place orders (no scope implies another). Breaking for tokens that used
+  `/trading-state` with `write:orders` only: reissue them with `operator` in `scopes`. The Python
+  `SCOPES` mirror, MCP scope lists and CLI choices include `operator`. Auth off is unchanged.
+
 ### Automatic OCO for declarative-strategy exits
 
 - `DeclarativeStrategy` now treats the protective stop and take-profit of one entry fill as a
@@ -33,7 +41,7 @@
   one shared cell in `AppState` (`trading_state()` / `set_trading_state()`), so the order gate and
   `POST /positions/close` see a change on the next request. Every transition is allowed, a repeat
   is an idempotent no-op (`previous == state`), the change and optional `reason` are logged, an
-  unknown state is a 422. Scope `write:orders` (no operator scope exists in ADR 0023); both routes
+  unknown state is a 422. Scope `operator` (first cut `write:orders`, superseded above); both routes
   are in `WRITE_PATHS`. `AppState.trading_state` is no longer a public field (use the getter).
   New wire types `TradingStateRequest`, `TradingStateResponse`, `TradingStateChange`,
   `HttpMethod::Put`; OpenAPI, domain schema, Python `.pyi` and the `ClientMethod` generator

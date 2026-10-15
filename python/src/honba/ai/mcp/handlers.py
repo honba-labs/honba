@@ -75,7 +75,7 @@ class McpGateway:
         tools: the tools to expose; defaults to the generated ones.
         toolset: an explicit allowlist of tool names (the "selected toolset"); defaults to all.
         scope: OAuth2 scope to filter tools (``read:market``, ``read:account``, ``write:orders``,
-            ``research``); if given, only tools with matching ``scope`` are exposed.
+            ``research``, ``operator``); if given, only tools with matching ``scope`` are exposed.
         read_only: when true (the default), a tool whose ``readOnlyHint`` is false is refused.
         free_text_keys: result keys treated as untrusted free text.
     """

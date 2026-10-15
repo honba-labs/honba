@@ -5,7 +5,13 @@ use honba_api::ENDPOINTS;
 use crate::{scope_for, unscoped_routes, RouteScope, ROUTE_SCOPES};
 
 /// The scopes ADR 0023 §2 defines; no route may name any other.
-const SCOPES: &[&str] = &["read:market", "read:account", "write:orders", "research"];
+const SCOPES: &[&str] = &[
+    "read:market",
+    "read:account",
+    "write:orders",
+    "research",
+    "operator",
+];
 
 #[test]
 fn scope_for_every_endpoint() {
@@ -54,4 +60,14 @@ fn known_route_needs_its_scope_and_unknown_is_unmapped() {
     );
     assert_eq!(scope_for("GET", "/capabilities"), Some(RouteScope::Public));
     assert_eq!(scope_for("GET", "/brand/new"), None);
+}
+
+#[test]
+fn trading_state_routes_need_the_operator_scope() {
+    for method in ["GET", "PUT"] {
+        assert_eq!(
+            scope_for(method, "/trading-state"),
+            Some(RouteScope::Required("operator"))
+        );
+    }
 }

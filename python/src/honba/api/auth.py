@@ -209,7 +209,7 @@ class FileTokenStore(TokenStore):
 PUBLIC_PATHS = frozenset({"/capabilities", "/health", "/schema"})
 
 #: The scopes ADR 0023 §2 defines; a route may name no other.
-SCOPES = ("read:market", "read:account", "write:orders", "research")
+SCOPES = ("read:market", "read:account", "write:orders", "research", "operator")
 
 
 def required_scope_for_route(method: str, path: str) -> str | None:
@@ -231,9 +231,9 @@ def required_scope_for_route(method: str, path: str) -> str | None:
         return "research"
     if path.startswith(("/backtests", "/sweeps", "/journals/")):
         return "research"
-    if path in {"/orders", "/positions/close", "/bars", "/trading-state"} or path.startswith(
-        "/orders/"
-    ):
+    if path == "/trading-state":
+        return "operator"
+    if path in {"/orders", "/positions/close", "/bars"} or path.startswith("/orders/"):
         return "write:orders"
     if path.startswith("/approval/"):
         return "write:orders"

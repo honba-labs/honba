@@ -139,7 +139,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument(
         "--scope",
-        choices=["read:market", "read:account", "write:orders", "research"],
+        choices=["read:market", "read:account", "write:orders", "research", "operator"],
         default=None,
         help="OAuth2 scope to filter exposed tools",
     )

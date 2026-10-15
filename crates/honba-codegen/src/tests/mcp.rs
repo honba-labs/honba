@@ -167,7 +167,13 @@ fn every_tool_maps_to_a_registered_endpoint() {
 
 #[test]
 fn every_tool_has_a_valid_scope() {
-    let valid_scopes = ["read:market", "read:account", "write:orders", "research"];
+    let valid_scopes = [
+        "read:market",
+        "read:account",
+        "write:orders",
+        "research",
+        "operator",
+    ];
     let rendered = render(&full());
     for out in rendered["tools"].as_array().unwrap() {
         let scope = out["annotations"]["scope"].as_str().expect("scope missing");

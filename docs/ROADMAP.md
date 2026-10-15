@@ -30,7 +30,7 @@ b12e5ba..c71424e: chunk 1 b12e5ba..1b2f6ce, chunk 2 d1299d3..c61d578, chunk 3a 9
 capabilities/schema, WASM hardening, ADR 0014/0015, golden vectors validated against the schema, honba-docs chunks.
 E5-S5 done (2026-10-11): AI strategy verifier (ADR 0022).
 E11-S8 done (2026-10-11): Minimal auth (Bearer token, scope map, file token store, audit log) (ADR 0023).
-Runtime trading state done (2026-10-15): `GET`/`PUT /trading-state` change the operator state of a running server (ADR 0018 decision 7), scope `write:orders`; a dedicated operator scope and a persisted operator journal remain open.
+Runtime trading state done (2026-10-15): `GET`/`PUT /trading-state` change the operator state of a running server (ADR 0018 decision 7), scope `operator` (ADR 0023, fifth scope); a persisted operator journal remains open.
 E5-S10, E5-S11 added (2026-10-11): In-process Llama runtime (GBNF constraints) and financial domain alignment (SFT + RLVR compiler rewards).
 E5-S10/S11 done (2026-10-12): GBNF→LLM grammar, local llama-cpp runner, synthetic dataset, QLoRA scaffold, GRPO compiler reward (`c9579d2`, `827627f`).
 E5-S3 done (2026-10-13): canonical route→scope map (`honba_api_rest::ROUTE_SCOPES`) with the drift guard
@@ -150,7 +150,7 @@ E10-S1..S8, E11-S1..S8). E6 batches 1-2, E7 and E8 are tracked separately below.
 | E6 batches 1-2 | commits 6372528, 510e0d4, efca4bd, 7c9a325, 6a91432 |
 | Backtest foundation (Python) | `python/src/honba/session.py` `BacktestSession`/`BacktestResult`, `backtest/simulated.py` `NextOpenExecution`, date-aware India settlement (9cc171e), single-round costs (d38fe82) |
 | E5-S5 AI strategy verifier | ADR 0022; `honba.ai.verification`: static AST scan (import allowlist, forbidden names/dunders), rlimit sandbox with audit hook, deterministic smoke, look-ahead truncation property; 45 unit + 37 integration tests; red-team corpus |
-| E11-S8 Minimal auth | ADR 0023; `honba-api-rest::auth`: Bearer token + scope map (read:market, read:account, write:orders, research); FileTokenStore (TOML, SHA-256 hashes, hot-reload); audit log (NDJSON); auth middleware; CLI `--tokens-file` / `--audit-log-file`; non-loopback warning suppressed when auth enabled |
+| E11-S8 Minimal auth | ADR 0023; `honba-api-rest::auth`: Bearer token + scope map (read:market, read:account, write:orders, research, operator); FileTokenStore (TOML, SHA-256 hashes, hot-reload); audit log (NDJSON); auth middleware; CLI `--tokens-file` / `--audit-log-file`; non-loopback warning suppressed when auth enabled |
 
 Not shipped despite appearing in earlier drafts: any streaming route beyond `GET /backtests/{id}/events`. (E2-S6's `OrderState` FSM, client order ids, `FillModel`/`LatencyModel`, DSR/PBO/MC/walk-forward, `honba.event_loop` and `Instrument` option metadata have since shipped as their own entries above.)
 
@@ -374,7 +374,7 @@ old critical path: the pull-based E7 and optional E8 epics.
 | E5-S5 (DONE) | AI strategy verifier: AST, import allowlist, subprocess with rlimits, no network, deterministic smoke, look-ahead check, red-team tests; ADR D7 | M | E4-S4, ADR | `ast_rejects_forbidden_import` / `generated_strategy_passes_same_suite_as_handwritten` | honba |
 | E5-S2 (DONE) | Trust envelope: broker/LLM/instrument text wrapped and marked untrusted | S | none | `wraps_untrusted_text` / `mcp_tool_output_marked` | honba |
 | E5-S1 (DONE) | Thin Python MCP server over generated `mcp_tools.json` (11 tools: backtest, sweep, verify_strategy, compile_strategy, list_strategies, screen, get_instruments, get_bars, get_backtest, get_backtest_journal, get_sweep); toolset filter; read-only kill switch | M | E5-S2 | `toolset_filter` / `mcp_call_matches_rest_response` | honba |
-| E5-S3 (DONE) | Scope map (read:market, read:account, write:orders, research) with CI drift test; audit by token id | S | E5-S1, E11-S8 min | `scope_for_every_endpoint` / `drift_test_fails_on_new_route` | honba |
+| E5-S3 (DONE) | Scope map (read:market, read:account, write:orders, research, operator) with CI drift test; audit by token id | S | E5-S1, E11-S8 min | `scope_for_every_endpoint` / `drift_test_fails_on_new_route` | honba |
 | E5-S4 (DONE) | Approval queue for placements; cancel/modify bypass | M | E2-S2, E5-S3 | `placement_held`, `cancel_bypasses` / `approve_flows_through_risk_to_sim` | honba |
 | E5-S7 (DONE) | Typed LLM decisions (veto/size-down only), journaled | S | E5-S5, E4-S1 | `schema_rejects_increase` / `decision_in_journal` | honba |
 | E5-S8 rest (DONE) | Write routes gated (E11-S7) | S | E2-S2, E5-S4 | `order_refused_by_risk` / `post_order_flows_to_sim_only` (commit `91ab361`) | honba |

@@ -30,7 +30,7 @@ def serve(
         str | None,
         typer.Option(
             "--scope",
-            help="OAuth2 scope to filter exposed tools (read:market, read:account, write:orders, research)",
+            help="OAuth2 scope to filter exposed tools (read:market, read:account, write:orders, research, operator)",
         ),
     ] = None,
 ) -> None:

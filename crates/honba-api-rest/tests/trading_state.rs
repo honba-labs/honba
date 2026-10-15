@@ -241,8 +241,8 @@ async fn auth_refuses_insufficient_scope() {
 }
 
 #[tokio::test]
-async fn auth_accepts_the_write_scope() {
-    let (app, _dir) = authed("\"write:orders\"");
+async fn auth_accepts_the_operator_scope() {
+    let (app, _dir) = authed("\"operator\"");
     let body = Some(json!({"state": "halted"}));
     let (s, v) = send(
         app.clone(),
@@ -257,4 +257,37 @@ async fn auth_accepts_the_write_scope() {
     let (s, v) = send(app, Method::GET, "/trading-state", None, Some("test")).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(v["data"]["state"], json!("halted"));
+}
+
+#[tokio::test]
+async fn write_orders_alone_can_no_longer_change_the_state() {
+    let (app, _dir) = authed("\"write:orders\", \"read:account\"");
+    let body = Some(json!({"state": "halted"}));
+    let (s, v) = send(
+        app.clone(),
+        Method::PUT,
+        "/trading-state",
+        body,
+        Some("test"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+    assert_eq!(v["error"]["code"], json!("forbidden"));
+    let (s, _) = send(app, Method::GET, "/trading-state", None, Some("test")).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn operator_scope_does_not_imply_write_orders() {
+    let (app, _dir) = authed("\"operator\"");
+    let (s, v) = send(
+        app,
+        Method::POST,
+        "/orders",
+        Some(order("buy", "k1")),
+        Some("test"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+    assert_eq!(v["error"]["code"], json!("forbidden"));
 }

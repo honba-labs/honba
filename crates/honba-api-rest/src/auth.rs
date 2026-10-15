@@ -18,7 +18,7 @@ use tracing::info;
 pub struct TokenInfo {
     /// Unique identifier for the token (first 8 chars of SHA-256)
     pub token_id: String,
-    /// Scopes granted to this token (e.g., "read:market", "write:orders", "research")
+    /// Scopes granted to this token (e.g., "read:market", "write:orders", "research", "operator")
     pub scopes: Vec<String>,
 }
 
@@ -172,9 +172,9 @@ pub enum RouteScope {
 /// Every route the router serves has exactly one row, so scope enforcement is a
 /// lookup rather than a set of prefix rules that can silently miss a new route.
 /// Paths use the `{param}` spelling of [`honba_api::ENDPOINTS`], so the drift
-/// guard can compare the two by key. The four scopes are `read:market`,
-/// `read:account`, `write:orders` and `research`; `read:account` is reserved for
-/// account routes not built yet.
+/// guard can compare the two by key. The five scopes are `read:market`,
+/// `read:account`, `write:orders`, `research` and `operator`; `read:account` is reserved
+/// for account routes not built yet. Scopes are explicit: none implies another.
 pub const ROUTE_SCOPES: &[(&str, &str, RouteScope)] = &[
     ("GET", "/capabilities", RouteScope::Public),
     ("GET", "/health", RouteScope::Public),
@@ -189,18 +189,10 @@ pub const ROUTE_SCOPES: &[(&str, &str, RouteScope)] = &[
     ("GET", "/bars/{id}", RouteScope::Required("read:market")),
     ("GET", "/depth/{id}", RouteScope::Required("read:market")),
     ("POST", "/bars", RouteScope::Required("write:orders")),
-    // Operator routes: no dedicated operator scope exists (ADR 0023), so the strictest
-    // existing scope applies, the one that gates every route that can move money.
-    (
-        "GET",
-        "/trading-state",
-        RouteScope::Required("write:orders"),
-    ),
-    (
-        "PUT",
-        "/trading-state",
-        RouteScope::Required("write:orders"),
-    ),
+    // Operator routes: the dedicated `operator` scope (ADR 0023). It implies nothing, and
+    // `write:orders` no longer reaches these routes.
+    ("GET", "/trading-state", RouteScope::Required("operator")),
+    ("PUT", "/trading-state", RouteScope::Required("operator")),
     ("GET", "/screener/scan", RouteScope::Required("read:market")),
     ("GET", "/strategies", RouteScope::Required("research")),
     ("POST", "/strategies", RouteScope::Required("research")),
@@ -570,6 +562,10 @@ mod tests {
         assert_eq!(
             AuthLayer::required_scope("POST", "/orders"),
             Some("write:orders")
+        );
+        assert_eq!(
+            AuthLayer::required_scope("PUT", "/trading-state"),
+            Some("operator")
         );
         assert_eq!(AuthLayer::required_scope("GET", "/unknown"), None);
     }

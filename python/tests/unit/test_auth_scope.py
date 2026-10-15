@@ -62,6 +62,16 @@ def test_drift_fails_on_new_route() -> None:
     assert unscoped_routes([("GET", "/health")]) == []
 
 
-def test_trading_state_routes_need_the_write_scope() -> None:
+def test_trading_state_routes_need_the_operator_scope() -> None:
     for method in ("GET", "PUT"):
-        assert required_scope_for_route(method, "/trading-state") == "write:orders"
+        assert required_scope_for_route(method, "/trading-state") == "operator"
+
+
+def test_scopes_are_the_five_adr_0023_scopes() -> None:
+    assert set(SCOPES) == {
+        "read:market",
+        "read:account",
+        "write:orders",
+        "research",
+        "operator",
+    }

@@ -12,8 +12,9 @@ safe, a minimal authentication and authorization layer is required before bindin
 address.
 
 What already exists:
-- **Scope map** (E5-S3, `python/src/honba/ai/mcp/tools.py:98`): four scopes defined —
-  `read:market`, `read:account`, `write:orders`, `research`. Every generated MCP tool carries a
+- **Scope map** (E5-S3, `python/src/honba/ai/mcp/tools.py:98`): scopes defined —
+  `read:market`, `read:account`, `write:orders`, `research` (a fifth, `operator`, was added on
+  2026-10-15). Every generated MCP tool carries a
   `scope` annotation. The `McpGateway` filters by scope (`python/src/honba/ai/mcp/handlers.py:99`).
 - **Write endpoints** (E11-S7): `POST /orders`, `DELETE /orders/{id}`, `POST /positions/close`,
   `POST /approval/approve`, `POST /approval/reject` — currently open to anyone who can reach the
@@ -21,7 +22,7 @@ What already exists:
 - **Error envelope** (`honba-messages::ErrorCode`): `Unauthorized`, `Forbidden`, `Auth` categories
   with stable codes (`crates/honba-messages/src/errors.rs`).
 - **TradingState** (`honba-messages::TradingState`): `Active`, `Reducing`, `Halted` — the operator
-  control plane; changing it is still a 501 route until E11-S8.
+  control plane; changing it is `PUT /trading-state` (scope `operator`).
 
 What is missing:
 - No token validation on incoming requests
@@ -60,9 +61,14 @@ to configure in a dev/CI context but strong enough to not be "security by obscur
 | `GET /approval/queue`, `POST /approval/approve`, `POST /approval/reject` | `write:orders` |
 | `GET /orders` (write ledger, E11-S7, currently 501) | `write:orders` |
 | `POST /bars` | `write:orders` |
-| `GET /trading-state`, `PUT /trading-state` | `write:orders` (no dedicated operator scope; see ADR 0018 decision log 2026-10-15) |
+| `GET /trading-state`, `PUT /trading-state` | `operator` (see decision log 2026-10-15) |
 
 `read:account` is reserved for future account/positions endpoints (not built yet).
+
+`operator` is the fifth scope. It gates the routes that change or read the runtime control plane
+(`GET`/`PUT /trading-state`), so a token that may place orders (`write:orders`) cannot halt
+trading, and an operator token cannot place orders. Scopes are explicit: none implies another, so
+a token that needs both lists both. An unlisted scope name never matches a route.
 
 ### 3. Secret store
 
@@ -129,7 +135,7 @@ expires_at = "2027-01-01T00:00:00Z"
 [[tokens]]
 token_id = "f0e1d2c3b4a5"
 token_hash = "sha256:..."
-scopes = ["read:market", "read:account", "write:orders", "research"]
+scopes = ["read:market", "read:account", "write:orders", "research", "operator"]
 label = "operator-cli"
 # no expires_at = never expires
 ```
@@ -168,6 +174,17 @@ hash in the file, and distributes the raw token to the client.
 - No token introspection endpoint; the client cannot query its own scopes (by design — the
   client knows what token it has).
 - Audit log grows unbounded; operator must configure logrotate or similar.
+
+## Decision log
+
+- 2026-10-15: add the `operator` scope. `GET` and `PUT /trading-state` moved from `write:orders`
+  (commit 4fa883a, a stopgap: no operator scope existed) to `operator`, so order placement and
+  halting trading are separate grants. Both methods require `operator` (a read-only `read:account`
+  fallback for `GET` was rejected to keep the map one scope per route). `operator` implies no other
+  scope and `write:orders` no longer reaches the route. Existing `tokens.toml` files keep working;
+  a token that used `PUT /trading-state` must be reissued with `operator`. Scope names in
+  `tokens.toml` are free-form strings checked against route requirements, so no parser change was
+  needed.
 
 ## References
 
