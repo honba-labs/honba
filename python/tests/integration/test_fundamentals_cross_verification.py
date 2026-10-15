@@ -37,7 +37,10 @@ def db_conn():
 
 def test_universe_completeness(db_conn: duckdb.DuckDBPyConnection) -> None:
     """Verify that all 250 Large-Cap and Mid-Cap companies exist in the DuckDB database."""
-    total_comps = db_conn.execute("SELECT count(*) FROM companies").fetchone()[0]
+    # The universe also holds a few small caps; the guarantee is for large + mid caps only.
+    total_comps = db_conn.execute(
+        "SELECT count(*) FROM companies WHERE cap_category IN ('LARGE_CAP', 'MID_CAP')"
+    ).fetchone()[0]
     large_comps = db_conn.execute(
         "SELECT count(*) FROM companies WHERE cap_category='LARGE_CAP'"
     ).fetchone()[0]
