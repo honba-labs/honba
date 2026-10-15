@@ -245,3 +245,16 @@ fn fill_invariants_reject_negative_overfilled_and_non_positive_price() {
     assert!(bad_px.validate().is_err());
     assert_eq!(order().with_fill(5.0, 10.0).validate(), Ok(()));
 }
+
+#[test]
+fn without_reject_reason_clears_the_reason() {
+    let reason = RejectReason::new(crate::ErrorCode::OrderRejected, "remainder");
+    let o = order().with_reject_reason(reason);
+    assert!(o.reject_reason().is_some());
+    let o = o.without_reject_reason();
+    assert_eq!(o.reject_reason(), None);
+    assert!(serde_json::to_value(&o)
+        .unwrap()
+        .get("reject_reason")
+        .is_none());
+}

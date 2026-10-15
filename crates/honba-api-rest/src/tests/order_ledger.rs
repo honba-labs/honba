@@ -54,3 +54,79 @@ fn a_fill_with_a_non_finite_or_non_positive_price_or_quantity_is_dropped() {
         assert!(serde_json::to_value(&row).is_ok());
     }
 }
+
+fn refusal() -> honba_messages::RejectReason {
+    honba_messages::RejectReason::new(
+        honba_messages::ErrorCode::OrderRejected,
+        "remainder refused",
+    )
+}
+
+#[test]
+fn completing_a_part_filled_row_clears_the_reject_reason_of_its_remainder() {
+    let ledger = OrderLedger::new();
+    working(&ledger, "o1", OrderSide::Buy, 10.0);
+    assert!(ledger.apply_fill("o1", 4.0, 100.0, 4.0, OrderStatus::PartiallyFilled));
+    assert!(ledger.reject("o1", refusal()));
+    let row = ledger.get("o1").unwrap();
+    assert_eq!(row.status(), OrderStatus::PartiallyFilled);
+    assert!(row.reject_reason().is_some());
+
+    // The venue then fills the rest: a completed order was not refused.
+    assert!(ledger.apply_fill("o1", 6.0, 101.0, 10.0, OrderStatus::Filled));
+    let row = ledger.get("o1").unwrap();
+    assert_eq!(row.status(), OrderStatus::Filled);
+    assert_eq!(row.reject_reason(), None);
+    assert_eq!(row.filled_qty(), 10.0);
+}
+
+#[test]
+fn a_reject_reason_survives_a_partial_that_is_then_cancelled() {
+    let ledger = OrderLedger::new();
+    working(&ledger, "o1", OrderSide::Buy, 10.0);
+    ledger.apply_fill("o1", 4.0, 100.0, 4.0, OrderStatus::PartiallyFilled);
+    ledger.reject("o1", refusal());
+    ledger.set_status("o1", OrderStatus::Cancelled);
+    let row = ledger.get("o1").unwrap();
+    assert_eq!(row.status(), OrderStatus::Cancelled);
+    assert_eq!(row.reject_reason(), Some(&refusal()));
+}
+
+#[test]
+fn the_average_follows_cum_qty_deltas_when_the_venue_disagrees_with_fill_sizes() {
+    // The venue's cumulative quantity is the truth for how much has filled. Here its second
+    // report says 10 cumulative although the two fill sizes add to 6: the 6 new units
+    // (10 - 4) are priced at the latest fill price, so the average is (4*100 + 6*110) / 10.
+    let ledger = OrderLedger::new();
+    working(&ledger, "o1", OrderSide::Buy, 10.0);
+    ledger.apply_fill("o1", 4.0, 100.0, 4.0, OrderStatus::PartiallyFilled);
+    ledger.apply_fill("o1", 2.0, 110.0, 10.0, OrderStatus::Filled);
+    let row = ledger.get("o1").unwrap();
+    assert_eq!(row.filled_qty(), 10.0);
+    assert!((row.avg_fill_price().unwrap() - 106.0).abs() < 1e-9);
+}
+
+#[test]
+fn a_replayed_or_stale_fill_does_not_move_the_average() {
+    let ledger = OrderLedger::new();
+    working(&ledger, "o1", OrderSide::Buy, 10.0);
+    ledger.apply_fill("o1", 4.0, 100.0, 4.0, OrderStatus::PartiallyFilled);
+    // The same report again, and an older one (lower cumulative quantity).
+    ledger.apply_fill("o1", 4.0, 100.0, 4.0, OrderStatus::PartiallyFilled);
+    ledger.apply_fill("o1", 1.0, 500.0, 2.0, OrderStatus::PartiallyFilled);
+    let row = ledger.get("o1").unwrap();
+    assert_eq!(row.filled_qty(), 4.0);
+    assert_eq!(row.avg_fill_price(), Some(100.0));
+}
+
+#[test]
+fn a_first_report_larger_than_its_fill_prices_the_unseen_quantity_at_that_fill() {
+    // The ledger missed earlier fills (cum 5 on the first report it sees): all 5 units are
+    // booked at the only price known.
+    let ledger = OrderLedger::new();
+    working(&ledger, "o1", OrderSide::Buy, 10.0);
+    ledger.apply_fill("o1", 2.0, 100.0, 5.0, OrderStatus::PartiallyFilled);
+    let row = ledger.get("o1").unwrap();
+    assert_eq!(row.filled_qty(), 5.0);
+    assert_eq!(row.avg_fill_price(), Some(100.0));
+}

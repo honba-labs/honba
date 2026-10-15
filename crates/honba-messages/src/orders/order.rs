@@ -546,4 +546,10 @@ impl Order {
         self.reject_reason = Some(reason);
         self
     }
+
+    /// Clears the refusal reason, returning `self` for chaining.
+    pub fn without_reject_reason(mut self) -> Self {
+        self.reject_reason = None;
+        self
+    }
 }

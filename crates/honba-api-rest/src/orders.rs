@@ -98,8 +98,10 @@ impl OrderLedger {
     }
 
     /// Books one fill on row `order_id`: `filled_qty` becomes the venue's cumulative `cum_qty`
-    /// (capped at the order quantity), `avg_fill_price` is the running quantity-weighted
-    /// average over the fills seen so far, and the status becomes `status`.
+    /// (capped at the order quantity, never decreasing), `avg_fill_price` is the running
+    /// quantity-weighted average where each `cum_qty` increase is priced at the fill that
+    /// reported it, and the status becomes `status`. A fill that completes the row
+    /// (`Filled`) clears any `reject_reason` recorded for a refused remainder.
     ///
     /// A terminal row is left untouched (as in [`OrderLedger::set_status`]); an unknown id
     /// returns `false`.
@@ -128,16 +130,26 @@ impl OrderLedger {
         {
             return true;
         }
+        // The venue's cumulative quantity is the truth for how much has filled; fill sizes only
+        // price it. The quantity newly filled is the growth of `cum_qty` (capped at the order
+        // quantity), booked at this fill's price, so a venue whose `cum_qty` disagrees with the
+        // sum of fill sizes cannot drift the average. A replayed or stale report (no growth)
+        // changes neither quantity nor average.
         let prev_qty = row.filled_qty();
-        let prev_avg = row.avg_fill_price().unwrap_or(fill_price);
-        let seen = prev_qty + fill_qty;
-        let avg = if seen > 0.0 {
-            (prev_qty * prev_avg + fill_qty * fill_price) / seen
-        } else {
-            fill_price
-        };
-        let filled = cum_qty.min(row.quantity()).max(0.0);
-        *row = row.clone().with_status(status).with_fill(filled, avg);
+        let filled = cum_qty.min(row.quantity()).max(prev_qty);
+        let delta = filled - prev_qty;
+        let mut next = row.clone().with_status(status);
+        if delta > 0.0 {
+            let prev_avg = row.avg_fill_price().unwrap_or(fill_price);
+            let avg = (prev_qty * prev_avg + delta * fill_price) / filled;
+            next = next.with_fill(filled, avg);
+        }
+        // A completed order was not refused: drop the reason recorded for a remainder that the
+        // venue then filled after all.
+        if status == OrderStatus::Filled {
+            next = next.without_reject_reason();
+        }
+        *row = next;
         true
     }
 
