@@ -23,8 +23,9 @@ use std::time::Duration;
 
 use honba_engine::{AlgoError, ExecutionEngine, Result as EngineResult};
 use honba_entities::{ExecutionEvent, Trade};
+use honba_messages::ErrorCode;
 use honba_messages::{Order, OrderId, UnixNanos};
-use honba_ports::ExecutionGateway;
+use honba_ports::{ExecutionGateway, PortError};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::task::JoinHandle;
 
@@ -38,6 +39,7 @@ const QTY_EPS: f64 = 1e-9;
 
 enum Command {
     Submit(Order),
+    Cancel { order_id: String, now: UnixNanos },
 }
 
 type Events = Arc<Mutex<VecDeque<ExecutionEvent>>>;
@@ -93,8 +95,10 @@ impl ExecutionEngine for GatewayVenue {
     }
 
     fn cancel(&mut self, order_id: &str, now: UnixNanos) -> EngineResult<()> {
-        let _ = (order_id, now);
-        Ok(())
+        self.send(Command::Cancel {
+            order_id: order_id.to_owned(),
+            now,
+        })
     }
 
     fn native_events(&self) -> bool {
@@ -137,8 +141,13 @@ async fn run<G: ExecutionGateway>(
         tokio::select! {
             command = rx.recv() => match command {
                 Some(Command::Submit(order)) => {
-                    submit(&mut gateway, &mut working, order).await;
+                    submit(&mut gateway, &mut working, &events, order).await;
                     poll_fills(&mut gateway, &mut working, &events).await;
+                }
+                Some(Command::Cancel { order_id, now }) => {
+                    // Fills first, so the remainder below excludes whatever already filled.
+                    poll_fills(&mut gateway, &mut working, &events).await;
+                    cancel(&mut gateway, &mut working, &events, &order_id, now).await;
                 }
                 None => break,
             },
@@ -150,17 +159,85 @@ async fn run<G: ExecutionGateway>(
 async fn submit<G: ExecutionGateway>(
     gateway: &mut G,
     working: &mut HashMap<String, Working>,
+    events: &Events,
     order: Order,
 ) {
-    if let Ok(venue_id) = gateway.submit_order(order.clone()).await {
-        working.insert(
-            order.order_id().as_str().to_owned(),
-            Working {
-                order,
-                venue_id,
-                cum: 0.0,
-            },
-        );
+    match gateway.submit_order(order.clone()).await {
+        Ok(venue_id) => {
+            working.insert(
+                order.order_id().as_str().to_owned(),
+                Working {
+                    order,
+                    venue_id,
+                    cum: 0.0,
+                },
+            );
+        }
+        Err(error) => {
+            // A timeout or transport error leaves the order's venue state unknown; the ledger
+            // has no "unknown" status, so it is rejected and the gap is documented (ADR 0030).
+            let code = error_code(&error);
+            tracing::warn!(order = %order.order_id(), %error, code = %code, "gateway refused submit");
+            lock(events).push_back(ExecutionEvent::Rejected {
+                order_id: order.order_id().clone(),
+                instrument_id: order.instrument_id().clone(),
+                side: order.side(),
+                quantity: order.quantity(),
+                reason: code.as_str().to_owned(),
+                venue_order_id: None,
+                ts: order.ts_event(),
+            });
+        }
+    }
+}
+
+async fn cancel<G: ExecutionGateway>(
+    gateway: &mut G,
+    working: &mut HashMap<String, Working>,
+    events: &Events,
+    order_id: &str,
+    now: UnixNanos,
+) {
+    let Some(w) = working.get(order_id) else {
+        return; // unknown or finished: a no-op, as the engine contract says
+    };
+    match gateway.cancel_order(w.venue_id.clone()).await {
+        Ok(()) => {
+            let w = working.remove(order_id).expect("looked up above");
+            lock(events).push_back(ExecutionEvent::Cancelled {
+                order_id: w.order.order_id().clone(),
+                instrument_id: w.order.instrument_id().clone(),
+                side: w.order.side(),
+                quantity: (w.order.quantity() - w.cum).max(0.0),
+                venue_order_id: None,
+                ts: now,
+            });
+        }
+        Err(error) => {
+            // The order stays working: a refused cancel (already filled or cancelled) is
+            // reconciled by the fill stream, an unreachable venue by the caller's retry.
+            tracing::warn!(order = order_id, %error, code = %error_code(&error), "gateway refused cancel");
+        }
+    }
+}
+
+/// The stable wire error code a gateway failure is reported under.
+///
+/// No new codes: a venue refusal on its merits is `order_rejected`, a venue that cannot be
+/// reached (unavailable, retriable, terminal, needs the operator) is
+/// `order_execution_unavailable`, and the rest keep their transport meaning.
+fn error_code(error: &PortError) -> ErrorCode {
+    match error {
+        PortError::Rejected { .. } => ErrorCode::OrderRejected,
+        PortError::InvalidRequest(_) => ErrorCode::ValidationInvalidRequest,
+        PortError::Unsupported(_) => ErrorCode::Unsupported,
+        PortError::Unavailable(_)
+        | PortError::Retriable(_)
+        | PortError::Terminal(_)
+        | PortError::Unrecoverable(_) => ErrorCode::OrderExecutionUnavailable,
+        PortError::Timeout => ErrorCode::Timeout,
+        PortError::Transport(_) => ErrorCode::TransportError,
+        _ => ErrorCode::InternalError,
     }
 }
 
@@ -169,14 +246,25 @@ async fn poll_fills<G: ExecutionGateway>(
     working: &mut HashMap<String, Working>,
     events: &Events,
 ) {
-    while let Ok(Some(trade)) = gateway.next_fill().await {
+    loop {
+        let trade = match gateway.next_fill().await {
+            Ok(Some(trade)) => trade,
+            Ok(None) => break,
+            Err(error) => {
+                tracing::warn!(%error, retryable = error.is_retryable(), "gateway fill stream error");
+                break;
+            }
+        };
         let key = working
             .iter()
             .find(|(client, w)| {
                 trade.order_id() == &w.venue_id || trade.order_id().as_str() == client.as_str()
             })
             .map(|(client, _)| client.clone());
-        let Some(client) = key else { continue };
+        let Some(client) = key else {
+            tracing::warn!(order = %trade.order_id(), "gateway fill for an unknown order dropped");
+            continue;
+        };
         let w = working.get_mut(&client).expect("key just found");
         w.cum += trade.quantity();
         let complete = w.cum >= w.order.quantity() - QTY_EPS;
