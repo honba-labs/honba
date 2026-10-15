@@ -1,6 +1,6 @@
 .PHONY: build test lint fmt python schema check-schema check-schema-ts openapi check-openapi \
 	pyi check-pyi mcp check-mcp client check-client codegen check-codegen check-codegen-ci \
-	check-wasm test-wasm check-l2-vectors
+	check-wasm test-wasm check-l2-vectors docs check-docs
 
 build:
 	cargo build --workspace
