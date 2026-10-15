@@ -9,6 +9,7 @@ mod executor;
 mod fallback;
 mod health;
 mod journal;
+mod order_ledger;
 mod orders_risk;
 mod registry;
 mod retention;
