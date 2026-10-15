@@ -15,6 +15,10 @@
   replay input and are not written to the run journal; `l2` runs bypass the result cache (its key
   does not cover the ticks). A source with no ticks in the window keeps `l2_requires_ticks`. No
   wire or schema change.
+- `honba serve --fill-model <bar_fill|bar_fill_through|l2>` and `--ticks <FILE>` (versioned NDJSON
+  of quote/trade ticks, format in ADR 0030) let the CLI server run `fill_model=l2` backtests.
+  `--fill-model l2` without `--ticks` fails at start-up; a bad tick line fails start-up with its
+  line number. Default behaviour is unchanged.
 
 ### Operator auth scope (ADR 0023)
 

@@ -99,3 +99,21 @@ All work is opt-in; the default simulator and research pipeline remain L1 (ADR 0
 - 2026-10-14: E3-S1d implemented: `crates/honba-sim/tests/l2_oracle.rs` holds an independent O(n^2) reference matcher (append-only order tape, status flags, no shared book/priority code) and a seeded stream generator; `oracle_agrees_seeded_streams` compares the full event queue (fills, rejections, cancels, expiries with timestamps), cash, fees, traded notional, positions and working orders after every step over 600 seeds. Ambiguities were resolved per this ADR and `l2_sim.json` (listed in the test header). No `L2Sim` divergence was found.
 - 2026-10-15: wire `BacktestRunConfig.execution.fill_model` gains `l2` (`honba_config::FillModel::L2`; schema, OpenAPI, MCP, `.pyi` and frontend TypeScript regenerated). The REST `BacktestExecutor` reads bars only (no tick reader port yet), so a run with `fill_model=l2` fails with `ErrorCode::Unsupported` and context `{"reason": "l2_requires_ticks", "fill_model": "l2"}`; it never falls back to bar fills. Wiring `L2Sim` into the executor waits on a tick source for the run.
 - 2026-10-15: `honba_ports::TickReader` (`read_quotes` / `read_trades` over a `TickRequest`, half-open `[from, to)`) and `honba_feed::InMemoryTickReader` added; the dataset/feed layer (`ColumnarSlice`, `Dataset`) holds bars only, so ticks have their own port rather than a dataset extension. `BacktestExecutor::with_tick_reader` (and `AppState::with_tick_reader` / `with_execution`) lets a `fill_model=l2` run drive `L2Sim`: ticks are merged with the bars by `ts_event`, ties ticks first and quotes before trades (the Python `BacktestSession` rule). The `l2_requires_ticks` refusal stays when no source is configured, the source holds no tick data (`PortError::Unsupported`), or it has none in the run window; other tick read failures are `reason = "tick_read"`. Ticks are not journaled, and `l2` runs skip the result cache. No parquet tick store yet; the execution config is set at composition, not per request.
+- 2026-10-15: `honba serve --fill-model <bar_fill|bar_fill_through|l2>` (default `bar_fill`, unchanged) and `--ticks <FILE>` load an `InMemoryTickReader` into `AppState` (`with_execution`, `with_tick_reader`) so wire/REST `fill_model=l2` backtests run from the CLI. `--fill-model l2` without `--ticks` is a start-up error (`--fill-model l2 needs --ticks <FILE>`), chosen over the runtime `l2_requires_ticks` refusal so a misconfigured server never listens; the runtime refusal stays for programmatic composition (and for a file with no ticks in the run window). The file is validated whole before the server listens; a bad line fails start-up naming the path and the 1-based line. No wire or schema change.
+
+### Tick file format (`honba serve --ticks`, version 1)
+
+NDJSON, UTF-8, one JSON object per line; blank lines are ignored. Line 1 is the header `{"honba_ticks":1}` (any other version is refused, so a later format cannot be misread). Every later line is one tick, tagged by `kind`:
+
+```
+{"honba_ticks":1}
+{"kind":"quote","symbol":"TCS","exchange":"NSE","ts_event":1704067200000000000,"bid_price":99.9,"ask_price":100.1,"bid_size":500,"ask_size":400}
+{"kind":"trade","symbol":"TCS","exchange":"NSE","ts_event":1704067200500000000,"price":100.0,"size":50,"aggressor":"buyer","trade_id":"T-1"}
+```
+
+- `quote`: `symbol`, `exchange`, `ts_event`, `bid_price`, `ask_price`, `bid_size`, `ask_size`, optional `ts_init`.
+- `trade`: `symbol`, `exchange`, `ts_event`, `price`, `size`, `aggressor` (`buyer`, `seller` or `no_aggressor`), `trade_id`, optional `ts_init`.
+- `ts_event` / `ts_init` are unix nanoseconds as JSON integers (this is a file format, not the `UnixNanos` wire object); `ts_init` defaults to `ts_event`.
+- Unknown fields and unknown `kind` values are errors. Tick invariants are those of `QuoteTick` / `TradeTick` (finite values, sizes `>= 0`, `bid_price <= ask_price`).
+- Ticks may appear in any order and any mix of instruments; the reader sorts by `ts_event`, stable for ties. A file with a header but no ticks is refused.
+- The whole file is held in memory; a Parquet tick store remains open. Implementation: `crates/honba-cli/src/ticks_file.rs`.
