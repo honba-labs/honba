@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Automatic OCO for declarative-strategy exits
+
+- `DeclarativeStrategy` now treats the protective stop and take-profit of one entry fill as a
+  One-Cancels-Other group (class flag `oco = True`; set `oco = False` for the old behaviour).
+  When one leg fills in full the strategy cancels its siblings, when the position returns to
+  flat leftover protectives are cancelled, and `should_exit` is consulted while only
+  protectives rest (it cancels them, then sends the market exit). Other unfilled orders still
+  block. A partial leg fill does not resize its sibling (no order-modify support yet); each
+  partial entry fill is its own group.
+- New cancel path for strategies: `Strategy.cancel(intent)` / `StrategyContext.cancel(intent)`
+  (idempotent; unknown or finished orders are ignored; an unsent intent is withdrawn), plus
+  `intent_of(order_id)`, `is_open(intent)` and `pending_quantity(instrument_id)`. They are
+  concrete no-op defaults on `StrategyContext`, so existing contexts stay valid.
+  `LedgerContext` implements them (`note_order`, `note_closed`, `drain_cancels` for runners);
+  `StrategyRunner` relays the requests to the port after each event and `replay()` honours
+  them (a cancelled order never fills; replay fills now carry an `order_id`).
+
 ### Price collar in the engine and runner (ADR 0018 addendum)
 
 - `Engine` and `StrategyRunner` now fill `RiskRequest.expected_price` from the latest `QuoteTick`

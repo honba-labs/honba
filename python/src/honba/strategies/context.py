@@ -8,6 +8,7 @@ same strategy runs unchanged in backtest, paper and live.
 
 from __future__ import annotations
 
+import math
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 
@@ -63,6 +64,33 @@ class StrategyContext(ABC):
     def submit(self, intent: OrderIntent) -> None:
         """Queue an intent; the runner turns it into an order after the current hook returns."""
 
+    # -- optional order management (concrete defaults keep older contexts valid) -----
+    def cancel(self, intent: OrderIntent) -> None:
+        """Ask for ``intent``'s order to be cancelled. Default: not supported, does nothing.
+
+        Idempotent: an intent that was never submitted, or whose order already finished, is
+        ignored. One still waiting to be sent is withdrawn. The runner delivers the request
+        to the execution port once the current hook returns.
+        """
+
+    def intent_of(self, order_id: str | None) -> OrderIntent | None:
+        """The intent the runner sent as ``order_id``, or ``None`` (unknown or unsupported)."""
+        return None
+
+    def is_open(self, intent: OrderIntent) -> bool:
+        """Whether ``intent`` may still fill: waiting to be sent or working, not finished.
+
+        Default for contexts that cannot tell: ``True``.
+        """
+        return True
+
+    def pending_quantity(self, instrument_id: InstrumentId) -> float:
+        """Quantity submitted for ``instrument_id`` and not yet filled or released.
+
+        Default for contexts that cannot tell: unbounded while ``busy``, else zero.
+        """
+        return math.inf if self.busy(instrument_id) else 0.0
+
 
 class LedgerContext(StrategyContext):
     """The reference context (mirrors ``honba_strategy::LedgerContext``).
@@ -87,6 +115,11 @@ class LedgerContext(StrategyContext):
         self._pending: dict[tuple[InstrumentId, OrderSide], float] = {}
         self._instruments: dict[InstrumentId, Instrument] = {}
         self._outbox: list[OrderIntent] = []
+        self._order_intents: dict[str, OrderIntent] = {}
+        self._intent_orders: dict[int, str] = {}  # id(intent) -> order id (intents are kept alive)
+        self._closed: set[str] = set()
+        self._cancel_asked: set[str] = set()
+        self._cancels: list[str] = []
         for instrument in instruments:
             self.add_instrument(instrument)
 
@@ -124,7 +157,48 @@ class LedgerContext(StrategyContext):
             self._pending[key] = self._pending.get(key, 0.0) + intent.quantity
         self._outbox.append(intent)
 
+    def pending_quantity(self, instrument_id: InstrumentId) -> float:
+        return sum(q for (iid, _), q in self._pending.items() if iid == instrument_id)
+
+    def is_open(self, intent: OrderIntent) -> bool:
+        order_id = self._intent_orders.get(id(intent))
+        if order_id is None:
+            return any(queued is intent for queued in self._outbox)
+        return order_id not in self._closed
+
+    def intent_of(self, order_id: str | None) -> OrderIntent | None:
+        return self._order_intents.get(order_id) if order_id is not None else None
+
+    def cancel(self, intent: OrderIntent) -> None:
+        for index, queued in enumerate(self._outbox):
+            if queued is intent:  # not sent yet: withdraw it
+                del self._outbox[index]
+                self.release(intent)
+                return
+        order_id = self._intent_orders.get(id(intent))
+        if (
+            order_id is not None
+            and order_id not in self._closed
+            and order_id not in self._cancel_asked
+        ):
+            self._cancel_asked.add(order_id)
+            self._cancels.append(order_id)
+
     # -- runner side ----------------------------------------------------------
+    def note_order(self, order_id: str, intent: OrderIntent) -> None:
+        """Record that the runner sent ``intent`` as ``order_id`` (enables ``cancel``)."""
+        self._order_intents[order_id] = intent
+        self._intent_orders[id(intent)] = order_id
+
+    def note_closed(self, order_id: str) -> None:
+        """Record that ``order_id`` finished (filled, rejected, cancelled or expired)."""
+        self._closed.add(order_id)
+
+    def drain_cancels(self) -> list[str]:
+        """Return and clear the order ids the strategy asked to cancel, in request order."""
+        ids, self._cancels = self._cancels, []
+        return ids
+
     def set_now(self, ts: int) -> None:
         """Set the clock to the ``ts_init`` of the event about to be processed."""
         self._now = ts

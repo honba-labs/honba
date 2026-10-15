@@ -64,6 +64,34 @@ def replay(strategy: Strategy, bars: Iterable[Bar], fill_delay: int = 0) -> Repl
     resting_stops: list[_RestingTrailingStop] = []
     last_close: dict[InstrumentId, float] = {}
     last_open: dict[InstrumentId, float] = {}
+    ids: dict[int, str] = {}  # id(intent) -> replay order id
+    cancelled: set[str] = set()
+    ledger = strategy.ctx if isinstance(strategy.ctx, LedgerContext) else None
+
+    def settle(intent: OrderIntent, px: float, ts: int) -> None:
+        oid = ids[id(intent)]
+        if oid in cancelled:
+            return
+        _fill(strategy, result, intent, px, ts, oid)
+        if ledger is not None:
+            ledger.note_closed(oid)
+            apply_cancels()
+
+    def apply_cancels() -> None:
+        # Strategy cancel requests (OCO): the order never fills; the ledger releases it.
+        nonlocal queue, resting_stops
+        if ledger is None:
+            return
+        for oid in ledger.drain_cancels():
+            intent = ledger.intent_of(oid)
+            if intent is None or oid in cancelled:
+                continue
+            cancelled.add(oid)
+            ledger.note_closed(oid)
+            ledger.release(intent)
+            queue = [q for q in queue if q[1] is not intent]
+            resting_stops = [s for s in resting_stops if s.intent is not intent]
+
     strategy.on_start()
     for i, bar in enumerate(bars):
         last_close[bar.instrument_id] = bar.close
@@ -106,18 +134,23 @@ def replay(strategy: Strategy, bars: Iterable[Bar], fill_delay: int = 0) -> Repl
 
         triggered.sort(key=lambda item: 0 if item[0].side is OrderSide.SELL else 1)
         for intent, px in triggered:
-            _fill(strategy, result, intent, px, bar.ts)
+            settle(intent, px, bar.ts)
 
         due = [q for q in queue if q[0] <= i]
         queue = [q for q in queue if q[0] > i]
         due.sort(key=lambda item: 0 if item[1].side is OrderSide.SELL else 1)
         for _, intent in due:
             px = last_open.get(intent.instrument_id, bar.open)
-            _fill(strategy, result, intent, px, bar.ts)
+            settle(intent, px, bar.ts)
         strategy.on_bar(bar)
+        apply_cancels()
         intents = strategy.drain_intents()
         for intent in intents:
             result.intents.append(intent)
+            oid = f"replay-{len(result.intents) - 1}"
+            ids[id(intent)] = oid
+            if ledger is not None:
+                ledger.note_order(oid, intent)
             if intent.order_type is OrderType.TRAILING_STOP:
                 ref = bar.close
                 resting_stops.append(_RestingTrailingStop(intent, peak=ref, trough=ref))
@@ -132,15 +165,20 @@ def replay(strategy: Strategy, bars: Iterable[Bar], fill_delay: int = 0) -> Repl
             )
             for intent in intents_to_fill:
                 px = last_close.get(intent.instrument_id, bar.close)
-                _fill(strategy, result, intent, px, bar.ts)
+                settle(intent, px, bar.ts)
     strategy.on_stop()
     return result
 
 
 def _fill(
-    strategy: Strategy, result: ReplayResult, intent: OrderIntent, price: float, ts: int
+    strategy: Strategy,
+    result: ReplayResult,
+    intent: OrderIntent,
+    price: float,
+    ts: int,
+    order_id: str | None = None,
 ) -> None:
-    fill = Trade(intent.instrument_id, intent.side, intent.quantity, price, ts)
+    fill = Trade(intent.instrument_id, intent.side, intent.quantity, price, ts, order_id)
     result.fills.append(fill)
     strategy.handle_fill(fill)
 

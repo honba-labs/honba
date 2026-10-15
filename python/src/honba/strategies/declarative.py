@@ -46,11 +46,19 @@ Notes and caveats
 * Warmup is the runner's job (``Strategy.warmup_bars``); this class does not repeat it.
 * Overriding ``on_bar`` bypasses the facade entirely. Overriding ``on_fill`` is fine
   but must call ``super().on_fill(fill)`` or protective orders are not placed.
-* Resting protective orders count as unfilled orders, so ``busy()`` is true while they
-  rest and ``should_exit`` is not consulted until they are gone; exits then come from
-  the stop / target themselves.
-* TODO(OCO): the stop and the target are independent orders. When one fills the other
-  must be cancelled by the engine / broker (OCO); this class does not cancel it.
+* OCO (``oco = True``, the default; set ``oco = False`` for the old behaviour). The stop and
+  the target placed for one entry fill form a One-Cancels-Other group, managed by the
+  strategy through ``self.cancel`` (the runner relays it to the port; ``cancel`` is idempotent
+  and ignores unknown or finished orders). When one leg fills in full the siblings are
+  cancelled; when the position returns to flat any leftover protectives are cancelled; and
+  ``should_exit`` is consulted while only protectives rest, cancelling them before the market
+  exit is sent. Other unfilled orders (an entry or exit in flight) still block everything.
+  A partial fill of a leg does *not* resize its sibling (there is no order-modify support
+  yet): the sibling stays at full size until the leg is filled completely or the position is
+  flat. Each entry fill (so each partial entry fill) is its own group. The cancel is a
+  request: a sibling that fills before the port processes it is not undone (the same
+  instant double fill an exchange can produce). With ``oco = False`` resting protectives
+  keep ``busy()`` true and exits come from the stop / target themselves.
 * Trailing stops (``OrderType.TRAILING_STOP``) are not used.
 
 TargetWeightStrategy
@@ -103,6 +111,21 @@ class Entry:
         _check_level("take_profit", self.take_profit)
 
 
+class _Leg:
+    __slots__ = ("filled", "intent")
+
+    def __init__(self, intent: OrderIntent) -> None:
+        self.intent = intent
+        self.filled = 0.0
+
+
+class _OcoGroup:
+    __slots__ = ("legs",)
+
+    def __init__(self, legs: list[_Leg]) -> None:
+        self.legs = legs
+
+
 class DeclarativeStrategy(Strategy):
     """Subclass, set ``name``, override the rule hooks you need (see the module docstring)."""
 
@@ -131,7 +154,18 @@ class DeclarativeStrategy(Strategy):
         """Flatten the open position at market. Default ``False``."""
         return False
 
+    oco: ClassVar[bool] = True
+    """Treat the protective stop and take-profit of an entry as a One-Cancels-Other group."""
+
     # -- facade -----------------------------------------------------------------
+    @property
+    def _oco_groups(self) -> dict[InstrumentId, list[_OcoGroup]]:
+        try:
+            return self.__oco_groups
+        except AttributeError:
+            self.__oco_groups: dict[InstrumentId, list[_OcoGroup]] = {}
+            return self.__oco_groups
+
     @property
     def _entries(self) -> dict[InstrumentId, tuple[OrderSide, Entry]]:
         try:
@@ -142,7 +176,7 @@ class DeclarativeStrategy(Strategy):
 
     def on_bar(self, bar: Bar) -> None:
         iid = bar.instrument_id
-        if self.busy(iid):
+        if self._blocked(iid):
             return
         position = self.position(iid)
         if abs(position) <= _EPSILON:
@@ -157,6 +191,7 @@ class DeclarativeStrategy(Strategy):
                 self._entries[iid] = (OrderSide.SELL, entry)
                 self.sell(iid, entry.quantity)
         elif self.should_exit(bar):
+            self._cancel_protectives(iid)
             if position > 0:
                 self.sell(iid, position)
             else:
@@ -170,17 +205,70 @@ class DeclarativeStrategy(Strategy):
             side, entry = state
             if fill.side is side:
                 self._protect(iid, side, fill.quantity, entry)
+        self._settle_oco(fill)
         if abs(self.position(iid)) <= _EPSILON:
             self._entries.pop(iid, None)
+            self._cancel_protectives(iid)
+
+    # -- OCO ----------------------------------------------------------------------
+    def _open_legs(self, iid: InstrumentId) -> list[_Leg]:
+        return [
+            leg
+            for group in self._oco_groups.get(iid, ())
+            for leg in group.legs
+            if self.ctx.is_open(leg.intent)
+        ]
+
+    def _blocked(self, iid: InstrumentId) -> bool:
+        """Unfilled orders block the rules, except resting protectives while in a position."""
+        if not self.busy(iid):
+            return False
+        if not self.oco:
+            return True
+        resting = self._open_legs(iid)
+        if not resting:
+            return True
+        if abs(self.position(iid)) <= _EPSILON:
+            return True  # stale protectives of a closed position: wait for their cancel
+        covered = sum(leg.intent.quantity - leg.filled for leg in resting)
+        return self.ctx.pending_quantity(iid) - covered > _EPSILON
+
+    def _cancel_protectives(self, iid: InstrumentId) -> None:
+        for leg in self._open_legs(iid):
+            self.cancel(leg.intent)
+        self._oco_groups.pop(iid, None)
+
+    def _settle_oco(self, fill: Trade) -> None:
+        """Book ``fill`` against its protective leg; a full fill cancels the group's siblings."""
+        intent = self.ctx.intent_of(fill.order_id)
+        if intent is None:
+            return
+        groups = self._oco_groups.get(fill.instrument_id, [])
+        for group in groups:
+            for leg in group.legs:
+                if leg.intent is not intent:
+                    continue
+                leg.filled += fill.quantity
+                if leg.filled + _EPSILON >= intent.quantity:
+                    for other in group.legs:
+                        if other is not leg and self.ctx.is_open(other.intent):
+                            self.cancel(other.intent)
+                    groups.remove(group)
+                return
 
     def _protect(self, iid: InstrumentId, side: OrderSide, qty: float, entry: Entry) -> None:
         long = side is OrderSide.BUY
+        legs: list[_Leg] = []
         if entry.stop_loss is not None:
             stop = OrderIntent.stop_sell if long else OrderIntent.stop_buy
-            self.submit(stop(iid, qty, entry.stop_loss))
+            legs.append(_Leg(stop(iid, qty, entry.stop_loss)))
         if entry.take_profit is not None:
             take = OrderIntent.limit_sell if long else OrderIntent.limit_buy
-            self.submit(take(iid, qty, entry.take_profit))
+            legs.append(_Leg(take(iid, qty, entry.take_profit)))
+        for leg in legs:
+            self.submit(leg.intent)
+        if self.oco and legs:
+            self._oco_groups.setdefault(iid, []).append(_OcoGroup(legs))
 
     @staticmethod
     def _validate_levels(entry: Entry, close: float, *, long: bool) -> None:

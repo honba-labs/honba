@@ -268,6 +268,10 @@ class Strategy(ABC):
     def submit(self, intent: OrderIntent) -> None:
         self.ctx.submit(intent)
 
+    def cancel(self, intent: OrderIntent) -> None:
+        """Ask for the order sent from ``intent`` to be cancelled (idempotent, see the context)."""
+        self.ctx.cancel(intent)
+
     # -- legacy runner entry points (kept for one minor version) -----------------
     def drain_intents(self) -> list[OrderIntent]:
         """Returns and clears pending intents (legacy runner entry point)."""

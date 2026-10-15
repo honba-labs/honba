@@ -95,6 +95,11 @@ __all__ = [
 ]
 
 
+_FINISHED = frozenset(
+    {OrderStatus.FILLED, OrderStatus.CANCELLED, OrderStatus.REJECTED, OrderStatus.EXPIRED}
+)
+
+
 @dataclass(frozen=True, slots=True)
 class SubmittedIntent:
     """An intent the runner sent as an order, with the ``ts_init`` it was sent at."""
@@ -345,7 +350,16 @@ class StrategyRunner:
             return self.strategy.drain_intents()  # deprecated override, honoured until 0.3
         return self.ctx.drain_intents()
 
+    def _flush_cancels(self) -> None:
+        """Relay the strategy's cancel requests (``Strategy.cancel``) to the port."""
+        for order_id in self.ctx.drain_cancels():
+            state = self._states.get(order_id)
+            if state is None or state.status in _FINISHED:
+                continue
+            self.cancel(order_id)
+
     def _submit_intents(self, ts_init: int) -> None:
+        self._flush_cancels()
         drained = self._drain()
         for index, intent in enumerate(drained):
             try:
@@ -403,6 +417,7 @@ class StrategyRunner:
             state.apply(OrderEvent.submitted(intent.quantity))
             self._states[order_id] = state
             self._orders[order_id] = (intent.instrument_id, intent.side)
+            self.ctx.note_order(order_id, intent)
             self.intents.append(SubmittedIntent(ts_init, intent, order_id))
             # Wire type: order (DEBUG — not emitted unless level <= DEBUG)
             self.logger.debug(
@@ -470,6 +485,7 @@ class StrategyRunner:
                 first_error = first_error or error
         if first_error is not None:
             raise first_error
+        self._flush_cancels()
 
     def _book_event(self, ev: ExecutionEvent) -> None:
         if isinstance(ev, Fill):
@@ -480,6 +496,7 @@ class StrategyRunner:
                     state.apply(OrderEvent.fill(ev.trade.quantity, complete))
                 except IllegalTransition:
                     pass  # an illegal fill (overfill) leaves the FSM unchanged but is booked
+                self._note_finished(ev.trade.order_id or "", state)
             self._book_fill(ev.trade)
             return
         rejection = rejection_from_event(ev)
@@ -499,7 +516,12 @@ class StrategyRunner:
                 return  # illegal terminal: releases nothing
             if not transitioned:
                 return  # duplicate terminal: releases nothing
+            self._note_finished(rejection.order_id, state)
         self._book_rejection(rejection)
+
+    def _note_finished(self, order_id: str, state: OrderState) -> None:
+        if state.status in _FINISHED:
+            self.ctx.note_closed(order_id)
 
     def _book_fill(self, fill: Trade) -> None:
         if _overrides(self.strategy, "handle_fill"):
