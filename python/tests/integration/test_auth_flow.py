@@ -45,6 +45,23 @@ created_at = "2026-10-11T09:35:09Z"
 """
 
 
+def resolve_honba_bin() -> str:
+    """The Rust ``honba`` binary: ``$HONBA_BIN``, else the cargo target dir, else ``PATH``.
+
+    ``PATH`` may hold the Python ``honba`` entry point, which has no ``serve`` command, so the
+    cargo build output (``cargo build -p honba-cli``) is preferred over it.
+    """
+    explicit = os.environ.get("HONBA_BIN")
+    if explicit:
+        return explicit
+    target = Path(os.environ.get("CARGO_TARGET_DIR") or Path(__file__).parents[3] / "target")
+    for profile in ("debug", "release"):
+        candidate = target / profile / "honba"
+        if candidate.is_file():
+            return str(candidate)
+    return "honba"
+
+
 def find_free_port() -> int:
     import socket
 
@@ -80,7 +97,7 @@ class TestAuthIntegration:
             tokens_file.write_text(TOKENS_TOML_MULTI, encoding="utf-8")
 
             port = find_free_port()
-            honba_bin = os.environ.get("HONBA_BIN", "honba")
+            honba_bin = resolve_honba_bin()
             cmd = [
                 honba_bin,
                 "serve",
@@ -132,7 +149,7 @@ class TestAuthIntegration:
             (data_dir / "NIFTY.NSE.parquet").write_bytes(pd.DataFrame(df).to_parquet(index=False))
 
             port = find_free_port()
-            honba_bin = os.environ.get("HONBA_BIN", "honba")
+            honba_bin = resolve_honba_bin()
             cmd = [
                 honba_bin,
                 "serve",
