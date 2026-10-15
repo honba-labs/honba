@@ -10,6 +10,7 @@ pub mod api;
 pub mod async_shell;
 pub mod codegen;
 pub mod domain;
+pub mod gateway_server;
 pub mod l2;
 pub mod manifest;
 pub mod next_open;
@@ -24,6 +25,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     async_shell::register(m)?;
     codegen::register(m)?;
     domain::register(m)?;
+    gateway_server::register(m)?;
     manifest::register(m)?;
     l2::register(m)?;
     next_open::register(m)?;

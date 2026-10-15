@@ -139,12 +139,33 @@ struct OwnedLoop {
     event_loop: Py<PyAny>,
 }
 
+/// Cancels what is still running on the loop, then stops it.
+const STOP_LOOP: &str = "
+import asyncio
+
+def stop_loop(loop):
+    async def drain():
+        me = asyncio.current_task()
+        pending = [t for t in asyncio.all_tasks() if t is not me]
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
+        loop.stop()
+
+    loop.call_soon_threadsafe(lambda: loop.create_task(drain()))
+";
+
 impl Drop for OwnedLoop {
     fn drop(&mut self) {
         Python::with_gil(|py| {
-            let lp = self.event_loop.bind(py);
-            if let Ok(stop) = lp.getattr("stop") {
-                let _ = lp.call_method1("call_soon_threadsafe", (stop,));
+            let stopped = PyModule::from_code_bound(py, STOP_LOOP, "stop_loop.py", "stop_loop")
+                .and_then(|m| m.getattr("stop_loop")?.call1((self.event_loop.bind(py),)));
+            if stopped.is_err() {
+                // Last resort: stop without cancelling.
+                let lp = self.event_loop.bind(py);
+                if let Ok(stop) = lp.getattr("stop") {
+                    let _ = lp.call_method1("call_soon_threadsafe", (stop,));
+                }
             }
         });
     }

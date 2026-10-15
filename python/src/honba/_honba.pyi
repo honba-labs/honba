@@ -13,6 +13,7 @@ __all__ = [
     "Command",
     "Fill",
     "FnoContract",
+    "GatewayServer",
     "InstrumentId",
     "L2Simulator",
     "NextOpenSimulator",
@@ -445,6 +446,38 @@ class Command:
     def stop() -> Command: ...
     @staticmethod
     def state(trading_state: TradingState) -> Command: ...
+
+@final
+class GatewayServer:
+    """The REST app over ``data_dir`` with a Python broker adapter behind ``/orders``.
+
+    ``gateway`` has ``submit_order(order_json) -> venue_id``, ``cancel_order(venue_id)``,
+    ``modify_order(venue_id, quantity, price)`` and ``next_fill() -> trade_json | None``, each
+    sync or ``async`` (see ``honba.adapters.gateway.ExecutionAdapterGateway``). Calls into it
+    never block the HTTP server; ``call_timeout_s`` bounds each one."""
+
+    def __new__(
+        cls,
+        data_dir: str,
+        gateway: object,
+        host: str = "127.0.0.1",
+        port: int = 0,
+        poll_interval_ms: int = 50,
+        drain_interval_ms: int = 50,
+        call_timeout_s: float | None = None,
+        event_loop: object | None = None,
+    ) -> Self: ...
+    def start(self) -> int:
+        """Start serving; returns the bound port. ``OSError`` if the data directory cannot be
+        loaded or the address bound, ``RuntimeError`` if already started."""
+    def stop(self) -> None:
+        """Stop serving and join the server threads. Idempotent."""
+    @property
+    def port(self) -> int: ...
+    @property
+    def url(self) -> str: ...
+    def __enter__(self) -> Self: ...
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> bool: ...
 
 @final
 class RiskLimits:
