@@ -16,8 +16,10 @@
 //! ledger row to `Filled`. Known limits: market orders only (a limit order is
 //! `Rejected` by the simulator) and order rows still carry a zero timestamp. Rows report
 //! `filled_qty` / `avg_fill_price` from the venue's fills and `reject_reason` (stable
-//! `ErrorCode` plus message) from its refusals (ADR 0030); a risk refusal is a 422 and
-//! never becomes a row, so it has no `reject_reason` on the ledger.
+//! `ErrorCode` plus message) from its refusals (ADR 0030). A risk refusal is still the 422
+//! below; when the request carries a `client_order_id` it is also recorded as a `Rejected` row
+//! (`reject_reason` = the refusal's code and message) and a repeat of that id replays the
+//! same 422. A keyless refusal is not recorded (the shared route key would poison later orders).
 //!
 //! When the approval queue is enabled (E5-S4), placements are held in the queue
 //! until approved by an operator. Cancel and modify bypass the queue.
@@ -66,6 +68,9 @@ fn is_terminal(status: OrderStatus) -> bool {
 #[derive(Clone, Debug, Default)]
 pub struct OrderLedger {
     inner: Arc<Mutex<BTreeMap<String, Order>>>,
+    /// The full error envelope of every risk refusal recorded as a `Rejected` row, by order
+    /// id, so a repeat of the id answers with the same 422 (context included).
+    refusals: Arc<Mutex<BTreeMap<String, ErrorDetail>>>,
 }
 
 impl OrderLedger {
@@ -168,6 +173,40 @@ impl OrderLedger {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         guard.insert(order.order_id().as_str().to_owned(), order);
+    }
+
+    /// Records a risk-refused `order` as a `Rejected` row carrying `detail` as its
+    /// `reject_reason`, and remembers `detail` so [`OrderLedger::refusal`] can replay it.
+    ///
+    /// An id that already has a row is left untouched (the first answer for a key stands).
+    pub fn record_refusal(&self, order: Order, detail: ErrorDetail) {
+        let id = order.order_id().as_str().to_owned();
+        let row = order
+            .with_status(OrderStatus::Rejected)
+            .with_reject_reason(RejectReason::new(detail.code, detail.message.clone()));
+        {
+            let mut guard = self
+                .inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if guard.contains_key(&id) {
+                return;
+            }
+            guard.insert(id.clone(), row);
+        }
+        self.refusals
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(id, detail);
+    }
+
+    /// The error envelope of the risk refusal recorded under `order_id`, if that row is one.
+    pub fn refusal(&self, order_id: &str) -> Option<ErrorDetail> {
+        self.refusals
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(order_id)
+            .cloned()
     }
 
     /// Looks up one row by client order id.
@@ -367,12 +406,23 @@ fn parse_order(
     Ok((instrument_id, side, quantity, price))
 }
 
-fn refusal_response(refusal: &honba_risk::RiskRefusal) -> Response {
-    let detail = ErrorDetail::new(
+fn refusal_detail(refusal: &honba_risk::RiskRefusal) -> ErrorDetail {
+    ErrorDetail::new(
         refusal.error_code(),
         format!("order refused by risk: {}", refusal.rule()),
     )
-    .with_context(refusal.context());
+    .with_context(refusal.context())
+}
+
+/// The 422 for a risk refusal. With `record` (the caller supplied the idempotency key) the
+/// refusal also becomes a `Rejected` ledger row, so `GET /orders` shows it and a repeat of the
+/// key replays this answer; the response itself is unchanged. A keyless refusal has no stable
+/// identity (the route placeholder key is shared) and is never recorded.
+fn refuse(state: &AppState, record: Option<Order>, refusal: &honba_risk::RiskRefusal) -> Response {
+    let detail = refusal_detail(refusal);
+    if let Some(order) = record {
+        state.orders.record_refusal(order, detail.clone());
+    }
     failure(StatusCode::UNPROCESSABLE_ENTITY, detail)
 }
 
@@ -443,6 +493,9 @@ pub(crate) async fn post_orders(
         .map(OrderId::new)
         .unwrap_or_else(|| order_id.clone());
     if let Some(existing) = state.orders.get(ledger_id.as_str()) {
+        if let Some(detail) = state.orders.refusal(ledger_id.as_str()) {
+            return failure(StatusCode::UNPROCESSABLE_ENTITY, detail);
+        }
         return success(order_json(&existing));
     }
 
@@ -496,7 +549,22 @@ pub(crate) async fn post_orders(
                 &state.orders.get(order.order_id().as_str()).unwrap_or(order),
             ))
         }
-        RiskDecision::Refused(refusal) => refusal_response(&refusal),
+        RiskDecision::Refused(refusal) => {
+            let record = req.client_order_id.as_ref().map(|_| {
+                Order::new(
+                    ledger_id,
+                    instrument_id,
+                    side,
+                    order_type_of(&req),
+                    quantity,
+                    price,
+                    TimeInForce::Day,
+                    UnixNanos::new(0),
+                    UnixNanos::new(0),
+                )
+            });
+            refuse(&state, record, &refusal)
+        }
     }
 }
 
@@ -576,7 +644,8 @@ pub(crate) async fn post_close_positions(State(state): State<Arc<AppState>>) -> 
             if let Err(detail) = queue.enqueue(OrderId::new(key), req) {
                 return failure(StatusCode::TOO_MANY_REQUESTS, detail);
             }
-        } else if let Err(response) = gate_and_record(&state, &req, OrderId::new(key)).await {
+        } else if let Err(response) = gate_and_record(&state, &req, OrderId::new(key), false).await
+        {
             return response;
         }
     }
@@ -629,17 +698,20 @@ async fn post_orders_direct(
     crate::ApiJson(req): crate::ApiJson<OrdersRequest>,
     order_id: OrderId,
 ) -> Response {
-    match gate_and_record(&state, &req, order_id).await {
+    let keyed = req.client_order_id.is_some();
+    match gate_and_record(&state, &req, order_id, keyed).await {
         Ok(order) => success(order_json(&order)),
         Err(response) => response,
     }
 }
 
 /// Runs the risk stage for `req` and, when approved, records the order in the ledger.
+/// With `record_refusal` a refusal is also recorded as a `Rejected` row (see [`refuse`]).
 async fn gate_and_record(
     state: &AppState,
     req: &OrdersRequest,
     order_id: OrderId,
+    record_refusal: bool,
 ) -> Result<Order, Response> {
     let (instrument_id, side, quantity, price) =
         parse_order(req).map_err(|detail| failure(StatusCode::UNPROCESSABLE_ENTITY, detail))?;
@@ -690,7 +762,22 @@ async fn gate_and_record(
             state.exec.submit(&state.orders, order.clone());
             Ok(state.orders.get(order.order_id().as_str()).unwrap_or(order))
         }
-        RiskDecision::Refused(refusal) => Err(refusal_response(&refusal)),
+        RiskDecision::Refused(refusal) => {
+            let record = record_refusal.then(|| {
+                Order::new(
+                    order_id,
+                    instrument_id,
+                    side,
+                    order_type_of(req),
+                    quantity,
+                    price,
+                    TimeInForce::Day,
+                    UnixNanos::new(0),
+                    UnixNanos::new(0),
+                )
+            });
+            Err(refuse(state, record, &refusal))
+        }
     }
 }
 

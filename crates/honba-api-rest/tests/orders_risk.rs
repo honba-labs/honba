@@ -647,3 +647,76 @@ mod collar {
         assert_eq!(status, StatusCode::OK);
     }
 }
+
+/// A risk refusal with a caller key is a 422 *and* a `rejected` ledger row (ADR 0030): the
+/// row names the refusal, and a repeat of the key answers with the same refusal, adding nothing.
+#[tokio::test]
+async fn a_keyed_risk_refusal_is_a_rejected_row_and_a_repeat_returns_the_same_422() {
+    let app = api_router_with(state());
+    let mut refused = order("X", "NSE", "buy", 30.0, Some(100.0));
+    refused["client_order_id"] = json!("refused-1");
+    let (first_status, first) =
+        call(app.clone(), Method::POST, "/orders", Some(refused.clone())).await;
+    assert_eq!(first_status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(first["error"]["code"], json!("risk_lot_multiple_violation"));
+
+    let (status, body) = call(app.clone(), Method::GET, "/orders", None).await;
+    assert_eq!(status, StatusCode::OK);
+    let rows = body["data"]["orders"].as_array().unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["order_id"], json!("refused-1"));
+    assert_eq!(rows[0]["status"], json!("rejected"));
+    assert_eq!(
+        rows[0]["reject_reason"]["code"],
+        json!("risk_lot_multiple_violation")
+    );
+    assert!(rows[0]["reject_reason"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("lot_multiple"));
+
+    // The repeat is the same refusal (status, code, context), not a 200 row and not a new row.
+    let (again_status, again) = call(app.clone(), Method::POST, "/orders", Some(refused)).await;
+    assert_eq!(again_status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(again["error"], first["error"]);
+    let (_, body) = call(app, Method::GET, "/orders", None).await;
+    assert_eq!(body["data"]["orders"].as_array().unwrap().len(), 1);
+}
+
+/// Without a `client_order_id` the route key is the shared placeholder `rest`, so recording a
+/// refusal under it would poison every later keyless order: such a refusal stays unrecorded.
+#[tokio::test]
+async fn a_keyless_risk_refusal_leaves_no_row_and_does_not_poison_later_orders() {
+    let app = api_router_with(state());
+    let (status, _) = call(
+        app.clone(),
+        Method::POST,
+        "/orders",
+        Some(order("X", "NSE", "buy", 30.0, Some(100.0))),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    let (_, body) = call(app.clone(), Method::GET, "/orders", None).await;
+    assert!(body["data"]["orders"].as_array().unwrap().is_empty());
+
+    let (status, body) = call(
+        app,
+        Method::POST,
+        "/orders",
+        Some(order("X", "NSE", "buy", 25.0, None)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["data"]["status"], json!("submitted"));
+}
+
+/// A refused order moves no exposure: the rejected row is outside `OrderLedger::position`.
+#[tokio::test]
+async fn a_refused_row_adds_no_exposure() {
+    let st = state();
+    let app = api_router_with(st.clone());
+    let mut refused = order("X", "NSE", "buy", 30.0, Some(100.0));
+    refused["client_order_id"] = json!("refused-2");
+    call(app, Method::POST, "/orders", Some(refused)).await;
+    assert_eq!(st.orders.position(&instrument_id()), 0.0);
+}
