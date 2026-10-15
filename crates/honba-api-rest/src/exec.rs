@@ -38,7 +38,7 @@ const DEFAULT_CASH_MINOR: i64 = 1_000_000_000_000;
 /// react to market bars.
 ///
 /// `on_bar` defaults to a no-op, for a venue driven by its own feed; such a venue's events are
-/// drained on every [`AppState::advance_market`] call (with or without bars).
+/// drained on every [`AppState::advance_market`](crate::AppState::advance_market) call (with or without bars).
 pub trait ExecutionVenue: ExecutionEngine + 'static {
     /// Feeds one market bar (ascending event time). An out-of-order bar is an error.
     fn on_bar(&mut self, _bar: &Bar) -> EngineResult<()> {
