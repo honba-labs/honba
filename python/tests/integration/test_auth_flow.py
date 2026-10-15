@@ -290,7 +290,7 @@ class TestScopeMap:
             ("GET", "/instruments", "read:market"),
             ("GET", "/bars/test", "read:market"),
             ("GET", "/depth/test", "read:market"),
-            ("GET", "/screener/scan?symbols=NIFTY.NSE", "read:market"),
+            ("GET", "/screener/scan", "read:market"),
             ("GET", "/strategies", "research"),
             ("POST", "/strategies", "research"),
             ("POST", "/strategies/verify", "research"),
