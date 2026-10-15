@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Packaging
+
+- New optional extra `fundamentals` (`duckdb>=1.0`), required by `honba.data.loaders.fundamentals`
+  (`pip install -e "python[fundamentals]"`). `python/requirements-dev.txt` includes `duckdb` so CI
+  runs the fundamentals tests instead of skipping them.
+
 ### Wire `fill_model` gains `l2` (ADR 0030)
 
 - `BacktestRunConfig.execution.fill_model` accepts `l2` (`bar_fill`, `bar_fill_through`, `l2`,

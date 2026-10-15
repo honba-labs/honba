@@ -60,7 +60,7 @@ ruff check .                              # line-length 100
 
 REST SDK: `honba.client` (`Client`, `HttpTransport`, `InprocTransport`) is the typed Python client for the REST read API. The in-process transport calls `honba._honba.api_request`, which drives the Rust router (`honba_api_rest::dispatch`) with no socket; the HTTP parity tests (`python/tests/integration/test_client_parity.py`) use a built `honba` binary (`cargo build -p honba-cli`, or `HONBA_BIN`) and skip without it.
 
-Optional extras: `ai` (openai, anthropic, litellm, mcp), `rl` (torch, gymnasium). CLI entry point: `honba` → `honba.cli.main:app` (typer; subcommands in `python/honba/cli/`: backtest, data, optimize, research, strategy, ai).
+Optional extras: `ai` (openai, anthropic, litellm, mcp), `rl` (torch, gymnasium), `fundamentals` (duckdb; needed by `honba.data.loaders.fundamentals`). CLI entry point: `honba` → `honba.cli.main:app` (typer; subcommands in `python/honba/cli/`: backtest, data, optimize, research, strategy, ai).
 
 CI (`.github/workflows/ci.yml`), all blocking: Rust job (fmt, check, check `honba-market` without default features, clippy `--workspace --all-targets -D warnings`, test, doctest, codegen drift via `make check-codegen-ci`, doc with `-D warnings`; cargo cache via `Swatinem/rust-cache`), dependency-graph check, and Python job (deps, maturin develop, stubtest, pytest, ruff lint: `ruff check python` and `ruff format --check python`). The frontend TypeScript drift check runs in the `codegen-drift-frontend` job, which checks out `honba-frontend` beside this repo and runs `make check-schema-ts check-client`.
 
