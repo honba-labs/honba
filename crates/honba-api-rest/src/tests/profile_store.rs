@@ -254,3 +254,50 @@ fn a_corrupt_file_is_moved_aside_and_the_user_starts_fresh() {
     let put = store.put("alice", 0, with_shortlist(&["A"])).unwrap();
     assert_eq!(put.revision, 1);
 }
+
+#[test]
+fn concurrent_updates_on_one_user_all_land() {
+    const THREADS: usize = 8;
+    const PER_THREAD: usize = 25;
+    let (_tmp, store) = store();
+    let store = std::sync::Arc::new(store);
+    let workers: Vec<_> = (0..THREADS)
+        .map(|t| {
+            let store = store.clone();
+            std::thread::spawn(move || {
+                for i in 0..PER_THREAD {
+                    store
+                        .update("alice", |p| {
+                            p.shortlist.push(format!("{t}-{i}"));
+                            true
+                        })
+                        .unwrap();
+                }
+            })
+        })
+        .collect();
+    for w in workers {
+        w.join().unwrap();
+    }
+    let profile = store.get("alice").unwrap();
+    assert_eq!(profile.revision, (THREADS * PER_THREAD) as u64);
+    assert_eq!(profile.shortlist.len(), THREADS * PER_THREAD);
+}
+
+#[test]
+fn temp_names_are_unique_per_write_and_cleaned_up() {
+    let (tmp, store) = store();
+    let dir = tmp.path().join("profiles");
+    store.put("alice", 0, Profile::default()).unwrap();
+    // A stale temp file from a crashed writer does not block later writes.
+    std::fs::write(dir.join("alice.json.tmp"), b"junk").unwrap();
+    store.put("alice", 1, Profile::default()).unwrap();
+    store.put("alice", 2, Profile::default()).unwrap();
+    let mut names: Vec<String> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    assert_eq!(names, vec!["alice.json", "alice.json.tmp"]);
+    assert_eq!(std::fs::read(dir.join("alice.json.tmp")).unwrap(), b"junk");
+}

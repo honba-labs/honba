@@ -59,7 +59,8 @@ pub(crate) struct RunsArgs {
     /// Directory holding one sub-directory per run (manifest.json + events.ndjson)
     #[arg(long, default_value = "data/journals")]
     pub journals_dir: PathBuf,
-    /// Directory holding one JSON profile per user (`/profile` routes); created on first write
+    /// Directory holding one JSON profile per user (`/profile` routes); created on first write.
+    /// Run one `honba serve` per profiles directory: there is no cross-process lock
     #[arg(long, default_value = "data/profiles")]
     pub profiles_dir: PathBuf,
     /// NDJSON file each `PUT /trading-state` change is appended to (ADR 0018 decision 7).

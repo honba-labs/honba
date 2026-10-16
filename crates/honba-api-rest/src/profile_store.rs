@@ -4,10 +4,15 @@
 //! Every profile carries a `revision`; [`ProfileStore::put`] is a compare-and-swap on it, so two
 //! tabs of the same user cannot silently overwrite each other. User ids come from bearer
 //! `token_id`s and are therefore untrusted: they are validated before they touch a path.
+//!
+//! The in-process mutex makes each read-check-write atomic within one process only. There is no
+//! cross-process file lock (none is available in the workspace), so run **one `honba serve` per
+//! profiles directory**; two servers sharing one could lose updates.
 
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 
 use tracing::warn;
@@ -218,9 +223,20 @@ fn read_profile(path: &Path) -> Result<Profile> {
     }
 }
 
-/// Write to a temp file beside `path`, sync it, then rename over `path`.
+/// Distinguishes the temp files of concurrent writes within one process.
+static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+/// Write to a uniquely named temp file beside `path`, sync it, then rename over `path`. The temp
+/// name carries the pid and a counter so concurrent writers never share a file; it is removed
+/// if any step fails.
 fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    let tmp = path.with_extension("json.tmp");
+    let mut name = path.as_os_str().to_owned();
+    name.push(format!(
+        ".{}-{}.tmp",
+        std::process::id(),
+        TMP_COUNTER.fetch_add(1, Ordering::Relaxed)
+    ));
+    let tmp = PathBuf::from(name);
     let result = (|| {
         let mut file = fs::File::create(&tmp)?;
         file.write_all(bytes)?;
