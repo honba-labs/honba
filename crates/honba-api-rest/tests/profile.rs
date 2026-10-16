@@ -150,9 +150,9 @@ async fn users_are_isolated_over_http() {
     assert_eq!(body["data"]["revision"], json!(0));
     assert_eq!(body["data"]["shortlist"], json!([]));
     let (_, body) = send(&app, Method::GET, "/profile/layouts", None, Some("other")).await;
-    assert_eq!(body["data"], json!({}));
+    assert_eq!(body["data"]["layouts"], json!({}));
     let (_, body) = send(&app, Method::GET, "/profile/modules", None, Some("other")).await;
-    assert_eq!(body["data"], json!({}));
+    assert_eq!(body["data"]["modules"], json!({}));
     let put = json!({"revision": 0, "shortlist": ["B"]});
     let (status, _) = send(&app, Method::PUT, "/profile", Some(put), Some("other")).await;
     assert_eq!(status, StatusCode::OK);
@@ -209,7 +209,10 @@ async fn layouts_crud() {
     assert_eq!(body["data"]["revision"], json!(1));
 
     let (_, body) = send(&app, Method::GET, "/profile/layouts", None, None).await;
-    assert_eq!(body["data"], json!({"intraday": {"panes": [1, 2]}}));
+    assert_eq!(
+        body["data"]["layouts"],
+        json!({"intraday": {"panes": [1, 2]}})
+    );
 
     let (status, body) = send(
         &app,
@@ -222,7 +225,7 @@ async fn layouts_crud() {
     assert_eq!(status, StatusCode::OK, "{body}");
     assert_eq!(body["data"]["revision"], json!(2));
     let (_, body) = send(&app, Method::GET, "/profile/layouts", None, None).await;
-    assert_eq!(body["data"], json!({}));
+    assert_eq!(body["data"]["layouts"], json!({}));
 
     // Deleting what is not there succeeds without a new revision.
     let (status, body) = send(
@@ -262,7 +265,7 @@ async fn modules_crud_and_id_mismatch() {
     assert_eq!(body["error"]["context"]["reason"], json!("id_mismatch"));
 
     let (_, body) = send(&app, Method::GET, "/profile/modules", None, None).await;
-    assert_eq!(body["data"], json!({"m1": module("m1")}));
+    assert_eq!(body["data"]["modules"], json!({"m1": module("m1")}));
     // Modules are part of the whole profile too.
     let (_, body) = send(&app, Method::GET, "/profile", None, None).await;
     assert_eq!(body["data"]["modules"]["m1"]["name"], json!("Core"));
@@ -270,7 +273,7 @@ async fn modules_crud_and_id_mismatch() {
     let (status, _) = send(&app, Method::DELETE, "/profile/modules/m1", None, None).await;
     assert_eq!(status, StatusCode::OK);
     let (_, body) = send(&app, Method::GET, "/profile/modules", None, None).await;
-    assert_eq!(body["data"], json!({}));
+    assert_eq!(body["data"]["modules"], json!({}));
 }
 
 #[tokio::test]

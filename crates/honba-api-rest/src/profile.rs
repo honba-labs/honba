@@ -133,7 +133,9 @@ pub(crate) async fn get_layouts(
     token: Option<Extension<TokenInfo>>,
 ) -> Response {
     with_store(state, token, |store, user| {
-        store.get(user).map(|p| LayoutsResponse(p.layouts))
+        store
+            .get(user)
+            .map(|p| LayoutsResponse { layouts: p.layouts })
     })
     .await
 }
@@ -181,7 +183,9 @@ pub(crate) async fn get_modules(
     token: Option<Extension<TokenInfo>>,
 ) -> Response {
     with_store(state, token, |store, user| {
-        store.get(user).map(|p| ModulesResponse(p.modules))
+        store
+            .get(user)
+            .map(|p| ModulesResponse { modules: p.modules })
     })
     .await
 }

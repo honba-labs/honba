@@ -56,13 +56,17 @@ pub struct Profile {
 
 /// `GET /profile/layouts` response: the named layouts by name.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
-#[serde(transparent)]
-pub struct LayoutsResponse(pub BTreeMap<String, Value>);
+pub struct LayoutsResponse {
+    /// Layouts by name (opaque to the server).
+    pub layouts: BTreeMap<String, Value>,
+}
 
 /// `GET /profile/modules` response: the modules by id.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
-#[serde(transparent)]
-pub struct ModulesResponse(pub BTreeMap<String, Module>);
+pub struct ModulesResponse {
+    /// Modules by id.
+    pub modules: BTreeMap<String, Module>,
+}
 
 /// Answer to a profile write that returns no profile: the revision now stored.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
