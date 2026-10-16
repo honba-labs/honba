@@ -306,6 +306,8 @@ E3-S1b/S1d, shipped per ADR 0030); E10-S8 shipped the bhavcopy Rust connector. R
 R8 (Optional) stays unscheduled.
 Follow-up (2026-10-15): the ADR 0018 price collar now sees the quote touch in the Rust `Engine` and `StrategyRunner`. Since then: `BacktestSession` replays ticks with `fill="l2"`, and the wire `execution.fill_model` has an `l2` variant (schema regenerated). The REST `BacktestExecutor` now takes a `TickReader` (`honba-ports`, in-memory impl in `honba-feed`) and runs `L2Sim` over ticks merged with the bars; without a source a wire run with `fill_model=l2` is still refused with reason `l2_requires_ticks`. `honba serve --fill-model` / `--ticks <ndjson>` (format in ADR 0030) now compose it for the CLI server; `l2` without `--ticks` fails at start-up. Persistent tick store done (2026-10-16): `honba-feed::ParquetTickStore` reads `{root}/ticks/*.parquet` (`honba_feed::write_tick_file`, `tick_schema`), `--ticks <DIR>` accepts a store and `honba data ticks-import` builds one from the NDJSON file (ADR 0030 follow-up entry; tests `crates/honba-feed/src/tests/parquet_ticks.rs`, `crates/honba-api-rest/tests/rest_backtest_l2_parquet.rs`, `crates/honba-cli/tests/serve.rs::fill_model_l2_with_a_parquet_tick_store_runs_a_backtest_end_to_end`). Per-request `fill_model` done (2026-10-16): `BacktestRequest.fill_model` overrides the server's model for one run (unset = server default; unknown = 422 with `context.field=fill_model`); pinned in `ResolvedBacktest`/manifest and resolved once in the executor (tests `crates/honba-api/src/tests/run_requests.rs`, `crates/honba-api-rest/src/tests/executor.rs`, `crates/honba-api-rest/tests/rest_backtest_l2.rs`).
 
+Proposed (2026-10-16): **E12 chart signals** — buy/sell detectors with inspectable reasons, day and swing presets, chart markers plus a reasons panel (ADR 0031, D18; pull-based, not scheduled). See the E12 section below.
+
 **Critical path:** E2-S2 -> E11-S7 (write endpoints) and E5-S4 (all DONE); ADR-Run -> E4-S3 -> `POST /backtests` -> E4-S5 -> E11-S4 -> E9-S7
 (all DONE in `honba`, E9-S7 in `honba-frontend`); E3-S1a (next-open Rust) -> E3-S2 -> E3-S7 (all DONE; E3-S1b/S1d DONE per ADR 0030);
 E10-S7 (done) gates Python callers of any async Rust API; E2-S6(a) -> E2-S6(b..d) -> E2-S7 -> E3-S7 (all DONE). What remains is off the
@@ -413,6 +415,24 @@ old critical path: the pull-based E7 and optional E8 epics.
 | E11-S7 (DONE) | Write endpoints behind risk and approval queue | M | E2-S2, E5-S4 | `order_refused_by_risk` / `post_order_flows_to_sim_only` / approval queue tests | honba |
 | E11-S8 (DONE) | Auth, scopes, secrets, audit (minimum viable before non-loopback `serve`) | L | ADR D11 | `token_scope_enforced` / `write_needs_second_factor` | honba |
 
+### E12 Chart signals (buy/sell with reasons; day and swing)
+
+Proposed in **ADR 0031** (2026-10-16). A first-class, explainable signal: a bar-anchored value with a direction, a normalized strength and **mandatory reasons**, computed by one pure engine (`honba-signals`, L4, composing `honba-indicators`) for a backtest, the server and the browser, and drawn as chart markers with a reasons panel. Two horizon rulesets — `signals/day:v1` (intraday) and `signals/swing:v1` (positional). Signals are research and presentation only: never an order, never execution columns (the render-contract boundary, ADR 0031 §9). Clean-room: no vendored study source is copied; a vendored study (`honba-frontend/src/indicators/**`, GPL/MPL/MIT) may only count as an "agreement" signal.
+
+| ID | Scope | Size | Deps | Acceptance | Owner |
+|---|---|---|---|---|---|
+| E12-S0 | ADR 0031 accepted; freeze the reason `code` ontology; register the wire DTOs (`SignalDto`, `ReasonDto`, `SignalScanRequest/Response`) and regenerate `schema/domain`, `schema/openapi`, `schema/mcp`, the Python `.pyi`, the frontend TS | S | ADR 0031 | ADR accepted; `make check-codegen-ci` green; additive change (ADR 0012) | honba |
+| E12-S1 | `honba-signals` crate: `Signal`/`Reason`, `catalog()`, the confluence scorer, the first detectors (trend, momentum, volume); confirmation on close and the truncation property | M | E12-S0, E4-S4 | `signals_day.json`/`signals_swing.json` golden replay; one unit test per detector; a signal at N is unchanged when bars after N are appended | honba |
+| E12-S2 | Price-action and level detectors: candlestick patterns, break of structure, pivots, prior-day H/L, 52-week H/L | M | E12-S1 | goldens extended; Rust↔Python parity on the conformance vectors | honba |
+| E12-S3 | Intraday detectors and the day ruleset: opening-range breakout, session VWAP reclaim/rejection, gap fill, session cutoff, per-side cooldown | M | E12-S1 | `signals_day.json` intraday cases; session-boundary and cutoff tests | honba |
+| E12-S4 | Swing detectors and the swing ruleset: relative strength vs index, base/52w breakout, weekly confirmation, pullback-to-MA | M | E12-S1 | `signals_swing.json`; higher-timeframe aggregation reuses ADR 0024/E4-S8 | honba |
+| E12-S5 | WASM surface: `honba-api-wasm::signals` (whole-series compute) + `list_signal_presets_json()` embedding the catalog | S | E12-S1 | browser-free node conformance run (like `indicator_conformance.mjs`) | honba |
+| E12-S6 | REST `GET /signals` and the scanner `signal` metric (Rust `honba-indicators::screener` + Python twin) | M | E12-S5, E4 | route tests; `test_client_parity`; a scan golden vector | honba |
+| E12-S7 | Frontend: the "Signals" study (markers/drawings/shading via `openalgo-charts`), the reasons panel, the Day/Swing preset switch | L -> split | E12-S5, E11-S5 | vitest for the marker mapping and the reason card; a markers smoke test on synthetic candles | honba-frontend |
+| E12-S8 | `honba-strategies` per-horizon strategies consuming the signals (so chart and backtest agree) | M | E12-S6 | strategy/catalog tests; chart↔backtest parity | honba-strategies |
+
+Slice order: **S0 → S1** (contract + the shared trend/momentum/volume core for both horizons), then **S3/S4** (the two horizons), then **S5–S7** (surfaces and UI), then **S8**. E12 is not on the old critical path: it starts only by pull (like E7/E8), after the current `honba` work.
+
 ---
 
 ## 5. Open decisions and ADRs to write
@@ -436,12 +456,13 @@ old critical path: the pull-based E7 and optional E8 epics.
 | D15 | Root CLAUDE.md wording for the pack pattern; clean-room log for OpenAlgo/QuantDinger-inspired work; `honba-python` split re-evaluation (needs `honba-py` on crates.io) | housekeeping | Owner approval |
 | D16 | `StrategyGraph` stored form — **decided (ADR 0029)**: Python file + optional `.strategy.json` sidecar; `graph_hash` + `source_hash` on the manifest | E9 | Shipped |
 | D17 | NSE settlement default and intraday cycle (counts bars, not sessions) in simulators — **decided (ADR 0016)**; shipped (E3-S1a) | E3-S1a | Settle in the port ADR |
+| D18 | **Chart signals** (E12): the reason `code` ontology, group weights and the strength normalisation, the two horizon rulesets, the multi-timeframe pairing, and the intraday data source — **proposed (ADR 0031)** | E12 | Freeze the reason codes and weights in E12-S0; ADR 0031 before E12-S1 |
 
 Already decided: pyo3 single cdylib (ADR 0014 decision, `honba-py`), Strategy ABC with shim (ADR 0008), schema from Rust (ADR 0014),
 integer money (0011), versioning and nanosecond strings (0012), REST read ports (0013), explicit runtime (0015, implemented in E10-S7), next-open Rust port (0016, all three chunks done, D17),
 run lifecycle and `run_id` (0017, D1), risk stage (0018, D4), `OrderState` FSM and client order ids (0019, D5/D2), journal schema v1 and result cache (0020, D3),
 SSE streaming (0021, D6), AI strategy verifier (0022, D7), minimal auth (0023, D11), overfitting gates / streaming datasets / session MTF (0024, D8),
-tick/depth scope (0025, D14), bhavcopy connector + D10 default (0028), StrategyGraph + AlgoDesigner (0029, D16), L2 matching + differential oracle (0030, D14). Still open: D13 (arbitrage), D15 (housekeeping).
+tick/depth scope (0025, D14), bhavcopy connector + D10 default (0028), StrategyGraph + AlgoDesigner (0029, D16), L2 matching + differential oracle (0030, D14). Still open: D13 (arbitrage), D15 (housekeeping), D18 (chart signals, proposed as ADR 0031).
 
 ---
 
@@ -450,10 +471,10 @@ tick/depth scope (0025, D14), bhavcopy connector + D10 default (0028), StrategyG
 | Repo | Impact and action | Triggered by |
 |---|---|---|
 | `honba-adapters` | dhan + zerodha certified (E1-S1b, `MIGRATION.md`); six adapters scaffold-only (future). Will need FSM events (E2-S6), reconcile reports (E2-S7), session/rate-limit (E1-S5) when they land | E1-S1b, E2-S6, D10 |
-| `honba-strategies` | Catalog passes `verify` and the loader; add `hyperparameters()` (E4-S2); `backtest_result.json` are placeholders with no regen script; alpha strategies excluded from the next-open replay test; 72 pre-existing ruff errors; `ai_generated/` must route through E5-S5 | E4-S2, E4-S3, E5-S5 |
+| `honba-strategies` | Catalog passes `verify` and the loader; add `hyperparameters()` (E4-S2); `backtest_result.json` are placeholders with no regen script; alpha strategies excluded from the next-open replay test; 72 pre-existing ruff errors; `ai_generated/` must route through E5-S5; **E12-S8** adds per-horizon strategies (`intraday/`, `swing/`) that consume signals so the chart and the backtest agree | E4-S2, E4-S3, E5-S5, E12 |
 | `honba-examples` | **Another agent owns it: ask first, new files only below.** Existing follow-ups (use core `NextOpenExecution`/loader, `*_minor` names, settlement default T+1) are theirs, not part of this roadmap | R2, R4, R5 |
-| `honba-frontend` | Generated client + types (E9-S8/E11-S6) and test/lint/typecheck scripts shipped (`ee2e1cb`); still needs SSE consumer (E11-S4) and WASM loader (E11-S5), then E9. TS drift check runs in CI (`codegen-drift-frontend`: `make check-schema-ts`/`check-client`) | E11-S6, E9 |
-| `honba-docs` | Resolved (2026-10-16): the pages exist and are in `mkdocs.yml` nav — `architecture/money.md`, `architecture/order_reject_cancel.md`, `architecture/wasm_indicators.md`, `api/python-sdk.md`, and quotes/depth/serve are covered by `api/rest.md` ("REST API and serve"); `on_stop` now exists in the real Python API (`honba/python/src/honba/strategies/{base,reference,runner}.py`) and the strategy pages describe it accurately ("intents submitted in `on_stop` are never executed"). Remaining: `make build` cannot run in this environment (mkdocs 1.6.1 is present but the `material` theme is not installed). E7-S1 sitemap is the docs ticket per story | every story; docs ticket per story |
+| `honba-frontend` | Generated client + types (E9-S8/E11-S6) and test/lint/typecheck scripts shipped (`ee2e1cb`); still needs SSE consumer (E11-S4) and WASM loader (E11-S5), then E9. TS drift check runs in CI (`codegen-drift-frontend`: `make check-schema-ts`/`check-client`); **E12** adds a "Signals" study (chart markers via `openalgo-charts` + a reasons panel) and a Day/Swing preset switch, reusing the vendored marker API | E11-S6, E9, E12 |
+| `honba-docs` | Resolved (2026-10-16): the pages exist and are in `mkdocs.yml` nav — `architecture/money.md`, `architecture/order_reject_cancel.md`, `architecture/wasm_indicators.md`, `api/python-sdk.md`, and quotes/depth/serve are covered by `api/rest.md` ("REST API and serve"); `on_stop` now exists in the real Python API (`honba/python/src/honba/strategies/{base,reference,runner}.py`) and the strategy pages describe it accurately ("intents submitted in `on_stop` are never executed"). Remaining: `make build` cannot run in this environment (mkdocs 1.6.1 is present but the `material` theme is not installed). E7-S1 sitemap is the docs ticket per story; **E12** gets a "Chart signals" page (the signal contract, the reason codes and the day/swing presets) | every story; docs ticket per story; E12 |
 
 ### 6.1 honba-examples E4/E5 demonstrations (new example files only; do not edit existing)
 

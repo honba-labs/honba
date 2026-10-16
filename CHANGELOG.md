@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Docs: chart signals plan (ADR 0031)
+
+- Proposed **ADR 0031** (chart signals: a bar-anchored `Signal` with a direction, a normalized
+  strength and mandatory **reasons**, one pure engine for backtest/server/browser, day and swing
+  rulesets, markers plus a reasons panel). No code yet.
+- Roadmap gains the **E12** epic (E12-S0..S8, slice order S0 -> S1 -> S3/S4 -> S5..S7 -> S8),
+  decision **D18**, and E12 notes in the cross-repo register. Pull-based, not scheduled.
+
 ### Persisted operator journal (ADR 0018 decision 7)
 
 - `honba serve --operator-journal <FILE>` makes each accepted `PUT /trading-state` that changes
