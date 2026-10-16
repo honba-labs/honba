@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Signal engine (ADR 0031, E12-S1)
+
+- New crate **`honba-signals`** (L4, pure and causal, no I/O and no clock): `engine::compute`
+  runs the detectors a `catalog::Ruleset` enables over a closed bar series, scores their firings
+  into a `honba_entities::Signal`, and attaches the reasons that fired. `signals_for_horizon` is
+  the shipped-ruleset convenience.
+- **Frozen reason ontology** `catalog::REASON_CODES` (code, group, polarity, weight, label) plus
+  `DETECTORS` and the two horizon rulesets `signals/day:v1` / `signals/swing:v1`; weights are
+  auditable and live in one place. Detectors decide *when* a code fires and cite its numbers.
+- First detectors: trend `ema_cross`, momentum `rsi_turn` and `macd_cross`, volume
+  `relative_volume`. Confluence `strength` is the winning side's fired weight capped at `1`;
+  signals below the ruleset's `min_strength` are dropped, and the same side is cooldown-suppressed.
+- **Causality**: a signal at bar *N* reads only bars `<= N` (confirmation-on-close, no
+  lookahead/repaint); a truncation property test asserts a truncated run equals the full run's
+  signals up to the cut.
+- Conformance vectors `schema/conformance/signals_day.json` and `signals_swing.json`, replayed by
+  `crates/honba-signals/tests/signals_conformance.rs` (`regenerate_vectors` refreshes them). Unit
+  tests cover the ontology, each detector, the gates and the truncation property.
+- Registered in the workspace and the crate layering (`scripts/dependency_graph.py`).
+
 ### Signal contract (ADR 0031, E12-S0)
 
 - ADR 0031 accepted. New **signal contract** in `honba-entities::signal`: `Signal` (a bar-anchored
