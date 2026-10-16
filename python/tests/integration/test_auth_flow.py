@@ -16,7 +16,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from honba.api.auth import required_scope_for_route
+from honba.api.auth import AUTHENTICATED, required_scope_for_route
 
 TEST_TOKEN = "a" * 64
 TEST_TOKEN_HASH = hashlib.sha256(TEST_TOKEN.encode()).hexdigest()
@@ -345,6 +345,14 @@ class TestScopeMap:
             ("GET", "/approval/queue", "write:orders"),
             ("POST", "/approval/approve", "write:orders"),
             ("POST", "/approval/reject", "write:orders"),
+            ("GET", "/profile", AUTHENTICATED),
+            ("PUT", "/profile", AUTHENTICATED),
+            ("GET", "/profile/layouts", AUTHENTICATED),
+            ("PUT", "/profile/layouts/main", AUTHENTICATED),
+            ("DELETE", "/profile/layouts/main", AUTHENTICATED),
+            ("GET", "/profile/modules", AUTHENTICATED),
+            ("PUT", "/profile/modules/m1", AUTHENTICATED),
+            ("DELETE", "/profile/modules/m1", AUTHENTICATED),
         ]
         for method, path, expected in routes:
             scope = required_scope_for_route(method, path)

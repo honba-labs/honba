@@ -20,6 +20,7 @@ except ImportError:  # pragma: no cover
     import tomli as tomllib  # type: ignore[import-not-found]
 
 __all__ = [
+    "AUTHENTICATED",
     "PUBLIC_PATHS",
     "SCOPES",
     "AuthError",
@@ -213,8 +214,15 @@ PUBLIC_PATHS = frozenset({"/capabilities", "/health", "/schema"})
 SCOPES = ("read:market", "read:account", "write:orders", "research", "operator")
 
 
+#: Sentinel for routes that need a valid token but no scope (the `/profile*` routes: any valid
+#: token manages its own profile). It is not a scope: no token record may grant it.
+AUTHENTICATED = "authenticated"
+
+
 def required_scope_for_route(method: str, path: str) -> str | None:
     """Return the required scope for a given route, or None if public or unknown.
+
+    Returns :data:`AUTHENTICATED` for routes that accept any valid token.
 
     ``method`` is accepted for parity with the Rust server; on this surface the
     scope is a property of the path (see ADR 0023 §2).
@@ -238,6 +246,8 @@ def required_scope_for_route(method: str, path: str) -> str | None:
         return "write:orders"
     if path.startswith("/approval/"):
         return "write:orders"
+    if path == "/profile" or path.startswith("/profile/"):
+        return AUTHENTICATED
     return None
 
 
@@ -257,9 +267,9 @@ def unscoped_routes(routes: Iterable[tuple[str, str]]) -> list[str]:
 
 
 def validate_token(store: TokenStore, token: str, required_scope: str) -> TokenInfo:
-    """Validate token and check it has the required scope."""
+    """Validate token and check it has the required scope (any token for AUTHENTICATED)."""
     info = store.validate(token)
-    if required_scope not in info.scopes:
+    if required_scope != AUTHENTICATED and required_scope not in info.scopes:
         raise AuthError(
             AuthErrorCode.FORBIDDEN,
             f"Token does not have required scope: {required_scope}",
