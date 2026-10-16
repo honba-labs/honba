@@ -1,6 +1,6 @@
 # ADR 0032: User-Specific Portfolio Manager
 
-Date: 2026-10-16. Status: **proposed**. Roadmap stories: E13-S0..E13-S6. Owner: `honba` (+ `honba-frontend`).
+Date: 2026-10-16. Status: **accepted** (2026-10-16). Roadmap stories: E13-S0..E13-S6. Owner: `honba` (+ `honba-frontend`).
 
 ## Context
 
@@ -186,3 +186,11 @@ pull-based, like E7/E8/E12.
 
 - 2026-10-16: proposed (research: OpenAlgo `/holdings`/`/positionbook`/sandbox and `AccountManager`;
   TradingView Portfolios and the account manager).
+- 2026-10-16: **accepted**; E13-S0..S6 authorized. Refinement recorded on acceptance: **both
+  position sources ship in this epic** — an account carries a `source: PortfolioSource`
+  (`Ledger` = honba's own fills/simulator, `Broker` = read from an adapter), so the local ledger
+  and broker-synced holdings coexist behind one contract from the start (a `Broker` account also
+  names its `broker`). The existing `honba_entities::Trade` is reused as the trade-history record
+  rather than duplicated. The wire types are `PortfolioSnapshot`, `PortfolioAccount`,
+  `PortfolioPosition`, `PortfolioHolding`, `PortfolioTotals` and the enums `PortfolioMode`,
+  `PortfolioSource`.

@@ -475,13 +475,13 @@ Slice order: **S0 → S1 → S2**, then **S3/S5** in parallel, then **S4**, then
 | D16 | `StrategyGraph` stored form — **decided (ADR 0029)**: Python file + optional `.strategy.json` sidecar; `graph_hash` + `source_hash` on the manifest | E9 | Shipped |
 | D17 | NSE settlement default and intraday cycle (counts bars, not sessions) in simulators — **decided (ADR 0016)**; shipped (E3-S1a) | E3-S1a | Settle in the port ADR |
 | D18 | **Chart signals** (E12): the reason `code` ontology, group weights and the strength normalisation, the two horizon rulesets, the multi-timeframe pairing, and the intraday data source — **proposed (ADR 0031)** | E12 | Freeze the reason codes and weights in E12-S0; ADR 0031 before E12-S1 |
-| D19 | **User-specific portfolio manager** (E13): ownership (the profile `Caller`/`token_id`), the wire contract, the pure valuation engine, per-user persistence, `Live`/`Sandbox` modes, and whether fills/persistence share the operator journal — **proposed (ADR 0032)** | E13 | ADR 0032 before E13-S1; read-first, contract in `honba-entities`, engine in `honba-portfolio` |
+| D19 | **User-specific portfolio manager** (E13): ownership (the profile `Caller`/`token_id`), the wire contract, the pure valuation engine, per-user persistence, `Live`/`Sandbox` modes, and both position sources (local ledger + broker-synced) — **decided (ADR 0032)** | E13 | ADR 0032 accepted; read-first, contract in `honba-entities`, engine in `honba-portfolio` |
 
 Already decided: pyo3 single cdylib (ADR 0014 decision, `honba-py`), Strategy ABC with shim (ADR 0008), schema from Rust (ADR 0014),
 integer money (0011), versioning and nanosecond strings (0012), REST read ports (0013), explicit runtime (0015, implemented in E10-S7), next-open Rust port (0016, all three chunks done, D17),
 run lifecycle and `run_id` (0017, D1), risk stage (0018, D4), `OrderState` FSM and client order ids (0019, D5/D2), journal schema v1 and result cache (0020, D3),
 SSE streaming (0021, D6), AI strategy verifier (0022, D7), minimal auth (0023, D11), overfitting gates / streaming datasets / session MTF (0024, D8),
-tick/depth scope (0025, D14), bhavcopy connector + D10 default (0028), StrategyGraph + AlgoDesigner (0029, D16), L2 matching + differential oracle (0030, D14). Still open: D13 (arbitrage), D15 (housekeeping), D19 (portfolio manager, proposed as ADR 0032); D18 (chart signals) is decided (ADR 0031) and shipping (E12-S0..S2 done).
+tick/depth scope (0025, D14), bhavcopy connector + D10 default (0028), StrategyGraph + AlgoDesigner (0029, D16), L2 matching + differential oracle (0030, D14). Still open: D13 (arbitrage), D15 (housekeeping); D18 (chart signals, ADR 0031) and D19 (portfolio manager, ADR 0032) are decided.
 
 ---
 
