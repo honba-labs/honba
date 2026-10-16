@@ -231,3 +231,26 @@ fn an_oversized_profile_is_refused_by_put_and_update() {
     ));
     assert_eq!(store.get("alice").unwrap().revision, 0);
 }
+
+#[test]
+fn a_corrupt_file_is_moved_aside_and_the_user_starts_fresh() {
+    let (tmp, store) = store();
+    let dir = tmp.path().join("profiles");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("alice.json"), b"{ not json").unwrap();
+
+    let got = store.get("alice").unwrap();
+    assert_eq!(got, Profile::default());
+    assert!(!dir.join("alice.json").exists());
+    let aside: Vec<_> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(aside.len(), 1, "{aside:?}");
+    assert!(aside[0].starts_with("alice.json.corrupt-"), "{aside:?}");
+    assert_eq!(std::fs::read(dir.join(&aside[0])).unwrap(), b"{ not json");
+
+    // Writes work again from revision 0.
+    let put = store.put("alice", 0, with_shortlist(&["A"])).unwrap();
+    assert_eq!(put.revision, 1);
+}

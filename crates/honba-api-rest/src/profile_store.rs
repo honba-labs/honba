@@ -10,6 +10,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+use tracing::warn;
+
 pub use honba_api::{Module, Profile, Source};
 
 /// The user id used when authentication is off.
@@ -56,7 +58,7 @@ pub enum ProfileError {
     /// Reading or writing the profile file failed.
     #[error("profile io: {0}")]
     Io(#[from] std::io::Error),
-    /// The stored file is not a valid profile.
+    /// A profile could not be serialized.
     #[error("profile json: {0}")]
     Json(#[from] serde_json::Error),
 }
@@ -183,11 +185,36 @@ fn encode_within_limits(profile: &Profile) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
+/// Read the profile at `path`; a missing file is the default profile. A file that is not valid
+/// JSON for a profile is moved aside to `<name>.corrupt-<unix_ts>` and the user starts over at
+/// revision 0, so one bad file cannot make every request for that user fail forever.
 fn read_profile(path: &Path) -> Result<Profile> {
-    match fs::read(path) {
-        Ok(bytes) => Ok(serde_json::from_slice(&bytes)?),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Profile::default()),
-        Err(e) => Err(e.into()),
+    let bytes = match fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Profile::default()),
+        Err(e) => return Err(e.into()),
+    };
+    match serde_json::from_slice(&bytes) {
+        Ok(profile) => Ok(profile),
+        Err(e) => {
+            let ts = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_secs());
+            let mut aside = path.as_os_str().to_owned();
+            aside.push(format!(".corrupt-{ts}"));
+            let aside = PathBuf::from(aside);
+            match fs::rename(path, &aside) {
+                Ok(()) => warn!(
+                    file = %path.display(), moved_to = %aside.display(), error = %e,
+                    "corrupt profile file moved aside; starting a fresh profile"
+                ),
+                Err(rename_err) => warn!(
+                    file = %path.display(), error = %e, rename_error = %rename_err,
+                    "corrupt profile file could not be moved aside; starting a fresh profile"
+                ),
+            }
+            Ok(Profile::default())
+        }
     }
 }
 
