@@ -308,6 +308,8 @@ Follow-up (2026-10-15): the ADR 0018 price collar now sees the quote touch in th
 
 Proposed (2026-10-16): **E12 chart signals** — buy/sell detectors with inspectable reasons, day and swing presets, chart markers plus a reasons panel (ADR 0031, D18; pull-based, not scheduled). See the E12 section below.
 
+Proposed (2026-10-16): **E13 user-specific portfolio manager** — a per-user portfolio (accounts, valued positions and delivery holdings, cash/equity, realized/unrealized PnL, trade history, analytics) scoped to the authenticated user via the existing profile `Caller`, persisted like the profile store (ADR 0032, D19; pull-based, not scheduled). See the E13 section below.
+
 **Critical path:** E2-S2 -> E11-S7 (write endpoints) and E5-S4 (all DONE); ADR-Run -> E4-S3 -> `POST /backtests` -> E4-S5 -> E11-S4 -> E9-S7
 (all DONE in `honba`, E9-S7 in `honba-frontend`); E3-S1a (next-open Rust) -> E3-S2 -> E3-S7 (all DONE; E3-S1b/S1d DONE per ADR 0030);
 E10-S7 (done) gates Python callers of any async Rust API; E2-S6(a) -> E2-S6(b..d) -> E2-S7 -> E3-S7 (all DONE). What remains is off the
@@ -433,6 +435,22 @@ Proposed in **ADR 0031** (2026-10-16). A first-class, explainable signal: a bar-
 
 Slice order: **S0 → S1** (contract + the shared trend/momentum/volume core for both horizons), then **S3/S4** (the two horizons), then **S5–S7** (surfaces and UI), then **S8**. E12 is not on the old critical path: it starts only by pull (like E7/E8), after the current `honba` work.
 
+### E13 User-specific portfolio manager
+
+Proposed in **ADR 0032** (2026-10-16). A portfolio owned by the authenticated user (the profile `Caller` / `token_id`): accounts with cash, equity and margin; valued positions and delivery holdings; realized/unrealized PnL; trade history; and TradingView-parity analytics. The wire contract lives in `honba-entities` (L1) and the pure valuation engine in a new `honba-portfolio` (L4, beside `honba-signals`); it is persisted per user like `ProfileStore`. Read-first (`GET /portfolio*`, activating the reserved `read:account` scope); `Live`/`Sandbox` modes never mix; a portfolio never places an order (ADR 0032 §7). Prior art: OpenAlgo `/holdings` + `/positionbook` + sandbox and the read-only `AccountManager`; TradingView Portfolios and the account manager.
+
+| ID | Scope | Size | Deps | Acceptance | Owner |
+|---|---|---|---|---|---|
+| E13-S0 | Contract: `PortfolioSnapshot`/`PortfolioAccount`/`PortfolioPosition`/`PortfolioTrade`/`PortfolioTotals` in `honba-entities`; register in codegen; regenerate every artifact | S | ADR 0032 | `make check-codegen-ci` green; additive (ADR 0012) | honba |
+| E13-S1 | `honba-portfolio` (L4): pure valuation/aggregation (market value, equity, realized/unrealized PnL) over positions + marks, `as_of`-stamped; golden vectors | M | E13-S0 | golden replay; same positions+marks give a byte-identical snapshot; layering green | honba |
+| E13-S2 | `PortfolioStore` (per-user JSON, mirroring `ProfileStore`) + `Caller` wiring + read routes (`GET /portfolio`, `/accounts`, `/positions`, `/holdings`, `/trades`); activate `read:account` | M | E13-S1 | per-user isolation test (one user's portfolio never returned for another); scope-map drift test; route tests | honba |
+| E13-S3 | Fill ingest: the execution path and `OrderLedger` update positions; `Live`/`Sandbox` separation; the missing `GET /positions` | M | E13-S2 | `sandbox_and_live_never_mix`; a fill moves the snapshot; a cross-mode order is refused | honba |
+| E13-S4 | Write path: manual transactions + CSV import (+ import-from-paper-trading), journaled | M | E13-S3 | import round-trip; a transaction is journaled; valuation reconciles | honba |
+| E13-S5 | Frontend: the Portfolio panel (account switcher with equity/margin/mode, holdings/positions table with grouping and PnL, trade history, portfolio cards) replacing the mock `INITIAL_POSITIONS` | L → split | E13-S2 | vitest for the panel mapping and the account switcher; markers/table smoke test on a fixture snapshot | honba-frontend |
+| E13-S6 | Analytics: portfolio value series, annualized yield, benchmark comparison, Beta/Sharpe/Sortino | M | E13-S3 | analytics golden vs a reference; benchmark compare deterministic | honba |
+
+Slice order: **S0 → S1 → S2**, then **S3/S5** in parallel, then **S4**, then **S6**. Pull-based, like E7/E8/E12.
+
 ---
 
 ## 5. Open decisions and ADRs to write
@@ -457,12 +475,13 @@ Slice order: **S0 → S1** (contract + the shared trend/momentum/volume core for
 | D16 | `StrategyGraph` stored form — **decided (ADR 0029)**: Python file + optional `.strategy.json` sidecar; `graph_hash` + `source_hash` on the manifest | E9 | Shipped |
 | D17 | NSE settlement default and intraday cycle (counts bars, not sessions) in simulators — **decided (ADR 0016)**; shipped (E3-S1a) | E3-S1a | Settle in the port ADR |
 | D18 | **Chart signals** (E12): the reason `code` ontology, group weights and the strength normalisation, the two horizon rulesets, the multi-timeframe pairing, and the intraday data source — **proposed (ADR 0031)** | E12 | Freeze the reason codes and weights in E12-S0; ADR 0031 before E12-S1 |
+| D19 | **User-specific portfolio manager** (E13): ownership (the profile `Caller`/`token_id`), the wire contract, the pure valuation engine, per-user persistence, `Live`/`Sandbox` modes, and whether fills/persistence share the operator journal — **proposed (ADR 0032)** | E13 | ADR 0032 before E13-S1; read-first, contract in `honba-entities`, engine in `honba-portfolio` |
 
 Already decided: pyo3 single cdylib (ADR 0014 decision, `honba-py`), Strategy ABC with shim (ADR 0008), schema from Rust (ADR 0014),
 integer money (0011), versioning and nanosecond strings (0012), REST read ports (0013), explicit runtime (0015, implemented in E10-S7), next-open Rust port (0016, all three chunks done, D17),
 run lifecycle and `run_id` (0017, D1), risk stage (0018, D4), `OrderState` FSM and client order ids (0019, D5/D2), journal schema v1 and result cache (0020, D3),
 SSE streaming (0021, D6), AI strategy verifier (0022, D7), minimal auth (0023, D11), overfitting gates / streaming datasets / session MTF (0024, D8),
-tick/depth scope (0025, D14), bhavcopy connector + D10 default (0028), StrategyGraph + AlgoDesigner (0029, D16), L2 matching + differential oracle (0030, D14). Still open: D13 (arbitrage), D15 (housekeeping), D18 (chart signals, proposed as ADR 0031).
+tick/depth scope (0025, D14), bhavcopy connector + D10 default (0028), StrategyGraph + AlgoDesigner (0029, D16), L2 matching + differential oracle (0030, D14). Still open: D13 (arbitrage), D15 (housekeeping), D19 (portfolio manager, proposed as ADR 0032); D18 (chart signals) is decided (ADR 0031) and shipping (E12-S0..S2 done).
 
 ---
 
