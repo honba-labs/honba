@@ -72,6 +72,7 @@ pub(crate) fn request_type_for(method: &str, path: &str) -> Option<&'static str>
         ("POST", "/orders") => "OrdersRequest",
         ("PUT", "/trading-state") => "TradingStateRequest",
         ("PUT", "/profile") => "Profile",
+        ("PUT", "/profile/layouts/{name}") => "LayoutDocument",
         ("PUT", "/profile/modules/{id}") => "Module",
         ("GET", "/orders") => "OrdersQuery",
         ("GET", "/instruments") => "InstrumentsQuery",

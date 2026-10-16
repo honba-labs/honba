@@ -5,6 +5,8 @@
 
 use std::collections::BTreeMap;
 
+use schemars::gen::SchemaGenerator;
+use schemars::schema::{Metadata, Schema, SchemaObject};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -56,6 +58,33 @@ pub struct Profile {
     /// a get / put round trip does not drop them.
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+/// The body of `PUT /profile/layouts/{name}`: a workbench layout, any JSON value (opaque to the
+/// server). A named type so the OpenAPI spec and generated clients carry a request body.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct LayoutDocument(pub Value);
+
+// By hand: schemars would name a bare `serde_json::Value` `AnyValue` and the registry would not
+// know this type. An object schema with no constraints accepts any JSON value.
+impl JsonSchema for LayoutDocument {
+    fn schema_name() -> String {
+        "LayoutDocument".into()
+    }
+
+    fn json_schema(_: &mut SchemaGenerator) -> Schema {
+        Schema::Object(SchemaObject {
+            metadata: Some(Box::new(Metadata {
+                title: Some(Self::schema_name()),
+                description: Some(
+                    "A workbench layout: any JSON value, opaque to the server.".into(),
+                ),
+                ..Metadata::default()
+            })),
+            ..SchemaObject::default()
+        })
+    }
 }
 
 /// `GET /profile/layouts` response: the named layouts by name.

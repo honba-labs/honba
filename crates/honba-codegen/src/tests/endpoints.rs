@@ -242,3 +242,22 @@ fn the_screener_scan_documents_its_query_and_a_screener_response() {
         assert!(names.contains(&want), "{names:?}");
     }
 }
+
+#[test]
+fn every_profile_put_carries_a_request_body_that_resolves() {
+    let paths = paths();
+    let set = registry::full_registry();
+    for (path, body) in [
+        ("/profile", "Profile"),
+        ("/profile/layouts/{name}", "LayoutDocument"),
+        ("/profile/modules/{id}", "Module"),
+    ] {
+        let schema = &paths[path]["put"]["requestBody"]["content"]["application/json"]["schema"];
+        assert_eq!(
+            schema["$ref"],
+            json!(format!("#/components/schemas/{body}")),
+            "PUT {path}"
+        );
+        assert!(set.get(body).is_some(), "{body} is not in the registry");
+    }
+}

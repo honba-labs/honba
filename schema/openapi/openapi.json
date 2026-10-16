@@ -2083,6 +2083,9 @@
         ],
         "type": "object"
       },
+      "LayoutDocument": {
+        "description": "A workbench layout: any JSON value, opaque to the server."
+      },
       "LayoutsResponse": {
         "description": "`GET /profile/layouts` response: the named layouts by name.",
         "properties": {
@@ -3336,6 +3339,133 @@
         ],
         "type": "object"
       },
+      "Reason": {
+        "description": "One detector firing, shown to the user verbatim (ADR 0031 §1).",
+        "properties": {
+          "code": {
+            "description": "Stable code from the frozen ontology (ADR 0031 §4), e.g. `ema_cross_up`.",
+            "type": "string"
+          },
+          "detail": {
+            "description": "One sentence citing the numbers.",
+            "type": "string"
+          },
+          "group": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReasonGroup"
+              }
+            ],
+            "description": "The detector family."
+          },
+          "label": {
+            "description": "Short human text, e.g. `20-EMA crosses above 50-EMA`.",
+            "type": "string"
+          },
+          "polarity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReasonPolarity"
+              }
+            ],
+            "description": "Which way this reason argues."
+          },
+          "weight": {
+            "description": "The positive term this detector contributed to the signal's `strength`.",
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "code",
+          "detail",
+          "group",
+          "label",
+          "polarity",
+          "weight"
+        ],
+        "type": "object"
+      },
+      "ReasonGroup": {
+        "description": "The detector family a reason belongs to.",
+        "oneOf": [
+          {
+            "description": "Moving-average and trend structure.",
+            "enum": [
+              "trend"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Oscillators (RSI, MACD, stochastic).",
+            "enum": [
+              "momentum"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Candlestick and market-structure patterns.",
+            "enum": [
+              "price_action"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Volume and participation.",
+            "enum": [
+              "volume"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Volatility regimes (ATR, bands).",
+            "enum": [
+              "volatility"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Support/resistance and prior extremes.",
+            "enum": [
+              "level"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Session clock and intraday levels.",
+            "enum": [
+              "session"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Relative strength versus an index or peer.",
+            "enum": [
+              "relative_strength"
+            ],
+            "type": "string"
+          }
+        ]
+      },
+      "ReasonPolarity": {
+        "description": "The direction a single reason argues for.",
+        "oneOf": [
+          {
+            "description": "Argues for a buy.",
+            "enum": [
+              "bullish"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Argues for a sell.",
+            "enum": [
+              "bearish"
+            ],
+            "type": "string"
+          }
+        ]
+      },
       "RejectReason": {
         "description": "Why an order was refused: the stable [`ErrorCode`] plus a short human message.\n\n``` use honba_messages::{ErrorCode, RejectReason};\n\nlet r = RejectReason::new(ErrorCode::OrderRejected, \"no_position\"); assert_eq!(r.code(), ErrorCode::OrderRejected); assert_eq!(r.message(), \"no_position\"); ```",
         "properties": {
@@ -3795,6 +3925,206 @@
           "columns",
           "range",
           "rows",
+          "total"
+        ],
+        "type": "object"
+      },
+      "Signal": {
+        "description": "An explainable buy/sell point at one closed bar (ADR 0031 §1).\n\n`reasons` is never empty: a signal with no reason is a bug, not a weaker signal. Construct through the engine, or call [`Signal::validate`] after building one by hand.",
+        "properties": {
+          "anchor_price": {
+            "description": "The bar close, or the trigger level for a level break.",
+            "format": "double",
+            "type": "number"
+          },
+          "direction": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SignalDirection"
+              }
+            ],
+            "description": "The direction suggested."
+          },
+          "evidence": {
+            "additionalProperties": {
+              "format": "double",
+              "type": "number"
+            },
+            "description": "Numbers the reason text cites, for inspection. Omitted when empty.",
+            "type": "object"
+          },
+          "horizon": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SignalHorizon"
+              }
+            ],
+            "description": "The horizon ruleset that produced the signal."
+          },
+          "instrument": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InstrumentId"
+              }
+            ],
+            "description": "The instrument the signal belongs to."
+          },
+          "reasons": {
+            "description": "The reasons that fired at this bar; never empty.",
+            "items": {
+              "$ref": "#/components/schemas/Reason"
+            },
+            "type": "array"
+          },
+          "ruleset": {
+            "description": "The ruleset id, e.g. `signals/day:v1`.",
+            "type": "string"
+          },
+          "strength": {
+            "description": "Confluence strength in `0..=1`: the winning side's share of fired weight.",
+            "format": "double",
+            "type": "number"
+          },
+          "t": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UnixNanos"
+              }
+            ],
+            "description": "Close time of the confirming bar."
+          },
+          "tags": {
+            "description": "Detector codes that fired, e.g. `[\"ema_cross\", \"rsi\", \"rel_volume\"]`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "timeframe": {
+            "description": "The bar timeframe the signal was evaluated on (e.g. `5m`, `1d`).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "anchor_price",
+          "direction",
+          "horizon",
+          "instrument",
+          "reasons",
+          "ruleset",
+          "strength",
+          "t",
+          "tags",
+          "timeframe"
+        ],
+        "type": "object"
+      },
+      "SignalDirection": {
+        "description": "The direction a signal points.",
+        "oneOf": [
+          {
+            "description": "A long/entry bias.",
+            "enum": [
+              "buy"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "A short/exit bias.",
+            "enum": [
+              "sell"
+            ],
+            "type": "string"
+          }
+        ]
+      },
+      "SignalHorizon": {
+        "description": "The trading horizon a signal was evaluated for (ADR 0031 §5).",
+        "oneOf": [
+          {
+            "description": "Intraday: session VWAP, opening range, no overnight.",
+            "enum": [
+              "intraday"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Positional: daily/weekly, multi-day holds.",
+            "enum": [
+              "swing"
+            ],
+            "type": "string"
+          }
+        ]
+      },
+      "SignalScanRequest": {
+        "additionalProperties": false,
+        "description": "Request payload for the signal scan / `GET /signals` (ADR 0031 §6).",
+        "properties": {
+          "detectors": {
+            "default": [],
+            "description": "Restrict to these detector codes; empty means every detector in the ruleset.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "horizon": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SignalHorizon"
+              }
+            ],
+            "description": "The horizon ruleset to apply."
+          },
+          "minStrength": {
+            "default": 0.0,
+            "description": "Drop signals weaker than this (`0..=1`); defaults to `0.0`.",
+            "format": "double",
+            "type": "number"
+          },
+          "timeframe": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Timeframe"
+              }
+            ],
+            "description": "The bar timeframe to evaluate."
+          },
+          "universe": {
+            "description": "Instruments to evaluate, as `EXCHANGE:SYMBOL` (e.g. `NSE:RELIANCE`).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "horizon",
+          "timeframe",
+          "universe"
+        ],
+        "type": "object"
+      },
+      "SignalScanResponse": {
+        "description": "Response to a signal scan: the fired signals across the universe, newest last.",
+        "properties": {
+          "signals": {
+            "description": "The signals, ordered by `t` then instrument.",
+            "items": {
+              "$ref": "#/components/schemas/Signal"
+            },
+            "type": "array"
+          },
+          "total": {
+            "description": "Count of signals returned.",
+            "format": "uint",
+            "minimum": 0.0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "signals",
           "total"
         ],
         "type": "object"
@@ -5751,6 +6081,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LayoutDocument"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {

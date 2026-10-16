@@ -449,3 +449,19 @@ async fn a_no_op_put_profile_keeps_the_revision() {
     assert_eq!(body["data"]["revision"], json!(1));
     assert_eq!(body["data"]["shortlist"], json!(["INFY"]));
 }
+
+#[tokio::test]
+async fn a_layout_may_be_any_json_value() {
+    let (app, _dir) = router(&[]);
+    for (name, layout) in [
+        ("arr", json!([1, 2])),
+        ("str", json!("grid")),
+        ("nul", Value::Null),
+    ] {
+        let uri = format!("/profile/layouts/{name}");
+        let (status, body) = send(&app, Method::PUT, &uri, Some(layout.clone()), None).await;
+        assert_eq!(status, StatusCode::OK, "{name}: {body}");
+        let (_, body) = send(&app, Method::GET, "/profile/layouts", None, None).await;
+        assert_eq!(body["data"]["layouts"][name], layout);
+    }
+}

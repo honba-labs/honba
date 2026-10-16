@@ -241,6 +241,7 @@ pub fn register_responses(set: &mut SchemaSet) {
     // stored profile written by a newer server must still load, so unknown fields are ignored.
     set.add_type::<honba_api::Profile>("Profile");
     set.add_type::<honba_api::Module>("Module");
+    set.add_type::<honba_api::LayoutDocument>("LayoutDocument");
     set.add_type::<honba_api::LayoutsResponse>("LayoutsResponse");
     set.add_type::<honba_api::ModulesResponse>("ModulesResponse");
     set.add_type::<honba_api::ProfileRevision>("ProfileRevision");

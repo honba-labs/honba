@@ -284,6 +284,8 @@ class IrUniverse:
     instruments: list[InstrumentId]
     named: str | None = None
 
+LayoutDocument = Any
+
 class LayoutsResponse:
     layouts: dict[str, Any]
 
@@ -467,6 +469,18 @@ class QuotesQuery:
 class QuotesResponse:
     quotes: list[QuoteTick]
 
+class Reason:
+    code: str
+    detail: str
+    group: ReasonGroup
+    label: str
+    polarity: ReasonPolarity
+    weight: float
+
+ReasonGroup = Literal["trend", "momentum", "price_action", "volume", "volatility", "level", "session", "relative_strength"]
+
+ReasonPolarity = Literal["bullish", "bearish"]
+
 class RejectReason:
     code: ErrorCode
     message: str
@@ -530,6 +544,34 @@ class ScreenerScanResponse:
     columns: list[str]
     range: list[Any]
     rows: list[ScreenerRow]
+    total: int
+
+class Signal:
+    anchor_price: float
+    direction: SignalDirection
+    evidence: dict[str, float] | None = None
+    horizon: SignalHorizon
+    instrument: InstrumentId
+    reasons: list[Reason]
+    ruleset: str
+    strength: float
+    t: UnixNanos
+    tags: list[str]
+    timeframe: str
+
+SignalDirection = Literal["buy", "sell"]
+
+SignalHorizon = Literal["intraday", "swing"]
+
+class SignalScanRequest:
+    detectors: list[str] | None = None
+    horizon: SignalHorizon
+    minStrength: float | None = None
+    timeframe: Timeframe
+    universe: list[str]
+
+class SignalScanResponse:
+    signals: list[Signal]
     total: int
 
 class SortSpec:

@@ -11,10 +11,10 @@ use axum::extract::{DefaultBodyLimit, FromRequestParts, Path, State};
 use axum::http::request::Parts;
 use axum::http::StatusCode;
 use axum::response::Response;
-use honba_api::{LayoutsResponse, ModulesResponse, ProfileRevision};
+use honba_api::{LayoutDocument, LayoutsResponse, ModulesResponse, ProfileRevision};
 use honba_messages::{ErrorCode, ErrorDetail};
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::json;
 use tracing::error;
 
 use crate::auth::{AuthEnforced, TokenInfo};
@@ -205,7 +205,7 @@ pub(crate) async fn put_layout(
     State(state): State<Arc<AppState>>,
     caller: Caller,
     Path(name): Path<String>,
-    ApiJson(layout): ApiJson<Value>,
+    ApiJson(LayoutDocument(layout)): ApiJson<LayoutDocument>,
 ) -> Response {
     if let Some(response) = check_name("layout name", &name) {
         return response;
