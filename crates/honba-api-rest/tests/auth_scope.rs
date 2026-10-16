@@ -35,7 +35,7 @@ fn drift_test_fails_on_new_route() {
 async fn every_scoped_route_is_registered_on_the_router() {
     let router = api_router();
     for (method, path, _) in ROUTE_SCOPES {
-        let uri = path.replace("{id}", "X.NSE");
+        let uri = path.replace("{id}", "X.NSE").replace("{name}", "main");
         let res = router
             .clone()
             .oneshot(

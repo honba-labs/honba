@@ -14,7 +14,7 @@ use axum::{
     extract::{rejection::JsonRejection, FromRequest, Path, Request, State},
     http::StatusCode,
     response::{IntoResponse, Json, Response},
-    routing::{delete, get, post},
+    routing::{delete, get, post, put},
     Router,
 };
 use honba_api::{
@@ -40,6 +40,7 @@ mod ingest;
 mod journal;
 mod market;
 mod orders;
+mod profile;
 mod profile_store;
 mod registry;
 mod retention;
@@ -177,6 +178,20 @@ pub fn api_router_with_config(state: AppState, config: &ApiConfig) -> Router {
         .route(
             "/trading-state",
             get(trading_state::get_trading_state).put(trading_state::put_trading_state),
+        )
+        .route(
+            "/profile",
+            get(profile::get_profile).put(profile::put_profile),
+        )
+        .route("/profile/layouts", get(profile::get_layouts))
+        .route(
+            "/profile/layouts/:name",
+            put(profile::put_layout).delete(profile::delete_layout),
+        )
+        .route("/profile/modules", get(profile::get_modules))
+        .route(
+            "/profile/modules/:id",
+            put(profile::put_module).delete(profile::delete_module),
         )
         .route("/strategies", post(post_strategies).get(get_strategies))
         .route("/strategies/verify", post(post_verify_strategy))

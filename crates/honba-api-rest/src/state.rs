@@ -5,7 +5,7 @@
 //! root. This crate names `honba-feed` only to build those adapters.
 
 use std::fmt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError, RwLock};
 
 use honba_api::StrategyCatalog;
@@ -15,8 +15,8 @@ use honba_messages::{ErrorDetail, TradingState};
 use honba_ports::{BarReader, DepthReader, InstrumentMaster, QuoteReader};
 
 use crate::{
-    ApprovalQueue, BacktestExecutor, OrderLedger, RunService, RunServiceConfig, RunStore,
-    StrategyRegistry,
+    ApprovalQueue, BacktestExecutor, OrderLedger, ProfileStore, RunService, RunServiceConfig,
+    RunStore, StrategyRegistry,
 };
 
 /// App state for REST API.
@@ -39,6 +39,9 @@ pub struct AppState {
     /// The run service behind `/backtests` and `/journals`; `None` until a journals root is
     /// configured ([`AppState::with_journals_dir`]).
     pub runs: Option<Arc<RunService>>,
+    /// The per-user profile store behind `/profile`; `None` until a profiles directory is
+    /// configured ([`AppState::with_profiles_dir`]).
+    pub profiles: Option<Arc<ProfileStore>>,
     /// Account currency of the runs (journal fills carry no costs; they are zero in this).
     pub account_currency: Currency,
     /// The operator trading state the write routes evaluate against (ADR 0018 decision 7).
@@ -89,6 +92,7 @@ impl AppState {
             depth,
             strategies: Arc::default(),
             runs: None,
+            profiles: None,
             account_currency: Currency::Inr,
             trading_state: Arc::default(),
             risk_limits: honba_risk::RiskLimits::default(),
@@ -223,6 +227,12 @@ impl AppState {
         );
         self.runs = Some(Arc::new(service));
         Ok(self)
+    }
+
+    /// Serves `/profile` from one JSON file per user under `dir` (created on first write).
+    pub fn with_profiles_dir(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.profiles = Some(Arc::new(ProfileStore::new(dir)));
+        self
     }
 
     /// Graceful shutdown of the run service (ADR 0017 decision 5): stops admitting, cancels

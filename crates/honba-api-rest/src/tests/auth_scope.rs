@@ -71,3 +71,23 @@ fn trading_state_routes_need_the_operator_scope() {
         );
     }
 }
+
+#[test]
+fn profile_routes_need_any_valid_token_and_no_scope() {
+    for (method, path) in [
+        ("GET", "/profile"),
+        ("PUT", "/profile"),
+        ("GET", "/profile/layouts"),
+        ("PUT", "/profile/layouts/main"),
+        ("DELETE", "/profile/layouts/main"),
+        ("GET", "/profile/modules"),
+        ("PUT", "/profile/modules/m1"),
+        ("DELETE", "/profile/modules/m1"),
+    ] {
+        assert_eq!(
+            scope_for(method, path),
+            Some(RouteScope::Authenticated),
+            "{method} {path}"
+        );
+    }
+}

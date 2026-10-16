@@ -165,6 +165,9 @@ pub enum RouteScope {
     Public,
     /// The caller's token must carry this scope.
     Required(&'static str),
+    /// Any valid token is enough; no particular scope. The handler acts for the token's own
+    /// `token_id` (the `/profile` routes: a token manages only its own profile).
+    Authenticated,
 }
 
 /// The canonical route-to-scope map (ADR 0023 §2).
@@ -194,6 +197,19 @@ pub const ROUTE_SCOPES: &[(&str, &str, RouteScope)] = &[
     ("GET", "/trading-state", RouteScope::Required("operator")),
     ("PUT", "/trading-state", RouteScope::Required("operator")),
     ("GET", "/screener/scan", RouteScope::Required("read:market")),
+    // Profile routes: any valid token, scoped to its own `token_id` by the handlers.
+    ("GET", "/profile", RouteScope::Authenticated),
+    ("PUT", "/profile", RouteScope::Authenticated),
+    ("GET", "/profile/layouts", RouteScope::Authenticated),
+    ("PUT", "/profile/layouts/{name}", RouteScope::Authenticated),
+    (
+        "DELETE",
+        "/profile/layouts/{name}",
+        RouteScope::Authenticated,
+    ),
+    ("GET", "/profile/modules", RouteScope::Authenticated),
+    ("PUT", "/profile/modules/{id}", RouteScope::Authenticated),
+    ("DELETE", "/profile/modules/{id}", RouteScope::Authenticated),
     ("GET", "/strategies", RouteScope::Required("research")),
     ("POST", "/strategies", RouteScope::Required("research")),
     (
@@ -319,9 +335,9 @@ impl AuthLayer {
     fn required_scope(method: &str, path: &str) -> Option<&'static str> {
         match scope_for(method, path) {
             Some(RouteScope::Required(scope)) => Some(scope),
-            // Public, or a route the table does not know: the router answers
-            // 404/405 for the latter, and the drift guard keeps it that way.
-            Some(RouteScope::Public) | None => None,
+            // Public, a route the table does not know (the router answers 404/405 for it, and
+            // the drift guard keeps it that way), or one that needs a token but no scope.
+            Some(RouteScope::Authenticated) | Some(RouteScope::Public) | None => None,
         }
     }
 }
@@ -375,10 +391,10 @@ impl AuthLayer {
         client_ip: Option<&str>,
     ) -> Result<Option<TokenInfo>, (StatusCode, Json<ResponseEnvelope<serde_json::Value>>)> {
         let required = Self::required_scope(method, path);
-        if required.is_none() {
+        let any_token = scope_for(method, path) == Some(RouteScope::Authenticated);
+        if required.is_none() && !any_token {
             return Ok(None);
         }
-        let required = required.unwrap();
 
         let auth_header = headers
             .get(AUTHORIZATION)
@@ -395,7 +411,7 @@ impl AuthLayer {
                     method,
                     decision: "denied",
                     reason: Some("missing_token"),
-                    required_scope: Some(required),
+                    required_scope: required,
                     token_scopes: None,
                     client_ip,
                 });
@@ -412,7 +428,8 @@ impl AuthLayer {
 
         match self.store.validate(token) {
             Ok(info) => {
-                if !info.scopes.iter().any(|s| s == required) {
+                if required.is_some_and(|r| !info.scopes.iter().any(|s| s == r)) {
+                    let required = required.unwrap_or_default();
                     self.audit(AuditEntry {
                         token_id: Some(&info.token_id),
                         route: path,
@@ -441,7 +458,7 @@ impl AuthLayer {
                     method,
                     decision: "granted",
                     reason: None,
-                    required_scope: Some(required),
+                    required_scope: required,
                     token_scopes: Some(&info.scopes),
                     client_ip,
                 });
@@ -459,7 +476,7 @@ impl AuthLayer {
                     method,
                     decision: "denied",
                     reason: Some(reason),
-                    required_scope: Some(required),
+                    required_scope: required,
                     token_scopes: None,
                     client_ip,
                 });
