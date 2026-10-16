@@ -162,3 +162,72 @@ fn update_rejects_a_hostile_user_id() {
     ));
     assert!(!tmp.path().join("profiles").exists());
 }
+
+#[test]
+fn count_limits_are_refused_and_change_nothing() {
+    use crate::profile_store::{MAX_LAYOUTS, MAX_MODULES, MAX_SYMBOLS, MAX_WATCHLISTS};
+
+    let (_tmp, store) = store();
+    let mut layouts = Profile::default();
+    for i in 0..=MAX_LAYOUTS {
+        layouts.layouts.insert(format!("l{i}"), json!(1));
+    }
+    let mut modules = Profile::default();
+    for i in 0..=MAX_MODULES {
+        modules
+            .modules
+            .insert(format!("m{i}"), crate::Module::default());
+    }
+    let mut lists = Profile::default();
+    for i in 0..=MAX_WATCHLISTS {
+        lists.watchlists.insert(format!("w{i}"), vec![]);
+    }
+    let long = vec!["X".to_string(); MAX_SYMBOLS + 1];
+    let mut long_list = Profile::default();
+    long_list.watchlists.insert("big".into(), long.clone());
+    let long_shortlist = Profile {
+        shortlist: long,
+        ..Profile::default()
+    };
+    for (name, bad) in [
+        ("layouts", layouts),
+        ("modules", modules),
+        ("watchlists", lists),
+        ("watchlist symbols", long_list),
+        ("shortlist", long_shortlist),
+    ] {
+        let err = store.put("alice", 0, bad).unwrap_err();
+        assert!(matches!(err, ProfileError::TooLarge { .. }), "{name}");
+    }
+    assert_eq!(store.get("alice").unwrap().revision, 0);
+    // Exactly at a limit is fine.
+    let mut ok = Profile::default();
+    for i in 0..MAX_LAYOUTS {
+        ok.layouts.insert(format!("l{i}"), json!(1));
+    }
+    store.put("alice", 0, ok).unwrap();
+}
+
+#[test]
+fn an_oversized_profile_is_refused_by_put_and_update() {
+    use crate::profile_store::MAX_PROFILE_BYTES;
+
+    let (_tmp, store) = store();
+    let blob = json!("x".repeat(MAX_PROFILE_BYTES));
+    let big = Profile {
+        preferences: blob.clone(),
+        ..Profile::default()
+    };
+    assert!(matches!(
+        store.put("alice", 0, big),
+        Err(ProfileError::TooLarge { .. })
+    ));
+    assert!(matches!(
+        store.update("alice", |p| {
+            p.layouts.insert("big".into(), blob);
+            true
+        }),
+        Err(ProfileError::TooLarge { .. })
+    ));
+    assert_eq!(store.get("alice").unwrap().revision, 0);
+}

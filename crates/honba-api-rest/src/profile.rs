@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use axum::extract::{FromRequestParts, Path, State};
+use axum::extract::{DefaultBodyLimit, FromRequestParts, Path, State};
 use axum::http::request::Parts;
 use axum::http::StatusCode;
 use axum::response::Response;
@@ -24,6 +24,16 @@ use crate::{ApiJson, AppState, Module, Profile, ProfileError, ProfileStore};
 
 /// Longest accepted layout name or module id, in characters.
 const MAX_NAME_LEN: usize = 128;
+
+/// Largest request body accepted on the `PUT /profile*` routes, in bytes. Smaller than
+/// [`MAX_PROFILE_BYTES`](crate::profile_store::MAX_PROFILE_BYTES) so oversized bodies are refused
+/// (413) before they are buffered and parsed.
+pub(crate) const MAX_BODY_BYTES: usize = 1024 * 1024;
+
+/// The body-size layer of the `PUT /profile*` routes.
+pub(crate) fn body_limit() -> DefaultBodyLimit {
+    DefaultBodyLimit::max(MAX_BODY_BYTES)
+}
 
 /// The user a request acts for, resolved from the auth middleware's output.
 ///
@@ -94,6 +104,14 @@ fn profile_failure(e: ProfileError) -> Response {
                 "expected": expected,
                 "current": current,
             })),
+        ),
+        ProfileError::TooLarge { what } => failure(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            ErrorDetail::new(
+                ErrorCode::ValidationInvalidRequest,
+                format!("profile too large: {what}"),
+            )
+            .with_context(json!({"reason": "profile_too_large"})),
         ),
         ProfileError::Io(_) | ProfileError::Json(_) => {
             error!(error = %e, "profile store failure");

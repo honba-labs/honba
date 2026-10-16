@@ -8,6 +8,7 @@
 //! All responses are wrapped in the versioned envelope from `honba-api`.
 
 use crate::auth::AuthRouterExt;
+use axum::handler::Handler as _;
 use axum::http::{HeaderValue, Method};
 use axum::{
     async_trait,
@@ -182,17 +183,17 @@ pub fn api_router_with_config(state: AppState, config: &ApiConfig) -> Router {
         )
         .route(
             "/profile",
-            get(profile::get_profile).put(profile::put_profile),
+            get(profile::get_profile).put(profile::put_profile.layer(profile::body_limit())),
         )
         .route("/profile/layouts", get(profile::get_layouts))
         .route(
             "/profile/layouts/:name",
-            put(profile::put_layout).delete(profile::delete_layout),
+            put(profile::put_layout.layer(profile::body_limit())).delete(profile::delete_layout),
         )
         .route("/profile/modules", get(profile::get_modules))
         .route(
             "/profile/modules/:id",
-            put(profile::put_module).delete(profile::delete_module),
+            put(profile::put_module.layer(profile::body_limit())).delete(profile::delete_module),
         )
         .route("/strategies", post(post_strategies).get(get_strategies))
         .route("/strategies/verify", post(post_verify_strategy))

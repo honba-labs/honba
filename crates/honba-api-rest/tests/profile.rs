@@ -366,3 +366,27 @@ async fn a_hostile_token_id_is_refused_and_touches_no_path() {
     assert!(!dir.path().join("profiles").exists());
     assert!(!dir.path().join("evil.json").exists());
 }
+
+#[tokio::test]
+async fn oversized_bodies_and_profiles_are_413_with_a_reason() {
+    let (app, _dir) = router(&[]);
+    // Over the route body limit: refused before it is parsed.
+    let huge = json!({"revision": 0, "preferences": "x".repeat(1024 * 1024 + 1)});
+    let (status, body) = send(&app, Method::PUT, "/profile", Some(huge.clone()), None).await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE, "{body}");
+    assert_eq!(body["error"]["code"], json!("validation_invalid_request"));
+    let (status, _) = send(&app, Method::PUT, "/profile/layouts/x", Some(huge), None).await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+
+    // Under the body limit but over a count limit: 413 with the store's reason.
+    let layouts: Value = (0..201).map(|i| (format!("l{i}"), json!(1))).collect();
+    let put = json!({"revision": 0, "layouts": layouts});
+    let (status, body) = send(&app, Method::PUT, "/profile", Some(put), None).await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE, "{body}");
+    assert_eq!(
+        body["error"]["context"]["reason"],
+        json!("profile_too_large")
+    );
+    let (_, body) = send(&app, Method::GET, "/profile", None, None).await;
+    assert_eq!(body["data"]["revision"], json!(0));
+}

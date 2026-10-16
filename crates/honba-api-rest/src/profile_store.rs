@@ -18,6 +18,21 @@ pub const DEFAULT_USER_ID: &str = "default";
 /// Longest accepted user id, in bytes.
 const MAX_USER_ID_LEN: usize = 64;
 
+/// Largest serialized profile a user may store, in bytes.
+pub const MAX_PROFILE_BYTES: usize = 2 * 1024 * 1024;
+
+/// Most named layouts one profile may hold.
+pub const MAX_LAYOUTS: usize = 200;
+
+/// Most modules one profile may hold.
+pub const MAX_MODULES: usize = 100;
+
+/// Most watchlists one profile may hold.
+pub const MAX_WATCHLISTS: usize = 100;
+
+/// Most symbols in one watchlist, and in the shortlist.
+pub const MAX_SYMBOLS: usize = 5000;
+
 /// Why a profile operation failed.
 #[derive(Debug, thiserror::Error)]
 pub enum ProfileError {
@@ -31,6 +46,12 @@ pub enum ProfileError {
         expected: u64,
         /// Revision currently stored.
         current: u64,
+    },
+    /// The profile exceeds a size or count limit; `what` names the limit.
+    #[error("profile too large: {what}")]
+    TooLarge {
+        /// Which limit was exceeded.
+        what: String,
     },
     /// Reading or writing the profile file failed.
     #[error("profile io: {0}")]
@@ -87,8 +108,9 @@ impl ProfileStore {
             });
         }
         new_profile.revision = current + 1;
+        let bytes = encode_within_limits(&new_profile)?;
         fs::create_dir_all(&self.dir)?;
-        write_atomic(&path, &serde_json::to_vec_pretty(&new_profile)?)?;
+        write_atomic(&path, &bytes)?;
         Ok(new_profile)
     }
 
@@ -110,8 +132,9 @@ impl ProfileStore {
             return Ok(profile);
         }
         profile.revision += 1;
+        let bytes = encode_within_limits(&profile)?;
         fs::create_dir_all(&self.dir)?;
-        write_atomic(&path, &serde_json::to_vec_pretty(&profile)?)?;
+        write_atomic(&path, &bytes)?;
         Ok(profile)
     }
 
@@ -132,6 +155,32 @@ fn validate_user_id(user_id: &str) -> Result<()> {
     } else {
         Err(ProfileError::InvalidUserId)
     }
+}
+
+/// Check the count limits, then serialize and check [`MAX_PROFILE_BYTES`].
+fn encode_within_limits(profile: &Profile) -> Result<Vec<u8>> {
+    let too_large = |what: String| Err(ProfileError::TooLarge { what });
+    if profile.layouts.len() > MAX_LAYOUTS {
+        return too_large(format!("more than {MAX_LAYOUTS} layouts"));
+    }
+    if profile.modules.len() > MAX_MODULES {
+        return too_large(format!("more than {MAX_MODULES} modules"));
+    }
+    if profile.watchlists.len() > MAX_WATCHLISTS {
+        return too_large(format!("more than {MAX_WATCHLISTS} watchlists"));
+    }
+    if profile.shortlist.len() > MAX_SYMBOLS
+        || profile.watchlists.values().any(|w| w.len() > MAX_SYMBOLS)
+    {
+        return too_large(format!(
+            "more than {MAX_SYMBOLS} symbols in a watchlist or the shortlist"
+        ));
+    }
+    let bytes = serde_json::to_vec_pretty(profile)?;
+    if bytes.len() > MAX_PROFILE_BYTES {
+        return too_large(format!("more than {MAX_PROFILE_BYTES} bytes"));
+    }
+    Ok(bytes)
 }
 
 fn read_profile(path: &Path) -> Result<Profile> {
