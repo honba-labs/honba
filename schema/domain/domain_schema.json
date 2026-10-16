@@ -2076,6 +2076,20 @@
       ],
       "type": "object"
     },
+    "LayoutsResponse": {
+      "description": "`GET /profile/layouts` response: the named layouts by name.",
+      "properties": {
+        "layouts": {
+          "additionalProperties": true,
+          "description": "Layouts by name (opaque to the server).",
+          "type": "object"
+        }
+      },
+      "required": [
+        "layouts"
+      ],
+      "type": "object"
+    },
     "Message": {
       "description": "The envelope that carries an [`Event`] plus Honba-side metadata.\n\nThis is the versioned unit of the wire contract: its JSON form is `{\"schema_version\": 4, \"event\": {...}, \"ts_init\": {...}}`, and deserializing a message with any other `schema_version` fails. Unknown fields, in the envelope or the event, are ignored (ADR 0012 rule 1): a newer producer's additive fields never break this reader, while a reshaped wire bumps the version and is rejected.\n\n``` use honba_messages::{Event, Message, UnixNanos, QuoteTick, InstrumentId, Exchange};\n\nlet quote = QuoteTick::new( InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), 22_000.0, 22_001.0, 50.0, 75.0, UnixNanos::from_u64(1), UnixNanos::from_u64(1), ); let msg = Message::new(Event::Quote(quote), UnixNanos::from_u64(2)); assert!(msg.event().is_market_data()); assert_eq!(msg.schema_version(), honba_messages::SCHEMA_VERSION); ```",
       "properties": {
@@ -2337,6 +2351,53 @@
         }
       ],
       "description": "Dynamic value of a metric in a screener row or symbol fact table."
+    },
+    "Module": {
+      "description": "A named collection of sources.",
+      "properties": {
+        "enabled": {
+          "description": "Whether the module is active.",
+          "type": "boolean"
+        },
+        "id": {
+          "description": "Stable module id.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Display name.",
+          "type": "string"
+        },
+        "sources": {
+          "description": "The sources the module groups.",
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "enabled",
+        "id",
+        "name",
+        "sources"
+      ],
+      "type": "object"
+    },
+    "ModulesResponse": {
+      "description": "`GET /profile/modules` response: the modules by id.",
+      "properties": {
+        "modules": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Module"
+          },
+          "description": "Modules by id.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "modules"
+      ],
+      "type": "object"
     },
     "Money": {
       "description": "Monetary amount in integer minor units (see Currency minor_exponent).",
@@ -3110,6 +3171,79 @@
         }
       ]
     },
+    "Profile": {
+      "description": "Everything stored for one user (`GET` / `PUT /profile`).",
+      "properties": {
+        "alerts": {
+          "default": null,
+          "description": "Alert rules (opaque to the server; may hold webhook URLs, visible only to this user)."
+        },
+        "layouts": {
+          "additionalProperties": true,
+          "default": {},
+          "description": "Named workbench layouts (opaque to the server).",
+          "type": "object"
+        },
+        "modules": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Module"
+          },
+          "default": {},
+          "description": "Modules by id.",
+          "type": "object"
+        },
+        "preferences": {
+          "default": null,
+          "description": "Preferences and theme (opaque to the server)."
+        },
+        "revision": {
+          "default": 0,
+          "description": "Monotonic revision, bumped by every successful write. A `PUT /profile` body carries the revision the client last read.",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "shortlist": {
+          "default": [],
+          "description": "Shortlisted symbols.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "watchlists": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "description": "Named watchlists of symbols.",
+          "type": "object"
+        },
+        "workbench": {
+          "default": null,
+          "description": "Workbench grid and the symbol in each pane (opaque to the server)."
+        }
+      },
+      "type": "object"
+    },
+    "ProfileRevision": {
+      "description": "Answer to a profile write that returns no profile: the revision now stored.",
+      "properties": {
+        "revision": {
+          "description": "The profile's revision after the write.",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "revision"
+      ],
+      "type": "object"
+    },
     "QuoteTick": {
       "description": "A top-of-book quote update.\n\n``` use honba_messages::{InstrumentId, QuoteTick, UnixNanos, Exchange};\n\nlet tick = QuoteTick::new( InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")), 22_000.0, 22_001.0, 50.0, 75.0, UnixNanos::from_u64(1), UnixNanos::from_u64(1), ); assert_eq!(tick.bid_price(), 22_000.0); assert_eq!(tick.ask_price(), 22_001.0); ```\n\nInvariants (checked by [`QuoteTick::validate`] and on deserialization): prices and sizes are finite, `bid_price <= ask_price`, sizes are `>= 0`.",
       "properties": {
@@ -3694,6 +3828,24 @@
       "required": [
         "dir",
         "key"
+      ],
+      "type": "object"
+    },
+    "Source": {
+      "description": "A source feeding a [`Module`], for example a broker adapter or a symbol list.",
+      "properties": {
+        "kind": {
+          "description": "Source kind, for example `broker`, `symbols` or `parquet`.",
+          "type": "string"
+        },
+        "reference": {
+          "description": "Kind-specific reference (an adapter name, a list name, a directory).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "reference"
       ],
       "type": "object"
     },

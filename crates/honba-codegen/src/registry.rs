@@ -212,6 +212,13 @@ pub fn register_responses(set: &mut SchemaSet) {
     set.add_type::<honba_api::TradingStateResponse>("TradingStateResponse");
     set.add_type::<honba_api::TradingStateChange>("TradingStateChange");
     set.add_type::<honba_api::TradesResponse>("TradesResponse");
+    // Records, not closed inputs: they are also the `PUT /profile` and module bodies, but a
+    // stored profile written by a newer server must still load, so unknown fields are ignored.
+    set.add_type::<honba_api::Profile>("Profile");
+    set.add_type::<honba_api::Module>("Module");
+    set.add_type::<honba_api::LayoutsResponse>("LayoutsResponse");
+    set.add_type::<honba_api::ModulesResponse>("ModulesResponse");
+    set.add_type::<honba_api::ProfileRevision>("ProfileRevision");
 }
 
 /// Builds the full registry used by every artifact.

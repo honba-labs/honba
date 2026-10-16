@@ -49,6 +49,14 @@ pub(crate) fn response_type_for(method: &str, path: &str) -> Option<&'static str
         ("PUT", "/trading-state") => "TradingStateChange",
         ("GET", "/screener/scan") => "ScreenerResponse",
         ("GET", "/journals/{id}") => "TradesResponse",
+        ("GET", "/profile") => "Profile",
+        ("PUT", "/profile") => "Profile",
+        ("GET", "/profile/layouts") => "LayoutsResponse",
+        ("PUT", "/profile/layouts/{name}") => "ProfileRevision",
+        ("DELETE", "/profile/layouts/{name}") => "ProfileRevision",
+        ("GET", "/profile/modules") => "ModulesResponse",
+        ("PUT", "/profile/modules/{id}") => "ProfileRevision",
+        ("DELETE", "/profile/modules/{id}") => "ProfileRevision",
         _ => return None,
     })
 }
@@ -63,6 +71,8 @@ pub(crate) fn request_type_for(method: &str, path: &str) -> Option<&'static str>
         ("POST", "/sweeps") => "SweepRequest",
         ("POST", "/orders") => "OrdersRequest",
         ("PUT", "/trading-state") => "TradingStateRequest",
+        ("PUT", "/profile") => "Profile",
+        ("PUT", "/profile/modules/{id}") => "Module",
         ("GET", "/orders") => "OrdersQuery",
         ("GET", "/instruments") => "InstrumentsQuery",
         ("GET", "/quotes") => "QuotesQuery",

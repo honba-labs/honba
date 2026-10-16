@@ -283,6 +283,9 @@ class IrUniverse:
     instruments: list[InstrumentId]
     named: str | None = None
 
+class LayoutsResponse:
+    layouts: dict[str, Any]
+
 class Message:
     event: Event
     schema_version: int
@@ -316,6 +319,15 @@ class MetricRef:
     timeframe: Timeframe | None = None
 
 MetricValue = float | str | bool | None
+
+class Module:
+    enabled: bool
+    id: str
+    name: str
+    sources: list[Source]
+
+class ModulesResponse:
+    modules: dict[str, Module]
 
 class Money:
     amount: int
@@ -424,6 +436,19 @@ PriceType = Literal["bid", "ask", "mid", "last"]
 
 Product = Literal["delivery", "intraday", "carry"]
 
+class Profile:
+    alerts: Any = None
+    layouts: dict[str, Any] | None = None
+    modules: dict[str, Module] | None = None
+    preferences: Any = None
+    revision: int | None = None
+    shortlist: list[str] | None = None
+    watchlists: dict[str, list[str]] | None = None
+    workbench: Any = None
+
+class ProfileRevision:
+    revision: int
+
 class QuoteTick:
     ask_price: float
     ask_size: float
@@ -511,6 +536,10 @@ class SortSpec:
     key: str
     period: MetricPeriod | None = None
     timeframe: Timeframe | None = None
+
+class Source:
+    kind: str
+    reference: str
 
 class StrategiesRequest:
     manifest: StrategyManifest
