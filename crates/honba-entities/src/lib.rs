@@ -39,6 +39,7 @@ pub mod instrument;
 pub mod portfolio;
 pub mod position;
 pub mod screener;
+pub mod signal;
 pub mod trade;
 
 pub use error::{EntitiesError, Result};
@@ -52,6 +53,10 @@ pub use screener::{
     check_predicate_value, FilterOp, MetricDefinition, MetricKeySpec, MetricPeriod, MetricRef,
     MetricValue, ScreenerFilterGroup, ScreenerFilterPredicate, ScreenerRow, ScreenerScanRequest,
     ScreenerScanResponse, SortSpec, Timeframe, UnitType, ValueType,
+};
+pub use signal::{
+    Reason, ReasonGroup, ReasonPolarity, Signal, SignalDirection, SignalError, SignalHorizon,
+    SignalScanRequest, SignalScanResponse,
 };
 pub use trade::Trade;
 

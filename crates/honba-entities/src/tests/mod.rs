@@ -6,6 +6,7 @@ mod instrument;
 mod money;
 mod position;
 mod screener;
+mod signal;
 mod trade;
 
 use honba_messages::{Exchange, InstrumentId};

@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Signal contract (ADR 0031, E12-S0)
+
+- ADR 0031 accepted. New **signal contract** in `honba-entities::signal`: `Signal` (a bar-anchored
+  buy/sell point with a direction, a `0..=1` confluence `strength` and mandatory `reasons`),
+  `Reason` (a stable `code`, group, polarity, weight, label and detail), the enums
+  `SignalHorizon`, `SignalDirection`, `ReasonGroup`, `ReasonPolarity`, and the scan
+  `SignalScanRequest` (closed input) / `SignalScanResponse` (open record). Contract types live in
+  `honba-entities` (L1) beside the screener contract, so codegen and `honba-api` name them
+  without the detector engine (ADR 0031 §3).
+- Registered in the codegen registry (`SIGNAL_TYPES`) and every artifact regenerated
+  (`schema/domain`, `schema/openapi`, the Python `.pyi`, the frontend `domain.ts`); additive per
+  ADR 0012.
+- Tests: `crates/honba-entities/src/tests/signal.rs`, `crates/honba-codegen/src/tests/registry.rs`
+  (`the_signal_contract_types_are_published`).
+
 ### Docs: chart signals plan (ADR 0031)
 
 - Proposed **ADR 0031** (chart signals: a bar-anchored `Signal` with a direction, a normalized

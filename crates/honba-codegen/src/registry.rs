@@ -36,6 +36,19 @@ pub const SCREENER_TYPES: &[&str] = &[
     "ScreenerScanResponse",
 ];
 
+/// The signal contract: the explainable buy/sell point, its reasons, and the
+/// scan request/response (ADR 0031, ROADMAP E12).
+pub const SIGNAL_TYPES: &[&str] = &[
+    "Signal",
+    "Reason",
+    "SignalHorizon",
+    "SignalDirection",
+    "ReasonGroup",
+    "ReasonPolarity",
+    "SignalScanRequest",
+    "SignalScanResponse",
+];
+
 /// The enums whose variants are published as stable string constants.
 pub const WIRE_ENUMS: &[&str] = &[
     "OrderSide",
@@ -83,6 +96,7 @@ pub fn published_names() -> Vec<&'static str> {
     let mut names: Vec<&'static str> = Vec::new();
     names.extend_from_slice(WIRE_TYPES);
     names.extend_from_slice(SCREENER_TYPES);
+    names.extend_from_slice(SIGNAL_TYPES);
     names.extend_from_slice(WIRE_ENUMS);
     names.extend_from_slice(API_TYPES);
     names.extend_from_slice(MANIFEST_TYPES);
@@ -114,6 +128,17 @@ pub fn register_all(set: &mut SchemaSet) {
     set.add_type::<honba_entities::ScreenerScanRequest>("ScreenerScanRequest");
     set.add_type::<honba_entities::ScreenerRow>("ScreenerRow");
     set.add_type::<honba_entities::ScreenerScanResponse>("ScreenerScanResponse");
+
+    // The signal contract (ADR 0031, ROADMAP E12). Same split as the screener: the
+    // data-carrying types live in honba-entities (L1); the detector engine is honba-signals (L4).
+    set.add_type::<honba_entities::Signal>("Signal");
+    set.add_type::<honba_entities::Reason>("Reason");
+    set.add_type::<honba_entities::SignalHorizon>("SignalHorizon");
+    set.add_type::<honba_entities::SignalDirection>("SignalDirection");
+    set.add_type::<honba_entities::ReasonGroup>("ReasonGroup");
+    set.add_type::<honba_entities::ReasonPolarity>("ReasonPolarity");
+    set.add_type::<honba_entities::SignalScanRequest>("SignalScanRequest");
+    set.add_type::<honba_entities::SignalScanResponse>("SignalScanResponse");
 
     set.add_type::<honba_messages::OrderSide>("OrderSide");
     set.add_type::<honba_messages::OrderType>("OrderType");
