@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Portfolio report contract (ADR 0032, E13-S0)
+
+- ADR 0032 accepted. New **portfolio report contract** in `honba-entities::portfolio_report`:
+  `PortfolioSnapshot` (a valued, per-user portfolio: owner, revision, `as_of`, base currency,
+  accounts and totals), `PortfolioAccount` (cash, equity, market value, margins, leverage, realized
+  and unrealized PnL, its positions and delivery holdings), `PortfolioPosition`, `PortfolioHolding`,
+  `PortfolioTotals`, and the enums `PortfolioMode` (`live` / `sandbox`, never mixed) and
+  `PortfolioSource` (`ledger` = honba's own fills/simulator, `broker` = read from an adapter).
+  Contract types live in `honba-entities` (L1) beside the screener and signal contracts, so codegen
+  and `honba-api` name them without the valuation engine (`honba-portfolio`, L4; E13-S1).
+- Registered in the codegen registry (`PORTFOLIO_TYPES`) and every artifact regenerated
+  (`schema/domain`, `schema/openapi`, the Python `.pyi`, the frontend `domain.ts`); additive per
+  ADR 0012.
+- Tests: `crates/honba-codegen/src/tests/registry.rs` (`the_portfolio_contract_types_are_published`;
+  `PortfolioSnapshot` is an open response record).
+
 ### Signal price action and levels (ADR 0031, E12-S2)
 
 - New price-action detectors in `honba-signals`: `candlestick` (`bullish_engulfing`,
