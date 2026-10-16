@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Per-request `fill_model` (ADR 0030)
+
+- `POST /backtests` accepts an optional `fill_model` (`bar_fill`, `bar_fill_through`, `l2` or
+  `none`) that overrides the server's configured model for that run. Unset means "use the
+  server's". An unknown name is a `422 validation_invalid_request` with
+  `context.field = "fill_model"` at submit.
+- `ResolvedBacktest` (and so the manifest) gains the optional field, omitted when unset, so no
+  `MANIFEST_VERSION` bump. Wire artifacts regenerated (`schema/domain`, `schema/openapi`, the
+  Python `.pyi`, the frontend `domain.ts`).
+- Tests: `crates/honba-api/src/tests/run_requests.rs`,
+  `crates/honba-api-rest/src/tests/executor.rs`,
+  `crates/honba-api-rest/tests/rest_backtest_l2.rs`.
+
 ### Persistent Parquet tick store (ADR 0030)
 
 - `honba-feed` gains `ParquetTickStore`, a `TickReader` over `{root}/ticks/*.parquet` (read whole

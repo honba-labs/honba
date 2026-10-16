@@ -122,6 +122,7 @@ pub fn backtest_request(seed: u64) -> ResolvedRequest {
         bar_spec: "1d".into(),
         initial_capital: 1_000_000.0,
         seed,
+        fill_model: None,
     })
 }
 
@@ -212,6 +213,7 @@ pub fn sma_request(seed: u64) -> BacktestRequest {
         bar_spec: Some("1d".into()),
         initial_capital: Some(1_000_000.0),
         seed: Some(seed),
+        fill_model: None,
     }
 }
 

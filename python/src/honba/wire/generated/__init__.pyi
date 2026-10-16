@@ -36,6 +36,7 @@ class BacktestMetrics:
 class BacktestRequest:
     bar_spec: str | None = None
     end: str | None = None
+    fill_model: str | None = None
     initial_capital: float | None = None
     seed: int | None = None
     start: str | None = None

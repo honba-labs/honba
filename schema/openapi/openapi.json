@@ -142,6 +142,13 @@
               "null"
             ]
           },
+          "fill_model": {
+            "description": "Fill model for this run, overriding the server's configured one: `bar_fill` (the default), `bar_fill_through`, `l2` or `none`. `l2` needs a tick source; without one the run fails with `l2_requires_ticks`. See [`FILL_MODELS`](crate::FILL_MODELS).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "initial_capital": {
             "description": "Initial capital.",
             "format": "double",

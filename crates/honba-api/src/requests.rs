@@ -123,6 +123,11 @@ pub struct BacktestRequest {
     /// byte-identical journal.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seed: Option<u64>,
+    /// Fill model for this run, overriding the server's configured one: `bar_fill` (the
+    /// default), `bar_fill_through`, `l2` or `none`. `l2` needs a tick source; without one the
+    /// run fails with `l2_requires_ticks`. See [`FILL_MODELS`](crate::FILL_MODELS).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fill_model: Option<String>,
 }
 
 /// Sweep request.

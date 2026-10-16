@@ -56,7 +56,7 @@ pub use run_id::{RunId, RunIdError, RunIdGenerator};
 pub use run_ports::{JournalWriter, RunExecutor, RunJob, RunOutcome};
 pub use run_resolve::{
     unknown_strategy, ResolvedBacktest, ResolvedRequest, ResolvedSweep, DEFAULT_BAR_SPEC,
-    DEFAULT_INITIAL_CAPITAL,
+    DEFAULT_INITIAL_CAPITAL, FILL_MODELS,
 };
 pub use runs::{RunEvent, RunKind, RunManifest, TransitionError, MANIFEST_VERSION};
 pub use screener::{

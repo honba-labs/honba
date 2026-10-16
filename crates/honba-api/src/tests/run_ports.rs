@@ -34,6 +34,7 @@ fn backtest() -> ResolvedRequest {
         bar_spec: "1d".into(),
         initial_capital: 1_000.0,
         seed: 42,
+        fill_model: None,
     })
 }
 

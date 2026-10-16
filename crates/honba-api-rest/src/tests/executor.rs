@@ -72,6 +72,7 @@ fn job_with(strategy: &str, universe: &str, bar_spec: &str, seed: u64) -> RunJob
             bar_spec: bar_spec.to_owned(),
             initial_capital: 1_000_000.0,
             seed,
+            fill_model: None,
         }),
         seed,
     }
@@ -503,5 +504,76 @@ mod l2 {
     fn lines_of(r: Result<RunOutcome, ErrorDetail>) -> String {
         let (m, _) = metrics_of(r.unwrap());
         format!("{m:?}")
+    }
+
+    // ---- a per-request fill_model (ADR 0030) overrides the server's configured one ----
+
+    fn with_fill_model(mut job: RunJob, name: &str) -> RunJob {
+        match &mut job.request {
+            ResolvedRequest::Backtest(spec) => spec.fill_model = Some(name.to_owned()),
+            ResolvedRequest::Sweep(_) => unreachable!("these tests submit backtests"),
+        }
+        job
+    }
+
+    #[test]
+    fn a_request_l2_uses_a_tick_source_a_bar_fill_server_ignored() {
+        // The server's model is bar_fill and it has a tick source; only the request asking for
+        // l2 makes the source matter, and the fill is the quote ask, not the bar close.
+        let ticks = InMemoryTickReader::new().with_quotes(vec![quote(T0, 99.0, 100.5)]);
+        let exec = executor().with_tick_reader(Arc::new(ticks));
+        let job = with_fill_model(job_with("buy_and_hold", "TCS.NSE", "1d", 5), "l2");
+        let mut journal = Memory::default();
+        exec.execute(job, &mut journal).unwrap();
+        assert_eq!(fill_prices(&journal), [100.5], "the request chose l2");
+    }
+
+    #[test]
+    fn a_request_bar_fill_overrides_an_l2_server_without_a_source() {
+        // The server is l2 and has no tick source, so a bar_fill request still runs.
+        let exec = executor().with_execution(ExecutionConfig {
+            fill_model: FillModel::L2,
+            ..ExecutionConfig::default()
+        });
+        let job = with_fill_model(job(42), "bar_fill");
+        exec.execute(job, &mut Memory::default()).unwrap();
+    }
+
+    #[test]
+    fn a_request_l2_without_a_tick_source_keeps_the_stable_refusal() {
+        let job = with_fill_model(job(42), "l2");
+        let err = executor().execute(job, &mut Memory::default()).unwrap_err();
+        assert_eq!(err.code, ErrorCode::Unsupported);
+        assert_eq!(err.context.unwrap()["reason"], "l2_requires_ticks");
+    }
+}
+
+/// The names `honba_api::FILL_MODELS` accepts are exactly `honba_config::FillModel`'s, so the
+/// request-side list cannot drift from the config enum the executor deserializes into.
+#[test]
+fn fill_model_names_match_the_config_enum() {
+    use honba_api::FILL_MODELS;
+    use honba_config::FillModel;
+    let from_config: std::collections::BTreeSet<String> = [
+        FillModel::BarFill,
+        FillModel::BarFillThrough,
+        FillModel::L2,
+        FillModel::None,
+    ]
+    .into_iter()
+    .map(|m| {
+        serde_json::to_value(m)
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_owned()
+    })
+    .collect();
+    let from_api: std::collections::BTreeSet<String> =
+        FILL_MODELS.iter().map(|s| (*s).to_owned()).collect();
+    assert_eq!(from_api, from_config);
+    for name in FILL_MODELS {
+        serde_json::from_value::<FillModel>(serde_json::json!(name))
+            .unwrap_or_else(|e| panic!("{name} must deserialize into FillModel: {e}"));
     }
 }

@@ -53,6 +53,7 @@ fn job_with(strategy: &str, universe: &str, bar_spec: &str, seed: u64, capital: 
             bar_spec: bar_spec.to_owned(),
             initial_capital: capital,
             seed,
+            fill_model: None,
         }),
         seed,
     }

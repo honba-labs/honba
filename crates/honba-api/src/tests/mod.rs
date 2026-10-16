@@ -37,6 +37,7 @@ fn a_backtest_request_round_trips_through_json() {
         bar_spec: Some("1d".into()),
         initial_capital: Some(1_000_000.0),
         seed: Some(42),
+        fill_model: None,
     };
     let text = serde_json::to_string(&req).unwrap();
     let back: BacktestRequest = serde_json::from_str(&text).unwrap();

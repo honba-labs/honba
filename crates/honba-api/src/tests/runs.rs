@@ -121,6 +121,7 @@ fn backtest_manifest() -> RunManifest {
             bar_spec: "1d".into(),
             initial_capital: 1_000_000.0,
             seed: 42,
+            fill_model: None,
         }),
         "2026-10-08T00:00:00Z",
     )

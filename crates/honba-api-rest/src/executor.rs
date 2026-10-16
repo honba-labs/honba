@@ -189,6 +189,19 @@ fn internal(reason: &str, message: impl Into<String>) -> ErrorDetail {
     ErrorDetail::new(ErrorCode::InternalError, message).with_context(json!({"reason": reason}))
 }
 
+/// Maps a request's `fill_model` name to the config enum, through serde so the accepted
+/// spellings are the enum's own (pinned to `honba_api::FILL_MODELS` by a test). Submit
+/// validation already refused an unknown name, so this is defensive.
+fn fill_model_from_name(name: &str) -> Result<FillModel, ErrorDetail> {
+    serde_json::from_value::<FillModel>(serde_json::Value::String(name.to_string())).map_err(|_| {
+        invalid(
+            "fill_model",
+            "unknown_fill_model",
+            format!("unknown fill_model {name:?}"),
+        )
+    })
+}
+
 fn port_error(e: &PortError) -> ErrorDetail {
     let code = match e {
         PortError::Unsupported(_) => ErrorCode::Unsupported,
@@ -710,14 +723,18 @@ impl BacktestExecutor {
             spec.end.as_u64()
         );
         let params = json!({"seed": job.seed, "initial_capital": spec.initial_capital});
-        let cost_model_version = match self.execution.fill_model {
+        let fill_model = match spec.fill_model.as_deref() {
+            None => self.execution.fill_model,
+            Some(name) => fill_model_from_name(name)?,
+        };
+        let cost_model_version = match fill_model {
             FillModel::BarFill => "bar_fill:v1",
             _ => "custom:v1",
         };
         let cache_key =
             CacheKey::compute(&job.strategy_id, &params, &dataset_id, cost_model_version);
 
-        let is_l2 = matches!(self.execution.fill_model, FillModel::L2);
+        let is_l2 = matches!(fill_model, FillModel::L2);
         // The key names bars and a bar-fill model only; an l2 run also depends on its ticks,
         // so it neither reads nor writes the cache.
         let cache = if is_l2 { None } else { self.cache.as_ref() };
@@ -729,7 +746,7 @@ impl BacktestExecutor {
                 });
             }
         }
-        if !is_l2 && !matches!(self.execution.fill_model, FillModel::BarFill) {
+        if !is_l2 && !matches!(fill_model, FillModel::BarFill) {
             return Err(ErrorDetail::new(
                 ErrorCode::Unsupported,
                 "only the bar_fill model is available",

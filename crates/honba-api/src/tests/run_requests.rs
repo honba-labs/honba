@@ -16,6 +16,7 @@ fn full() -> BacktestRequest {
         bar_spec: None,
         initial_capital: None,
         seed: Some(42),
+        fill_model: None,
     }
 }
 
@@ -51,6 +52,35 @@ fn backtest_resolve_keeps_explicit_optionals() {
     let r = req.resolve().unwrap();
     assert_eq!(r.bar_spec, "5m");
     assert_eq!(r.initial_capital, 250_000.0);
+}
+
+#[test]
+fn backtest_resolve_carries_a_known_fill_model_and_defaults_to_none() {
+    assert_eq!(
+        full().resolve().unwrap().fill_model,
+        None,
+        "unset by default"
+    );
+
+    let mut req = full();
+    req.fill_model = Some("l2".into());
+    assert_eq!(req.resolve().unwrap().fill_model.as_deref(), Some("l2"));
+}
+
+#[test]
+fn backtest_resolve_rejects_an_unknown_or_blank_fill_model() {
+    let mut req = full();
+    req.fill_model = Some("midpoint".into());
+    let err = req.resolve().unwrap_err();
+    assert_eq!(
+        err.context.as_ref().unwrap()["reason"],
+        json!("unknown_fill_model")
+    );
+    assert_field(err, "fill_model");
+
+    let mut req = full();
+    req.fill_model = Some("  ".into());
+    assert_field(req.resolve().unwrap_err(), "fill_model");
 }
 
 #[test]

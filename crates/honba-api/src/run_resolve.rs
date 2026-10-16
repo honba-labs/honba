@@ -15,6 +15,13 @@ use crate::requests::{BacktestRequest, SweepRequest};
 /// Bar specification used when `bar_spec` is omitted.
 pub const DEFAULT_BAR_SPEC: &str = "1d";
 
+/// Fill models a [`BacktestRequest`] may name, in the server's own spellings.
+///
+/// `honba-api` sits above `honba-config` in the layering and cannot read
+/// `honba_config::FillModel`, so this list is pinned equal to it by a test in
+/// `honba-api-rest` (which can read both). A name outside the list is a 422 at submit.
+pub const FILL_MODELS: [&str; 4] = ["bar_fill", "bar_fill_through", "l2", "none"];
+
 /// Initial capital used when `initial_capital` is omitted.
 ///
 /// Mirrors `honba_config::AccountConfig::default().starting_cash`; `honba-api` sits above
@@ -38,6 +45,12 @@ pub struct ResolvedBacktest {
     pub initial_capital: f64,
     /// Seed, non-zero.
     pub seed: u64,
+    /// Fill model this run asked for, if any (see [`FILL_MODELS`]). `None` means the request did
+    /// not override the server's configured model. Omitted from a manifest when unset, so an old
+    /// manifest still parses and a new optional field does not bump the manifest version
+    /// (ADR 0012 rule 1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fill_model: Option<String>,
 }
 
 /// A [`SweepRequest`] with every required field present and valid.
@@ -132,6 +145,27 @@ impl BacktestRequest {
                 "initial_capital must be a finite positive number",
             ));
         }
+        let fill_model = match self.fill_model.as_deref().map(str::trim) {
+            None => None,
+            Some("") => {
+                return Err(invalid(
+                    "fill_model",
+                    "empty",
+                    "fill_model must not be empty",
+                ));
+            }
+            Some(name) if FILL_MODELS.contains(&name) => Some(name.to_owned()),
+            Some(name) => {
+                return Err(invalid(
+                    "fill_model",
+                    "unknown_fill_model",
+                    format!(
+                        "unknown fill_model {name:?}; expected one of {}",
+                        FILL_MODELS.join(", ")
+                    ),
+                ));
+            }
+        };
         Ok(ResolvedBacktest {
             strategy,
             universe,
@@ -140,6 +174,7 @@ impl BacktestRequest {
             bar_spec,
             initial_capital,
             seed,
+            fill_model,
         })
     }
 }
