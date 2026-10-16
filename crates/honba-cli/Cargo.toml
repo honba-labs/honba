@@ -27,6 +27,7 @@ honba-engine          = { path = "../honba-engine" }
 honba-async           = { path = "../honba-async" }
 honba-analytics       = { path = "../honba-analytics" }
 honba-feed            = { path = "../honba-feed" }
+honba-ports           = { path = "../honba-ports" }
 honba-strategy        = { path = "../honba-strategy" }
 honba-testing         = { path = "../honba-testing" }
 honba-sim             = { path = "../honba-sim" }
@@ -37,6 +38,5 @@ honba-config          = { path = "../honba-config" }
 tokio                 = { version = "1", features = ["rt-multi-thread", "net", "signal"] }
 
 [dev-dependencies]
-honba-ports = { path = "../honba-ports" }
 arrow   = "53"
 parquet = { version = "53", features = ["arrow"] }

@@ -533,6 +533,63 @@ fn fill_model_l2_with_ticks_runs_a_backtest_end_to_end() {
     assert_eq!(done["data"]["status"], "completed", "{done}");
 }
 
+/// A Parquet tick store built from the NDJSON file, kept beside the data dir (never inside it,
+/// so its file is not mistaken for a bar source).
+fn tick_store(name: &str) -> PathBuf {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+        .join("honba-cli-serve")
+        .join(format!("{name}.store"));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+#[test]
+fn fill_model_l2_with_a_parquet_tick_store_runs_a_backtest_end_to_end() {
+    let dir = data_dir("l2-parquet-ticks");
+    let ticks = ticks_file("l2-parquet-ticks", TICKS_OK);
+    let store = tick_store("l2-parquet-ticks");
+
+    let imported = Command::new(env!("CARGO_BIN_EXE_honba"))
+        .args([
+            "data",
+            "ticks-import",
+            "--ticks",
+            ticks.to_str().unwrap(),
+            "--out",
+            store.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        imported.status.success(),
+        "{}",
+        String::from_utf8_lossy(&imported.stderr)
+    );
+    let report = String::from_utf8_lossy(&imported.stdout);
+    assert!(report.contains("2 quote and 1 trade"), "{report}");
+
+    let journals = dir.join("journals-parquet");
+    let (child, addr) = start(&[
+        "--data-dir",
+        dir.to_str().unwrap(),
+        "--addr",
+        "127.0.0.1:0",
+        "--journals-dir",
+        journals.to_str().unwrap(),
+        "--fill-model",
+        "l2",
+        "--ticks",
+        store.to_str().unwrap(),
+    ]);
+    let (status, body) = post(addr, "/backtests", BACKTEST);
+    assert_eq!(status, 200, "{body}");
+    let id = body["data"]["run_id"].as_str().unwrap().to_owned();
+    let done = finished_run(addr, &id);
+    stop(child);
+    assert_eq!(done["data"]["status"], "completed", "{done}");
+}
+
 #[test]
 fn fill_model_l2_without_ticks_fails_at_startup() {
     let dir = data_dir("l2-no-ticks");

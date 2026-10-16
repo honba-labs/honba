@@ -116,6 +116,15 @@ enum DataCommands {
         #[arg(long)]
         exchange: Option<String>,
     },
+    /// Import an NDJSON ticks file (ADR 0030) into a Parquet tick store directory
+    TicksImport {
+        /// NDJSON ticks file to read (format v1, see ADR 0030)
+        #[arg(long)]
+        ticks: PathBuf,
+        /// Store directory to write `{out}/ticks/ticks.parquet` into; created if missing
+        #[arg(long)]
+        out: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -156,6 +165,7 @@ fn main() -> Result<()> {
                 symbol,
                 exchange,
             } => data::load(&source, &symbol, exchange.as_deref()),
+            DataCommands::TicksImport { ticks, out } => data::ticks_import(&ticks, &out),
         },
         Commands::Calendars { command } => match command {
             CalendarCommands::Show { year } => calendars::show(year),

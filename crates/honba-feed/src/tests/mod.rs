@@ -4,5 +4,6 @@ mod export_tests;
 mod import_tests;
 mod instruments;
 mod live_quotes;
+mod parquet_ticks;
 mod reader;
 mod ticks;

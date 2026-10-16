@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Persistent Parquet tick store (ADR 0030)
+
+- `honba-feed` gains `ParquetTickStore`, a `TickReader` over `{root}/ticks/*.parquet` (read whole
+  at `open`, merged in file-name order, sorted by `ts_event`), plus `write_tick_file` and
+  `tick_schema()` so producers and consumers share one column layout. Rows go through the wire
+  types, so a bad row is an error naming the file and row rather than a panic; a store holding no
+  ticks answers `PortError::Unsupported`, which is what the `l2_requires_ticks` refusal needs.
+- `honba serve --ticks` accepts a store directory as well as the NDJSON file, and
+  `honba data ticks-import --ticks <FILE> --out <DIR>` builds a store from the NDJSON format
+  (read back before reporting success). No wire or schema change.
+- Tests: `crates/honba-feed/src/tests/parquet_ticks.rs`,
+  `crates/honba-api-rest/tests/rest_backtest_l2_parquet.rs`,
+  `crates/honba-cli/tests/serve.rs::fill_model_l2_with_a_parquet_tick_store_runs_a_backtest_end_to_end`.
+
 ### Order ledger follow-ups (ADR 0030)
 
 - A risk refusal that carries a `client_order_id` is still the 422 envelope, and is now also

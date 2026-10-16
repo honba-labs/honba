@@ -22,7 +22,7 @@ use std::time::Duration;
 
 use honba_api_rest::{ApiConfig, AppState, RetentionPolicy, RunServiceConfig};
 use honba_config::{ExecutionConfig, FillModel};
-use honba_feed::InMemoryTickReader;
+use honba_feed::{InMemoryTickReader, ParquetTickStore};
 use honba_messages::TradingState;
 
 /// Parses the `--trading-state` value; the spellings are the wire form (ADR 0018 decision 2).
@@ -117,10 +117,20 @@ pub(crate) struct FillArgs {
     /// `l2` needs --ticks (refused at start-up otherwise)
     #[arg(long, value_parser = parse_fill_model)]
     pub fill_model: Option<FillModel>,
-    /// NDJSON file of quote/trade ticks (format v1, see ADR 0030) that `--fill-model l2` matches
-    /// against. Validated at start-up; a bad line is reported with its line number
+    /// NDJSON file (format v1, see ADR 0030) or Parquet tick store directory that
+    /// `--fill-model l2` matches against. A file is validated at start-up; a directory is read
+    /// through the Parquet tick store (`honba data ticks-import` builds one). A bad line is
+    /// reported with its line number
     #[arg(long)]
     pub ticks: Option<PathBuf>,
+}
+
+/// The loaded tick source behind `--ticks`: an NDJSON file or a Parquet store directory.
+pub(crate) enum TickSource {
+    /// An NDJSON `--ticks <FILE>`.
+    Ndjson(InMemoryTickReader),
+    /// A `--ticks <DIR>` Parquet store.
+    Parquet(ParquetTickStore),
 }
 
 /// Parses the `--fill-model` value; the spellings are the wire form.
@@ -139,18 +149,21 @@ impl FillArgs {
     /// The execution config and the loaded tick source these flags spell. `l2` without
     /// `--ticks` is a start-up error, so the runtime `l2_requires_ticks` refusal is never the
     /// first the operator hears of it.
-    pub(crate) fn resolve(&self) -> Result<(ExecutionConfig, Option<InMemoryTickReader>)> {
+    pub(crate) fn resolve(&self) -> Result<(ExecutionConfig, Option<TickSource>)> {
         let fill_model = self.fill_model.unwrap_or_default();
         if fill_model == FillModel::L2 && self.ticks.is_none() {
             anyhow::bail!(
-                "--fill-model l2 needs --ticks <FILE> (NDJSON quote/trade ticks, see ADR 0030)"
+                "--fill-model l2 needs --ticks <FILE|DIR> (NDJSON or a Parquet tick store, see ADR 0030)"
             );
         }
-        let ticks = self
-            .ticks
-            .as_deref()
-            .map(crate::ticks_file::load)
-            .transpose()?;
+        let ticks = match self.ticks.as_deref() {
+            Some(path) if path.is_dir() => Some(TickSource::Parquet(
+                ParquetTickStore::open(path)
+                    .with_context(|| format!("reading --ticks store {}", path.display()))?,
+            )),
+            Some(path) => Some(TickSource::Ndjson(crate::ticks_file::load(path)?)),
+            None => None,
+        };
         let execution = ExecutionConfig {
             fill_model,
             ..ExecutionConfig::default()
@@ -239,7 +252,11 @@ pub fn run(
         .with_risk_limits(risk_limits)
         .with_execution(execution);
     if let Some(ticks) = ticks {
-        state = state.with_tick_reader(std::sync::Arc::new(ticks));
+        let reader: std::sync::Arc<dyn honba_ports::TickReader> = match ticks {
+            TickSource::Ndjson(reader) => std::sync::Arc::new(reader),
+            TickSource::Parquet(store) => std::sync::Arc::new(store),
+        };
+        state = state.with_tick_reader(reader);
     }
     // Execution and ticks are set before the run service, which captures them.
     let state = state

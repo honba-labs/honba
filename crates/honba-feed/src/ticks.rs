@@ -45,6 +45,16 @@ impl InMemoryTickReader {
         }
         Ok(())
     }
+
+    /// The quotes held, in `ts_event` order (as written), for export and inspection.
+    pub fn quotes(&self) -> &[QuoteTick] {
+        &self.quotes
+    }
+
+    /// The trades held, in `ts_event` order (as written), for export and inspection.
+    pub fn trades(&self) -> &[TradeTick] {
+        &self.trades
+    }
 }
 
 fn in_range(t: UnixNanos, request: &TickRequest) -> bool {
