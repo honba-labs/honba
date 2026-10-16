@@ -194,3 +194,20 @@ pull-based, like E7/E8/E12.
   rather than duplicated. The wire types are `PortfolioSnapshot`, `PortfolioAccount`,
   `PortfolioPosition`, `PortfolioHolding`, `PortfolioTotals` and the enums `PortfolioMode`,
   `PortfolioSource`.
+- 2026-10-16: E13-S1 implementation decisions. The engine is a new pure crate **`honba-portfolio`**
+  (L4, deps `honba-messages` + `honba-entities`), mirroring `honba-signals`, and registered in the
+  workspace and the crate layering. `value(state, marks, owner, revision, as_of) ->
+  Result<PortfolioSnapshot, PortfolioError>` takes the positions and marks as arguments and stamps
+  `as_of` from the caller — no clock, no I/O — so the snapshot is byte-identical for equal input.
+  Input types are `PortfolioState` / `AccountState` / `HeldPosition` (a `Position` paired with its
+  `Product`, since `Position` carries no product) plus a `Marks` lookup; the wire types stay the
+  projection. A non-flat position with **no mark** is an error (`PortfolioError::MissingMark`), not
+  a silent cost mark. A **flat** position is dropped from `positions`/`holdings` but its realized
+  PnL still counts toward the account. Amounts round once to minor units via `Money::mul_qty` /
+  `from_major_f64` (nearest), consistent with the fill ledger. A short's market value is negative
+  (signed by side); `equity = cash + market value`; `margin_used`/`margin_available` are passed
+  through, not derived. Accounts sort by id and positions/holdings by instrument, so input order
+  never reaches the wire. A position in a currency other than the account's is a currency-mismatch
+  error (v1 assumes one settlement currency). Acceptance: golden replay
+  (`crates/honba-portfolio/tests/golden/portfolio_snapshot.json`), byte-identical determinism, and
+  layering green.

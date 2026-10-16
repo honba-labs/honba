@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Portfolio valuation engine (ADR 0032, E13-S1)
+
+- New crate **`honba-portfolio`** (L4, pure and deterministic: no clock, no I/O). `value` turns a
+  `PortfolioState` (accounts with cash, positions, margins and mode/source) plus a `Marks` price
+  lookup into a `honba_entities::PortfolioSnapshot`: accounts with mark-to-market positions and
+  delivery holdings, cash, equity, realized/unrealized PnL, and portfolio totals.
+- Valuation rules: a delivery `Product` becomes a holding and everything else an open position; a
+  short's market value is negative (signed by side); `equity = cash + market value`; margins are
+  passed through; a flat position is dropped but its realized PnL still counts; a non-flat position
+  with no mark is a `PortfolioError::MissingMark`. Amounts round once to minor units, consistent
+  with the fill ledger (ADR 0011).
+- Deterministic: accounts sort by id and positions/holdings by instrument, so input order never
+  reaches the wire and equal positions and marks give a byte-identical snapshot. Golden replay in
+  `crates/honba-portfolio/tests/golden/portfolio_snapshot.json` (`regenerate_golden` refreshes it).
+- Registered in the workspace and the crate layering (`scripts/dependency_graph.py`).
+
 ### Portfolio report contract (ADR 0032, E13-S0)
 
 - ADR 0032 accepted. New **portfolio report contract** in `honba-entities::portfolio_report`:
