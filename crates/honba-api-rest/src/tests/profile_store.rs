@@ -301,3 +301,15 @@ fn temp_names_are_unique_per_write_and_cleaned_up() {
     assert_eq!(names, vec!["alice.json", "alice.json.tmp"]);
     assert_eq!(std::fs::read(dir.join("alice.json.tmp")).unwrap(), b"junk");
 }
+
+#[test]
+fn a_write_into_a_new_nested_directory_is_durable_and_readable() {
+    let tmp = tempfile::tempdir().unwrap();
+    let store = ProfileStore::new(tmp.path().join("a").join("b").join("profiles"));
+    store.put("alice", 0, with_shortlist(&["A"])).unwrap();
+    store.put("alice", 1, with_shortlist(&["B"])).unwrap();
+    assert_eq!(store.get("alice").unwrap().shortlist, vec!["B".to_string()]);
+    crate::profile_store::sync_dir(tmp.path()).unwrap();
+    #[cfg(unix)]
+    assert!(crate::profile_store::sync_dir(&tmp.path().join("missing")).is_err());
+}

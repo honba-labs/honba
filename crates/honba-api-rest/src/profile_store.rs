@@ -116,7 +116,7 @@ impl ProfileStore {
         }
         new_profile.revision = current + 1;
         let bytes = encode_within_limits(&new_profile)?;
-        fs::create_dir_all(&self.dir)?;
+        create_dir_durable(&self.dir)?;
         write_atomic(&path, &bytes)?;
         Ok(new_profile)
     }
@@ -140,7 +140,7 @@ impl ProfileStore {
         }
         profile.revision += 1;
         let bytes = encode_within_limits(&profile)?;
-        fs::create_dir_all(&self.dir)?;
+        create_dir_durable(&self.dir)?;
         write_atomic(&path, &bytes)?;
         Ok(profile)
     }
@@ -241,10 +241,40 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
         let mut file = fs::File::create(&tmp)?;
         file.write_all(bytes)?;
         file.sync_all()?;
-        fs::rename(&tmp, path)
+        fs::rename(&tmp, path)?;
+        // The rename is only durable once the directory entry is.
+        path.parent().map_or(Ok(()), sync_dir)
     })();
     if result.is_err() {
         let _ = fs::remove_file(&tmp);
     }
     result
+}
+
+/// Create `dir` (and parents) if missing, syncing it and its parent so the new directory
+/// survives a crash.
+fn create_dir_durable(dir: &Path) -> std::io::Result<()> {
+    if dir.is_dir() {
+        return Ok(());
+    }
+    fs::create_dir_all(dir)?;
+    sync_dir(dir)?;
+    match dir.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => sync_dir(parent),
+        _ => Ok(()),
+    }
+}
+
+/// `fsync` a directory so renames and creations inside it are durable. A no-op off unix, where
+/// directories cannot be opened for syncing.
+pub(crate) fn sync_dir(dir: &Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        fs::File::open(dir)?.sync_all()
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = dir;
+        Ok(())
+    }
 }
