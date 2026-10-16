@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Persisted operator journal (ADR 0018 decision 7)
+
+- `honba serve --operator-journal <FILE>` makes each accepted `PUT /trading-state` that changes
+  the state append one NDJSON record (`ts`, `event`, `from`, `to`, optional `reason` and
+  `token_id`); off by default. A no-op is not written and the file is created on first change.
+  The journal is a record, not a source of truth: the state is never restored from it at
+  start-up (ADR 0015). Best-effort: a failed append is logged, never returned.
+- Tests: `crates/honba-api-rest/tests/trading_state.rs` and
+  `crates/honba-cli/tests/serve.rs::operator_journal_records_a_trading_state_change`.
+
 ### Per-request `fill_model` (ADR 0030)
 
 - `POST /backtests` accepts an optional `fill_model` (`bar_fill`, `bar_fill_through`, `l2` or

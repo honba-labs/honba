@@ -341,6 +341,62 @@ fn trading_state_gates_post_orders() {
     stop(child);
 }
 
+fn put(addr: SocketAddr, path: &str, body: &str) -> (u16, Value) {
+    let mut stream = TcpStream::connect(addr).unwrap();
+    write!(
+        stream,
+        "PUT {path} HTTP/1.0\r\nHost: {addr}\r\nContent-Type: application/json\r\n\
+         Content-Length: {}\r\n\r\n{body}",
+        body.len()
+    )
+    .unwrap();
+    let mut text = String::new();
+    stream.read_to_string(&mut text).unwrap();
+    let (head, body) = text.split_once("\r\n\r\n").unwrap();
+    let status = head.split_whitespace().nth(1).unwrap().parse().unwrap();
+    (status, serde_json::from_str(body).unwrap_or(Value::Null))
+}
+
+/// `--operator-journal` records a trading-state change as NDJSON (ADR 0018 decision 7); with the
+/// flag absent it writes nothing.
+#[test]
+fn operator_journal_records_a_trading_state_change() {
+    let dir = data_dir("operator-journal");
+    let d = dir.to_str().unwrap();
+    let journal = dir.join("operator.ndjson");
+
+    let (child, addr) = start(&[
+        "--data-dir",
+        d,
+        "--addr",
+        "127.0.0.1:0",
+        "--operator-journal",
+        journal.to_str().unwrap(),
+    ]);
+    let (status, body) = put(
+        addr,
+        "/trading-state",
+        r#"{"state":"halted","reason":"e2e"}"#,
+    );
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(
+        body["data"],
+        serde_json::json!({"state": "halted", "previous": "active"})
+    );
+    stop(child);
+
+    let text = std::fs::read_to_string(&journal).unwrap();
+    let lines: Vec<Value> = text
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    assert_eq!(lines.len(), 1, "{text}");
+    assert_eq!(lines[0]["event"], Value::from("trading_state.change"));
+    assert_eq!(lines[0]["from"], Value::from("active"));
+    assert_eq!(lines[0]["to"], Value::from("halted"));
+    assert_eq!(lines[0]["reason"], Value::from("e2e"));
+}
+
 fn bar_body(ts: u64, close: f64) -> String {
     use honba_messages::{
         Bar, BarAggregation, BarSpecification, BarType, Exchange, InstrumentId, PriceType,

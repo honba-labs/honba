@@ -39,6 +39,7 @@ mod gateway_venue;
 mod ingest;
 mod journal;
 mod market;
+mod operator_journal;
 mod orders;
 mod profile;
 mod profile_store;

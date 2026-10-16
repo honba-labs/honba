@@ -197,6 +197,11 @@ async fn clones_of_the_state_share_the_trading_state() {
 const TEST_HASH: &str = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
 
 fn authed(scopes: &str) -> (Router, tempfile::TempDir) {
+    authed_state(scopes, state())
+}
+
+/// An authed router over an explicit state, so a test can configure it further.
+fn authed_state(scopes: &str, st: AppState) -> (Router, tempfile::TempDir) {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("tokens.toml");
     std::fs::write(
@@ -209,7 +214,7 @@ fn authed(scopes: &str) -> (Router, tempfile::TempDir) {
     .unwrap();
     let mut config = ApiConfig::default();
     config.auth.tokens_file = Some(path);
-    (api_router_with_config(state(), &config), dir)
+    (api_router_with_config(st, &config), dir)
 }
 
 #[tokio::test]
@@ -290,4 +295,91 @@ async fn operator_scope_does_not_imply_write_orders() {
     .await;
     assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
     assert_eq!(v["error"]["code"], json!("forbidden"));
+}
+
+// ---- the operator journal (ADR 0018 decision 7) ----
+
+/// Every line of `path` parsed as JSON, `[]` if the file does not exist.
+fn journal(path: &std::path::Path) -> Vec<Value> {
+    match std::fs::read_to_string(path) {
+        Err(_) => Vec::new(),
+        Ok(text) => text
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap_or_else(|e| panic!("{line}: {e}")))
+            .collect(),
+    }
+}
+
+#[tokio::test]
+async fn a_change_is_journaled_and_a_no_op_is_not() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("operator.ndjson");
+    let app = api_router_with(state().with_operator_journal(path.clone()));
+
+    let (s, _) = put_state(&app, json!({"state": "halted", "reason": "drill"})).await;
+    assert_eq!(s, StatusCode::OK);
+    // Setting the state it is already in changes nothing and writes nothing.
+    let (s, _) = put_state(&app, json!({"state": "halted"})).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = put_state(&app, json!({"state": "active"})).await;
+    assert_eq!(s, StatusCode::OK);
+
+    let lines = journal(&path);
+    assert_eq!(lines.len(), 2, "only the two real changes");
+    assert_eq!(lines[0]["event"], json!("trading_state.change"));
+    assert_eq!(lines[0]["from"], json!("active"));
+    assert_eq!(lines[0]["to"], json!("halted"));
+    assert_eq!(lines[0]["reason"], json!("drill"));
+    assert!(
+        lines[0]["ts"].as_str().unwrap().contains('T'),
+        "an RFC 3339 timestamp: {}",
+        lines[0]["ts"]
+    );
+    assert_eq!(lines[1]["from"], json!("halted"));
+    assert_eq!(lines[1]["to"], json!("active"));
+    assert!(
+        lines[1].get("reason").is_none(),
+        "omitted when the request carried none"
+    );
+}
+
+#[tokio::test]
+async fn a_no_op_alone_creates_no_journal_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("operator.ndjson");
+    let app = api_router_with(state().with_operator_journal(path.clone()));
+    let (s, _) = put_state(&app, json!({"state": "active"})).await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(!path.exists(), "the file is created on the first change");
+}
+
+#[tokio::test]
+async fn the_journal_records_who_changed_the_state() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("operator.ndjson");
+    let (app, _tokens) = authed_state("\"operator\"", state().with_operator_journal(path.clone()));
+    let (s, v) = send(
+        app,
+        Method::PUT,
+        "/trading-state",
+        Some(json!({"state": "halted", "reason": "auth test"})),
+        Some("test"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    let lines = journal(&path);
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert_eq!(lines[0]["token_id"], json!("t1"));
+    assert_eq!(lines[0]["reason"], json!("auth test"));
+}
+
+#[tokio::test]
+async fn an_unconfigured_journal_writes_no_file() {
+    let app = api_router_with(state());
+    let (s, _) = put_state(&app, json!({"state": "halted"})).await;
+    assert_eq!(s, StatusCode::OK);
+    // Nothing to assert but that the change still succeeded with no journal path.
+    let (_, v) = call(&app, Method::GET, "/trading-state", None).await;
+    assert_eq!(v["data"]["state"], json!("halted"));
 }

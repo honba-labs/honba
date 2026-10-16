@@ -10,8 +10,12 @@
 //! quotes follow). Shutdown drops the sender, waits for the pump to drain, and reports its
 //! counts on stderr.
 //!
-//! With `--fill-model l2 --ticks <FILE>`, REST backtests match against the quote/trade ticks in
-//! the file (format: ADR 0030, parsed in `ticks_file.rs`) instead of bars alone.
+//! With `--fill-model l2 --ticks <FILE|DIR>`, REST backtests match against the quote/trade ticks in
+//! the file or store (format: ADR 0030, parsed in `ticks_file.rs` / `parquet_ticks.rs`) instead of
+//! bars alone.
+//!
+//! With `--operator-journal <FILE>`, each `PUT /trading-state` change is appended to it as NDJSON
+//! (ADR 0018 decision 7); off by default and never read back at start-up.
 
 use anyhow::{Context, Result};
 use std::io::Write;
@@ -58,6 +62,10 @@ pub(crate) struct RunsArgs {
     /// Directory holding one JSON profile per user (`/profile` routes); created on first write
     #[arg(long, default_value = "data/profiles")]
     pub profiles_dir: PathBuf,
+    /// NDJSON file each `PUT /trading-state` change is appended to (ADR 0018 decision 7).
+    /// Off by default; never read back at start-up
+    #[arg(long)]
+    pub operator_journal: Option<PathBuf>,
     /// Worker threads, one backtest each (default: available parallelism)
     #[arg(long, value_parser = clap::value_parser!(u64).range(1..))]
     pub max_concurrent_runs: Option<u64>,
@@ -259,8 +267,11 @@ pub fn run(
         state = state.with_tick_reader(reader);
     }
     // Execution and ticks are set before the run service, which captures them.
+    let mut state = state.with_profiles_dir(&runs.profiles_dir);
+    if let Some(journal) = &runs.operator_journal {
+        state = state.with_operator_journal(journal);
+    }
     let state = state
-        .with_profiles_dir(&runs.profiles_dir)
         .with_journals_dir(&runs.journals_dir, runs.service_config())
         .map_err(|e| anyhow::anyhow!("{}", e.message))
         .with_context(|| format!("opening journals directory {}", runs.journals_dir.display()))?;

@@ -42,6 +42,9 @@ pub struct AppState {
     /// The per-user profile store behind `/profile`; `None` until a profiles directory is
     /// configured ([`AppState::with_profiles_dir`]).
     pub profiles: Option<Arc<ProfileStore>>,
+    /// NDJSON file `PUT /trading-state` appends one record per change to; `None` until
+    /// configured ([`AppState::with_operator_journal`]). The state is never restored from it.
+    pub operator_journal: Option<PathBuf>,
     /// Account currency of the runs (journal fills carry no costs; they are zero in this).
     pub account_currency: Currency,
     /// The operator trading state the write routes evaluate against (ADR 0018 decision 7).
@@ -93,6 +96,7 @@ impl AppState {
             strategies: Arc::default(),
             runs: None,
             profiles: None,
+            operator_journal: None,
             account_currency: Currency::Inr,
             trading_state: Arc::default(),
             risk_limits: honba_risk::RiskLimits::default(),
@@ -232,6 +236,14 @@ impl AppState {
     /// Serves `/profile` from one JSON file per user under `dir` (created on first write).
     pub fn with_profiles_dir(mut self, dir: impl Into<PathBuf>) -> Self {
         self.profiles = Some(Arc::new(ProfileStore::new(dir)));
+        self
+    }
+
+    /// Appends one NDJSON record per `PUT /trading-state` change to `path` (created on first
+    /// change). Off by default. The journal is a record, not a source of truth: the state is
+    /// never restored from it at start-up (ADR 0015, explicit runtime).
+    pub fn with_operator_journal(mut self, path: impl Into<PathBuf>) -> Self {
+        self.operator_journal = Some(path.into());
         self
     }
 

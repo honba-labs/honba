@@ -623,6 +623,23 @@ E3-S1b/S1d shipped (ADR 0030), so top-of-book prices exist. Decision, kept small
 
 ## Decision log
 
+- 2026-10-16: the operator trading state has a persisted journal. `honba serve --operator-journal
+  <FILE>` (off by default, `AppState::with_operator_journal`) makes each accepted `PUT
+  /trading-state` that *changes* the state append one NDJSON record via the new
+  `honba-api-rest::operator_journal` module: `{"ts","event":"trading_state.change","from","to",
+  "reason"?, "token_id"?}`. **Decision: a journal, not a source of truth.** The state is *not*
+  restored from the file at start-up — ADR 0015 keeps initialisation explicit and in the
+  composition root (a restored state would be an implicit seed), so an operator replays the
+  journal by hand if they want the last state back. **Decision: record the body and the caller.**
+  The auth audit log (decision 6) records who called which route but not bodies, so `reason` and
+  the `token_id` from the request's `TokenInfo` extension go in the journal line. **Decision:
+  best-effort.** A failed append is logged through `tracing` and never fails the request, so an
+  operator can always halt trading when the disk is full. A no-op `PUT` (the state is already the
+  requested one) changes nothing and is not written, so the file is created lazily on the first
+  real change. Tests: `crates/honba-api-rest/tests/trading_state.rs` (`a_change_is_journaled_and_a_no_op_is_not`,
+  `a_no_op_alone_creates_no_journal_file`, `the_journal_records_who_changed_the_state`,
+  `an_unconfigured_journal_writes_no_file`) and `crates/honba-cli/tests/serve.rs::operator_journal_records_a_trading_state_change`.
+
 - 2026-10-15: the operator trading state is changeable at runtime. `GET /trading-state` and
   `PUT /trading-state` (`{state, reason?}` -> `{state, previous}`) read and set the shared cell in
   `AppState`; the order gate and `POST /positions/close` read it per request, so a change applies
