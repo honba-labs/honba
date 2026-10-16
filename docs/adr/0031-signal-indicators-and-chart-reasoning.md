@@ -1,6 +1,6 @@
 # ADR 0031: Chart Signals — Buy/Sell Detectors with Inspectable Reasons
 
-Date: 2026-10-16. Status: **proposed**. Roadmap stories: E12-S0..E12-S8. Owner: `honba` (+ `honba-frontend`, `honba-strategies`).
+Date: 2026-10-16. Status: **accepted** (2026-10-16). Roadmap stories: E12-S0..E12-S8. Owner: `honba` (+ `honba-frontend`, `honba-strategies`).
 
 ## Context
 
@@ -31,7 +31,7 @@ Signal {
   ruleset: String,                       // "signals/day:v1" | "signals/swing:v1"
   reasons: [Reason],                     // never empty
   tags: [String],                        // detector codes, e.g. "orb", "vwap_reclaim"
-  evidence: Value,                       // numbers the reason text cites, for inspection
+  evidence: {key: f64},                  // numbers the reason text cites, for inspection
 }
 Reason {
   code: String,                          // stable, from the frozen ontology (§4)
@@ -53,6 +53,7 @@ A signal at bar *N* uses only bars `<= N` and is emitted only when bar *N* has *
 ### 3. New crate `honba-signals` (L4); detectors compose `honba-indicators`
 
 - A pure crate above `honba-indicators` (and `honba-entities`), with a `catalog()` of detector descriptors and rulesets declared once, mirroring `honba-indicators::render`. Detectors are small functions over a rolling window of bars and indicator values (`Option<Reason>`); the **confluence scorer** aggregates fired reasons into `strength`.
+- **The wire contract types live in `honba-entities` (L1), not in this crate.** `Signal`, `Reason`, the four enums and `SignalScanRequest`/`SignalScanResponse` sit beside the screener contract (`entities::screener`), so `honba-codegen` (L5) and `honba-api` (L6) can name them without depending on the detector engine — exactly the split the screener already uses. `honba-signals` holds only the detectors, the `catalog()` and the scorer.
 - **Two rulesets, one engine.** `signals/day:v1` (intraday) and `signals/swing:v1` (positional) differ in timeframe, detector set, parameters and session rules, not in machinery (§5). Weights live in the catalog and are auditable.
 - No new dependency edge beyond `honba-signals -> {honba-indicators, honba-entities}`; the layering script (`scripts/dependency_graph.py`) is updated.
 
@@ -119,3 +120,4 @@ New files `schema/conformance/signals_day.json` and `schema/conformance/signals_
 ## Decision log
 
 - 2026-10-16: proposed.
+- 2026-10-16: accepted; E12-S0..S2 authorized. Implementation refinement recorded while starting S0: the wire contract types live in `honba-entities` (L1) beside the screener contract (not in `honba-signals`), so `honba-codegen`/`honba-api` name them without the engine (mirrors the screener split exactly); `Signal.evidence` is a `{key: f64}` map rather than a free `Value`, so the schema stays typed. E12-S0 registered `Signal`, `Reason`, `SignalHorizon`, `SignalDirection`, `ReasonGroup`, `ReasonPolarity`, `SignalScanRequest`, `SignalScanResponse` in the codegen registry and regenerated every artifact.
