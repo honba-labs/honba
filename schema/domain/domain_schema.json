@@ -3179,6 +3179,7 @@
       ]
     },
     "Profile": {
+      "additionalProperties": true,
       "description": "Everything stored for one user (`GET` / `PUT /profile`).",
       "properties": {
         "alerts": {

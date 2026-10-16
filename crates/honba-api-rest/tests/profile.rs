@@ -418,3 +418,14 @@ async fn put_profile_validates_map_keys_like_the_sub_resources() {
     let (status, resp) = send(&app, Method::PUT, "/profile", Some(good), None).await;
     assert_eq!(status, StatusCode::OK, "{resp}");
 }
+
+#[tokio::test]
+async fn unknown_profile_fields_survive_a_get_put_round_trip() {
+    let (app, _dir) = router(&[]);
+    let put = json!({"revision": 0, "futureThing": {"k": 1}});
+    let (status, body) = send(&app, Method::PUT, "/profile", Some(put), None).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["data"]["futureThing"], json!({"k": 1}));
+    let (_, body) = send(&app, Method::GET, "/profile", None, None).await;
+    assert_eq!(body["data"]["futureThing"], json!({"k": 1}));
+}

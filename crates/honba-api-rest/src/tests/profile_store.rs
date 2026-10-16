@@ -313,3 +313,36 @@ fn a_write_into_a_new_nested_directory_is_durable_and_readable() {
     #[cfg(unix)]
     assert!(crate::profile_store::sync_dir(&tmp.path().join("missing")).is_err());
 }
+
+#[test]
+fn unknown_fields_round_trip_through_get_put_and_update() {
+    let (tmp, store) = store();
+    let dir = tmp.path().join("profiles");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("alice.json"),
+        r#"{"revision": 1, "shortlist": ["A"], "futureThing": {"k": [1, 2]}}"#,
+    )
+    .unwrap();
+
+    let got = store.get("alice").unwrap();
+    assert_eq!(got.extra["futureThing"], json!({"k": [1, 2]}));
+
+    // A client that read it sends it back; the field survives a put ...
+    let mut next = got.clone();
+    next.shortlist.push("B".into());
+    let put = store.put("alice", 1, next).unwrap();
+    assert_eq!(put.extra["futureThing"], json!({"k": [1, 2]}));
+
+    // ... and a sub-resource update, which never sees the field, keeps it too.
+    store
+        .update("alice", |p| {
+            p.layouts.insert("main".into(), json!({}));
+            true
+        })
+        .unwrap();
+    let disk: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(dir.join("alice.json")).unwrap()).unwrap();
+    assert_eq!(disk["futureThing"], json!({"k": [1, 2]}));
+    assert_eq!(disk["revision"], json!(3));
+}

@@ -52,6 +52,10 @@ pub struct Profile {
     pub workbench: Value,
     /// Alert rules (opaque to the server; may hold webhook URLs, visible only to this user).
     pub alerts: Value,
+    /// Fields this server version does not know (written by a newer client or server); kept so
+    /// a get / put round trip does not drop them.
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 /// `GET /profile/layouts` response: the named layouts by name.
