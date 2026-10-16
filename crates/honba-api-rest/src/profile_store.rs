@@ -95,7 +95,9 @@ impl ProfileStore {
     }
 
     /// Replace the user's profile if `expected_revision` is the stored revision. The stored
-    /// profile gets `expected_revision + 1`, whatever revision `new_profile` carries.
+    /// profile gets `expected_revision + 1`, whatever revision `new_profile` carries. If
+    /// `new_profile` equals the stored one apart from the revision, nothing is written and the
+    /// stored profile (same revision) is returned.
     pub fn put(
         &self,
         user_id: &str,
@@ -107,12 +109,18 @@ impl ProfileStore {
             .write_lock
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let current = read_profile(&path)?.revision;
+        let stored = read_profile(&path)?;
+        let current = stored.revision;
         if current != expected_revision {
             return Err(ProfileError::RevisionConflict {
                 expected: expected_revision,
                 current,
             });
+        }
+        // Saving what is already stored (a debounced client re-sending) writes nothing.
+        new_profile.revision = current;
+        if new_profile == stored {
+            return Ok(stored);
         }
         new_profile.revision = current + 1;
         let bytes = encode_within_limits(&new_profile)?;

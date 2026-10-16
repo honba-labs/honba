@@ -100,8 +100,8 @@ fn hostile_or_malformed_user_ids_are_rejected() {
 #[test]
 fn put_leaves_one_file_and_no_temp_files() {
     let (tmp, store) = store();
-    store.put("alice", 0, Profile::default()).unwrap();
-    store.put("alice", 1, Profile::default()).unwrap();
+    store.put("alice", 0, with_shortlist(&["A"])).unwrap();
+    store.put("alice", 1, with_shortlist(&["B"])).unwrap();
     let names: Vec<String> = std::fs::read_dir(tmp.path().join("profiles"))
         .unwrap()
         .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
@@ -288,11 +288,11 @@ fn concurrent_updates_on_one_user_all_land() {
 fn temp_names_are_unique_per_write_and_cleaned_up() {
     let (tmp, store) = store();
     let dir = tmp.path().join("profiles");
-    store.put("alice", 0, Profile::default()).unwrap();
+    store.put("alice", 0, with_shortlist(&["A"])).unwrap();
     // A stale temp file from a crashed writer does not block later writes.
     std::fs::write(dir.join("alice.json.tmp"), b"junk").unwrap();
-    store.put("alice", 1, Profile::default()).unwrap();
-    store.put("alice", 2, Profile::default()).unwrap();
+    store.put("alice", 1, with_shortlist(&["B"])).unwrap();
+    store.put("alice", 2, with_shortlist(&["C"])).unwrap();
     let mut names: Vec<String> = std::fs::read_dir(&dir)
         .unwrap()
         .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
@@ -345,4 +345,32 @@ fn unknown_fields_round_trip_through_get_put_and_update() {
         serde_json::from_slice(&std::fs::read(dir.join("alice.json")).unwrap()).unwrap();
     assert_eq!(disk["futureThing"], json!({"k": [1, 2]}));
     assert_eq!(disk["revision"], json!(3));
+}
+
+#[test]
+fn putting_an_unchanged_profile_keeps_the_revision_and_writes_nothing() {
+    let (tmp, store) = store();
+    let first = store.put("alice", 0, with_shortlist(&["A"])).unwrap();
+    assert_eq!(first.revision, 1);
+    let path = tmp.path().join("profiles/alice.json");
+    let mtime = std::fs::metadata(&path).unwrap().modified().unwrap();
+
+    // Same content at the current revision: the stored profile comes back untouched.
+    let same = store.put("alice", 1, with_shortlist(&["A"])).unwrap();
+    assert_eq!(same, first);
+    assert_eq!(store.get("alice").unwrap().revision, 1);
+    assert_eq!(std::fs::metadata(&path).unwrap().modified().unwrap(), mtime);
+
+    // A real change still bumps it, and a stale revision is still a conflict.
+    assert_eq!(
+        store
+            .put("alice", 1, with_shortlist(&["B"]))
+            .unwrap()
+            .revision,
+        2
+    );
+    assert!(matches!(
+        store.put("alice", 1, with_shortlist(&["B"])),
+        Err(ProfileError::RevisionConflict { .. })
+    ));
 }

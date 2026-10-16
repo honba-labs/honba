@@ -207,7 +207,14 @@ async fn users_are_isolated_over_http() {
 #[tokio::test]
 async fn a_stale_revision_is_409_in_the_error_envelope() {
     let (app, _dir) = router(&[]);
-    let (status, _) = send(&app, Method::PUT, "/profile", Some(json!({})), None).await;
+    let (status, _) = send(
+        &app,
+        Method::PUT,
+        "/profile",
+        Some(json!({"shortlist": ["first"]})),
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     let put = json!({"revision": 0, "shortlist": ["late"]});
     let (status, body) = send(&app, Method::PUT, "/profile", Some(put), None).await;
@@ -219,7 +226,7 @@ async fn a_stale_revision_is_409_in_the_error_envelope() {
     );
     assert_eq!(body["error"]["context"]["current"], json!(1));
     let (_, body) = send(&app, Method::GET, "/profile", None, None).await;
-    assert_eq!(body["data"]["shortlist"], json!([]));
+    assert_eq!(body["data"]["shortlist"], json!(["first"]));
 }
 
 #[tokio::test]
@@ -428,4 +435,17 @@ async fn unknown_profile_fields_survive_a_get_put_round_trip() {
     assert_eq!(body["data"]["futureThing"], json!({"k": 1}));
     let (_, body) = send(&app, Method::GET, "/profile", None, None).await;
     assert_eq!(body["data"]["futureThing"], json!({"k": 1}));
+}
+
+#[tokio::test]
+async fn a_no_op_put_profile_keeps_the_revision() {
+    let (app, _dir) = router(&[]);
+    let put = json!({"revision": 0, "shortlist": ["INFY"]});
+    let (_, body) = send(&app, Method::PUT, "/profile", Some(put), None).await;
+    assert_eq!(body["data"]["revision"], json!(1));
+    let again = json!({"revision": 1, "shortlist": ["INFY"]});
+    let (status, body) = send(&app, Method::PUT, "/profile", Some(again), None).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["data"]["revision"], json!(1));
+    assert_eq!(body["data"]["shortlist"], json!(["INFY"]));
 }
