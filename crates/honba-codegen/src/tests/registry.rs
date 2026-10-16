@@ -80,6 +80,25 @@ fn the_signal_contract_types_are_published() {
 }
 
 #[test]
+fn the_portfolio_contract_types_are_published() {
+    // ADR 0032 / E13-S0: the portfolio panel and the read endpoints need a schema for the
+    // snapshot, its accounts, positions, holdings, totals and the mode/source enums.
+    let set = full_registry();
+    for name in [
+        "PortfolioSnapshot",
+        "PortfolioAccount",
+        "PortfolioPosition",
+        "PortfolioHolding",
+        "PortfolioTotals",
+        "PortfolioMode",
+        "PortfolioSource",
+    ] {
+        assert!(published_names().contains(&name), "{name} not published");
+        assert!(set.get(name).is_some(), "{name} not registered");
+    }
+}
+
+#[test]
 fn api_responses_are_open_records_and_api_requests_are_closed_inputs() {
     // ADR 0012: the published schema must say what serde does, or a generated
     // client would reject a newer server's response.
@@ -106,6 +125,7 @@ fn api_responses_are_open_records_and_api_requests_are_closed_inputs() {
         "ScreenerResultRow",
         "Signal",
         "SignalScanResponse",
+        "PortfolioSnapshot",
     ];
     for name in responses {
         let schema = set.get(name).expect("registered");

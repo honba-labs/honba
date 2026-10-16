@@ -49,6 +49,17 @@ pub const SIGNAL_TYPES: &[&str] = &[
     "SignalScanResponse",
 ];
 
+/// The portfolio report contract: a valued, per-user portfolio snapshot (ADR 0032, ROADMAP E13).
+pub const PORTFOLIO_TYPES: &[&str] = &[
+    "PortfolioSnapshot",
+    "PortfolioAccount",
+    "PortfolioPosition",
+    "PortfolioHolding",
+    "PortfolioTotals",
+    "PortfolioMode",
+    "PortfolioSource",
+];
+
 /// The enums whose variants are published as stable string constants.
 pub const WIRE_ENUMS: &[&str] = &[
     "OrderSide",
@@ -97,6 +108,7 @@ pub fn published_names() -> Vec<&'static str> {
     names.extend_from_slice(WIRE_TYPES);
     names.extend_from_slice(SCREENER_TYPES);
     names.extend_from_slice(SIGNAL_TYPES);
+    names.extend_from_slice(PORTFOLIO_TYPES);
     names.extend_from_slice(WIRE_ENUMS);
     names.extend_from_slice(API_TYPES);
     names.extend_from_slice(MANIFEST_TYPES);
@@ -139,6 +151,16 @@ pub fn register_all(set: &mut SchemaSet) {
     set.add_type::<honba_entities::ReasonPolarity>("ReasonPolarity");
     set.add_type::<honba_entities::SignalScanRequest>("SignalScanRequest");
     set.add_type::<honba_entities::SignalScanResponse>("SignalScanResponse");
+
+    // The portfolio report contract (ADR 0032, ROADMAP E13). Same split: the data-carrying types
+    // live in honba-entities (L1); the valuation engine is honba-portfolio (L4).
+    set.add_type::<honba_entities::PortfolioSnapshot>("PortfolioSnapshot");
+    set.add_type::<honba_entities::PortfolioAccount>("PortfolioAccount");
+    set.add_type::<honba_entities::PortfolioPosition>("PortfolioPosition");
+    set.add_type::<honba_entities::PortfolioHolding>("PortfolioHolding");
+    set.add_type::<honba_entities::PortfolioTotals>("PortfolioTotals");
+    set.add_type::<honba_entities::PortfolioMode>("PortfolioMode");
+    set.add_type::<honba_entities::PortfolioSource>("PortfolioSource");
 
     set.add_type::<honba_messages::OrderSide>("OrderSide");
     set.add_type::<honba_messages::OrderType>("OrderType");

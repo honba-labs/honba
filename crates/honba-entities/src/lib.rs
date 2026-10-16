@@ -37,6 +37,7 @@ pub mod error;
 pub mod execution;
 pub mod instrument;
 pub mod portfolio;
+pub mod portfolio_report;
 pub mod position;
 pub mod screener;
 pub mod signal;
@@ -48,6 +49,10 @@ pub use instrument::{
     Currency, Instrument, InstrumentKind, MinorUnit, Money, MoneyError, OptionType,
 };
 pub use portfolio::{Account, Portfolio};
+pub use portfolio_report::{
+    PortfolioAccount, PortfolioHolding, PortfolioMode, PortfolioPosition, PortfolioSnapshot,
+    PortfolioSource, PortfolioTotals,
+};
 pub use position::{Position, PositionSide};
 pub use screener::{
     check_predicate_value, FilterOp, MetricDefinition, MetricKeySpec, MetricPeriod, MetricRef,

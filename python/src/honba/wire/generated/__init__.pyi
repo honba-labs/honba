@@ -422,6 +422,64 @@ class PboResult:
     passed: bool
     pbo: float
 
+class PortfolioAccount:
+    broker: str | None = None
+    cash: Money
+    currency: Currency
+    equity: Money
+    holdings: list[PortfolioHolding]
+    id: str
+    leverage: float
+    margin_available: Money
+    margin_used: Money
+    market_value: Money
+    mode: PortfolioMode
+    name: str
+    positions: list[PortfolioPosition]
+    realized_pnl: Money
+    source: PortfolioSource
+    unrealized_pnl: Money
+
+class PortfolioHolding:
+    avg_price: float
+    instrument_id: InstrumentId
+    mark: float
+    market_value: Money
+    quantity: float
+    realized_pnl: Money
+    unrealized_pnl: Money
+
+PortfolioMode = Literal["live", "sandbox"]
+
+class PortfolioPosition:
+    avg_price: float
+    instrument_id: InstrumentId
+    mark: float
+    market_value: Money
+    product: Product
+    quantity: float
+    realized_pnl: Money
+    side: PositionSide
+    unrealized_pnl: Money
+
+class PortfolioSnapshot:
+    accounts: list[PortfolioAccount]
+    as_of: UnixNanos
+    base_currency: Currency
+    owner: str
+    revision: int
+    totals: PortfolioTotals
+
+PortfolioSource = Literal["ledger", "broker"]
+
+class PortfolioTotals:
+    cash: Money
+    equity: Money
+    market_value: Money
+    realized_pnl: Money
+    total_pnl: Money
+    unrealized_pnl: Money
+
 class Position:
     avg_price: float
     currency: Currency

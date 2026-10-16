@@ -3053,6 +3053,440 @@
         ],
         "type": "object"
       },
+      "PortfolioAccount": {
+        "description": "One account of a portfolio: cash, equity, margins and the positions it holds (ADR 0032 §2).",
+        "properties": {
+          "broker": {
+            "description": "The broker this account is synced from, when `source` is [`PortfolioSource::Broker`].",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cash": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "description": "Free cash."
+          },
+          "currency": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Currency"
+              }
+            ],
+            "description": "The settlement currency of the account's amounts."
+          },
+          "equity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "description": "Cash plus mark-to-market value of the open positions (and holdings)."
+          },
+          "holdings": {
+            "description": "Carried delivery holdings.",
+            "items": {
+              "$ref": "#/components/schemas/PortfolioHolding"
+            },
+            "type": "array"
+          },
+          "id": {
+            "description": "Stable account id within the portfolio.",
+            "type": "string"
+          },
+          "leverage": {
+            "description": "Account leverage, `1.0` when unlevered.",
+            "format": "double",
+            "type": "number"
+          },
+          "margin_available": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "description": "Margin still available to trade."
+          },
+          "margin_used": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "description": "Margin currently committed."
+          },
+          "market_value": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "description": "Mark-to-market value of the open positions (and holdings)."
+          },
+          "mode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PortfolioMode"
+              }
+            ],
+            "description": "Live or sandbox money (ADR 0032 §4)."
+          },
+          "name": {
+            "description": "Display name.",
+            "type": "string"
+          },
+          "positions": {
+            "description": "Open / intraday positions.",
+            "items": {
+              "$ref": "#/components/schemas/PortfolioPosition"
+            },
+            "type": "array"
+          },
+          "realized_pnl": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "description": "Realized PnL summed over the account's positions."
+          },
+          "source": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PortfolioSource"
+              }
+            ],
+            "description": "Where the positions and funds come from (ADR 0032 §6)."
+          },
+          "unrealized_pnl": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "description": "Unrealized PnL summed over the account's positions."
+          }
+        },
+        "required": [
+          "cash",
+          "currency",
+          "equity",
+          "holdings",
+          "id",
+          "leverage",
+          "margin_available",
+          "margin_used",
+          "market_value",
+          "mode",
+          "name",
+          "positions",
+          "realized_pnl",
+          "source",
+          "unrealized_pnl"
+        ],
+        "type": "object"
+      },
+      "PortfolioHolding": {
+        "description": "A delivery holding: a carried position, without an intraday side (ADR 0032 §2).",
+        "properties": {
+          "avg_price": {
+            "description": "Volume-weighted average entry price.",
+            "format": "double",
+            "type": "number"
+          },
+          "instrument_id": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InstrumentId"
+              }
+            ],
+            "description": "The instrument held."
+          },
+          "mark": {
+            "description": "The last mark used to value the holding.",
+            "format": "double",
+            "type": "number"
+          },
+          "market_value": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "description": "`quantity * mark`, in the account's currency."
+          },
+          "quantity": {
+            "description": "The absolute quantity held.",
+            "format": "double",
+            "type": "number"
+          },
+          "realized_pnl": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "description": "Realized PnL accrued on fills, in the account's currency."
+          },
+          "unrealized_pnl": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "description": "Mark-to-market PnL, in the account's currency."
+          }
+        },
+        "required": [
+          "avg_price",
+          "instrument_id",
+          "mark",
+          "market_value",
+          "quantity",
+          "realized_pnl",
+          "unrealized_pnl"
+        ],
+        "type": "object"
+      },
+      "PortfolioMode": {
+        "description": "Whether an account holds real or simulated money (ADR 0032 §4).\n\nSandbox money must never mix with live money: totals are per mode and an order names its account. `Sandbox` is the default while no live venue exists.",
+        "oneOf": [
+          {
+            "description": "Real money, sourced from a live broker.",
+            "enum": [
+              "live"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Simulated money (paper trading, backtest or the simulator).",
+            "enum": [
+              "sandbox"
+            ],
+            "type": "string"
+          }
+        ]
+      },
+      "PortfolioPosition": {
+        "description": "A valued position held for a user (ADR 0032 §2).\n\n`quantity` and the prices are observations (`f64`); the amounts are `Money` in the account's currency. `realized_pnl` is the ledger entry accrued per fill (ADR 0011); `unrealized_pnl` is `(mark - avg_price) * sign * quantity`, computed against the last mark.",
+        "properties": {
+          "avg_price": {
+            "description": "Volume-weighted average entry price.",
+            "format": "double",
+            "type": "number"
+          },
+          "instrument_id": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InstrumentId"
+              }
+            ],
+            "description": "The instrument held."
+          },
+          "mark": {
+            "description": "The last mark used to value the position.",
+            "format": "double",
+            "type": "number"
+          },
+          "market_value": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "description": "`quantity * mark`, in the account's currency."
+          },
+          "product": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Product"
+              }
+            ],
+            "description": "The product the position is held under (intraday/delivery/carry)."
+          },
+          "quantity": {
+            "description": "The absolute quantity held.",
+            "format": "double",
+            "type": "number"
+          },
+          "realized_pnl": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "description": "Realized PnL accrued on fills, in the account's currency."
+          },
+          "side": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PositionSide"
+              }
+            ],
+            "description": "Long or short. The sign of `quantity` is carried here, not in the number."
+          },
+          "unrealized_pnl": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "description": "Mark-to-market PnL, in the account's currency."
+          }
+        },
+        "required": [
+          "avg_price",
+          "instrument_id",
+          "mark",
+          "market_value",
+          "product",
+          "quantity",
+          "realized_pnl",
+          "side",
+          "unrealized_pnl"
+        ],
+        "type": "object"
+      },
+      "PortfolioSnapshot": {
+        "description": "A valued, per-user portfolio: the response body of `GET /portfolio` (ADR 0032 §2).\n\n`owner` is the request's `Caller` (`token_id` when auth is on, else `default`): one snapshot belongs to one user. `as_of` is stamped by the caller, never read from a clock here.",
+        "properties": {
+          "accounts": {
+            "description": "The accounts, in a stable order.",
+            "items": {
+              "$ref": "#/components/schemas/PortfolioAccount"
+            },
+            "type": "array"
+          },
+          "as_of": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UnixNanos"
+              }
+            ],
+            "description": "The time the marks were taken (`UnixNanos`)."
+          },
+          "base_currency": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Currency"
+              }
+            ],
+            "description": "The base currency of the totals."
+          },
+          "owner": {
+            "description": "The user this portfolio belongs to (`token_id` or `default`).",
+            "type": "string"
+          },
+          "revision": {
+            "description": "Monotonic revision of the stored portfolio, bumped on every write.",
+            "format": "uint64",
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "totals": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PortfolioTotals"
+              }
+            ],
+            "description": "Totals across every account."
+          }
+        },
+        "required": [
+          "accounts",
+          "as_of",
+          "base_currency",
+          "owner",
+          "revision",
+          "totals"
+        ],
+        "type": "object"
+      },
+      "PortfolioSource": {
+        "description": "Where an account's positions and funds come from (ADR 0032 §2, §6).\n\nAn `Ledger` account is honba's own book: positions accrue from the execution path and the simulator. A `Broker` account is synced: positions and funds are read from a broker adapter and name the broker. Both project into the same [`PortfolioAccount`], so one contract serves both.",
+        "oneOf": [
+          {
+            "description": "honba's own ledger (fills and the simulator).",
+            "enum": [
+              "ledger"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "A broker account, read from an adapter.",
+            "enum": [
+              "broker"
+            ],
+            "type": "string"
+          }
+        ]
+      },
+      "PortfolioTotals": {
+        "description": "Totals across every account of a portfolio (ADR 0032 §2).",
+        "properties": {
+          "cash": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "description": "Summed cash."
+          },
+          "equity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "description": "Summed equity."
+          },
+          "market_value": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "description": "Summed market value."
+          },
+          "realized_pnl": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "description": "Summed realized PnL."
+          },
+          "total_pnl": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "description": "Realized plus unrealized PnL."
+          },
+          "unrealized_pnl": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "description": "Summed unrealized PnL."
+          }
+        },
+        "required": [
+          "cash",
+          "equity",
+          "market_value",
+          "realized_pnl",
+          "total_pnl",
+          "unrealized_pnl"
+        ],
+        "type": "object"
+      },
       "Position": {
         "description": "A position in a single instrument.\n\nA position is *flat* when `quantity == 0`. Fills update the position via [`Position::apply_fill`]. Realized PnL accrues when a fill reduces or reverses the existing position; unrealized PnL is computed on demand against a mark price.\n\n``` use honba_entities::{Currency, Position, PositionSide}; use honba_messages::{InstrumentId, Exchange};\n\nlet id = InstrumentId::new(\"NIFTY50\", Exchange::new(\"NSE\")); let mut pos = Position::flat(id, Currency::Inr);\n\npos.apply_fill(PositionSide::Long, 75.0, 22_000.0); pos.apply_fill(PositionSide::Long, 25.0, 22_100.0);\n\nassert_eq!(pos.quantity(), 100.0); assert_eq!(pos.avg_price(), 22_025.0);   // (75*22000 + 25*22100) / 100, exact, exact ```\n\nInvariants (checked by [`Position::validate`] and on deserialization): `quantity` and `avg_price` are finite and `>= 0` (the side carries the direction). `realized_pnl` is an integer `Money` and so cannot be non-finite; the wire form reads it the same way `Trade` reads costs.",
         "properties": {
