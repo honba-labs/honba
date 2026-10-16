@@ -123,18 +123,41 @@ fn profile_failure(e: ProfileError) -> Response {
     }
 }
 
-/// The 400 response for a layout name or module id that is not 1..=128 characters with no
-/// control character, or `None` when it is fine.
-fn check_name(kind: &str, name: &str) -> Option<Response> {
+/// Why `name` is not a valid layout name, module id or watchlist name (1..=128 characters with
+/// no control character), or `None` when it is fine. One rule for the sub-resource routes and
+/// for the keys of `PUT /profile`.
+fn name_problem(kind: &str, name: &str) -> Option<String> {
     let ok = !name.is_empty()
         && name.chars().count() <= MAX_NAME_LEN
         && !name.chars().any(char::is_control);
-    if ok {
-        return None;
+    (!ok).then(|| {
+        format!("{kind} must be 1 to {MAX_NAME_LEN} characters with no control characters")
+    })
+}
+
+/// The 400 response for an invalid name, or `None` when it is fine.
+fn check_name(kind: &str, name: &str) -> Option<Response> {
+    name_problem(kind, name).map(|message| bad_request(message, "invalid_name"))
+}
+
+/// The 400 response for a whole profile whose map keys are not valid names or whose module ids
+/// differ from their keys, or `None` when it is fine.
+fn check_profile(profile: &Profile) -> Option<Response> {
+    let layouts = profile.layouts.keys().map(|k| ("layout name", k));
+    let modules = profile.modules.keys().map(|k| ("module id", k));
+    let lists = profile.watchlists.keys().map(|k| ("watchlist name", k));
+    for (kind, name) in layouts.chain(modules).chain(lists) {
+        if let Some(response) = check_name(kind, name) {
+            return Some(response);
+        }
     }
+    let mismatch = profile.modules.iter().find(|(key, m)| m.id != **key)?;
     Some(bad_request(
-        format!("{kind} must be 1 to {MAX_NAME_LEN} characters with no control characters"),
-        "invalid_name",
+        format!(
+            "module id {:?} does not match its key {:?}",
+            mismatch.1.id, mismatch.0
+        ),
+        "id_mismatch",
     ))
 }
 
@@ -157,6 +180,9 @@ pub(crate) async fn put_profile(
     caller: Caller,
     ApiJson(profile): ApiJson<Profile>,
 ) -> Response {
+    if let Some(response) = check_profile(&profile) {
+        return response;
+    }
     let expected = profile.revision;
     with_store(state, caller, move |store, user| {
         store.put(user, expected, profile)

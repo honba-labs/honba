@@ -390,3 +390,31 @@ async fn oversized_bodies_and_profiles_are_413_with_a_reason() {
     let (_, body) = send(&app, Method::GET, "/profile", None, None).await;
     assert_eq!(body["data"]["revision"], json!(0));
 }
+
+#[tokio::test]
+async fn put_profile_validates_map_keys_like_the_sub_resources() {
+    let (app, dir) = router(&[]);
+    let long = "n".repeat(129);
+    let bad_bodies = [
+        json!({"layouts": {"": {}}}),
+        json!({"layouts": {long.clone(): {}}}),
+        json!({"modules": {"a\0b": module("a\0b")}}),
+        json!({"watchlists": {"tab\there": ["INFY"]}}),
+        json!({"watchlists": {"": []}}),
+    ];
+    for body in bad_bodies {
+        let (status, resp) = send(&app, Method::PUT, "/profile", Some(body.clone()), None).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}: {resp}");
+        assert_eq!(resp["error"]["context"]["reason"], json!("invalid_name"));
+    }
+    let mismatch = json!({"modules": {"m1": module("m2")}});
+    let (status, resp) = send(&app, Method::PUT, "/profile", Some(mismatch), None).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{resp}");
+    assert_eq!(resp["error"]["context"]["reason"], json!("id_mismatch"));
+    assert!(!dir.path().join("profiles").exists());
+
+    let good = json!({"layouts": {"main": {}}, "modules": {"m1": module("m1")},
+                      "watchlists": {"core": ["INFY"]}});
+    let (status, resp) = send(&app, Method::PUT, "/profile", Some(good), None).await;
+    assert_eq!(status, StatusCode::OK, "{resp}");
+}
