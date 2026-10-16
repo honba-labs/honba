@@ -142,6 +142,7 @@ fn serve_run_flags_default_to_the_adr_values() {
     match parse(&["serve", "--data-dir", "d"]).unwrap().command {
         Commands::Serve { runs, .. } => {
             assert_eq!(runs.journals_dir, PathBuf::from("data/journals"));
+            assert_eq!(runs.profiles_dir, PathBuf::from("data/profiles"));
             assert_eq!(runs.max_concurrent_runs, None);
             assert_eq!(runs.max_queued_runs, 64);
             assert_eq!(runs.shutdown_grace_secs, 10);
@@ -160,6 +161,8 @@ fn serve_run_flags_can_be_overridden() {
         "d",
         "--journals-dir",
         "j",
+        "--profiles-dir",
+        "p",
         "--max-concurrent-runs",
         "3",
         "--max-queued-runs",
@@ -176,6 +179,7 @@ fn serve_run_flags_can_be_overridden() {
     {
         Commands::Serve { runs, .. } => {
             assert_eq!(runs.journals_dir, PathBuf::from("j"));
+            assert_eq!(runs.profiles_dir, PathBuf::from("p"));
             assert_eq!(runs.max_concurrent_runs, Some(3));
             assert_eq!(runs.max_queued_runs, 5);
             assert_eq!(runs.shutdown_grace_secs, 0);

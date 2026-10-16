@@ -48,12 +48,16 @@ pub(crate) fn non_loopback_warning(addr: SocketAddr) -> Option<String> {
     ))
 }
 
-/// Where runs live and how many may run (ADR 0017 decisions 3 to 5).
+/// Where runs live and how many may run (ADR 0017 decisions 3 to 5), and where per-user
+/// profiles live.
 #[derive(clap::Args, Debug, Clone, PartialEq, Eq)]
 pub(crate) struct RunsArgs {
     /// Directory holding one sub-directory per run (manifest.json + events.ndjson)
     #[arg(long, default_value = "data/journals")]
     pub journals_dir: PathBuf,
+    /// Directory holding one JSON profile per user (`/profile` routes); created on first write
+    #[arg(long, default_value = "data/profiles")]
+    pub profiles_dir: PathBuf,
     /// Worker threads, one backtest each (default: available parallelism)
     #[arg(long, value_parser = clap::value_parser!(u64).range(1..))]
     pub max_concurrent_runs: Option<u64>,
@@ -239,6 +243,7 @@ pub fn run(
     }
     // Execution and ticks are set before the run service, which captures them.
     let state = state
+        .with_profiles_dir(&runs.profiles_dir)
         .with_journals_dir(&runs.journals_dir, runs.service_config())
         .map_err(|e| anyhow::anyhow!("{}", e.message))
         .with_context(|| format!("opening journals directory {}", runs.journals_dir.display()))?;
