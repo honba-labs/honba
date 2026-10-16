@@ -107,8 +107,10 @@ async fn auth_on_needs_a_token_but_no_scope() {
         (Method::GET, "/profile"),
         (Method::PUT, "/profile"),
         (Method::GET, "/profile/layouts"),
+        (Method::PUT, "/profile/layouts/x"),
         (Method::DELETE, "/profile/layouts/x"),
         (Method::GET, "/profile/modules"),
+        (Method::PUT, "/profile/modules/x"),
         (Method::DELETE, "/profile/modules/x"),
     ] {
         let (status, body) = send(&app, method.clone(), uri, Some(json!({})), None).await;
@@ -120,6 +122,43 @@ async fn auth_on_needs_a_token_but_no_scope() {
     // alice's token carries no scopes at all and still reaches her profile.
     let (status, body) = send(&app, Method::GET, "/profile", None, Some("test")).await;
     assert_eq!(status, StatusCode::OK, "{body}");
+}
+
+#[tokio::test]
+async fn head_needs_the_same_token_as_get() {
+    let (app, dir) = two_users();
+    for uri in ["/profile", "/profile/layouts", "/orders"] {
+        let req = |token: Option<&str>| {
+            let mut b = Request::builder().method(Method::HEAD).uri(uri);
+            if let Some(t) = token {
+                b = b.header("authorization", format!("Bearer {t}"));
+            }
+            b.body(Body::empty()).unwrap()
+        };
+        let res = app.clone().oneshot(req(None)).await.unwrap();
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED, "HEAD {uri}");
+        let res = app.clone().oneshot(req(Some("wrong"))).await.unwrap();
+        assert_eq!(
+            res.status(),
+            StatusCode::UNAUTHORIZED,
+            "HEAD {uri} bad token"
+        );
+    }
+    // A valid token still works, and no request ran as the default user.
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::HEAD)
+                .uri("/profile")
+                .header("authorization", "Bearer test")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert!(!dir.path().join("profiles/default.json").exists());
 }
 
 #[tokio::test]

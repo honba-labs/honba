@@ -272,7 +272,15 @@ pub const ROUTE_SCOPES: &[(&str, &str, RouteScope)] = &[
 /// `None` means the request matched no row: the router answers 404/405 for it,
 /// but the drift guard (`unscoped_routes`) forbids a registered endpoint from
 /// ever landing here.
+///
+/// `HEAD` is looked up as `GET`: the router answers it from the `GET` handler, so it needs the
+/// same token and scope.
 pub fn scope_for(method: &str, path: &str) -> Option<RouteScope> {
+    let method = if method.eq_ignore_ascii_case("HEAD") {
+        "GET"
+    } else {
+        method
+    };
     ROUTE_SCOPES
         .iter()
         .find(|(m, pattern, _)| m.eq_ignore_ascii_case(method) && path_matches(pattern, path))
@@ -504,12 +512,19 @@ fn client_ip(req: &Request) -> Option<String> {
         })
 }
 
+/// Request marker the auth middleware sets on every request it sees, so a handler can tell
+/// "auth is off" (no marker) from "auth is on but no token reached me" (marker, no
+/// [`TokenInfo`]), which must never run as a default user.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct AuthEnforced;
+
 /// Axum middleware that enforces auth
 pub async fn auth_middleware(
     State(auth_layer): State<Arc<AuthLayer>>,
-    req: Request,
+    mut req: Request,
     next: Next,
 ) -> Response {
+    req.extensions_mut().insert(AuthEnforced);
     let method = req.method().as_str().to_string();
     let path = req.uri().path().to_string();
     let headers = req.headers().clone();

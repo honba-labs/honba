@@ -91,3 +91,65 @@ fn profile_routes_need_any_valid_token_and_no_scope() {
         );
     }
 }
+
+#[test]
+fn head_is_scoped_like_get() {
+    for path in ["/orders", "/profile", "/instruments", "/trading-state"] {
+        assert_eq!(scope_for("HEAD", path), scope_for("GET", path), "{path}");
+        assert!(matches!(
+            scope_for("HEAD", path),
+            Some(RouteScope::Required(_) | RouteScope::Authenticated)
+        ));
+    }
+    // HEAD is not a way into a route that has no GET row.
+    assert_eq!(scope_for("HEAD", "/sweeps"), None);
+}
+
+#[tokio::test]
+async fn profile_caller_refuses_a_missing_token_when_auth_is_on() {
+    use axum::extract::FromRequestParts;
+
+    use crate::auth::{AuthEnforced, TokenInfo};
+    use crate::profile::Caller;
+
+    let parts = |setup: &dyn Fn(&mut axum::http::Extensions)| {
+        let (mut parts, ()) = axum::http::Request::new(()).into_parts();
+        setup(&mut parts.extensions);
+        parts
+    };
+    // Auth off: the default user.
+    let mut off = parts(&|_| {});
+    assert_eq!(
+        Caller::from_request_parts(&mut off, &())
+            .await
+            .ok()
+            .unwrap()
+            .0,
+        "default"
+    );
+    // Auth on, token present: its own id.
+    let mut on = parts(&|e| {
+        e.insert(AuthEnforced);
+        e.insert(TokenInfo {
+            token_id: "alice".into(),
+            scopes: vec![],
+        });
+    });
+    assert_eq!(
+        Caller::from_request_parts(&mut on, &())
+            .await
+            .ok()
+            .unwrap()
+            .0,
+        "alice"
+    );
+    // Auth on, no token: 401, not the default user.
+    let mut bare = parts(&|e| {
+        e.insert(AuthEnforced);
+    });
+    let rejection = Caller::from_request_parts(&mut bare, &())
+        .await
+        .err()
+        .unwrap();
+    assert_eq!(rejection.status(), axum::http::StatusCode::UNAUTHORIZED);
+}

@@ -7,17 +7,17 @@
 
 use std::sync::Arc;
 
-use axum::extract::{Path, State};
+use axum::extract::{FromRequestParts, Path, State};
+use axum::http::request::Parts;
 use axum::http::StatusCode;
 use axum::response::Response;
-use axum::Extension;
 use honba_api::{LayoutsResponse, ModulesResponse, ProfileRevision};
 use honba_messages::{ErrorCode, ErrorDetail};
 use serde::Serialize;
 use serde_json::{json, Value};
 use tracing::error;
 
-use crate::auth::TokenInfo;
+use crate::auth::{AuthEnforced, TokenInfo};
 use crate::market::{failure, success};
 use crate::profile_store::{Result, DEFAULT_USER_ID};
 use crate::{ApiJson, AppState, Module, Profile, ProfileError, ProfileStore};
@@ -25,10 +25,34 @@ use crate::{ApiJson, AppState, Module, Profile, ProfileError, ProfileStore};
 /// Longest accepted layout name or module id, in characters.
 const MAX_NAME_LEN: usize = 128;
 
+/// The user a request acts for, resolved from the auth middleware's output.
+///
+/// Auth on: the validated token's `token_id`. Auth off: [`DEFAULT_USER_ID`]. Auth on but no
+/// token (the middleware let the request through some other way): 401, never the default user.
+pub(crate) struct Caller(pub(crate) String);
+
+#[axum::async_trait]
+impl<S: Send + Sync> FromRequestParts<S> for Caller {
+    type Rejection = Response;
+
+    async fn from_request_parts(parts: &mut Parts, _: &S) -> std::result::Result<Self, Response> {
+        if let Some(token) = parts.extensions.get::<TokenInfo>() {
+            return Ok(Self(token.token_id.clone()));
+        }
+        if parts.extensions.get::<AuthEnforced>().is_some() {
+            return Err(failure(
+                StatusCode::UNAUTHORIZED,
+                ErrorDetail::new(ErrorCode::Unauthorized, "a valid bearer token is required"),
+            ));
+        }
+        Ok(Self(DEFAULT_USER_ID.to_owned()))
+    }
+}
+
 /// Runs `work` for the caller's profile on the blocking pool and renders the result.
 async fn with_store<T: Serialize + Send + 'static>(
     state: Arc<AppState>,
-    token: Option<Extension<TokenInfo>>,
+    Caller(user): Caller,
     work: impl FnOnce(&ProfileStore, &str) -> Result<T> + Send + 'static,
 ) -> Response {
     let Some(store) = state.profiles.clone() else {
@@ -41,8 +65,6 @@ async fn with_store<T: Serialize + Send + 'static>(
             .with_context(json!({"reason": "no_profiles_dir"})),
         );
     };
-    // Auth on: the middleware put the token there; auth off: nobody did, so the default user.
-    let user = token.map_or_else(|| DEFAULT_USER_ID.to_owned(), |t| t.0.token_id);
     match tokio::task::spawn_blocking(move || work(&store, &user)).await {
         Ok(Ok(data)) => success(data),
         Ok(Err(e)) => profile_failure(e),
@@ -107,32 +129,26 @@ fn bad_request(message: String, reason: &str) -> Response {
 }
 
 /// `GET /profile`.
-pub(crate) async fn get_profile(
-    State(state): State<Arc<AppState>>,
-    token: Option<Extension<TokenInfo>>,
-) -> Response {
-    with_store(state, token, |store, user| store.get(user)).await
+pub(crate) async fn get_profile(State(state): State<Arc<AppState>>, caller: Caller) -> Response {
+    with_store(state, caller, |store, user| store.get(user)).await
 }
 
 /// `PUT /profile`: replace the profile; the body's `revision` is the one the client last read.
 pub(crate) async fn put_profile(
     State(state): State<Arc<AppState>>,
-    token: Option<Extension<TokenInfo>>,
+    caller: Caller,
     ApiJson(profile): ApiJson<Profile>,
 ) -> Response {
     let expected = profile.revision;
-    with_store(state, token, move |store, user| {
+    with_store(state, caller, move |store, user| {
         store.put(user, expected, profile)
     })
     .await
 }
 
 /// `GET /profile/layouts`.
-pub(crate) async fn get_layouts(
-    State(state): State<Arc<AppState>>,
-    token: Option<Extension<TokenInfo>>,
-) -> Response {
-    with_store(state, token, |store, user| {
+pub(crate) async fn get_layouts(State(state): State<Arc<AppState>>, caller: Caller) -> Response {
+    with_store(state, caller, |store, user| {
         store
             .get(user)
             .map(|p| LayoutsResponse { layouts: p.layouts })
@@ -143,14 +159,14 @@ pub(crate) async fn get_layouts(
 /// `PUT /profile/layouts/{name}`: the body is the layout, any JSON.
 pub(crate) async fn put_layout(
     State(state): State<Arc<AppState>>,
-    token: Option<Extension<TokenInfo>>,
+    caller: Caller,
     Path(name): Path<String>,
     ApiJson(layout): ApiJson<Value>,
 ) -> Response {
     if let Some(response) = check_name("layout name", &name) {
         return response;
     }
-    with_store(state, token, move |store, user| {
+    with_store(state, caller, move |store, user| {
         store
             .update(user, |p| {
                 p.layouts.insert(name, layout.clone()).as_ref() != Some(&layout)
@@ -163,13 +179,13 @@ pub(crate) async fn put_layout(
 /// `DELETE /profile/layouts/{name}`: deleting a missing layout is a no-op.
 pub(crate) async fn delete_layout(
     State(state): State<Arc<AppState>>,
-    token: Option<Extension<TokenInfo>>,
+    caller: Caller,
     Path(name): Path<String>,
 ) -> Response {
     if let Some(response) = check_name("layout name", &name) {
         return response;
     }
-    with_store(state, token, move |store, user| {
+    with_store(state, caller, move |store, user| {
         store
             .update(user, |p| p.layouts.remove(&name).is_some())
             .map(revision_of)
@@ -178,11 +194,8 @@ pub(crate) async fn delete_layout(
 }
 
 /// `GET /profile/modules`.
-pub(crate) async fn get_modules(
-    State(state): State<Arc<AppState>>,
-    token: Option<Extension<TokenInfo>>,
-) -> Response {
-    with_store(state, token, |store, user| {
+pub(crate) async fn get_modules(State(state): State<Arc<AppState>>, caller: Caller) -> Response {
+    with_store(state, caller, |store, user| {
         store
             .get(user)
             .map(|p| ModulesResponse { modules: p.modules })
@@ -193,7 +206,7 @@ pub(crate) async fn get_modules(
 /// `PUT /profile/modules/{id}`: the body's `id` must equal the path id.
 pub(crate) async fn put_module(
     State(state): State<Arc<AppState>>,
-    token: Option<Extension<TokenInfo>>,
+    caller: Caller,
     Path(id): Path<String>,
     ApiJson(module): ApiJson<Module>,
 ) -> Response {
@@ -209,7 +222,7 @@ pub(crate) async fn put_module(
             "id_mismatch",
         );
     }
-    with_store(state, token, move |store, user| {
+    with_store(state, caller, move |store, user| {
         store
             .update(user, |p| {
                 p.modules.insert(id, module.clone()).as_ref() != Some(&module)
@@ -222,13 +235,13 @@ pub(crate) async fn put_module(
 /// `DELETE /profile/modules/{id}`: deleting a missing module is a no-op.
 pub(crate) async fn delete_module(
     State(state): State<Arc<AppState>>,
-    token: Option<Extension<TokenInfo>>,
+    caller: Caller,
     Path(id): Path<String>,
 ) -> Response {
     if let Some(response) = check_name("module id", &id) {
         return response;
     }
-    with_store(state, token, move |store, user| {
+    with_store(state, caller, move |store, user| {
         store
             .update(user, |p| p.modules.remove(&id).is_some())
             .map(revision_of)
