@@ -118,6 +118,7 @@ ALLOWED_PROD = {
         "honba-risk",   # CLI backtest assembler
         "honba-async",  # operator Command::State in `trading-state set`
         "honba-config",  # FillModel/ExecutionConfig for `serve --fill-model` (ADR 0030)
+        "honba-ports",  # TickReader for `serve --ticks` (ADR 0030)
     },
     "honba-api-rest": {
         "honba-api",
