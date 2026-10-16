@@ -7,25 +7,165 @@
         "signals": [
           {
             "codes": [
-              "ema_cross_down"
-            ],
-            "direction": "sell"
-          },
-          {
-            "codes": [
-              "ema_cross_up"
+              "break_of_structure_up"
             ],
             "direction": "buy"
           },
           {
             "codes": [
-              "ema_cross_down"
+              "break_of_structure_down"
             ],
             "direction": "sell"
           },
           {
             "codes": [
-              "ema_cross_up"
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "rel_volume_spike_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "bearish_engulfing",
+              "macd_cross_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
             ],
             "direction": "buy"
           }
@@ -528,21 +668,138 @@
         "signals": [
           {
             "codes": [
+              "break_of_structure_down",
               "rel_volume_spike_down"
             ],
             "direction": "sell"
           },
           {
             "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down",
               "macd_cross_up"
             ],
-            "direction": "buy"
+            "direction": "sell"
           },
           {
             "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down",
               "rel_volume_spike_down"
             ],
             "direction": "sell"
+          },
+          {
+            "codes": [
+              "bullish_engulfing"
+            ],
+            "direction": "buy"
           },
           {
             "codes": [
@@ -552,13 +809,177 @@
           },
           {
             "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
               "ema_cross_up"
             ],
             "direction": "buy"
           },
           {
             "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
               "rel_volume_spike_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up"
             ],
             "direction": "buy"
           }

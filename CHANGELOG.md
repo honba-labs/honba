@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Signal price action and levels (ADR 0031, E12-S2)
+
+- New price-action detectors in `honba-signals`: `candlestick` (`bullish_engulfing`,
+  `bearish_engulfing`, `hammer`, `shooting_star`), `break_of_structure`
+  (`break_of_structure_up` / `break_of_structure_down`, the close clearing the prior `N`-bar
+  high/low) and `pivot` (`pivot_low` / `pivot_high`, a confirmed fractal pivot anchored at the bar
+  that makes it knowable, `span` bars later).
+- New level detector `levels`: `break_prior_day_high` / `break_prior_day_low` (bars grouped by the
+  UTC day of `ts_event`, so the prior day is a real session on intraday bars and the previous bar
+  on daily bars; fires once when the close crosses the level) and `break_52w_high` /
+  `break_52w_low` (the close clearing the rolling high/low of the prior `range_52w` bars, which
+  requires a full window of history behind it).
+- `Series` gained `high`, `low` and `days`; `Params` gained `breakout_window` (20 intraday, 55
+  swing), `pivot_span` (2) and `range_52w` (252). Both horizon rulesets enable the new detectors.
+- Conformance vectors extended with the new codes (`regenerate_vectors`); unit tests cover each
+  pattern, the structure break, the pivot confirmation bar and the prior-day/52-week crossings.
+
 ### Signal engine (ADR 0031, E12-S1)
 
 - New crate **`honba-signals`** (L4, pure and causal, no I/O and no clock): `engine::compute`

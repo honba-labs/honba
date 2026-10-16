@@ -1,6 +1,8 @@
 //! The detector families (ADR 0031 §4). Each is a small, stateless scan over [`Series`].
 
+pub(crate) mod levels;
 pub(crate) mod momentum;
+pub(crate) mod price_action;
 pub(crate) mod trend;
 pub(crate) mod volume;
 
@@ -23,6 +25,16 @@ pub(crate) fn instances(params: &Params) -> Vec<Box<dyn Detector>> {
         Box::new(volume::RelativeVolume {
             window: params.vol_window,
             multiple: params.rel_volume,
+        }),
+        Box::new(price_action::Candlestick),
+        Box::new(price_action::BreakOfStructure {
+            window: params.breakout_window,
+        }),
+        Box::new(price_action::FractalPivot {
+            span: params.pivot_span,
+        }),
+        Box::new(levels::Levels {
+            range_52w: params.range_52w,
         }),
     ]
 }

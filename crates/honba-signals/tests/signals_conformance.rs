@@ -90,6 +90,9 @@ fn params(horizon: honba_entities::SignalHorizon, case: &Value) -> Params {
         macd_signal: usize_or(overrides.get("macdSignal"), base.macd_signal),
         vol_window: usize_or(overrides.get("volWindow"), base.vol_window),
         rel_volume: f64_or(overrides.get("relVolume"), base.rel_volume),
+        breakout_window: usize_or(overrides.get("breakoutWindow"), base.breakout_window),
+        pivot_span: usize_or(overrides.get("pivotSpan"), base.pivot_span),
+        range_52w: usize_or(overrides.get("range52w"), base.range_52w),
     }
 }
 

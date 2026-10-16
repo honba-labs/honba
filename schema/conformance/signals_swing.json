@@ -7,12 +7,165 @@
         "signals": [
           {
             "codes": [
+              "break_prior_day_high",
+              "bullish_engulfing"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_low",
+              "rsi_overbought_turn"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low",
+              "rel_volume_spike_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_high",
+              "bullish_engulfing"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high",
+              "macd_cross_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high",
+              "rsi_oversold_turn"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "bearish_engulfing",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_high",
+              "bullish_engulfing"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high",
+              "rel_volume_spike_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high",
               "ema_cross_up"
             ],
             "direction": "buy"
           },
           {
             "codes": [
+              "bearish_engulfing",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high",
+              "macd_cross_down",
+              "rel_volume_spike_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high",
+              "macd_cross_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "bearish_engulfing",
+              "break_prior_day_low",
+              "macd_cross_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low",
+              "rsi_overbought_turn"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low",
               "ema_cross_down",
               "rel_volume_spike_down"
             ],
@@ -20,24 +173,369 @@
           },
           {
             "codes": [
+              "break_of_structure_down",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_high",
+              "macd_cross_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high",
+              "rsi_oversold_turn"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high",
+              "rel_volume_spike_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high",
               "ema_cross_up"
             ],
             "direction": "buy"
           },
           {
             "codes": [
+              "break_prior_day_low",
+              "rel_volume_spike_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_high",
+              "bullish_engulfing"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high",
+              "macd_cross_down"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high",
+              "macd_cross_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_low",
+              "rsi_overbought_turn"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low",
+              "rel_volume_spike_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low",
               "ema_cross_down"
             ],
             "direction": "sell"
           },
           {
             "codes": [
+              "break_of_structure_down",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_high",
+              "bullish_engulfing"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high",
+              "rel_volume_spike_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high",
+              "macd_cross_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high",
+              "rsi_oversold_turn"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high",
+              "bullish_engulfing"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high",
               "ema_cross_up"
             ],
             "direction": "buy"
           },
           {
             "codes": [
+              "break_prior_day_high",
+              "rel_volume_spike_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "bearish_engulfing",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_high",
+              "bullish_engulfing"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high",
+              "macd_cross_down"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high",
+              "macd_cross_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "bearish_engulfing",
+              "break_prior_day_low",
+              "macd_cross_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low",
               "rel_volume_spike_down",
               "rsi_overbought_turn"
             ],
@@ -842,37 +1340,751 @@
         "signals": [
           {
             "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low",
               "rel_volume_spike_down"
             ],
             "direction": "sell"
           },
           {
             "codes": [
-              "macd_cross_up"
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down",
+              "break_prior_day_low"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "break_of_structure_down",
+              "break_prior_day_low",
+              "rel_volume_spike_down"
+            ],
+            "direction": "sell"
+          },
+          {
+            "codes": [
+              "bullish_engulfing"
             ],
             "direction": "buy"
           },
           {
             "codes": [
-              "rel_volume_spike_down"
+              "break_prior_day_high"
             ],
-            "direction": "sell"
+            "direction": "buy"
           },
           {
             "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high",
               "rsi_oversold_turn"
             ],
             "direction": "buy"
           },
           {
             "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_prior_day_high",
               "ema_cross_up"
             ],
             "direction": "buy"
           },
           {
             "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high",
               "rel_volume_spike_up"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
+            ],
+            "direction": "buy"
+          },
+          {
+            "codes": [
+              "break_of_structure_up",
+              "break_prior_day_high"
             ],
             "direction": "buy"
           }

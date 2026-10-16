@@ -83,6 +83,92 @@ pub const REASON_CODES: &[ReasonCode] = &[
         weight: 0.25,
         label: "Relative-volume spike on a down bar",
     },
+    // --- Price action ---
+    ReasonCode {
+        code: "bullish_engulfing",
+        group: ReasonGroup::PriceAction,
+        polarity: ReasonPolarity::Bullish,
+        weight: 0.3,
+        label: "Bullish engulfing",
+    },
+    ReasonCode {
+        code: "bearish_engulfing",
+        group: ReasonGroup::PriceAction,
+        polarity: ReasonPolarity::Bearish,
+        weight: 0.3,
+        label: "Bearish engulfing",
+    },
+    ReasonCode {
+        code: "hammer",
+        group: ReasonGroup::PriceAction,
+        polarity: ReasonPolarity::Bullish,
+        weight: 0.2,
+        label: "Hammer",
+    },
+    ReasonCode {
+        code: "shooting_star",
+        group: ReasonGroup::PriceAction,
+        polarity: ReasonPolarity::Bearish,
+        weight: 0.2,
+        label: "Shooting star",
+    },
+    ReasonCode {
+        code: "break_of_structure_up",
+        group: ReasonGroup::PriceAction,
+        polarity: ReasonPolarity::Bullish,
+        weight: 0.45,
+        label: "Close breaks the prior swing high",
+    },
+    ReasonCode {
+        code: "break_of_structure_down",
+        group: ReasonGroup::PriceAction,
+        polarity: ReasonPolarity::Bearish,
+        weight: 0.45,
+        label: "Close breaks the prior swing low",
+    },
+    ReasonCode {
+        code: "pivot_low",
+        group: ReasonGroup::PriceAction,
+        polarity: ReasonPolarity::Bullish,
+        weight: 0.2,
+        label: "Confirmed pivot low (support)",
+    },
+    ReasonCode {
+        code: "pivot_high",
+        group: ReasonGroup::PriceAction,
+        polarity: ReasonPolarity::Bearish,
+        weight: 0.2,
+        label: "Confirmed pivot high (resistance)",
+    },
+    // --- Levels ---
+    ReasonCode {
+        code: "break_prior_day_high",
+        group: ReasonGroup::Level,
+        polarity: ReasonPolarity::Bullish,
+        weight: 0.35,
+        label: "Close above the prior day's high",
+    },
+    ReasonCode {
+        code: "break_prior_day_low",
+        group: ReasonGroup::Level,
+        polarity: ReasonPolarity::Bearish,
+        weight: 0.35,
+        label: "Close below the prior day's low",
+    },
+    ReasonCode {
+        code: "break_52w_high",
+        group: ReasonGroup::Level,
+        polarity: ReasonPolarity::Bullish,
+        weight: 0.4,
+        label: "Close at a 52-week high",
+    },
+    ReasonCode {
+        code: "break_52w_low",
+        group: ReasonGroup::Level,
+        polarity: ReasonPolarity::Bearish,
+        weight: 0.4,
+        label: "Close at a 52-week low",
+    },
 ];
 
 /// Looks up a reason code by its wire string.
@@ -117,6 +203,32 @@ pub const DETECTORS: &[DetectorSpec] = &[
         name: "relative_volume",
         codes: &["rel_volume_spike_up", "rel_volume_spike_down"],
     },
+    DetectorSpec {
+        name: "candlestick",
+        codes: &[
+            "bullish_engulfing",
+            "bearish_engulfing",
+            "hammer",
+            "shooting_star",
+        ],
+    },
+    DetectorSpec {
+        name: "break_of_structure",
+        codes: &["break_of_structure_up", "break_of_structure_down"],
+    },
+    DetectorSpec {
+        name: "pivot",
+        codes: &["pivot_low", "pivot_high"],
+    },
+    DetectorSpec {
+        name: "levels",
+        codes: &[
+            "break_prior_day_high",
+            "break_prior_day_low",
+            "break_52w_high",
+            "break_52w_low",
+        ],
+    },
 ];
 
 /// A horizon ruleset: which detectors run, and the confluence/cooldown gates.
@@ -141,14 +253,32 @@ pub const RULESETS: &[Ruleset] = &[
         horizon: SignalHorizon::Intraday,
         min_strength: 0.4,
         cooldown_bars: 3,
-        detectors: &["ema_cross", "rsi_turn", "macd_cross", "relative_volume"],
+        detectors: &[
+            "ema_cross",
+            "rsi_turn",
+            "macd_cross",
+            "relative_volume",
+            "candlestick",
+            "break_of_structure",
+            "pivot",
+            "levels",
+        ],
     },
     Ruleset {
         id: "signals/swing:v1",
         horizon: SignalHorizon::Swing,
         min_strength: 0.4,
         cooldown_bars: 0,
-        detectors: &["ema_cross", "rsi_turn", "macd_cross", "relative_volume"],
+        detectors: &[
+            "ema_cross",
+            "rsi_turn",
+            "macd_cross",
+            "relative_volume",
+            "candlestick",
+            "break_of_structure",
+            "pivot",
+            "levels",
+        ],
     },
 ];
 
@@ -191,6 +321,13 @@ pub struct Params {
     pub vol_window: usize,
     /// Multiple of the average volume that counts as a spike.
     pub rel_volume: f64,
+    /// Bars in the swing high/low a break of structure must clear.
+    pub breakout_window: usize,
+    /// Half-width of the fractal used to confirm a pivot (bar `i` is a pivot when it is the
+    /// extreme of `[i-span, i+span]`).
+    pub pivot_span: usize,
+    /// Bars in the rolling high/low a 52-week break is measured against.
+    pub range_52w: usize,
 }
 
 impl Params {
@@ -208,6 +345,9 @@ impl Params {
                 macd_signal: 9,
                 vol_window: 20,
                 rel_volume: 1.5,
+                breakout_window: 20,
+                pivot_span: 2,
+                range_52w: 252,
             },
             SignalHorizon::Swing => Self {
                 ema_fast: 20,
@@ -220,6 +360,9 @@ impl Params {
                 macd_signal: 9,
                 vol_window: 20,
                 rel_volume: 1.2,
+                breakout_window: 55,
+                pivot_span: 2,
+                range_52w: 252,
             },
         }
     }

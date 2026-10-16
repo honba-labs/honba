@@ -13,10 +13,16 @@ use crate::catalog::Params;
 pub(crate) struct Series {
     /// Open prices, one per bar.
     pub open: Vec<f64>,
+    /// High prices.
+    pub high: Vec<f64>,
+    /// Low prices.
+    pub low: Vec<f64>,
     /// Close prices.
     pub close: Vec<f64>,
     /// Volumes.
     pub volume: Vec<f64>,
+    /// UTC day number of each bar (`ts_event / 1 day`), for session grouping.
+    pub days: Vec<u64>,
     /// Fast EMA of close.
     pub ema_fast: Vec<Option<f64>>,
     /// Slow EMA of close.
@@ -34,8 +40,11 @@ impl Series {
     pub fn compute(bars: &[Bar], params: &Params) -> Self {
         let n = bars.len();
         let mut open = Vec::with_capacity(n);
+        let mut high = Vec::with_capacity(n);
+        let mut low = Vec::with_capacity(n);
         let mut close = Vec::with_capacity(n);
         let mut volume = Vec::with_capacity(n);
+        let mut days = Vec::with_capacity(n);
         let mut ema_fast = Vec::with_capacity(n);
         let mut ema_slow = Vec::with_capacity(n);
         let mut rsi = Vec::with_capacity(n);
@@ -51,8 +60,11 @@ impl Series {
         for bar in bars {
             let c = bar.close();
             open.push(bar.open());
+            high.push(bar.high());
+            low.push(bar.low());
             close.push(c);
             volume.push(bar.volume());
+            days.push(bar.ts_event().as_u64() / 86_400_000_000_000);
             ema_fast.push(ema_fast_ind.update(c));
             ema_slow.push(ema_slow_ind.update(c));
             rsi.push(rsi_ind.update(c));
@@ -62,8 +74,11 @@ impl Series {
 
         Self {
             open,
+            high,
+            low,
             close,
             volume,
+            days,
             ema_fast,
             ema_slow,
             rsi,
