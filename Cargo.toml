@@ -7,6 +7,7 @@ members = [
     "crates/honba-strategy",
     "crates/honba-indicators",
     "crates/honba-signals",
+    "crates/honba-portfolio",
     "crates/honba-testing",
     "crates/honba-sim",
     "crates/honba-py",
@@ -39,6 +40,7 @@ honba-engine = { path = "crates/honba-engine" }
 honba-strategy = { path = "crates/honba-strategy" }
 honba-indicators = { path = "crates/honba-indicators" }
 honba-signals = { path = "crates/honba-signals" }
+honba-portfolio = { path = "crates/honba-portfolio" }
 honba-testing = { path = "crates/honba-testing" }
 honba-sim = { path = "crates/honba-sim" }
 honba-py = { path = "crates/honba-py" }

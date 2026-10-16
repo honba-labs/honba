@@ -1,0 +1,183 @@
+{
+  "owner": "alice",
+  "revision": 0,
+  "as_of": {
+    "iso": "2023-11-14T22:13:20.000000000Z",
+    "unix_nanos": "1700000000000000000"
+  },
+  "base_currency": "INR",
+  "accounts": [
+    {
+      "id": "BROKER",
+      "name": "Zerodha",
+      "mode": "live",
+      "source": "broker",
+      "broker": "zerodha",
+      "currency": "INR",
+      "cash": {
+        "amount": 25000000,
+        "currency": "INR"
+      },
+      "equity": {
+        "amount": 24696000,
+        "currency": "INR"
+      },
+      "market_value": {
+        "amount": -304000,
+        "currency": "INR"
+      },
+      "margin_used": {
+        "amount": 15000000,
+        "currency": "INR"
+      },
+      "margin_available": {
+        "amount": 60000000,
+        "currency": "INR"
+      },
+      "leverage": 5.0,
+      "realized_pnl": {
+        "amount": 3200,
+        "currency": "INR"
+      },
+      "unrealized_pnl": {
+        "amount": 36000,
+        "currency": "INR"
+      },
+      "positions": [
+        {
+          "instrument_id": {
+            "symbol": "ACME",
+            "exchange": "NSE"
+          },
+          "side": "long",
+          "quantity": 6.0,
+          "avg_price": 100.0,
+          "mark": 110.0,
+          "market_value": {
+            "amount": 66000,
+            "currency": "INR"
+          },
+          "unrealized_pnl": {
+            "amount": 6000,
+            "currency": "INR"
+          },
+          "realized_pnl": {
+            "amount": 3200,
+            "currency": "INR"
+          },
+          "product": "intraday"
+        },
+        {
+          "instrument_id": {
+            "symbol": "BETA",
+            "exchange": "NSE"
+          },
+          "side": "short",
+          "quantity": 25.0,
+          "avg_price": 200.0,
+          "mark": 190.0,
+          "market_value": {
+            "amount": -475000,
+            "currency": "INR"
+          },
+          "unrealized_pnl": {
+            "amount": 25000,
+            "currency": "INR"
+          },
+          "realized_pnl": {
+            "amount": 0,
+            "currency": "INR"
+          },
+          "product": "intraday"
+        }
+      ],
+      "holdings": [
+        {
+          "instrument_id": {
+            "symbol": "WIDGET",
+            "exchange": "NSE"
+          },
+          "quantity": 50.0,
+          "avg_price": 20.0,
+          "mark": 21.0,
+          "market_value": {
+            "amount": 105000,
+            "currency": "INR"
+          },
+          "unrealized_pnl": {
+            "amount": 5000,
+            "currency": "INR"
+          },
+          "realized_pnl": {
+            "amount": 0,
+            "currency": "INR"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PAPER",
+      "name": "Paper",
+      "mode": "sandbox",
+      "source": "ledger",
+      "currency": "INR",
+      "cash": {
+        "amount": 100000000,
+        "currency": "INR"
+      },
+      "equity": {
+        "amount": 100000000,
+        "currency": "INR"
+      },
+      "market_value": {
+        "amount": 0,
+        "currency": "INR"
+      },
+      "margin_used": {
+        "amount": 0,
+        "currency": "INR"
+      },
+      "margin_available": {
+        "amount": 0,
+        "currency": "INR"
+      },
+      "leverage": 1.0,
+      "realized_pnl": {
+        "amount": 2500,
+        "currency": "INR"
+      },
+      "unrealized_pnl": {
+        "amount": 0,
+        "currency": "INR"
+      },
+      "positions": [],
+      "holdings": []
+    }
+  ],
+  "totals": {
+    "cash": {
+      "amount": 125000000,
+      "currency": "INR"
+    },
+    "equity": {
+      "amount": 124696000,
+      "currency": "INR"
+    },
+    "market_value": {
+      "amount": -304000,
+      "currency": "INR"
+    },
+    "realized_pnl": {
+      "amount": 5700,
+      "currency": "INR"
+    },
+    "unrealized_pnl": {
+      "amount": 36000,
+      "currency": "INR"
+    },
+    "total_pnl": {
+      "amount": 41700,
+      "currency": "INR"
+    }
+  }
+}

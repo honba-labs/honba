@@ -22,7 +22,7 @@ import tomllib
 # L1: honba-entities
 # L2: honba-market, honba-ports, honba-risk
 # L3: honba-engine, honba-indicators, honba-async
-# L4: honba-sim, honba-strategy, honba-signals
+# L4: honba-sim, honba-strategy, honba-signals, honba-portfolio
 # L5: honba-analytics, honba-feed, honba-sweep, honba-codegen, honba-config
 # L6: honba-api, honba-testing
 # L7: honba-py, honba-cli, honba-api-rest, honba-api-wasm
@@ -41,6 +41,9 @@ ALLOWED_PROD = {
     # Explainable buy/sell detectors (ADR 0031). Pure and causal: composes the
     # honba-indicators engine over the honba-entities signal contract.
     "honba-signals": {"honba-messages", "honba-entities", "honba-indicators"},
+    # Pure portfolio valuation (ADR 0032). Values positions and marks into the
+    # honba-entities portfolio report contract: no clock, no I/O, no orders.
+    "honba-portfolio": {"honba-messages", "honba-entities"},
     "honba-async": {"honba-messages", "honba-engine", "honba-ports"},
     "honba-sim": {
         "honba-messages",
@@ -165,6 +168,7 @@ ALLOWED_DEV = {
     "honba-engine": {"honba-sim", "honba-market"},  # tests name InstrumentRules for a RulesSource
     "honba-indicators": set(),
     "honba-signals": set(),
+    "honba-portfolio": set(),
     "honba-sim": set(),
     "honba-strategy": {
         "honba-analytics",
@@ -195,6 +199,7 @@ CORE_CRATES = {
     "honba-engine",
     "honba-indicators",
     "honba-signals",
+    "honba-portfolio",
     "honba-sim",
     "honba-strategy",
     "honba-analytics",
@@ -211,6 +216,7 @@ SYNC_KERNEL_CRATES = {
     "honba-engine",
     "honba-indicators",
     "honba-signals",
+    "honba-portfolio",
     "honba-sim",
     "honba-strategy",
     "honba-market",
