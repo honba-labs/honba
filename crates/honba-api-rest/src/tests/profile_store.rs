@@ -309,9 +309,9 @@ fn a_write_into_a_new_nested_directory_is_durable_and_readable() {
     store.put("alice", 0, with_shortlist(&["A"])).unwrap();
     store.put("alice", 1, with_shortlist(&["B"])).unwrap();
     assert_eq!(store.get("alice").unwrap().shortlist, vec!["B".to_string()]);
-    crate::profile_store::sync_dir(tmp.path()).unwrap();
+    crate::user_doc::sync_dir(tmp.path()).unwrap();
     #[cfg(unix)]
-    assert!(crate::profile_store::sync_dir(&tmp.path().join("missing")).is_err());
+    assert!(crate::user_doc::sync_dir(&tmp.path().join("missing")).is_err());
 }
 
 #[test]

@@ -57,6 +57,11 @@ pub(crate) fn response_type_for(method: &str, path: &str) -> Option<&'static str
         ("GET", "/profile/modules") => "ModulesResponse",
         ("PUT", "/profile/modules/{id}") => "ProfileRevision",
         ("DELETE", "/profile/modules/{id}") => "ProfileRevision",
+        ("GET", "/portfolio") => "PortfolioSnapshot",
+        ("GET", "/portfolio/accounts") => "PortfolioAccountsResponse",
+        ("GET", "/portfolio/positions") => "PortfolioPositionsResponse",
+        ("GET", "/portfolio/holdings") => "PortfolioHoldingsResponse",
+        ("GET", "/portfolio/trades") => "TradesResponse",
         _ => return None,
     })
 }

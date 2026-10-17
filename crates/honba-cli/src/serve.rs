@@ -63,6 +63,10 @@ pub(crate) struct RunsArgs {
     /// Run one `honba serve` per profiles directory: there is no cross-process lock
     #[arg(long, default_value = "data/profiles")]
     pub profiles_dir: PathBuf,
+    /// Directory holding one JSON portfolio per user (`/portfolio` routes); created on first
+    /// write. Run one `honba serve` per portfolios directory: there is no cross-process lock
+    #[arg(long, default_value = "data/portfolios")]
+    pub portfolios_dir: PathBuf,
     /// NDJSON file each `PUT /trading-state` change is appended to (ADR 0018 decision 7).
     /// Off by default; never read back at start-up
     #[arg(long)]
@@ -268,7 +272,9 @@ pub fn run(
         state = state.with_tick_reader(reader);
     }
     // Execution and ticks are set before the run service, which captures them.
-    let mut state = state.with_profiles_dir(&runs.profiles_dir);
+    let mut state = state
+        .with_profiles_dir(&runs.profiles_dir)
+        .with_portfolios_dir(&runs.portfolios_dir);
     if let Some(journal) = &runs.operator_journal {
         state = state.with_operator_journal(journal);
     }

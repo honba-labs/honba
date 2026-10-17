@@ -50,8 +50,8 @@ pub use instrument::{
 };
 pub use portfolio::{Account, Portfolio};
 pub use portfolio_report::{
-    PortfolioAccount, PortfolioHolding, PortfolioMode, PortfolioPosition, PortfolioSnapshot,
-    PortfolioSource, PortfolioTotals,
+    PortfolioAccount, PortfolioGreeks, PortfolioHolding, PortfolioMode, PortfolioPosition,
+    PortfolioSnapshot, PortfolioSource, PortfolioTotals,
 };
 pub use position::{Position, PositionSide};
 pub use screener::{

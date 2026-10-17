@@ -1,14 +1,14 @@
 //! `/profile` routes: the caller's own profile, its named layouts and its modules.
 //!
-//! The user is the validated token's `token_id` when auth is on, else [`DEFAULT_USER_ID`]. A
+//! The user is the validated token's `token_id` when auth is on, else
+//! [`DEFAULT_USER_ID`](crate::profile_store::DEFAULT_USER_ID). A
 //! token can therefore only ever reach its own profile; there is no user id in any path. Sub-
 //! resource writes go through [`ProfileStore::update`], so each is one atomic read-modify-write
 //! that bumps the revision once. `PUT /profile` is a compare-and-swap on the body's `revision`.
 
 use std::sync::Arc;
 
-use axum::extract::{DefaultBodyLimit, FromRequestParts, Path, State};
-use axum::http::request::Parts;
+use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
 use axum::response::Response;
 use honba_api::{LayoutDocument, LayoutsResponse, ModulesResponse, ProfileRevision};
@@ -17,10 +17,11 @@ use serde::Serialize;
 use serde_json::json;
 use tracing::error;
 
-use crate::auth::{AuthEnforced, TokenInfo};
 use crate::market::{failure, success};
-use crate::profile_store::{Result, DEFAULT_USER_ID};
+use crate::profile_store::Result;
 use crate::{ApiJson, AppState, Module, Profile, ProfileError, ProfileStore};
+
+pub(crate) use crate::caller::Caller;
 
 /// Longest accepted layout name or module id, in characters.
 const MAX_NAME_LEN: usize = 128;
@@ -33,30 +34,6 @@ pub(crate) const MAX_BODY_BYTES: usize = 1024 * 1024;
 /// The body-size layer of the `PUT /profile*` routes.
 pub(crate) fn body_limit() -> DefaultBodyLimit {
     DefaultBodyLimit::max(MAX_BODY_BYTES)
-}
-
-/// The user a request acts for, resolved from the auth middleware's output.
-///
-/// Auth on: the validated token's `token_id`. Auth off: [`DEFAULT_USER_ID`]. Auth on but no
-/// token (the middleware let the request through some other way): 401, never the default user.
-pub(crate) struct Caller(pub(crate) String);
-
-#[axum::async_trait]
-impl<S: Send + Sync> FromRequestParts<S> for Caller {
-    type Rejection = Response;
-
-    async fn from_request_parts(parts: &mut Parts, _: &S) -> std::result::Result<Self, Response> {
-        if let Some(token) = parts.extensions.get::<TokenInfo>() {
-            return Ok(Self(token.token_id.clone()));
-        }
-        if parts.extensions.get::<AuthEnforced>().is_some() {
-            return Err(failure(
-                StatusCode::UNAUTHORIZED,
-                ErrorDetail::new(ErrorCode::Unauthorized, "a valid bearer token is required"),
-            ));
-        }
-        Ok(Self(DEFAULT_USER_ID.to_owned()))
-    }
 }
 
 /// Runs `work` for the caller's profile on the blocking pool and renders the result.

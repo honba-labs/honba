@@ -10,20 +10,15 @@
 //! profiles directory**; two servers sharing one could lose updates.
 
 use std::fs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
-
-use tracing::warn;
 
 pub use honba_api::{Module, Profile, Source};
 
-/// The user id used when authentication is off.
-pub const DEFAULT_USER_ID: &str = "default";
+use crate::user_doc;
 
-/// Longest accepted user id, in bytes.
-const MAX_USER_ID_LEN: usize = 64;
+/// The user id used when authentication is off.
+pub const DEFAULT_USER_ID: &str = crate::user_doc::DEFAULT_USER_ID;
 
 /// Largest serialized profile a user may store, in bytes.
 pub const MAX_PROFILE_BYTES: usize = 2 * 1024 * 1024;
@@ -124,8 +119,8 @@ impl ProfileStore {
         }
         new_profile.revision = current + 1;
         let bytes = encode_within_limits(&new_profile)?;
-        create_dir_durable(&self.dir)?;
-        write_atomic(&path, &bytes)?;
+        user_doc::create_dir_durable(&self.dir)?;
+        user_doc::write_atomic(&path, &bytes)?;
         Ok(new_profile)
     }
 
@@ -148,27 +143,13 @@ impl ProfileStore {
         }
         profile.revision += 1;
         let bytes = encode_within_limits(&profile)?;
-        create_dir_durable(&self.dir)?;
-        write_atomic(&path, &bytes)?;
+        user_doc::create_dir_durable(&self.dir)?;
+        user_doc::write_atomic(&path, &bytes)?;
         Ok(profile)
     }
 
     fn path_for(&self, user_id: &str) -> Result<PathBuf> {
-        validate_user_id(user_id)?;
-        Ok(self.dir.join(format!("{user_id}.json")))
-    }
-}
-
-/// Accept only `[A-Za-z0-9_-]`, 1..=64 bytes.
-fn validate_user_id(user_id: &str) -> Result<()> {
-    let ok = (1..=MAX_USER_ID_LEN).contains(&user_id.len())
-        && user_id
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-');
-    if ok {
-        Ok(())
-    } else {
-        Err(ProfileError::InvalidUserId)
+        user_doc::path_for(&self.dir, user_id).ok_or(ProfileError::InvalidUserId)
     }
 }
 
@@ -210,79 +191,8 @@ fn read_profile(path: &Path) -> Result<Profile> {
     match serde_json::from_slice(&bytes) {
         Ok(profile) => Ok(profile),
         Err(e) => {
-            let ts = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map_or(0, |d| d.as_secs());
-            let mut aside = path.as_os_str().to_owned();
-            aside.push(format!(".corrupt-{ts}"));
-            let aside = PathBuf::from(aside);
-            match fs::rename(path, &aside) {
-                Ok(()) => warn!(
-                    file = %path.display(), moved_to = %aside.display(), error = %e,
-                    "corrupt profile file moved aside; starting a fresh profile"
-                ),
-                Err(rename_err) => warn!(
-                    file = %path.display(), error = %e, rename_error = %rename_err,
-                    "corrupt profile file could not be moved aside; starting a fresh profile"
-                ),
-            }
+            user_doc::quarantine_corrupt(path, "profile", &e);
             Ok(Profile::default())
         }
-    }
-}
-
-/// Distinguishes the temp files of concurrent writes within one process.
-static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
-
-/// Write to a uniquely named temp file beside `path`, sync it, then rename over `path`. The temp
-/// name carries the pid and a counter so concurrent writers never share a file; it is removed
-/// if any step fails.
-fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    let mut name = path.as_os_str().to_owned();
-    name.push(format!(
-        ".{}-{}.tmp",
-        std::process::id(),
-        TMP_COUNTER.fetch_add(1, Ordering::Relaxed)
-    ));
-    let tmp = PathBuf::from(name);
-    let result = (|| {
-        let mut file = fs::File::create(&tmp)?;
-        file.write_all(bytes)?;
-        file.sync_all()?;
-        fs::rename(&tmp, path)?;
-        // The rename is only durable once the directory entry is.
-        path.parent().map_or(Ok(()), sync_dir)
-    })();
-    if result.is_err() {
-        let _ = fs::remove_file(&tmp);
-    }
-    result
-}
-
-/// Create `dir` (and parents) if missing, syncing it and its parent so the new directory
-/// survives a crash.
-fn create_dir_durable(dir: &Path) -> std::io::Result<()> {
-    if dir.is_dir() {
-        return Ok(());
-    }
-    fs::create_dir_all(dir)?;
-    sync_dir(dir)?;
-    match dir.parent() {
-        Some(parent) if !parent.as_os_str().is_empty() => sync_dir(parent),
-        _ => Ok(()),
-    }
-}
-
-/// `fsync` a directory so renames and creations inside it are durable. A no-op off unix, where
-/// directories cannot be opened for syncing.
-pub(crate) fn sync_dir(dir: &Path) -> std::io::Result<()> {
-    #[cfg(unix)]
-    {
-        fs::File::open(dir)?.sync_all()
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = dir;
-        Ok(())
     }
 }

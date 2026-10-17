@@ -17,6 +17,19 @@ use serde::{Deserialize, Serialize};
 use crate::instrument::{Currency, Money};
 use crate::position::PositionSide;
 
+/// Net aggregate option Greeks across open positions in an account or portfolio (OpenAlgo design).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct PortfolioGreeks {
+    /// Delta: sensitivity of position value to underlying price changes.
+    pub delta: f64,
+    /// Gamma: sensitivity of Delta to underlying price changes.
+    pub gamma: f64,
+    /// Theta: time decay per day.
+    pub theta: f64,
+    /// Vega: sensitivity to a 1% change in implied volatility.
+    pub vega: f64,
+}
+
 /// Where an account's positions and funds come from (ADR 0032 §2, §6).
 ///
 /// An `Ledger` account is honba's own book: positions accrue from the execution path and the
@@ -69,6 +82,15 @@ pub struct PortfolioPosition {
     pub realized_pnl: Money,
     /// The product the position is held under (intraday/delivery/carry).
     pub product: Product,
+    /// Logical group or sub-basket (from QuantDinger design: e.g. "Core", "Hedge").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_name: Option<String>,
+    /// User or strategy tags (from QuantDinger design: e.g. ["tech", "dividend"]).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    /// Strategy tag attributing this position to an automated strategy (from OpenAlgo design).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strategy_id: Option<String>,
 }
 
 /// A delivery holding: a carried position, without an intraday side (ADR 0032 §2).
@@ -88,6 +110,12 @@ pub struct PortfolioHolding {
     pub unrealized_pnl: Money,
     /// Realized PnL accrued on fills, in the account's currency.
     pub realized_pnl: Money,
+    /// Logical group or sub-basket (from QuantDinger design: e.g. "Core", "Growth").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_name: Option<String>,
+    /// User or strategy tags (from QuantDinger design: e.g. ["largecap", "esg"]).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
 }
 
 /// One account of a portfolio: cash, equity, margins and the positions it holds (ADR 0032 §2).
@@ -126,6 +154,9 @@ pub struct PortfolioAccount {
     pub positions: Vec<PortfolioPosition>,
     /// Carried delivery holdings.
     pub holdings: Vec<PortfolioHolding>,
+    /// Net aggregate option Greeks across positions, when options are present (OpenAlgo design).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub greeks: Option<PortfolioGreeks>,
 }
 
 /// Totals across every account of a portfolio (ADR 0032 §2).

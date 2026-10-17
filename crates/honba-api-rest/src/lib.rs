@@ -33,6 +33,7 @@ use tower_http::{
 mod approval;
 mod auth;
 mod bar_pump;
+mod caller;
 mod dispatch;
 mod exec;
 mod executor;
@@ -42,6 +43,8 @@ mod journal;
 mod market;
 mod operator_journal;
 mod orders;
+mod portfolio;
+mod portfolio_store;
 mod profile;
 mod profile_store;
 mod registry;
@@ -54,6 +57,7 @@ mod state;
 mod streams;
 mod trades;
 mod trading_state;
+mod user_doc;
 
 pub use approval::ApprovalQueue;
 pub use auth::{
@@ -69,6 +73,10 @@ pub use honba_api::JournalWriter;
 pub use journal::NdjsonJournal;
 pub use market::{ApiQuery, ApiQueryRejection, MAX_BAR_ROWS};
 pub use orders::OrderLedger;
+pub use portfolio_store::{
+    PortfolioAccountRecord, PortfolioDocument, PortfolioError, PortfolioHeldPosition,
+    PortfolioStore,
+};
 pub use profile_store::{Module, Profile, ProfileError, ProfileStore, Source, DEFAULT_USER_ID};
 pub use registry::StrategyRegistry;
 pub use retention::{evictions, RetentionPolicy};
@@ -195,6 +203,11 @@ pub fn api_router_with_config(state: AppState, config: &ApiConfig) -> Router {
             "/profile/modules/:id",
             put(profile::put_module.layer(profile::body_limit())).delete(profile::delete_module),
         )
+        .route("/portfolio", get(portfolio::get_portfolio))
+        .route("/portfolio/accounts", get(portfolio::get_accounts))
+        .route("/portfolio/positions", get(portfolio::get_positions))
+        .route("/portfolio/holdings", get(portfolio::get_holdings))
+        .route("/portfolio/trades", get(portfolio::get_trades))
         .route("/strategies", post(post_strategies).get(get_strategies))
         .route("/strategies/verify", post(post_verify_strategy))
         .route("/backtests", post(runs::post_backtests))

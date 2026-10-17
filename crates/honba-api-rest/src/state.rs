@@ -15,8 +15,8 @@ use honba_messages::{ErrorDetail, TradingState};
 use honba_ports::{BarReader, DepthReader, InstrumentMaster, QuoteReader};
 
 use crate::{
-    ApprovalQueue, BacktestExecutor, OrderLedger, ProfileStore, RunService, RunServiceConfig,
-    RunStore, StrategyRegistry,
+    ApprovalQueue, BacktestExecutor, OrderLedger, PortfolioStore, ProfileStore, RunService,
+    RunServiceConfig, RunStore, StrategyRegistry,
 };
 
 /// App state for REST API.
@@ -42,6 +42,9 @@ pub struct AppState {
     /// The per-user profile store behind `/profile`; `None` until a profiles directory is
     /// configured ([`AppState::with_profiles_dir`]).
     pub profiles: Option<Arc<ProfileStore>>,
+    /// The per-user portfolio store behind `/portfolio`; `None` until a portfolios directory is
+    /// configured ([`AppState::with_portfolios_dir`]).
+    pub portfolios: Option<Arc<PortfolioStore>>,
     /// NDJSON file `PUT /trading-state` appends one record per change to; `None` until
     /// configured ([`AppState::with_operator_journal`]). The state is never restored from it.
     pub operator_journal: Option<PathBuf>,
@@ -96,6 +99,7 @@ impl AppState {
             strategies: Arc::default(),
             runs: None,
             profiles: None,
+            portfolios: None,
             operator_journal: None,
             account_currency: Currency::Inr,
             trading_state: Arc::default(),
@@ -236,6 +240,15 @@ impl AppState {
     /// Serves `/profile` from one JSON file per user under `dir` (created on first write).
     pub fn with_profiles_dir(mut self, dir: impl Into<PathBuf>) -> Self {
         self.profiles = Some(Arc::new(ProfileStore::new(dir)));
+        self
+    }
+
+    /// Serves `/portfolio` from one JSON file per user under `dir` (created on first write).
+    ///
+    /// Run one `honba serve` per portfolios directory: the store's lock is in-process only
+    /// (ADR 0032 §5).
+    pub fn with_portfolios_dir(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.portfolios = Some(Arc::new(PortfolioStore::new(dir)));
         self
     }
 

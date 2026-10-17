@@ -1911,6 +1911,76 @@
         "type": "object"
       },
       "name": "get_sweep"
+    },
+    {
+      "annotations": {
+        "readOnlyHint": true,
+        "scope": "read:account"
+      },
+      "description": "Get the caller's valued portfolio snapshot with accounts, equity, cash, unrealized and realized PnL, and totals.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "name": "get_portfolio"
+    },
+    {
+      "annotations": {
+        "readOnlyHint": true,
+        "scope": "read:account"
+      },
+      "description": "List the valued accounts of the caller's portfolio with cash, equity, and margins.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "name": "get_portfolio_accounts"
+    },
+    {
+      "annotations": {
+        "readOnlyHint": true,
+        "scope": "read:account"
+      },
+      "description": "List the valued open intraday and derivative positions across accounts, marked to market.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "name": "get_portfolio_positions"
+    },
+    {
+      "annotations": {
+        "readOnlyHint": true,
+        "scope": "read:account"
+      },
+      "description": "List the valued delivery holdings (carried long-term stock) across accounts, marked to market.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "name": "get_portfolio_holdings"
+    },
+    {
+      "annotations": {
+        "readOnlyHint": true,
+        "scope": "read:account"
+      },
+      "description": "List the caller's execution and trade history.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "name": "get_portfolio_trades"
     }
   ]
 }

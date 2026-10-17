@@ -176,8 +176,8 @@ pub enum RouteScope {
 /// lookup rather than a set of prefix rules that can silently miss a new route.
 /// Paths use the `{param}` spelling of [`honba_api::ENDPOINTS`], so the drift
 /// guard can compare the two by key. The five scopes are `read:market`,
-/// `read:account`, `write:orders`, `research` and `operator`; `read:account` is reserved
-/// for account routes not built yet. Scopes are explicit: none implies another.
+/// `read:account`, `write:orders`, `research` and `operator`; `read:account` governs the
+/// per-user portfolio reads (ADR 0032). Scopes are explicit: none implies another.
 pub const ROUTE_SCOPES: &[(&str, &str, RouteScope)] = &[
     ("GET", "/capabilities", RouteScope::Public),
     ("GET", "/health", RouteScope::Public),
@@ -210,6 +210,29 @@ pub const ROUTE_SCOPES: &[(&str, &str, RouteScope)] = &[
     ("GET", "/profile/modules", RouteScope::Authenticated),
     ("PUT", "/profile/modules/{id}", RouteScope::Authenticated),
     ("DELETE", "/profile/modules/{id}", RouteScope::Authenticated),
+    // Portfolio routes: the reserved `read:account` scope, finally used (ADR 0032 §1, §6). The
+    // handlers scope the portfolio to the token's own `token_id`, like the profile routes.
+    ("GET", "/portfolio", RouteScope::Required("read:account")),
+    (
+        "GET",
+        "/portfolio/accounts",
+        RouteScope::Required("read:account"),
+    ),
+    (
+        "GET",
+        "/portfolio/positions",
+        RouteScope::Required("read:account"),
+    ),
+    (
+        "GET",
+        "/portfolio/holdings",
+        RouteScope::Required("read:account"),
+    ),
+    (
+        "GET",
+        "/portfolio/trades",
+        RouteScope::Required("read:account"),
+    ),
     ("GET", "/strategies", RouteScope::Required("research")),
     ("POST", "/strategies", RouteScope::Required("research")),
     (

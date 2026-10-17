@@ -310,6 +310,8 @@ Proposed (2026-10-16): **E12 chart signals** — buy/sell detectors with inspect
 
 Proposed (2026-10-16): **E13 user-specific portfolio manager** — a per-user portfolio (accounts, valued positions and delivery holdings, cash/equity, realized/unrealized PnL, trade history, analytics) scoped to the authenticated user via the existing profile `Caller`, persisted like the profile store (ADR 0032, D19; pull-based, not scheduled). See the E13 section below.
 
+Proposed (2026-10-16): **portfolio equity series, fill ingest and analytics** — a parallel track to E13 (chunks P1..P6): schema v5 (`account_id`, `strategy_id`, fill `costs`), costed idempotent fill ingest, an equity series stored beside the portfolio document, and one show-the-working analytics payload for paper accounts and runs, including simulator-vs-paper drift (ADR 0033, D20; ownership split with E13-S3/S5/S6 in ADR 0033 §10).
+
 **Critical path:** E2-S2 -> E11-S7 (write endpoints) and E5-S4 (all DONE); ADR-Run -> E4-S3 -> `POST /backtests` -> E4-S5 -> E11-S4 -> E9-S7
 (all DONE in `honba`, E9-S7 in `honba-frontend`); E3-S1a (next-open Rust) -> E3-S2 -> E3-S7 (all DONE; E3-S1b/S1d DONE per ADR 0030);
 E10-S7 (done) gates Python callers of any async Rust API; E2-S6(a) -> E2-S6(b..d) -> E2-S7 -> E3-S7 (all DONE). What remains is off the
@@ -476,6 +478,7 @@ Slice order: **S0 → S1 → S2**, then **S3/S5** in parallel, then **S4**, then
 | D17 | NSE settlement default and intraday cycle (counts bars, not sessions) in simulators — **decided (ADR 0016)**; shipped (E3-S1a) | E3-S1a | Settle in the port ADR |
 | D18 | **Chart signals** (E12): the reason `code` ontology, group weights and the strength normalisation, the two horizon rulesets, the multi-timeframe pairing, and the intraday data source — **proposed (ADR 0031)** | E12 | Freeze the reason codes and weights in E12-S0; ADR 0031 before E12-S1 |
 | D19 | **User-specific portfolio manager** (E13): ownership (the profile `Caller`/`token_id`), the wire contract, the pure valuation engine, per-user persistence, `Live`/`Sandbox` modes, and both position sources (local ledger + broker-synced) — **decided (ADR 0032)** | E13 | ADR 0032 accepted; read-first, contract in `honba-entities`, engine in `honba-portfolio` |
+| D20 | **Portfolio equity series and analytics** (parallel to E13): the `SCHEMA_VERSION` 5 bump and reader range, fill-ingest rules, series storage beside the document, the analytics payload and conventions, and the split with E13-S3/S5/S6 — **proposed (ADR 0033)** | P1..P6, E13-S3, E13-S6 | Accept ADR 0033 and agree the ownership table with the E13 owner before P1 |
 
 Already decided: pyo3 single cdylib (ADR 0014 decision, `honba-py`), Strategy ABC with shim (ADR 0008), schema from Rust (ADR 0014),
 integer money (0011), versioning and nanosecond strings (0012), REST read ports (0013), explicit runtime (0015, implemented in E10-S7), next-open Rust port (0016, all three chunks done, D17),

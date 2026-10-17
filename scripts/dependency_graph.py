@@ -140,6 +140,7 @@ ALLOWED_PROD = {
         "honba-strategy",  # L4: Strategy, StrategyIr
         "honba-sim",  # L4: fill/execution simulation
         "honba-analytics",  # L5: BacktestMetrics
+        "honba-portfolio",  # L4: portfolio valuation for GET /portfolio (ADR 0032, E13-S2)
         "honba-config",  # L5: ExecutionConfig, AccountConfig, BacktestRunConfig validation
         "honba-sweep",  # L5: concurrent sweep execution
     },

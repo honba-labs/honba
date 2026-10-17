@@ -427,6 +427,7 @@ class PortfolioAccount:
     cash: Money
     currency: Currency
     equity: Money
+    greeks: PortfolioGreeks | None = None
     holdings: list[PortfolioHolding]
     id: str
     leverage: float
@@ -440,19 +441,34 @@ class PortfolioAccount:
     source: PortfolioSource
     unrealized_pnl: Money
 
+class PortfolioAccountsResponse:
+    accounts: list[PortfolioAccount]
+
+class PortfolioGreeks:
+    delta: float
+    gamma: float
+    theta: float
+    vega: float
+
 class PortfolioHolding:
     avg_price: float
+    group_name: str | None = None
     instrument_id: InstrumentId
     mark: float
     market_value: Money
     quantity: float
     realized_pnl: Money
+    tags: list[str] | None = None
     unrealized_pnl: Money
+
+class PortfolioHoldingsResponse:
+    holdings: list[PortfolioHolding]
 
 PortfolioMode = Literal["live", "sandbox"]
 
 class PortfolioPosition:
     avg_price: float
+    group_name: str | None = None
     instrument_id: InstrumentId
     mark: float
     market_value: Money
@@ -460,7 +476,12 @@ class PortfolioPosition:
     quantity: float
     realized_pnl: Money
     side: PositionSide
+    strategy_id: str | None = None
+    tags: list[str] | None = None
     unrealized_pnl: Money
+
+class PortfolioPositionsResponse:
+    positions: list[PortfolioPosition]
 
 class PortfolioSnapshot:
     accounts: list[PortfolioAccount]

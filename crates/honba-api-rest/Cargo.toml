@@ -19,6 +19,7 @@ honba-sim.workspace = true
 honba-analytics.workspace = true
 honba-config.workspace = true
 honba-market.workspace = true
+honba-portfolio.workspace = true
 honba-risk.workspace = true
 honba-sweep.workspace = true
 serde.workspace = true

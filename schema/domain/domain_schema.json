@@ -3087,6 +3087,17 @@
           ],
           "description": "Cash plus mark-to-market value of the open positions (and holdings)."
         },
+        "greeks": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PortfolioGreeks"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Net aggregate option Greeks across positions, when options are present (OpenAlgo design)."
+        },
         "holdings": {
           "description": "Carried delivery holdings.",
           "items": {
@@ -3190,6 +3201,54 @@
       ],
       "type": "object"
     },
+    "PortfolioAccountsResponse": {
+      "description": "`GET /portfolio/accounts` response: the valued accounts of the caller's portfolio (ADR 0032 §6). The full snapshot is `GET /portfolio`.",
+      "properties": {
+        "accounts": {
+          "description": "The valued accounts.",
+          "items": {
+            "$ref": "#/$defs/PortfolioAccount"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "accounts"
+      ],
+      "type": "object"
+    },
+    "PortfolioGreeks": {
+      "description": "Net aggregate option Greeks across open positions in an account or portfolio (OpenAlgo design).",
+      "properties": {
+        "delta": {
+          "description": "Delta: sensitivity of position value to underlying price changes.",
+          "format": "double",
+          "type": "number"
+        },
+        "gamma": {
+          "description": "Gamma: sensitivity of Delta to underlying price changes.",
+          "format": "double",
+          "type": "number"
+        },
+        "theta": {
+          "description": "Theta: time decay per day.",
+          "format": "double",
+          "type": "number"
+        },
+        "vega": {
+          "description": "Vega: sensitivity to a 1% change in implied volatility.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "delta",
+        "gamma",
+        "theta",
+        "vega"
+      ],
+      "type": "object"
+    },
     "PortfolioHolding": {
       "description": "A delivery holding: a carried position, without an intraday side (ADR 0032 §2).",
       "properties": {
@@ -3197,6 +3256,13 @@
           "description": "Volume-weighted average entry price.",
           "format": "double",
           "type": "number"
+        },
+        "group_name": {
+          "description": "Logical group or sub-basket (from QuantDinger design: e.g. \"Core\", \"Growth\").",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "instrument_id": {
           "allOf": [
@@ -3232,6 +3298,13 @@
           ],
           "description": "Realized PnL accrued on fills, in the account's currency."
         },
+        "tags": {
+          "description": "User or strategy tags (from QuantDinger design: e.g. [\"largecap\", \"esg\"]).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "unrealized_pnl": {
           "allOf": [
             {
@@ -3249,6 +3322,22 @@
         "quantity",
         "realized_pnl",
         "unrealized_pnl"
+      ],
+      "type": "object"
+    },
+    "PortfolioHoldingsResponse": {
+      "description": "`GET /portfolio/holdings` response: the valued delivery holdings across the caller's accounts (ADR 0032 §6).",
+      "properties": {
+        "holdings": {
+          "description": "The valued delivery holdings, flattened across accounts.",
+          "items": {
+            "$ref": "#/$defs/PortfolioHolding"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "holdings"
       ],
       "type": "object"
     },
@@ -3278,6 +3367,13 @@
           "description": "Volume-weighted average entry price.",
           "format": "double",
           "type": "number"
+        },
+        "group_name": {
+          "description": "Logical group or sub-basket (from QuantDinger design: e.g. \"Core\", \"Hedge\").",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "instrument_id": {
           "allOf": [
@@ -3329,6 +3425,20 @@
           ],
           "description": "Long or short. The sign of `quantity` is carried here, not in the number."
         },
+        "strategy_id": {
+          "description": "Strategy tag attributing this position to an automated strategy (from OpenAlgo design).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tags": {
+          "description": "User or strategy tags (from QuantDinger design: e.g. [\"tech\", \"dividend\"]).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "unrealized_pnl": {
           "allOf": [
             {
@@ -3348,6 +3458,22 @@
         "realized_pnl",
         "side",
         "unrealized_pnl"
+      ],
+      "type": "object"
+    },
+    "PortfolioPositionsResponse": {
+      "description": "`GET /portfolio/positions` response: the valued open positions across the caller's accounts (ADR 0032 §6). Delivery holdings are `GET /portfolio/holdings`.",
+      "properties": {
+        "positions": {
+          "description": "The valued open positions, flattened across accounts.",
+          "items": {
+            "$ref": "#/$defs/PortfolioPosition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "positions"
       ],
       "type": "object"
     },

@@ -1,6 +1,6 @@
 //! The valuation input: a user's accounts, cash and positions (ADR 0032 §3).
 
-use honba_entities::{Currency, Money, PortfolioMode, PortfolioSource, Position};
+use honba_entities::{Currency, Money, PortfolioGreeks, PortfolioMode, PortfolioSource, Position};
 use honba_messages::Product;
 
 /// A user's portfolio as the ledger holds it: accounts with cash and positions.
@@ -65,6 +65,8 @@ pub struct AccountState {
     pub margin_available: Money,
     /// The positions the account holds, each with the product it is held under.
     pub positions: Vec<HeldPosition>,
+    /// Net aggregate option Greeks across positions, when options are present (OpenAlgo design).
+    pub greeks: Option<PortfolioGreeks>,
 }
 
 impl AccountState {
@@ -88,6 +90,7 @@ impl AccountState {
             margin_used: Money::zero(currency),
             margin_available: Money::zero(currency),
             positions: Vec::new(),
+            greeks: None,
         }
     }
 
@@ -99,6 +102,12 @@ impl AccountState {
     /// Returns a copy with one more position, for chaining.
     pub fn with_position(mut self, position: Position, product: Product) -> Self {
         self.add_position(position, product);
+        self
+    }
+
+    /// Sets the aggregate option Greeks for this account.
+    pub fn with_greeks(mut self, greeks: PortfolioGreeks) -> Self {
+        self.greeks = Some(greeks);
         self
     }
 }
@@ -113,11 +122,41 @@ pub struct HeldPosition {
     pub position: Position,
     /// The product: `Delivery` becomes a holding, anything else an open position.
     pub product: Product,
+    /// Sub-basket / logical group (from QuantDinger design: e.g. "Core", "Hedge").
+    pub group_name: Option<String>,
+    /// Categorization tags (from QuantDinger design).
+    pub tags: Vec<String>,
+    /// Associated strategy tag (from OpenAlgo design).
+    pub strategy_id: Option<String>,
 }
 
 impl HeldPosition {
     /// Pairs a position with its product.
     pub fn new(position: Position, product: Product) -> Self {
-        Self { position, product }
+        Self {
+            position,
+            product,
+            group_name: None,
+            tags: Vec::new(),
+            strategy_id: None,
+        }
+    }
+
+    /// Sets the sub-basket / group name for this position.
+    pub fn with_group(mut self, group_name: impl Into<String>) -> Self {
+        self.group_name = Some(group_name.into());
+        self
+    }
+
+    /// Sets the tags for this position.
+    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
+        self.tags = tags;
+        self
+    }
+
+    /// Sets the strategy id for this position.
+    pub fn with_strategy(mut self, strategy_id: impl Into<String>) -> Self {
+        self.strategy_id = Some(strategy_id.into());
+        self
     }
 }

@@ -50,7 +50,8 @@ pub use requests::{
 pub use responses::{
     BacktestMetrics, BacktestResponse, BacktestStatus, BarsIngestResponse, BarsResponse,
     CapabilitiesResponse, CompiledStrategy, DepthLevel, DepthResponse, InstrumentsResponse,
-    OrdersResponse, PositionsResponse, QuotesResponse, RunStatus, ScreenerResponse,
+    OrdersResponse, PortfolioAccountsResponse, PortfolioHoldingsResponse,
+    PortfolioPositionsResponse, PositionsResponse, QuotesResponse, RunStatus, ScreenerResponse,
     ScreenerResultRow, StrategiesResponse, StreamFrame, SweepReportResponse, SweepResponse,
     SweepStatus, TradesResponse, TradingStateChange, TradingStateResponse,
 };

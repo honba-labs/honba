@@ -188,6 +188,11 @@ pub const ENDPOINTS: &[(&str, &str)] = &[
     ("GET", "/profile/modules"),
     ("PUT", "/profile/modules/{id}"),
     ("DELETE", "/profile/modules/{id}"),
+    ("GET", "/portfolio"),
+    ("GET", "/portfolio/accounts"),
+    ("GET", "/portfolio/positions"),
+    ("GET", "/portfolio/holdings"),
+    ("GET", "/portfolio/trades"),
 ];
 
 /// Returns every write endpoint in the registry.

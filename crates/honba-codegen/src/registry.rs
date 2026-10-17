@@ -255,6 +255,9 @@ pub fn register_responses(set: &mut SchemaSet) {
     set.add_type::<honba_api::StreamFrame>("StreamFrame");
     set.add_type::<honba_api::OrdersResponse>("OrdersResponse");
     set.add_type::<honba_api::PositionsResponse>("PositionsResponse");
+    set.add_type::<honba_api::PortfolioAccountsResponse>("PortfolioAccountsResponse");
+    set.add_type::<honba_api::PortfolioPositionsResponse>("PortfolioPositionsResponse");
+    set.add_type::<honba_api::PortfolioHoldingsResponse>("PortfolioHoldingsResponse");
     set.add_type::<honba_api::BarsIngestResponse>("BarsIngestResponse");
     set.add_type::<honba_api::TradingStateResponse>("TradingStateResponse");
     set.add_type::<honba_api::TradingStateChange>("TradingStateChange");

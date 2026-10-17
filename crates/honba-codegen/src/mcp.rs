@@ -167,6 +167,41 @@ pub(crate) const TOOLS: &[Tool] = &[
         args: &[],
         scope: "research",
     },
+    Tool {
+        name: "get_portfolio",
+        description: "Get the caller's valued portfolio snapshot with accounts, equity, cash, unrealized and realized PnL, and totals.",
+        endpoint: ("GET", "/portfolio"),
+        args: &[],
+        scope: "read:account",
+    },
+    Tool {
+        name: "get_portfolio_accounts",
+        description: "List the valued accounts of the caller's portfolio with cash, equity, and margins.",
+        endpoint: ("GET", "/portfolio/accounts"),
+        args: &[],
+        scope: "read:account",
+    },
+    Tool {
+        name: "get_portfolio_positions",
+        description: "List the valued open intraday and derivative positions across accounts, marked to market.",
+        endpoint: ("GET", "/portfolio/positions"),
+        args: &[],
+        scope: "read:account",
+    },
+    Tool {
+        name: "get_portfolio_holdings",
+        description: "List the valued delivery holdings (carried long-term stock) across accounts, marked to market.",
+        endpoint: ("GET", "/portfolio/holdings"),
+        args: &[],
+        scope: "read:account",
+    },
+    Tool {
+        name: "get_portfolio_trades",
+        description: "List the caller's execution and trade history.",
+        endpoint: ("GET", "/portfolio/trades"),
+        args: &[],
+        scope: "read:account",
+    },
 ];
 
 /// Renders the MCP tool schemas.

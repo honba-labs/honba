@@ -4,7 +4,7 @@ use honba_entities::{Currency, Money, PortfolioMode, PortfolioSource, Position, 
 use honba_messages::{Exchange, InstrumentId, Product, UnixNanos};
 
 use crate::error::PortfolioError;
-use crate::{value, AccountState, Marks, PortfolioState};
+use crate::{value, AccountState, HeldPosition, Marks, PortfolioState};
 
 /// An INR instrument on the NSE.
 fn instrument(symbol: &str) -> InstrumentId {
@@ -240,4 +240,54 @@ fn a_position_currency_that_differs_from_the_account_is_an_error() {
 
     let error = value(&state, &marks, "default", 0, UnixNanos::from_u64(1)).unwrap_err();
     assert!(matches!(error, PortfolioError::Money(_)));
+}
+
+#[test]
+fn sub_baskets_tags_strategy_and_greeks_are_carried_through() {
+    use honba_entities::PortfolioGreeks;
+
+    let held_intraday = HeldPosition::new(
+        position("NIFTY_FUT", PositionSide::Long, 50.0, 24_000.0),
+        Product::Intraday,
+    )
+    .with_group("Hedge")
+    .with_tags(vec!["futures".to_string(), "index".to_string()])
+    .with_strategy("strat_alpha");
+
+    let held_delivery = HeldPosition::new(
+        position("RELIANCE", PositionSide::Long, 10.0, 2_800.0),
+        Product::Delivery,
+    )
+    .with_group("Core")
+    .with_tags(vec!["energy".to_string(), "largecap".to_string()]);
+
+    let greeks = PortfolioGreeks {
+        delta: 0.55,
+        gamma: 0.02,
+        theta: -15.0,
+        vega: 8.5,
+    };
+
+    let mut acct = account("MAIN").with_greeks(greeks);
+    acct.positions.push(held_intraday);
+    acct.positions.push(held_delivery);
+
+    let marks = Marks::new()
+        .with(instrument("NIFTY_FUT"), 24_100.0)
+        .with(instrument("RELIANCE"), 2_850.0);
+
+    let marked = valued_account(acct, &marks);
+
+    assert_eq!(marked.greeks, Some(greeks));
+    assert_eq!(marked.positions.len(), 1);
+    assert_eq!(marked.positions[0].group_name.as_deref(), Some("Hedge"));
+    assert_eq!(marked.positions[0].tags, vec!["futures", "index"]);
+    assert_eq!(
+        marked.positions[0].strategy_id.as_deref(),
+        Some("strat_alpha")
+    );
+
+    assert_eq!(marked.holdings.len(), 1);
+    assert_eq!(marked.holdings[0].group_name.as_deref(), Some("Core"));
+    assert_eq!(marked.holdings[0].tags, vec!["energy", "largecap"]);
 }

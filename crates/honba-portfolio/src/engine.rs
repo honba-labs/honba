@@ -89,6 +89,8 @@ fn value_account(
                 market_value: leg_value,
                 unrealized_pnl: leg_unrealized,
                 realized_pnl: position.realized_pnl(),
+                group_name: held.group_name.clone(),
+                tags: held.tags.clone(),
             });
         } else {
             positions.push(PortfolioPosition {
@@ -101,6 +103,9 @@ fn value_account(
                 unrealized_pnl: leg_unrealized,
                 realized_pnl: position.realized_pnl(),
                 product: held.product,
+                group_name: held.group_name.clone(),
+                tags: held.tags.clone(),
+                strategy_id: held.strategy_id.clone(),
             });
         }
     }
@@ -127,6 +132,7 @@ fn value_account(
         unrealized_pnl: unrealized,
         positions,
         holdings,
+        greeks: account.greeks,
     })
 }
 

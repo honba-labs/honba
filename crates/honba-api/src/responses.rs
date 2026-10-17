@@ -4,7 +4,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use honba_entities::{Position, Trade};
+use honba_entities::{PortfolioAccount, PortfolioHolding, PortfolioPosition, Position, Trade};
 use std::collections::BTreeMap;
 
 use honba_messages::{Bar, ErrorDetail, InstrumentId, Message, Order, QuoteTick};
@@ -205,6 +205,30 @@ pub struct PositionsResponse {
 pub struct TradesResponse {
     /// Realized trades.
     pub trades: Vec<Trade>,
+}
+
+/// `GET /portfolio/accounts` response: the valued accounts of the caller's portfolio
+/// (ADR 0032 §6). The full snapshot is `GET /portfolio`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct PortfolioAccountsResponse {
+    /// The valued accounts.
+    pub accounts: Vec<PortfolioAccount>,
+}
+
+/// `GET /portfolio/positions` response: the valued open positions across the caller's accounts
+/// (ADR 0032 §6). Delivery holdings are `GET /portfolio/holdings`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct PortfolioPositionsResponse {
+    /// The valued open positions, flattened across accounts.
+    pub positions: Vec<PortfolioPosition>,
+}
+
+/// `GET /portfolio/holdings` response: the valued delivery holdings across the caller's accounts
+/// (ADR 0032 §6).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct PortfolioHoldingsResponse {
+    /// The valued delivery holdings, flattened across accounts.
+    pub holdings: Vec<PortfolioHolding>,
 }
 
 /// One frame of the run event stream (ADR 0021, `GET /backtests/{id}/events`).
